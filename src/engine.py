@@ -97,23 +97,34 @@ def detect_language(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Product catalog matching
+# Product catalog matching (embedding-based, language-agnostic)
 # --------------------------------------------------------------------------- #
-_STOPWORDS = {
-    "the", "a", "an", "and", "or", "for", "to", "of", "in", "on", "is", "are",
-    "my", "how", "what", "why", "ve", "bir", "icin", "için", "nasil", "nasıl",
-    "neden", "ile", "bu", "da", "de", "mi", "mı",
-}
+# Below this cosine similarity, a product is considered unrelated to the query
+# rather than forced into the top-k. Tuned empirically against bge-m3.
+MIN_PRODUCT_SIMILARITY = 0.35
 
 
-def _tokenize(text: str) -> set[str]:
-    tokens = re.findall(r"[a-zçğıöşü0-9]+", text.lower())
-    return {t for t in tokens if len(t) > 2 and t not in _STOPWORDS}
+@lru_cache(maxsize=1)
+def _get_embeddings_client():
+    try:
+        from .ingest import get_embeddings
+    except ImportError:
+        from ingest import get_embeddings  # type: ignore
+    return get_embeddings()
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    if na == 0 or nb == 0:
+        return 0.0
+    return dot / (na * nb)
 
 
 @lru_cache(maxsize=1)
 def _load_products() -> tuple[dict, ...]:
-    """Load and cache the scraped product catalog. Returns () if missing."""
+    """Load the catalog and embed each product's text blob once."""
     if not PRODUCTS_JSON.exists():
         print(f"[engine] product catalog not found at {PRODUCTS_JSON}")
         return ()
@@ -122,42 +133,43 @@ def _load_products() -> tuple[dict, ...]:
     except (json.JSONDecodeError, OSError) as exc:
         print(f"[engine] could not read product catalog: {exc}")
         return ()
-    # Pre-compute a searchable token blob per product.
-    enriched: list[dict] = []
-    for p in data:
-        blob = " ".join(
-            str(p.get(k, ""))
-            for k in ("product_name", "description", "category")
-        )
-        enriched.append({**p, "_tokens": _tokenize(blob)})
-    return tuple(enriched)
+    if not data:
+        return ()
+
+    blobs = [
+        " ".join(str(p.get(k, "")) for k in ("product_name", "description", "category"))
+        for p in data
+    ]
+    try:
+        embeddings = _get_embeddings_client().embed_documents(blobs)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] product embedding failed: {exc}")
+        return ()
+
+    return tuple({**p, "_embedding": emb} for p, emb in zip(data, embeddings))
 
 
 def match_products(query: str, botany_context: str = "", k: int | None = None) -> list[RecommendedProduct]:
-    """Score catalog products against the user's query (+ retrieved context)
-    using token overlap. Purely lexical => fast and fully offline."""
+    """Rank catalog products by embedding similarity to the query, so matches
+    work regardless of the query's language versus the (Turkish) catalog."""
     k = k or settings.product_match_k
     products = _load_products()
     if not products:
         return []
 
-    query_tokens = _tokenize(query) | _tokenize(botany_context)
-    if not query_tokens:
+    embed_input = f"{query}\n{botany_context[:1000]}" if botany_context else query
+    try:
+        query_embedding = _get_embeddings_client().embed_query(embed_input)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] query embedding failed: {exc}")
         return []
 
-    scored: list[tuple[float, dict]] = []
-    for p in products:
-        overlap = query_tokens & p["_tokens"]
-        if not overlap:
-            continue
-        # Weight name/category hits a little higher via a simple length-norm.
-        score = len(overlap) / (1 + len(p["_tokens"]) ** 0.5)
-        scored.append((score, p))
-
+    scored = [(_cosine(query_embedding, p["_embedding"]), p) for p in products]
     scored.sort(key=lambda x: x[0], reverse=True)
     return [
         RecommendedProduct(title=p["product_name"], link=p["source_url"])
-        for _, p in scored[:k]
+        for score, p in scored[:k]
+        if score >= MIN_PRODUCT_SIMILARITY
     ]
 
 
