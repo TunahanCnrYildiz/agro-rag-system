@@ -21,6 +21,23 @@
     dark: "#231f20",
   };
 
+  // Greeting shown before any user message exists, so there's nothing to
+  // detect language from yet - picked from the browser's locale instead.
+  // Falls back to English for locales not in this list.
+  var GREETINGS = {
+    tr: "Merhaba! Ben ekolojik tarım asistanıyım. Bitki besleme, organik gübreleme ve toprak sağlığı hakkında sorularınızı yanıtlayabilirim.",
+    en: "Hello! I'm an ecological agriculture assistant. I can help with plant nutrition, organic fertilization, and soil health questions.",
+    de: "Hallo! Ich bin ein Assistent für ökologische Landwirtschaft. Ich helfe gerne bei Fragen zu Pflanzenernährung, organischer Düngung und Bodengesundheit.",
+    fr: "Bonjour ! Je suis un assistant en agriculture écologique. Je peux répondre à vos questions sur la nutrition des plantes, la fertilisation biologique et la santé des sols.",
+    es: "¡Hola! Soy un asistente de agricultura ecológica. Puedo ayudarte con preguntas sobre nutrición vegetal, fertilización orgánica y salud del suelo.",
+    ar: "مرحباً! أنا مساعد للزراعة البيئية. يمكنني مساعدتك في أسئلة حول تغذية النباتات والتسميد العضوي وصحة التربة.",
+  };
+
+  function getGreeting() {
+    var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+    return GREETINGS[lang] || GREETINGS.en;
+  }
+
   var LOGO_URL = "https://www.ekolojiktarim.com.tr/wp-content/uploads/2024/09/ekolojik-tarim.svg";
 
   var CSS = "" +
@@ -108,7 +125,7 @@
 
     var header = el("div", { class: "header" });
     var logoImg = el("img", { src: LOGO_URL, alt: "logo" });
-    var titleWrap = el("div", {}, '<div class="title">Ekolojik Tarım Asistanı</div><div class="subtitle">Ziraat Mühendisi · Organik Beslenme</div>');
+    var titleWrap = el("div", {}, '<div class="title">Ekolojik Tarım Asistanı</div><div class="subtitle">Yapay Zeka · Organik Beslenme</div>');
     var closeBtn = el("div", { class: "close" }, "&#10005;");
     header.appendChild(logoImg);
     header.appendChild(titleWrap);
@@ -276,7 +293,7 @@
       if (e.key === "Enter") send();
     });
 
-    addMessage(ui.messages, "bot", "Merhaba! Ben ekolojik tarım asistanınızım. Bitki besleme, organik gübreleme ve toprak sağlığı hakkında sorularınızı yanıtlayabilirim.");
+    addMessage(ui.messages, "bot", getGreeting());
   }
 
   if (document.readyState === "loading") {

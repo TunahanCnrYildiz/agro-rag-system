@@ -15,6 +15,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { MarkdownText } from "./src/MarkdownText";
 import { colors } from "./src/theme";
+import { getGreeting } from "./src/greeting";
 import {
   ChatTurn,
   RecommendedProduct,
@@ -40,7 +41,7 @@ export default function App() {
     {
       id: newId(),
       role: "bot",
-      text: "Merhaba! Ben ekolojik tarım asistanınızım. Bitki besleme, organik gübreleme ve toprak sağlığı hakkında sorularınızı yanıtlayabilirim.",
+      text: getGreeting(),
     },
   ]);
   const [input, setInput] = useState("");
@@ -102,7 +103,7 @@ export default function App() {
           />
           <View>
             <Text style={styles.title}>Ekolojik Tarım Asistanı</Text>
-            <Text style={styles.subtitle}>Ziraat Mühendisi · Organik Beslenme</Text>
+            <Text style={styles.subtitle}>Yapay Zeka · Organik Beslenme</Text>
           </View>
         </View>
 
