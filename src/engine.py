@@ -191,20 +191,30 @@ def _get_retriever_store():
         return None
 
 
+# Below this relevance score, a retrieved chunk is treated as noise (the
+# vector store always returns its k nearest neighbors, even for off-topic
+# queries). Calibrated against real on-topic (~0.38-0.50) vs off-topic
+# (~0.14-0.26) queries, which leave a clean gap around 0.3.
+MIN_RETRIEVAL_RELEVANCE = 0.30
+
+
 def retrieve_context(query: str, k: int | None = None) -> str:
-    """Return concatenated botany chunks relevant to the query."""
+    """Return concatenated botany chunks relevant to the query, or an empty
+    string if nothing clears the relevance threshold (i.e. off-topic)."""
     k = k or settings.retrieval_k
     store = _get_retriever_store()
     if store is None:
         return ""
     try:
-        docs = store.similarity_search(query, k=k)
+        results = store.similarity_search_with_relevance_scores(query, k=k)
     except Exception as exc:  # noqa: BLE001
         print(f"[engine] retrieval failed: {exc}")
         return ""
 
     parts: list[str] = []
-    for d in docs:
+    for d, score in results:
+        if score < MIN_RETRIEVAL_RELEVANCE:
+            continue
         src = d.metadata.get("source", "?")
         page = d.metadata.get("page", "?")
         parts.append(f"[Kaynak: {src}, s.{page}]\n{d.page_content}")
