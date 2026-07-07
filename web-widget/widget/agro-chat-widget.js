@@ -66,7 +66,6 @@
     "}" +
     ".header img { height: 22px; filter: brightness(0) invert(1); }" +
     ".header .title { font-size: 14px; font-weight: 600; line-height: 1.25; }" +
-    ".header .subtitle { font-size: 11px; opacity: .85; }" +
     ".header .close { margin-left: auto; cursor: pointer; opacity: .9; padding: 4px; }" +
     ".header .close:hover { opacity: 1; }" +
     ".messages {" +
@@ -125,7 +124,7 @@
 
     var header = el("div", { class: "header" });
     var logoImg = el("img", { src: LOGO_URL, alt: "logo" });
-    var titleWrap = el("div", {}, '<div class="title">Ekolojik Tarım Asistanı</div><div class="subtitle">Yapay Zeka · Organik Beslenme</div>');
+    var titleWrap = el("div", {}, '<div class="title">Ekolojik Tarım Asistanı</div>');
     var closeBtn = el("div", { class: "close" }, "&#10005;");
     header.appendChild(logoImg);
     header.appendChild(titleWrap);

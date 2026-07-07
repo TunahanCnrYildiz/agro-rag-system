@@ -101,10 +101,7 @@ export default function App() {
             resizeMode="contain"
             tintColor="#ffffff"
           />
-          <View>
-            <Text style={styles.title}>Ekolojik Tarım Asistanı</Text>
-            <Text style={styles.subtitle}>Yapay Zeka · Organik Beslenme</Text>
-          </View>
+          <Text style={styles.title}>Ekolojik Tarım Asistanı</Text>
         </View>
 
         <KeyboardAvoidingView
@@ -192,7 +189,6 @@ const styles = StyleSheet.create({
   },
   logo: { width: 130, height: 21 },
   title: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  subtitle: { color: "#ffffffdd", fontSize: 11, marginTop: 1 },
   messages: { flex: 1 },
   messagesContent: { padding: 14, gap: 10 },
   bubble: {
