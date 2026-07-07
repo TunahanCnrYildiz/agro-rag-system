@@ -95,9 +95,22 @@ python -m src.scraper --mock   # force offline mock catalog
 
 Writes `docs/products/products.json`.
 
-### 4. Ingest botany documents
+### 4. Get botany documents
 
-Drop PDFs / TXTs into `docs/books/`, then:
+Either drop your own PDFs / TXTs into `docs/books/`, or bulk-download
+open-access / public-domain botany books from the Internet Archive:
+
+```bash
+python -m src.fetch_books --max 50          # plant-nutrition focused, 50 books
+python -m src.fetch_books --query "subject:(mycorrhiza)" --max 20
+```
+
+Only freely downloadable, non-restricted items are fetched (borrow-only / DRM
+items are skipped), and each PDF is validated before it is kept.
+
+### 5. Ingest botany documents
+
+With documents in `docs/books/`:
 
 ```bash
 python -m src.ingest           # incremental
@@ -107,7 +120,7 @@ python -m src.ingest --reset   # rebuild collection
 Persists embeddings to `data/vector_store/`. (Requires LM Studio's embedding
 model to be running.)
 
-### 5. Run the API
+### 6. Run the API
 
 ```bash
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
