@@ -120,6 +120,7 @@ def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
                 if not chunk:
                     continue
                 meta_out = dict(meta)
+                meta_out["chunk_index"] = i
                 yield Document(page_content=chunk, metadata=meta_out)
 
 
@@ -158,11 +159,10 @@ def ingest(reset: bool = False) -> int:
         batch_ids.clear()
 
     for doc in iter_chunks(splitter):
-        idx = len([d for d in batch_ids])  # position within current batch
         cid = _stable_chunk_id(
             doc.metadata.get("source", "unknown"),
             int(doc.metadata.get("page", 0)),
-            total + idx,
+            int(doc.metadata.get("chunk_index", 0)),
             doc.page_content,
         )
         batch_docs.append(doc)

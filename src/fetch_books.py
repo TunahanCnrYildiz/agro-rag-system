@@ -81,6 +81,16 @@ CURATED_SOURCES: dict[str, str] = {
         'OR "soil science" OR "soil fertility" OR agronomy OR "plant nutrition" '
         'OR "vegetable physiology" OR "economic botany") ' + _COMMON
     ),
+    # Federal soil-health/microbiology/composting guides. US government works
+    # are public domain regardless of age, so this reaches newer material than
+    # the other sources (mostly pre-1980s).
+    "soil_health": (
+        'publisher:("United States. Department of Agriculture" OR '
+        '"Natural Resources Conservation Service" OR "Agricultural Research '
+        'Service") AND (vermicompost OR "cover crop" OR "soil health" OR '
+        'biochar OR mycorrhiza OR "soil microbiology" OR compost OR '
+        '"soil biology") ' + _COMMON
+    ),
 }
 
 SKIP_TOKENS = ("_index", "_contents", "_advertis", "_cover", "_toc")
