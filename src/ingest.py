@@ -1,20 +1,12 @@
 """Document ingestion pipeline.
 
-Reads every PDF / TXT file under ``docs/books/``, splits them into overlapping
-chunks, embeds the chunks with an LM Studio embedding model, and persists them
-into a ChromaDB collection under ``data/vector_store/``.
+Reads every PDF/TXT under docs/books/, splits them into overlapping chunks,
+embeds them with the LM Studio embedding model, and stores them in ChromaDB
+under data/vector_store/. Files are streamed one at a time and flushed to Chroma
+in batches, so the whole corpus never sits in memory at once.
 
-Memory safety
--------------
-Hundreds of books cannot be held in RAM at once. This pipeline therefore:
-  * streams one source file at a time,
-  * yields chunks lazily and flushes them to Chroma in fixed-size batches,
-  * never accumulates the full corpus of Document objects in a single list.
-
-Run directly::
-
-    python -m src.ingest                 # incremental add to the store
-    python -m src.ingest --reset         # wipe the collection first
+    python -m src.ingest            # add to the store
+    python -m src.ingest --reset    # wipe the collection first
 """
 
 from __future__ import annotations

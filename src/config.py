@@ -83,12 +83,8 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-# --------------------------------------------------------------------------- #
-# Strict System Persona & Guardrails
-# --------------------------------------------------------------------------- #
-# NOTE: This prompt is injected on EVERY query. It is intentionally strict.
-# The {language_instruction}, {context} and {products} placeholders are filled
-# in by the engine at query time.
+# System persona and guardrails. Injected on every query; the engine fills in
+# the {language_instruction}, {context} and {products} placeholders.
 SYSTEM_PROMPT: str = """\
 You are an expert Agricultural Engineer (Ziraat Muhendisi) working for an
 ecological agriculture company. You specialise strictly in plant nutrition,
@@ -137,18 +133,18 @@ micro/macro nutrient balance, and botanical science education.
 def build_language_instruction(language_hint: str | None = None) -> str:
     """Return the language-matching directive injected into the system prompt.
 
-    The model must always answer in the SAME language the user wrote in. When a
-    detected language hint is available we state it explicitly to reduce drift.
+    The model must answer in the same language the user wrote in. A detected
+    hint, when available, is stated explicitly to reduce drift.
     """
     if language_hint:
         return (
             f"Detect the language of the user's message. It appears to be "
-            f"'{language_hint}'. You MUST write your ENTIRE response — including "
-            f"botanical advice and product recommendations — in that same "
-            f"language. Do not switch languages."
+            f"'{language_hint}'. Write your ENTIRE response (including botanical "
+            f"advice and product recommendations) in that same language. Do not "
+            f"switch languages."
         )
     return (
-        "Automatically detect the language of the user's message. You MUST "
-        "write your ENTIRE response — including botanical advice and product "
-        "recommendations — in that exact same language. Do not switch languages."
+        "Automatically detect the language of the user's message. Write your "
+        "ENTIRE response (including botanical advice and product recommendations) "
+        "in that exact same language. Do not switch languages."
     )

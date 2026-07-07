@@ -1,14 +1,9 @@
 """Core RAG query engine.
 
-Responsibilities
-----------------
-1. Retrieve botany knowledge chunks from the persistent Chroma store.
-2. Match relevant company products from the scraped catalog.
-3. Compose the strict system prompt (persona + guardrails + language rule).
-4. Call the LM Studio (OpenAI-compatible) chat model, streaming or unified.
-
-The engine is intentionally resilient: if the vector store or LM Studio is
-unavailable it degrades gracefully instead of crashing the API.
+Retrieves botany chunks from Chroma, matches catalog products, builds the system
+prompt (persona + guardrails + language rule), and calls the LM Studio chat
+model. If the vector store or LM Studio is down it falls back instead of
+erroring, so the API stays up.
 """
 
 from __future__ import annotations
@@ -153,8 +148,8 @@ def match_products(query: str, botany_context: str = "", k: int | None = None) -
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
 def _get_retriever_store():
-    """Open the Chroma store once. Returns None if unavailable (e.g. langchain
-    not installed yet, or no ingested documents) so the API degrades gracefully."""
+    """Open the Chroma store once. Returns None if it's unavailable (langchain
+    not installed, or nothing ingested yet) so callers can fall back."""
     try:
         try:
             from .ingest import get_vector_store  # type: ignore

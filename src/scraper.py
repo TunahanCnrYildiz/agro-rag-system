@@ -1,20 +1,12 @@
 """Product scraper for ekolojiktarim.com.tr.
 
-Crawls the storefront, extracts product name / description / category / URL,
-and writes a structured JSON catalog to ``docs/products/products.json``.
+Crawls the storefront and writes product name/description/category/URL to
+docs/products/products.json. Selectors are kept tolerant, and if the site is
+unreachable or returns nothing it falls back to a built-in mock catalog so the
+rest of the pipeline still runs offline.
 
-Design notes
-------------
-* The public site structure can change or rate-limit anonymous crawlers, so
-  the scraper is defensive: it tries several common selectors, honours a
-  polite delay, and — critically — falls back to a curated MOCK catalog when
-  the network is unavailable or no products are found. This keeps the rest of
-  the pipeline (ingest / engine / API) fully runnable offline.
-
-Run directly::
-
-    python -m src.scraper            # real crawl, mock fallback on failure
-    python -m src.scraper --mock     # force the mock catalog
+    python -m src.scraper           # crawl, mock fallback on failure
+    python -m src.scraper --mock    # force the mock catalog
 """
 
 from __future__ import annotations

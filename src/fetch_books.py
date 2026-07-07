@@ -1,26 +1,14 @@
-"""Bulk-download open-access / public-domain botany & plant-nutrition books
-from the Internet Archive into ``docs/books/``.
+"""Download botany / plant-nutrition PDFs from the Internet Archive into
+docs/books/.
 
-Reliability first
------------------
-The user needs an *academically / professionally trustworthy* corpus, not a
-random pile of PDFs. So instead of a broad popularity search (which surfaces
-folk herbals, astrology "medicine", dictionaries and town histories), this tool
-pulls from a curated set of AUTHORITATIVE sources:
+Pulls from a few authoritative sources (USDA publications, agricultural
+experiment station bulletins, classic botany/plant-physiology texts) and skips
+borrow-only/DRM items plus off-topic or non-scientific subjects. Each PDF is
+validated before it's kept.
 
-  * USDA (U.S. Department of Agriculture) publications  — public-domain, peer/gov reviewed
-  * Agricultural Experiment Station bulletins           — university research stations
-  * Classic academic botany / plant-physiology texts    — with unreliable subjects excluded
-
-Only freely downloadable, non-restricted items are fetched (borrow-only / DRM
-items are skipped) and each PDF is validated (real ``%PDF`` header + minimum
-size) before it is kept.
-
-Usage::
-
-    python -m src.fetch_books --dry-run --max 40    # preview quality, download nothing
-    python -m src.fetch_books --max 250             # download up to 250 books
-    python -m src.fetch_books --source usda --max 100
+    python -m src.fetch_books --dry-run --max 40
+    python -m src.fetch_books --max 250
+    python -m src.fetch_books --source usda_soil --max 100
     python -m src.fetch_books --list-sources
 """
 
@@ -42,8 +30,7 @@ METADATA_URL = "https://archive.org/metadata/{identifier}"
 DOWNLOAD_URL = "https://archive.org/download/{identifier}/{name}"
 USER_AGENT = "AgroBotanyBot/0.1 (+https://ekolojiktarim.com.tr/)"
 
-# Common tail appended to every curated query: only real, downloadable PDFs,
-# never borrow-only/restricted items, and never unreliable/off-topic subjects.
+# Subject/title terms to exclude from every query.
 _UNRELIABLE = (
     "medicinal OR medicine OR herbal OR herbals OR therapeutics OR "
     "pharmacology OR homeopathy OR homoeopathy OR astrology OR occult OR "
@@ -53,8 +40,8 @@ _OFFTOPIC = (
     "dictionary OR dictionaries OR language OR biography OR genealogy OR "
     "fiction OR poetry OR religion OR cookery OR travel"
 )
-# Title-level noise: hydrology/fisheries/administrative docs that match "soil"
-# or "water" loosely, plus the highly repetitive USDA "plant inventory" series.
+# Titles that slip through on loose "soil"/"water" matches, plus the repetitive
+# USDA "plant inventory" series.
 _NOISE_TITLES = (
     'pond OR ponds OR fish OR fishing OR flood OR "flood plain" OR watershed OR '
     'river OR climate OR rainfall OR "wind erosion" OR directory OR "plant inventory"'
