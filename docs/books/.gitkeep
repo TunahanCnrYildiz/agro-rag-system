@@ -1,0 +1,2 @@
+# Place botany / fertilization PDF and TXT source files in this directory.
+# The ingest.py pipeline will process every .pdf and .txt file found here.

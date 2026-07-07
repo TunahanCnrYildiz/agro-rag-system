@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.env
+
+# Vector store (persistent DB is large / regenerable)
+data/vector_store/
+
+# Source documents (books can be huge — keep out of git)
+docs/books/*.pdf
+docs/books/*.txt
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code local (machine-specific permission allowlist)
+.claude/settings.local.json
+
+# Logs
+*.log

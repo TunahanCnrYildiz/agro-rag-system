@@ -1,0 +1,50 @@
+[
+  {
+    "product_name": "Solucan Gubresi (Vermikompost)",
+    "description": "Organik solucan gubresi; toprak yapisini iyilestirir, bitkilere yavas salinan dogal besin saglar. Sebze, meyve ve sus bitkileri icin uygundur.",
+    "category": "Organik Gubreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=solucan-gubresi-vermikompost"
+  },
+  {
+    "product_name": "Deniz Yosunu Ozutu (Algae Extract)",
+    "description": "Deniz yosunu bazli sivi besin takviyesi; koklenmeyi ve stres dayanikliligini destekler, mikro besin elementleri icerir.",
+    "category": "Sivi Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=deniz-yosunu-ozutu-algae-extract"
+  },
+  {
+    "product_name": "Organik Sivi Solucan Gubresi",
+    "description": "Yaprak ve kokten uygulanabilen sivi vermikompost; azot, fosfor, potasyum ve humik asit bakimindan zengindir.",
+    "category": "Sivi Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=organik-sivi-solucan-gubresi"
+  },
+  {
+    "product_name": "Humik & Fulvik Asit Konsantresi",
+    "description": "Toprakta besin alimini artiran humik-fulvik asit karisimi; kok gelisimini ve mikrobiyal aktiviteyi destekler.",
+    "category": "Toprak Duzenleyiciler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=humik-&-fulvik-asit-konsantresi"
+  },
+  {
+    "product_name": "Bitkisel Kompost (Organik)",
+    "description": "Bitkisel atiklardan uretilmis olgun kompost; toprak organik madde oranini yukseltir ve su tutma kapasitesini artirir.",
+    "category": "Organik Gubreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=bitkisel-kompost-organik"
+  },
+  {
+    "product_name": "Mikoriza Mantari Inokulanti",
+    "description": "Kok bolgesinde faydali mikoriza mantarlarini cogaltan biyolojik urun; fosfor ve su aliminda bitkilere yardimci olur.",
+    "category": "Biyolojik Urunler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=mikoriza-mantari-inokulanti"
+  },
+  {
+    "product_name": "Dogal Kaya Fosfat",
+    "description": "Yavas salinan dogal fosfor kaynagi; koklenme ve cicek/meyve olusumu doneminde toprak fosforunu destekler.",
+    "category": "Mineral Gubreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=dogal-kaya-fosfat"
+  },
+  {
+    "product_name": "Odun Kulu Bazli Potasyum Takviyesi",
+    "description": "Dogal potasyum ve kalsiyum kaynagi; meyve kalitesini ve bitki dayanikliligini desteklemek icin toprak duzenleyici olarak kullanilir.",
+    "category": "Toprak Duzenleyiciler",
+    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=odun-kulu-bazli-potasyum-takviyesi"
+  }
+]
