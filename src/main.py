@@ -12,16 +12,20 @@ Run::
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import json
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 try:
-    from .config import settings
+    from .config import settings, PRODUCTS_JSON
+    from .articles_scraper import ARTICLES_JSON
     from . import engine
 except ImportError:  # pragma: no cover
-    from config import settings  # type: ignore
+    from config import settings, PRODUCTS_JSON  # type: ignore
+    from articles_scraper import ARTICLES_JSON  # type: ignore
     import engine  # type: ignore
 
 
@@ -51,6 +55,24 @@ class ChatResponse(BaseModel):
     recommended_products: list[ProductOut]
 
 
+class CatalogProduct(BaseModel):
+    product_name: str
+    description: str
+    category: str
+    source_url: str
+    image_url: str = ""
+
+
+class ArticleOut(BaseModel):
+    title: str
+    excerpt: str
+    category: str
+    date: str
+    source_url: str
+    image_url: str = ""
+    content: str = ""
+
+
 # --------------------------------------------------------------------------- #
 # App
 # --------------------------------------------------------------------------- #
@@ -75,6 +97,30 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "model": settings.chat_model}
+
+
+@app.get("/api/products", response_model=list[CatalogProduct])
+def products(category: str | None = None):
+    """Real product catalog scraped from ekolojiktarim.com.tr (src/scraper.py).
+    Optionally filter by exact category name."""
+    if not PRODUCTS_JSON.exists():
+        raise HTTPException(status_code=503, detail="Product catalog not available yet.")
+    data = json.loads(PRODUCTS_JSON.read_text(encoding="utf-8"))
+    if category:
+        data = [p for p in data if p.get("category") == category]
+    return data
+
+
+@app.get("/api/articles", response_model=list[ArticleOut])
+def articles(category: str | None = None):
+    """Tarim Akademisi articles scraped from ekolojiktarim.com.tr
+    (src/articles_scraper.py). Optionally filter by exact category name."""
+    if not ARTICLES_JSON.exists():
+        raise HTTPException(status_code=503, detail="Articles not available yet.")
+    data = json.loads(ARTICLES_JSON.read_text(encoding="utf-8"))
+    if category:
+        data = [a for a in data if a.get("category") == category]
+    return data
 
 
 @app.post("/api/chat", response_model=ChatResponse)

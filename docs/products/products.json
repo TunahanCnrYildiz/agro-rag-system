@@ -1,50 +1,338 @@
 [
   {
-    "product_name": "Solucan Gubresi (Vermikompost)",
-    "description": "Organik solucan gubresi; toprak yapisini iyilestirir, bitkilere yavas salinan dogal besin saglar. Sebze, meyve ve sus bitkileri icin uygundur.",
-    "category": "Organik Gubreler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=solucan-gubresi-vermikompost"
+    "product_name": "HIGRO WETT",
+    "description": "HIGRO WETT kullanılacak gübrelerin yaprağın alt ve üst yüzeyine homojen bir şekilde yayılmasını sağlar. HIGRO WETT aynı zamanda kullanılacak gübrenin yaprağın alt ve üst yüzeyinde uzun süre tutunmasını sağlar. Gübrelerin etki süresini ve yüzdesini artıran Adjuvant bir üründür.",
+    "category": "Adjuvant",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrowett/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-WETT-YAYICI-VE-YAPISTIRICI-100-min-450x450.webp"
   },
   {
-    "product_name": "Deniz Yosunu Ozutu (Algae Extract)",
-    "description": "Deniz yosunu bazli sivi besin takviyesi; koklenmeyi ve stres dayanikliligini destekler, mikro besin elementleri icerir.",
-    "category": "Sivi Besinler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=deniz-yosunu-ozutu-algae-extract"
+    "product_name": "A.P.P® COMBIFER",
+    "description": "A.P.P® COMBIFER, sebze, meyve ve açık tarla üretiminde, şekil bozuklukları, sararmalar, yaprak ve sürgünlerde kurumalar ve cılızlaşma olarak görülen iz elementi noksanlıklarını etkin ve hızlı bir şekilde çözer. A.P.P® COMBIFER, yüksek oranda ve alınırlığı yüksek demir, çinko, mangan Bor, Bakır, Molibden içermektedir. Makro besin elementlerinin verilmesine rağmen bitki ihtiyacını karşılayamadığı durumlarda da üründe beklenen kalite ve verim alınamamaktadır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/a-p-pcombifer-yuksek-etkili-toz-iz-element-karisimi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/A.P.P®COMBIFER-YUKSEK-ETKILI-TOZ-IZ-ELEMENT-KARISIMI-100-min-450x450.webp"
   },
   {
-    "product_name": "Organik Sivi Solucan Gubresi",
-    "description": "Yaprak ve kokten uygulanabilen sivi vermikompost; azot, fosfor, potasyum ve humik asit bakimindan zengindir.",
-    "category": "Sivi Besinler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=organik-sivi-solucan-gubresi"
+    "product_name": "A.P.P® VIROXYN",
+    "description": "A.P.P® VIROXYN",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/a-p-pviroxyn-pk-gubresi-harmanlanmis-a-p-p-viroxyn-0-5-13/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/APP-VIROXYN-450x450.webp"
   },
   {
-    "product_name": "Humik & Fulvik Asit Konsantresi",
-    "description": "Toprakta besin alimini artiran humik-fulvik asit karisimi; kok gelisimini ve mikrobiyal aktiviteyi destekler.",
-    "category": "Toprak Duzenleyiciler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=humik-&-fulvik-asit-konsantresi"
+    "product_name": "FLY AZOT",
+    "description": "FLY AZOT",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/fly-azot-azotlu-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/FLY-AZOT-AZOTLU-GUBRE-COZELTISI-100-min-450x450.webp"
   },
   {
-    "product_name": "Bitkisel Kompost (Organik)",
-    "description": "Bitkisel atiklardan uretilmis olgun kompost; toprak organik madde oranini yukseltir ve su tutma kapasitesini artirir.",
-    "category": "Organik Gubreler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=bitkisel-kompost-organik"
+    "product_name": "HİGRO 8 ZN",
+    "description": "HİGRO 8 ZN",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro8-zn-kolay-alinabilir-sivi-cinko-cinkolu-gubre-cozeltisi-cinko-sulfat-icerikli/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-8-ZN-CINKOLU-SIVI-GUBRE-COZELTISI-100-min-450x450.webp"
   },
   {
-    "product_name": "Mikoriza Mantari Inokulanti",
-    "description": "Kok bolgesinde faydali mikoriza mantarlarini cogaltan biyolojik urun; fosfor ve su aliminda bitkilere yardimci olur.",
-    "category": "Biyolojik Urunler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=mikoriza-mantari-inokulanti"
+    "product_name": "HİGRO ABS",
+    "description": "HİGRO ABS, bitkilerde tonaj kazandırır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroabs-np-gubre-cozeltisi-4-14-0/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-ABS-NP-GUBRE-COZELTISI-4-14-0-100-min-450x450.webp"
   },
   {
-    "product_name": "Dogal Kaya Fosfat",
-    "description": "Yavas salinan dogal fosfor kaynagi; koklenme ve cicek/meyve olusumu doneminde toprak fosforunu destekler.",
-    "category": "Mineral Gubreler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=dogal-kaya-fosfat"
+    "product_name": "HİGRO BARF",
+    "description": "HİGRO BARF",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrobarf-ec-fertilizer-pk-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-BARF-PK-GUBRE-COZELTISI-100-min-450x450.webp"
   },
   {
-    "product_name": "Odun Kulu Bazli Potasyum Takviyesi",
-    "description": "Dogal potasyum ve kalsiyum kaynagi; meyve kalitesini ve bitki dayanikliligini desteklemek icin toprak duzenleyici olarak kullanilir.",
-    "category": "Toprak Duzenleyiciler",
-    "source_url": "https://www.ekolojiktarim.com.tr/arama?q=odun-kulu-bazli-potasyum-takviyesi"
+    "product_name": "HİGRO COMBİ",
+    "description": "HİGRO COMBİ, Alınabilirliği yüksek, hızlı etki gösteren, çoklu Mikro Element içeren Sıvı formda olan bir gübredir.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrocombi-bor-b-demir-fe-sulfatmangan-mn-sulfat-molibden-mo-ve-cinko-zn-sulfat-sivi-mikrobitki-besin-maddeleri-karisim/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-COMBI-SIVI-MIKRO-BITKI-BESIN-MADDELERI-KARISIMI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO COMBİSE",
+    "description": "HİGRO COMBİSE",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrocombise-bitkilerde-iz-element-noksanliklarinda-etkili-ve-ekonomik-cozum/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-COMBISE-TOZ-FORMDA-MIKRO-BESINLER-ICEREN-IZ-ELEMENT-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO EQUAJE",
+    "description": "HİGRO EQUAJE, tamamı suda çözünür bir ürünümüzdür. HİGRO EQUAJE, çiçeklenme öncesi dönemde, çiçeklendirmede, etkili bir ürünümüzdür. Yaz ve kış aylarında çiçek fizyolojisi ortam koşulları nedeniyle yaz aylarında dişiçik tepesi uzayıp erkek organların sapları kısa kalmaktadır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroequaje-npk-blended-fertilizer-cicek-ve-meyve-tutturucu/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-EQUAJE-NPK-GUBRESI-HARMANLANMIS-CICEK-VE-MEYVE-TUTTURUCU-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO FOSFO",
+    "description": "HİGRO FOSFO, bitkilerde çiçek oluşumunu güçlendirir.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrofosfo-5-23-0-ozel-sivi-fosfor/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/HIGRO-FOSFO-5-23-0-OZEL-SIVI-FOSFOR-min-450x450.webp"
+  },
+  {
+    "product_name": "HIGRO FOSTER",
+    "description": "Bitki besleme ve bitki fizyolojisi çerçevesinde değerlendirildiğinde; fosfor bitkide anahtar görevi yapar.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrofoster-5-13-0-me-tam-etkili-fosfor-cinko/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/HIGRO-FOSTER-5-13-0-ME-CICEK-OLUSUMU-TUTUMU-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO FUBBY",
+    "description": "HİGRO FUBBY",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrofubby-mikro-bitki-besin-elementleri-karisimi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-FUBBY-MIKRO-BITKI-BESIN-ELEMENTLERI-KARISIMI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO K-FORCE",
+    "description": "HİGRO K-FORCE",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrok-force-potasyum-cozeltisi-hizli-buyutucu/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/HIGRO-K-FORCE-HIZLI-BUYUTUCU-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO MATEN",
+    "description": "HİGRO MATEN,  Azotun üç farklı kombinasyonunu içeren etkili sıvı gübredir.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higromaten-yuksek-alinabilirlikte-sivi-azot-kombinasyonu-azotlu-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-MATEN-SIVI-AZOTLU-GUBRE-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO MATEN PLUS",
+    "description": "HİGRO MATEN PLUS",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higromaten-plus-ec-fertilizer-azotlu-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-MATEN-PLUS-AZOTLU-GUBRE-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO N.K.FE",
+    "description": "HİGRO N.K.Fe, Yapraktan ve Topraktan kolay kullanılan süspansiyon içerikli Meyve büyütücü ve erkencilik sağlayan bir gübredir.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/kuvvetli-meyve-buyutucu-higro-n-k-fe-3-0-20/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-N.K.FE-3-0-20-MEYVE-BUYUTUCU-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO RİNO",
+    "description": "HİGRO RİNO",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrorino-meyve-buyutucu/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/HIGRO-RINO-MEYVELERI-VE-SEBZELERI-BUYUTUCU-VE-UZATICI_1-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO ROOT LEGEND",
+    "description": "HİGRO ROOT LEGEND",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroroot-legend-6-40-0/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/HIGRO-ROOT-LEGEND-YENI-NESIL-TOZ-KOKLENDIRICI-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO SÜPER ZİNC PHOS",
+    "description": "HİGRO SÜPER ZİNC PHOS, güçlü ve kaliteli çiçek oluşumu istenilen bitkilerde özelikle tavsiye edilir.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrosuper-zinc-phos-ec-fertilizer-np-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-SUPER-ZINC-PHOS-NP-GUBRE-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO TRACO",
+    "description": "HİGRO TRACO",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro-traco/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-TRACO-POTASYUM-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO ZİMOBOR",
+    "description": "HİGRO ZİMOBOR",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrozimobor-mikro-besin-elementleri-karisimi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-ZIMOBOR-10-Molibden-Mo-4-Cinko-Zn-3-Bor-B-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO ZİNCBOR",
+    "description": "HİGRO ZİNCBOR, Bitki ve çiçekte oluşacak Çinko ve Bor noksanlarını hızlı bir şekilde çözümüdür.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrozincbor-toz-cinko-bor/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-ZINCBOR-TOZ-FORMDA-10-CINKO-3-BOR-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO® BLUE",
+    "description": "Bu ürün, içeriğindeki Fosfor sayesinde çiçek oluşumunu, çiçek tutumunu ve çiçek sayısını artırır, ayrıca bitkinin gelişimini düzenleyerek gövdeyi kalınlaştırır. İçindeki %5 Azot, potasyumla gelişen meyvenin çatlamasını önler, yeşil aksamı geliştirir ve bitkinin sağlıklı çalışmasını sağlar. Potasyum ve Manganez (Mn) ise olgunlaşan meyvenin rengini koyulaştırır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/eko-gel-5-15-50znmnfe/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/Higro-Blue-1-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO® FAST",
+    "description": "İçeriğindeki fosfor, çiçek oluşumunu ve çiçek tutumunu artırarak doğrudan verimi yükseltir. Aynı zamanda fosfor gibi, bitkinin gövde kalınlığını ve köklerini güçlendirir, bitkiyi daha dayanıklı ve hastalıklara karşı dirençli hale getirir.İçeriğindeki potasyum ise meyvenin daha iyi gelişmesini, daha güzel bir renk kazanmasını ve aromada artışla birlikte lezzetin yükselmesini sağlar.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/eko-gel-0-50-50/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/Higro-Fast-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO® PİNK",
+    "description": "İçeriğindeki Fosfor sayesinde çiçek oluşumu, çiçek tutumu ve çiçek sayısı artarak verimi yükseltir; ayrıca fosfor bitkinin gövde kalınlığını ve kök sayısını artırır. Buna ek olarak, potasyum meyve iriliğini artırırken, meyve oluşumunu, meyve sayısını ve meyve tutumunu artıran ve meyve dökülmesini azaltan mükemmel bir karışımdır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro-pink/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/Higro-Pink-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO® SPEED",
+    "description": "Bu ürün dengelidir; yani bitkiye verildiğinde çiçeklerin, vejetatif yeşil aksamın ve meyvelerin gelişimi üzerinde eşzamanlı bir etkiye sahiptir ve içeriğindeki iz elementler bu etkiyi daha da artırır. Biraz açacak olursak, içindeki Fosfor ve Çinko çiçek oluşumunu, çiçek tutumunu ve çiçek sayısını artırarak verimi yükseltir. İçeriğindeki Azot ise yeşil aksamı geliştirir ve Potasyum ile büyüyen meyve kabuklarının çatlamasını önleyen bir karışımdır. Ayrıca, Fosfor sayesinde gövde kalınlaşır ve kökler güçlenir. Suda hızla çözünür ve bitkiler tarafından hızlı bir şekilde alınır.",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/eko-gel-20-20-20znmnfe/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/Higro-Speed-450x450.webp"
+  },
+  {
+    "product_name": "LOPİN",
+    "description": "LOPİN Meyve ve Sebzede tonaj arttırır .",
+    "category": "Makro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/lopin-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2022/08/LOPIN-GUBRE-COZELTISI_1-100-min-450x450.webp"
+  },
+  {
+    "product_name": "A.P.P – ORNE",
+    "description": "A.P.P - ORNE",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/a-p-p-orne-spesifik-urun-sivi-mikro-bitki-besin-elementleri-karisimi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/A.P.P-–-ORNE-SPESIFIK-ELEMENTLERDEN-OLUSAN-URUNDUR-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO 14 BOR",
+    "description": "HİGRO 14 BOR",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro14-bor-guclu-cicek/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-14-BOR-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HIGRO 8 MN",
+    "description": "HIGRO 8 Mn, Bitkilerin ihtiyacı olan Mangan Elementini hızlı bir şekilde almasını sağlar. Mangan aynı zamanda Sebze ve Meyvelerin renk oluşumuna katkı yapan önemli bir Mikro Elementtir.",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro8-mn-manganli-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-8-MN-MANGANLI-GUBRE-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO BOROL",
+    "description": "HİGRO BOROL, yüksek içerikli, yoğun kıvamlı ve hızlı alınabilen konsantre bir gübredir.",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroborol-boron-ethanol-amin/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-BOROL-11-ICERIKLI-BORON-ETHANOL-AMIN-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO CUFİT",
+    "description": "HİGRO CUFİT",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrocufit-bakirli-gubre-cozeltisi-bakir-sulfat-icerikli-tamami-suda-cozunur/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-CUFIT-BAKIRLI-GUBRE-COZELTISI-BAKIR-SULFAT-ICERIKLI-TAMAMI-SUDA-COZUNUR-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO CUPPERS",
+    "description": "HİGRO CUPPERS",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrocuppers-bakirli-gubre-cozeltisi-bakir-sulfat-icerikli/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-CUPPERS-BAKIRLI-GUBRE-COZELTISI-BAKIR-SULFAT-ICERIKLI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HIGRO FERFORCE",
+    "description": "HIGRO FERFORCE",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroferforce-eddha-selatli-toz-demir-fe-6/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-FERFORCE-EDDHA-SELATLI-TOZ-DEMIR-Fe-6-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO FERRY",
+    "description": "HİGRO FERRY",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroferry-demirli-gubre-cozeltisi-demir-sulfat-icerikli/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-FERRY-DEMIRLI-GUBRE-COZELTISI-DEMIR-SULFAT-ICERIKLI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO RENGAL PLUS",
+    "description": "HİGRO RENGAL PLUS",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrorengal-plus-cinkolu-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-RENGAL-PLUS-CINKOLU-GUBRE-COZELTISI-RENKLENDIRICI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "ZİNCER",
+    "description": "ZİNCER, Tüm sebze ve meyve ağaçları uygulamalarında özel içeriği sayesinde çiçeği daha iyi beslediği için DAHA İYİ ÇİÇEK oluşur, kaliteyi ve verimi artırır.",
+    "category": "Mikro Besinler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/zincer-sira-disi-cicek-icin-cinkolu-gubre-cozeltisi/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/ZINCER-SIRA-DISI-CICEK-ICIN-CINKOLU-GUBRE-COZELTISI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "BİNGO",
+    "description": "BİNGO; Tamamen bitkisel kaynaklı materyallerden üretilmiştir, bitkinin serum gibi hazır gıdasıdır.",
+    "category": "Sertifikalı Organik Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/bingo/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/BINGO-scaled-1-450x450.jpg"
+  },
+  {
+    "product_name": "HİGRO ALGİN",
+    "description": "HİGRO ALGİN",
+    "category": "Sertifikalı Organik Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroalgin-sivi-deniz-yosunu/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-ALGIN-SIVI-DENIZ-YOSUNU-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO AMİN-L",
+    "description": "HİGRO AMİN-L",
+    "category": "Sertifikalı Organik Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higroamin-l-sivi-bitkisel-amino-asit/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-AMIN-L-SIVI-BITKISEL-AMINO-ASIT-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO ROOTİNG PLUS",
+    "description": "HİGRO ROOTİNG PLUS bitkilerin verimini destekler.",
+    "category": "Sertifikalı Organik Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro-rooting-plus-kilcal-kok-gelistirici/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-ROOTING-PLUS-KILCAL-KOK-GELISTIRICI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "A.P.P. MAXİNİM",
+    "description": "A.P.P -MAXİNİM, bitki özlerinin hammadde olarak kullanıldığı Organomineral gübredir.",
+    "category": "Sıvı Organomineral Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/a-p-p-maxinim-yuksek-etkili-tam-buyume/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/A.P.P.-MAXINIM-NKLI-ORGANOMINERAL-SIVI-GUBRE-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HIGRO DENGELİ",
+    "description": "HIGRO DENGELİ",
+    "category": "Sıvı Organomineral Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrodengeli/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-DENGELI-NPKLI-SIVI-ORGANOMINERAL-GUBRE_1-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO FOSFORLU",
+    "description": "HİGRO FOSFORLU; bitkiler tarafından özelikle kış aylarında havaları soğuk olduğu dönemlerde çok kolay alınabilen ve uygulandığı alandaki bitkilere çok yoğun etki sunan özel fosforlu damlama gübresidir.",
+    "category": "Sıvı Organomineral Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrofosforlu-sivi-npli-suspanse-gubre/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-FOSFORLU-NPLI-SIVI-ORGANOMINERAL-GUBRE-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO POTASYUMLU",
+    "description": "HIGRO POTASYUMLU bitkinin ihtiyacı olan potasyum miktarını karşılamasını ve içeriğindeki potasyum miktarının tamamının bitkiler tarafından alınmasını sağlayacak özelliktedir.",
+    "category": "Sıvı Organomineral Gübreler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higro-potasyumlu-sivi-nkli-suspanse-gubre/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-POTASYUMLU-NKLI-SIVI-ORGANOMINERAL-GUBRE-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO WATER MASTER",
+    "description": "HİGRO WATER MASTER en hızlı alıma sahip bir gübredir.",
+    "category": "Tüm Ürünler",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrowater-master/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO-WATER-MASTER-TUZLULUK-GIDERICI-VE-pH-DUZENLEYICI-100-min-450x450.webp"
+  },
+  {
+    "product_name": "HİGRO® CAPİLLE",
+    "description": "HİGRO CAPİLLE, Üst Segment NPK + TE  Yapraktan ve Topraktan kullanılan Toz gübre çeşitleri.",
+    "category": "NPK Damlama Gübreleri",
+    "source_url": "https://www.ekolojiktarim.com.tr/product/higrocapille/",
+    "image_url": "https://www.ekolojiktarim.com.tr/wp-content/uploads/2023/07/HIGRO®CAPILLE-NPK-TOZ-GUBRE-CESITLERI-100-min-450x450.webp"
   }
 ]

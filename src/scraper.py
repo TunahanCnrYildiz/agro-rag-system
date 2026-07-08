@@ -1,9 +1,10 @@
 """Product scraper for ekolojiktarim.com.tr.
 
-Crawls the storefront and writes product name/description/category/URL to
-docs/products/products.json. Selectors are kept tolerant, and if the site is
-unreachable or returns nothing it falls back to a built-in mock catalog so the
-rest of the pipeline still runs offline.
+Crawls the WooCommerce product-category pages (following pagination) and
+writes product name/description/category/image/URL to
+docs/products/products.json. If the site is unreachable or returns nothing,
+falls back to a built-in mock catalog so the rest of the pipeline still runs
+offline.
 
     python -m src.scraper           # crawl, mock fallback on failure
     python -m src.scraper --mock    # force the mock catalog
@@ -16,7 +17,7 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from typing import Iterable
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -32,16 +33,29 @@ USER_AGENT = (
 )
 REQUEST_DELAY_SECONDS = 1.0  # polite crawl delay
 REQUEST_TIMEOUT = 15
+MAX_PAGES_PER_CATEGORY = 10  # safety cap on pagination
+
+# Known WooCommerce category slugs (from the site's navigation).
+CATEGORY_SLUGS = [
+    "adjuvant",
+    "makro-besinler",
+    "mikro-besinler",
+    "sertifikali-organik-gubreler",
+    "sivi-organomineral-gubreler",
+    "tuzluluk-giderici-ph-duzenleyiciler",
+    "ust-segment",
+]
 
 
 @dataclass
 class Product:
-    """A single catalog entry. Metadata schema required by the spec."""
+    """A single catalog entry."""
 
     product_name: str
     description: str
     category: str
     source_url: str
+    image_url: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -64,98 +78,104 @@ def _fetch(session: requests.Session, url: str) -> BeautifulSoup | None:
 
 
 # --------------------------------------------------------------------------- #
-# Parsing
+# Category listing parsing
 # --------------------------------------------------------------------------- #
-def _same_site(url: str) -> bool:
-    return urlparse(url).netloc.endswith("ekolojiktarim.com.tr")
-
-
-def _discover_product_links(soup: BeautifulSoup, base: str) -> set[str]:
-    """Heuristically collect links that look like product detail pages."""
-    links: set[str] = set()
-    for a in soup.find_all("a", href=True):
-        href = urljoin(base, a["href"])
-        if not _same_site(href):
+def _parse_category_page(soup: BeautifulSoup) -> list[dict]:
+    """Extract product cards (name, url, image, category) from a WooCommerce
+    category listing page."""
+    cards = []
+    for li in soup.select(".shop-product_grid"):
+        title_a = li.select_one(".shop-product_title a")
+        if not title_a:
             continue
-        path = urlparse(href).path.lower()
-        # Common e-commerce URL hints; kept broad on purpose.
-        if any(tok in path for tok in ("urun", "product", "-p-", "/p/")):
-            links.add(href.split("#")[0])
-    return links
+        name = title_a.get_text(strip=True)
+        url = title_a.get("href", "").split("#")[0]
+        if not name or not url:
+            continue
+
+        img = li.select_one(".shop-product_photo img")
+        image_url = img.get("src", "") if img else ""
+
+        cat_a = li.select_one(".shop-product-cat")
+        category = cat_a.get_text(strip=True) if cat_a else "Genel"
+
+        cards.append(
+            {"name": name, "url": url, "image_url": image_url, "category": category}
+        )
+    return cards
 
 
-def _parse_product_page(soup: BeautifulSoup, url: str) -> Product | None:
-    """Extract fields from a product detail page using tolerant selectors."""
-    # Name: prefer <h1>, then og:title, then <title>.
-    name = None
-    if soup.h1 and soup.h1.get_text(strip=True):
-        name = soup.h1.get_text(strip=True)
-    if not name:
-        og = soup.find("meta", property="og:title")
-        if og and og.get("content"):
-            name = og["content"].strip()
-    if not name and soup.title:
-        name = soup.title.get_text(strip=True)
-    if not name:
-        return None
+def _crawl_category(session: requests.Session, slug: str) -> list[dict]:
+    """Crawl one category, following pagination until no more products."""
+    all_cards: dict[str, dict] = {}
+    for page_num in range(1, MAX_PAGES_PER_CATEGORY + 1):
+        url = (
+            f"{BASE_URL}product-category/{slug}/"
+            if page_num == 1
+            else f"{BASE_URL}product-category/{slug}/page/{page_num}/"
+        )
+        soup = _fetch(session, url)
+        if soup is None:
+            break
+        cards = _parse_category_page(soup)
+        if not cards:
+            break
+        new_count = 0
+        for c in cards:
+            if c["url"] not in all_cards:
+                all_cards[c["url"]] = c
+                new_count += 1
+        if new_count == 0:
+            break  # paginated past the end, WordPress re-served the last page
+        time.sleep(REQUEST_DELAY_SECONDS)
+    return list(all_cards.values())
 
-    # Description: meta description / og:description, else first sizeable <p>.
-    description = ""
+
+def _fetch_description(session: requests.Session, url: str) -> str:
+    """Best-effort short description from a product detail page."""
+    soup = _fetch(session, url)
+    if soup is None:
+        return ""
     meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
         "meta", property="og:description"
     )
     if meta_desc and meta_desc.get("content"):
-        description = meta_desc["content"].strip()
-    if not description:
-        for p in soup.find_all("p"):
-            text = p.get_text(strip=True)
-            if len(text) > 40:
-                description = text
-                break
-
-    # Category: breadcrumb links are the most reliable signal.
-    category = "Genel"
-    crumb = soup.select_one(
-        ".breadcrumb, .breadcrumbs, nav[aria-label='breadcrumb']"
-    )
-    if crumb:
-        crumb_links = [a.get_text(strip=True) for a in crumb.find_all("a")]
-        crumb_links = [c for c in crumb_links if c and c.lower() not in ("anasayfa", "home")]
-        if crumb_links:
-            category = crumb_links[-1]
-
-    return Product(
-        product_name=name,
-        description=description,
-        category=category,
-        source_url=url,
-    )
+        return meta_desc["content"].strip()
+    for p in soup.find_all("p"):
+        text = p.get_text(strip=True)
+        if len(text) > 40:
+            return text
+    return ""
 
 
-def crawl(max_products: int = 60) -> list[Product]:
-    """Crawl the storefront homepage + discovered product pages."""
+def crawl(max_products: int = 200) -> list[Product]:
+    """Crawl all known product categories (with pagination), then fetch a
+    short description per product."""
     session = _make_session()
-    home = _fetch(session, BASE_URL)
-    if home is None:
-        return []
-
-    product_links = _discover_product_links(home, BASE_URL)
-    print(f"[scraper] discovered {len(product_links)} candidate product links")
+    cards_by_url: dict[str, dict] = {}
+    for slug in CATEGORY_SLUGS:
+        print(f"[scraper] category: {slug}")
+        cards = _crawl_category(session, slug)
+        print(f"[scraper]   found {len(cards)} products")
+        for c in cards:
+            cards_by_url.setdefault(c["url"], c)
+        if len(cards_by_url) >= max_products:
+            break
 
     products: list[Product] = []
-    seen: set[str] = set()
-    for link in list(product_links)[:max_products]:
-        if link in seen:
-            continue
-        seen.add(link)
+    for url, card in list(cards_by_url.items())[:max_products]:
         time.sleep(REQUEST_DELAY_SECONDS)
-        page = _fetch(session, link)
-        if page is None:
-            continue
-        product = _parse_product_page(page, link)
-        if product:
-            products.append(product)
-            print(f"[scraper]   + {product.product_name}")
+        description = _fetch_description(session, url)
+        products.append(
+            Product(
+                product_name=card["name"],
+                description=description,
+                category=card["category"],
+                source_url=url,
+                image_url=card["image_url"],
+            )
+        )
+        print(f"[scraper]   + {card['name']}")
     return products
 
 
@@ -239,7 +259,7 @@ def save_catalog(products: Iterable[Product]) -> None:
     print(f"[scraper] wrote {len(payload)} products -> {PRODUCTS_JSON}")
 
 
-def run(force_mock: bool = False, max_products: int = 60) -> list[Product]:
+def run(force_mock: bool = False, max_products: int = 200) -> list[Product]:
     products: list[Product] = []
     if not force_mock:
         try:
@@ -263,7 +283,7 @@ def main() -> None:
         "--mock", action="store_true", help="Force the mock catalog (offline)."
     )
     parser.add_argument(
-        "--max", type=int, default=60, help="Max product pages to crawl."
+        "--max", type=int, default=200, help="Max products to crawl."
     )
     args = parser.parse_args()
     run(force_mock=args.mock, max_products=args.max)
