@@ -51,7 +51,14 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
 
     # --- Generation params --- #
-    temperature: float = Field(default=0.4)
+    # Low temperature keeps answers grounded/consistent for a factual RAG
+    # assistant (less drift, fewer invented facts).
+    temperature: float = Field(default=0.2)
+    top_p: float = Field(default=0.9)
+    # min_p prunes low-probability "junk" tokens without hurting fluency -
+    # a practical anti-hallucination lever alongside the RAG grounding.
+    min_p: float = Field(default=0.05)
+    repeat_penalty: float = Field(default=1.1)
     # Kept generous: reasoning-capable local builds (e.g. Gemma QAT) spend
     # tokens "thinking" before the visible answer, so a tight budget can return
     # empty content with finish_reason="length".

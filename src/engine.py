@@ -274,6 +274,20 @@ def _build_messages(
 # --------------------------------------------------------------------------- #
 # Public API: full (unified) and streaming answers
 # --------------------------------------------------------------------------- #
+def _sampling_kwargs() -> dict:
+    """Shared generation params. top_p is a standard OpenAI field; min_p and
+    repeat_penalty are LM Studio extensions passed via extra_body."""
+    return {
+        "temperature": settings.temperature,
+        "top_p": settings.top_p,
+        "max_tokens": settings.max_tokens,
+        "extra_body": {
+            "min_p": settings.min_p,
+            "repeat_penalty": settings.repeat_penalty,
+        },
+    }
+
+
 def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
     context = retrieve_context(message)
@@ -285,9 +299,8 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         completion = client.chat.completions.create(
             model=settings.chat_model,
             messages=messages,
-            temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
             stream=False,
+            **_sampling_kwargs(),
         )
         answer_text = completion.choices[0].message.content or ""
     except Exception as exc:  # noqa: BLE001
@@ -319,9 +332,8 @@ def stream_answer(
         stream = client.chat.completions.create(
             model=settings.chat_model,
             messages=messages,
-            temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
             stream=True,
+            **_sampling_kwargs(),
         )
         for chunk in stream:
             delta = chunk.choices[0].delta.content if chunk.choices else None
