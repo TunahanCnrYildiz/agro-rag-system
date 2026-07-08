@@ -18,7 +18,7 @@ import { openExternalUrl } from "../../src/openExternalUrl";
 import {
   ChatTurn,
   RecommendedProduct,
-  sendChatMessage,
+  sendChatMessageStream,
 } from "../../src/api";
 
 interface Message {
@@ -43,6 +43,7 @@ export default function ChatScreen() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const historyRef = useRef<ChatTurn[]>([]);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -50,7 +51,7 @@ export default function ChatScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }
 
-  async function handleSend() {
+  function handleSend() {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
@@ -61,32 +62,58 @@ export default function ChatScreen() {
     setLoading(true);
     scrollToEnd();
 
-    try {
-      const resp = await sendChatMessage(text, requestHistory);
-      historyRef.current.push({ role: "user", content: text });
-      historyRef.current.push({ role: "assistant", content: resp.answer });
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: newId(),
-          role: "bot",
-          text: resp.answer,
-          products: resp.recommended_products,
-        },
-      ]);
-    } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: newId(),
-          role: "bot",
-          text: "Bağlantı hatası. Lütfen API sunucusunun çalıştığından emin olun ve tekrar deneyin.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-      scrollToEnd();
-    }
+    const botId = newId();
+    let accumulated = "";
+    let products: RecommendedProduct[] = [];
+    let started = false;
+
+    sendChatMessageStream(text, requestHistory, {
+      onToken: (content) => {
+        accumulated += content;
+        if (!started) {
+          started = true;
+          setStreamingId(botId);
+          setMessages((prev) => [
+            ...prev,
+            { id: botId, role: "bot", text: accumulated, products },
+          ]);
+        } else {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: accumulated } : m))
+          );
+        }
+        scrollToEnd();
+      },
+      onProducts: (p) => {
+        // Arrives before the bot message exists (it's the first SSE event),
+        // so it can't be applied via setMessages yet - stash it here and
+        // attach it when the message is created in onToken above.
+        products = p;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, products: p } : m))
+        );
+      },
+      onDone: () => {
+        historyRef.current.push({ role: "user", content: text });
+        historyRef.current.push({ role: "assistant", content: accumulated });
+        setLoading(false);
+        setStreamingId(null);
+        scrollToEnd();
+      },
+      onError: () => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: newId(),
+            role: "bot",
+            text: "Bağlantı hatası. Lütfen API sunucusunun çalıştığından emin olun ve tekrar deneyin.",
+          },
+        ]);
+        setLoading(false);
+        setStreamingId(null);
+        scrollToEnd();
+      },
+    });
   }
 
   return (
@@ -95,7 +122,7 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <ScrollView
@@ -133,7 +160,7 @@ export default function ChatScreen() {
               )}
             </View>
           ))}
-          {loading && (
+          {loading && !streamingId && (
             <View style={[styles.bubble, styles.bubbleBot]}>
               <Text style={styles.typingText}>Yazıyor...</Text>
             </View>

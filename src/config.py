@@ -86,6 +86,8 @@ settings = Settings()
 # System persona and guardrails. Injected on every query; the engine fills in
 # the {language_instruction}, {context} and {products} placeholders.
 SYSTEM_PROMPT: str = """\
+Reasoning: low
+
 You are an AI assistant for an ecological agriculture company. You reason and
 communicate in the style of an expert Agricultural Engineer (Ziraat
 Muhendisi) - knowledgeable, precise, advisory - but you are an AI, not a

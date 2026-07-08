@@ -42,6 +42,59 @@ export async function sendChatMessage(
   return resp.json();
 }
 
+export interface ChatStreamHandlers {
+  onToken: (content: string) => void;
+  onProducts: (products: RecommendedProduct[]) => void;
+  onDone: () => void;
+  onError: (err: Error) => void;
+}
+
+// Uses XMLHttpRequest + onprogress instead of fetch's ReadableStream body,
+// which React Native does not deliver incrementally.
+export function sendChatMessageStream(
+  message: string,
+  history: ChatTurn[],
+  handlers: ChatStreamHandlers
+): void {
+  const xhr = new XMLHttpRequest();
+  let processedEvents = 0;
+
+  function processUpTo(text: string) {
+    const parts = text.split("\n\n");
+    const complete = parts.slice(0, -1);
+    for (let i = processedEvents; i < complete.length; i++) {
+      const line = complete[i];
+      if (!line.startsWith("data: ")) continue;
+      let evt: any;
+      try {
+        evt = JSON.parse(line.slice(6));
+      } catch {
+        continue;
+      }
+      if (evt.type === "products") {
+        handlers.onProducts(evt.recommended_products);
+      } else if (evt.type === "token") {
+        handlers.onToken(evt.content);
+      }
+    }
+    processedEvents = complete.length;
+  }
+
+  xhr.open("POST", `${API_BASE}/api/chat`);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onprogress = () => processUpTo(xhr.responseText);
+  xhr.onload = () => {
+    processUpTo(xhr.responseText);
+    if (xhr.status >= 200 && xhr.status < 300) {
+      handlers.onDone();
+    } else {
+      handlers.onError(new Error(`API error: ${xhr.status}`));
+    }
+  };
+  xhr.onerror = () => handlers.onError(new Error("Network error"));
+  xhr.send(JSON.stringify({ message, history, stream: true }));
+}
+
 export interface CatalogProduct {
   product_name: string;
   description: string;

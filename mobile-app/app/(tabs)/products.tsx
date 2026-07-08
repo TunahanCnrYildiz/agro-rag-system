@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -18,14 +18,31 @@ export default function ProductsScreen() {
   const { data, loading, error } = useProducts();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const router = useRouter();
+  const chipsScrollRef = useRef<ScrollView>(null);
+  const chipOffsets = useRef<Record<string, number>>({});
 
+  // "Tüm Ürünler" is the source site's default label for uncategorized
+  // products, not a real category - it's redundant with our own "Tümü"
+  // filter, so it's dropped from the chip list (the product itself still
+  // shows up under "Tümü").
   const categories = useMemo(
-    () => Array.from(new Set(data.map((p) => p.category))).sort(),
+    () =>
+      Array.from(new Set(data.map((p) => p.category)))
+        .filter((c) => c !== "Tüm Ürünler")
+        .sort(),
     [data]
   );
   const filtered = activeCategory
     ? data.filter((p) => p.category === activeCategory)
     : data;
+
+  function selectCategory(key: string | null) {
+    setActiveCategory(key);
+    const x = chipOffsets.current[key ?? "__all__"];
+    if (x !== undefined) {
+      chipsScrollRef.current?.scrollTo({ x: Math.max(0, x - 20), animated: true });
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -47,6 +64,7 @@ export default function ProductsScreen() {
       {!loading && !error && (
         <>
           <ScrollView
+            ref={chipsScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.chipsRow}
@@ -54,7 +72,10 @@ export default function ProductsScreen() {
           >
             <TouchableOpacity
               style={[styles.chip, !activeCategory && styles.chipActive]}
-              onPress={() => setActiveCategory(null)}
+              onPress={() => selectCategory(null)}
+              onLayout={(e) => {
+                chipOffsets.current["__all__"] = e.nativeEvent.layout.x;
+              }}
             >
               <Text
                 style={[
@@ -69,7 +90,10 @@ export default function ProductsScreen() {
               <TouchableOpacity
                 key={c}
                 style={[styles.chip, activeCategory === c && styles.chipActive]}
-                onPress={() => setActiveCategory(c)}
+                onPress={() => selectCategory(c)}
+                onLayout={(e) => {
+                  chipOffsets.current[c] = e.nativeEvent.layout.x;
+                }}
               >
                 <Text
                   style={[
@@ -117,18 +141,30 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   centerBox: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   errorText: { color: "#a33", textAlign: "center", fontSize: 13 },
-  chipsRow: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: "#e6e6e6" },
-  chipsContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  chipsRow: {
+    flexGrow: 0,
+    flexShrink: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e6e6e6",
+  },
+  chipsContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    alignItems: "center",
+  },
   chip: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.greenLight,
   },
   chipActive: { backgroundColor: colors.green, borderColor: colors.green },
-  chipText: { fontSize: 12, color: colors.dark },
+  // Explicit lineHeight so the chip Text reserves enough vertical room for
+  // tall Turkish glyphs (ü, ğ, İ) - without it Android crops the text.
+  chipText: { fontSize: 12, lineHeight: 18, color: colors.dark },
   chipTextActive: { color: "#fff", fontWeight: "600" },
   grid: {
     padding: 12,
@@ -139,6 +175,7 @@ const styles = StyleSheet.create({
   card: {
     flexBasis: "47%",
     flexGrow: 1,
+    maxWidth: "47%",
     backgroundColor: colors.white,
     borderRadius: 12,
     padding: 10,
