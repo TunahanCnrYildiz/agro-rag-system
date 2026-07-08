@@ -2,11 +2,13 @@
 // React Native's fetch does not reliably support reading a streaming
 // response body (no ReadableStream support), unlike the browser widget.
 //
-// Platform note: 127.0.0.1 only reaches the API when the app runs in the
-// same browser/host as the server (e.g. `expo start --web`). An Android
-// emulator needs 10.0.2.2, and a physical device needs the host machine's
-// LAN IP — change API_BASE accordingly when testing on-device.
-export const API_BASE = "http://127.0.0.1:8000";
+// Platform note: a physical device can't reach 127.0.0.1 (that's the phone
+// itself) - it needs the host machine's LAN IP instead, and both devices must
+// be on the same Wi-Fi. This IP is assigned by the router (DHCP) and can
+// change; if the app can't reach the API, check the PC's current IP
+// (ipconfig / Settings > Network) and update it here.
+// Android emulator (not a physical device) would instead use 10.0.2.2.
+export const API_BASE = "http://192.168.1.103:8000";
 
 export type ChatRole = "user" | "assistant";
 
