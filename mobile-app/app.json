@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "ekolojiktarim",
     "userInterfaceStyle": "light",
     "backgroundColor": "#f7f9f5",
     "ios": {
@@ -35,7 +36,11 @@
           "backgroundColor": "#f7f9f5",
           "imageWidth": 220
         }
-      ]
-    ]
+      ],
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

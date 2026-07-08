@@ -1,6 +1,5 @@
 import React, { useRef, useState } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -11,16 +10,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { MarkdownText } from "./src/MarkdownText";
-import { colors } from "./src/theme";
-import { getGreeting } from "./src/greeting";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MarkdownText } from "../../src/MarkdownText";
+import { ScreenHeader } from "../../src/ScreenHeader";
+import { colors } from "../../src/theme";
+import { getGreeting } from "../../src/greeting";
 import {
   ChatTurn,
   RecommendedProduct,
   sendChatMessage,
-} from "./src/api";
+} from "../../src/api";
 
 interface Message {
   id: string;
@@ -29,14 +28,12 @@ interface Message {
   products?: RecommendedProduct[];
 }
 
-const LOGO = require("./assets/logo-wordmark.png");
-
 let nextId = 1;
 function newId() {
   return String(nextId++);
 }
 
-export default function App() {
+export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: newId(),
@@ -93,105 +90,83 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar style="light" />
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <ScreenHeader title="Ekolojik Tarım Asistanı" />
 
-        <View style={styles.header}>
-          <Image
-            source={LOGO}
-            style={styles.logo}
-            resizeMode="contain"
-            tintColor="#ffffff"
-          />
-          <Text style={styles.title}>Ekolojik Tarım Asistanı</Text>
-        </View>
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
         >
-          <ScrollView
-            ref={scrollRef}
-            style={styles.messages}
-            contentContainerStyle={styles.messagesContent}
-          >
-            {messages.map((m) => (
-              <View key={m.id}>
-                <View
-                  style={[
-                    styles.bubble,
-                    m.role === "user" ? styles.bubbleUser : styles.bubbleBot,
-                  ]}
-                >
-                  {m.role === "user" ? (
-                    <Text style={styles.userText}>{m.text}</Text>
-                  ) : (
-                    <MarkdownText text={m.text} color={colors.dark} />
-                  )}
-                </View>
-                {m.products && m.products.length > 0 && (
-                  <View style={styles.products}>
-                    {m.products.map((p, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        style={styles.productChip}
-                        onPress={() => Linking.openURL(p.link)}
-                      >
-                        <View style={styles.dot} />
-                        <Text style={styles.productText}>{p.title}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+          {messages.map((m) => (
+            <View key={m.id}>
+              <View
+                style={[
+                  styles.bubble,
+                  m.role === "user" ? styles.bubbleUser : styles.bubbleBot,
+                ]}
+              >
+                {m.role === "user" ? (
+                  <Text style={styles.userText}>{m.text}</Text>
+                ) : (
+                  <MarkdownText text={m.text} color={colors.dark} />
                 )}
               </View>
-            ))}
-            {loading && (
-              <View style={[styles.bubble, styles.bubbleBot]}>
-                <Text style={styles.typingText}>Yazıyor...</Text>
-              </View>
-            )}
-          </ScrollView>
+              {m.products && m.products.length > 0 && (
+                <View style={styles.products}>
+                  {m.products.map((p, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.productChip}
+                      onPress={() => Linking.openURL(p.link)}
+                    >
+                      <View style={styles.dot} />
+                      <Text style={styles.productText}>{p.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          ))}
+          {loading && (
+            <View style={[styles.bubble, styles.bubbleBot]}>
+              <Text style={styles.typingText}>Yazıyor...</Text>
+            </View>
+          )}
+        </ScrollView>
 
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder="Bitkileriniz hakkında bir soru sorun..."
-              placeholderTextColor="#9aa393"
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-              editable={!loading}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, loading && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={loading}
-            >
-              <Text style={styles.sendIcon}>&#10148;</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </SafeAreaProvider>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Bitkileriniz hakkında bir soru sorun..."
+            placeholderTextColor="#9aa393"
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, loading && styles.sendButtonDisabled]}
+            onPress={handleSend}
+            disabled={loading}
+          >
+            <Text style={styles.sendIcon}>&#10148;</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    backgroundColor: colors.green,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  logo: { width: 130, height: 21 },
-  title: { color: "#fff", fontSize: 15, fontWeight: "700" },
   messages: { flex: 1 },
   messagesContent: { padding: 14, gap: 10 },
   bubble: {

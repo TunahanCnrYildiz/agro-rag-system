@@ -39,3 +39,33 @@ export async function sendChatMessage(
   }
   return resp.json();
 }
+
+export interface CatalogProduct {
+  product_name: string;
+  description: string;
+  category: string;
+  source_url: string;
+  image_url: string;
+}
+
+export interface Article {
+  title: string;
+  excerpt: string;
+  category: string;
+  date: string;
+  source_url: string;
+  image_url: string;
+  content: string;
+}
+
+export async function fetchProducts(): Promise<CatalogProduct[]> {
+  const resp = await fetch(`${API_BASE}/api/products`);
+  if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchArticles(): Promise<Article[]> {
+  const resp = await fetch(`${API_BASE}/api/articles`);
+  if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+  return resp.json();
+}
