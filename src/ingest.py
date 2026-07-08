@@ -104,6 +104,20 @@ def _stable_chunk_id(source: str, page: int, index: int, text: str) -> str:
     return f"{source}:{page}:{index}:{digest}"
 
 
+MIN_CHUNK_CHARS = 40
+MIN_ALPHA_RATIO = 0.6
+
+
+def _is_junk_chunk(text: str) -> bool:
+    """Reject OCR-garbage chunks (scanned-book noise: stray punctuation,
+    single characters, near-empty pages) that would otherwise pollute
+    similarity search with low-quality, falsely "generic" embeddings."""
+    if len(text) < MIN_CHUNK_CHARS:
+        return True
+    letters = sum(c.isalpha() for c in text)
+    return (letters / len(text)) < MIN_ALPHA_RATIO
+
+
 def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
     """Lazily yield chunked Documents across all source files."""
     files = _iter_source_files()
@@ -117,7 +131,7 @@ def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
         for text, meta in _load_file_text(path):
             for i, chunk in enumerate(splitter.split_text(text)):
                 chunk = chunk.strip()
-                if not chunk:
+                if not chunk or _is_junk_chunk(chunk):
                     continue
                 meta_out = dict(meta)
                 meta_out["chunk_index"] = i

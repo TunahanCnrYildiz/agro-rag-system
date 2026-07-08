@@ -151,13 +151,20 @@ def _load_products() -> tuple[dict, ...]:
 
 def match_products(query: str, botany_context: str = "", k: int | None = None) -> list[RecommendedProduct]:
     """Rank catalog products by embedding similarity to the query, so matches
-    work regardless of the query's language versus the (Turkish) catalog."""
+    work regardless of the query's language versus the (Turkish) catalog.
+
+    Requires non-empty botany_context (i.e. retrieval already found the query
+    on-topic) - otherwise there's nothing to genuinely ground a recommendation
+    in, so we return no products rather than guess from the query alone.
+    """
     k = k or settings.product_match_k
+    if not botany_context or not botany_context.strip():
+        return []
     products = _load_products()
     if not products:
         return []
 
-    embed_input = f"{query}\n{botany_context[:1000]}" if botany_context else query
+    embed_input = f"{query}\n{botany_context[:1000]}"
     try:
         query_embedding = _get_embeddings_client().embed_query(embed_input)
     except Exception as exc:  # noqa: BLE001
