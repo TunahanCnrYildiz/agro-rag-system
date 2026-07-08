@@ -200,9 +200,11 @@ def _get_retriever_store():
 
 # Below this relevance score, a retrieved chunk is treated as noise (the
 # vector store always returns its k nearest neighbors, even for off-topic
-# queries). Calibrated against real on-topic (~0.38-0.50) vs off-topic
-# (~0.14-0.26) queries, which leave a clean gap around 0.3.
-MIN_RETRIEVAL_RELEVANCE = 0.30
+# queries). On-topic queries have consistently scored ~0.38+; some generic
+# off-topic phrasings ("bilgisayar ile ilgili bilgi ver") can drift up to
+# ~0.34 against administrative/boilerplate scan text, so 0.30 wasn't quite
+# enough margin - raised to sit clearly between the two.
+MIN_RETRIEVAL_RELEVANCE = 0.36
 
 
 def retrieve_context(query: str, k: int | None = None) -> str:

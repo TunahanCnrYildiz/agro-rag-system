@@ -106,16 +106,35 @@ def _stable_chunk_id(source: str, page: int, index: int, text: str) -> str:
 
 MIN_CHUNK_CHARS = 40
 MIN_ALPHA_RATIO = 0.6
+MIN_SPACE_RATIO = 0.08
+MAX_AVG_WORD_LEN = 20
+
+# Recurring USDA scan boilerplate - real text, but metadata about the scan
+# itself, not agricultural content. Filtered by substring, case-insensitive.
+_BOILERPLATE_MARKERS = (
+    "do not assume content reflects current scientific knowledge",
+)
 
 
 def _is_junk_chunk(text: str) -> bool:
-    """Reject OCR-garbage chunks (scanned-book noise: stray punctuation,
-    single characters, near-empty pages) that would otherwise pollute
-    similarity search with low-quality, falsely "generic" embeddings."""
+    """Reject OCR-garbage chunks that would otherwise pollute similarity
+    search with low-quality, falsely "generic" embeddings: stray punctuation,
+    near-empty pages, OCR text with lost word-spacing (words run together),
+    and recurring scan-disclaimer boilerplate."""
     if len(text) < MIN_CHUNK_CHARS:
         return True
     letters = sum(c.isalpha() for c in text)
-    return (letters / len(text)) < MIN_ALPHA_RATIO
+    if (letters / len(text)) < MIN_ALPHA_RATIO:
+        return True
+    if (text.count(" ") / len(text)) < MIN_SPACE_RATIO:
+        return True
+    words = text.split()
+    if words and (len(text) / len(words)) > MAX_AVG_WORD_LEN:
+        return True
+    lowered = text.lower()
+    if any(marker in lowered for marker in _BOILERPLATE_MARKERS):
+        return True
+    return False
 
 
 def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
