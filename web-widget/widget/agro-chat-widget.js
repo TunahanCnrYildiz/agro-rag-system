@@ -233,7 +233,9 @@
       ui.input.value = "";
       ui.sendBtn.disabled = true;
       addMessage(ui.messages, "user", text);
-      history.push({ role: "user", content: text });
+      // Snapshot prior turns only - the current message is sent separately
+      // via `message`, so it must not also appear as the last history entry.
+      var requestHistory = history.slice();
 
       var botBubble = addMessage(ui.messages, "bot typing", "Yazıyor...");
       var accumulated = "";
@@ -242,7 +244,7 @@
       fetch(API_BASE + "/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history: history, stream: true }),
+        body: JSON.stringify({ message: text, history: requestHistory, stream: true }),
       })
         .then(function (resp) {
           var reader = resp.body.getReader();
@@ -270,6 +272,7 @@
                   botBubble.innerHTML = renderMarkdown(accumulated);
                   ui.messages.scrollTop = ui.messages.scrollHeight;
                 } else if (evt.type === "done") {
+                  history.push({ role: "user", content: text });
                   history.push({ role: "assistant", content: accumulated });
                 }
               });

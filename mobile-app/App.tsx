@@ -58,12 +58,15 @@ export default function App() {
     if (!text || loading) return;
     setInput("");
     setMessages((prev) => [...prev, { id: newId(), role: "user", text }]);
-    historyRef.current.push({ role: "user", content: text });
+    // Prior turns only - the current message is sent separately as `text`,
+    // so it must not also be the last entry in the history we send.
+    const requestHistory = historyRef.current.slice();
     setLoading(true);
     scrollToEnd();
 
     try {
-      const resp = await sendChatMessage(text, historyRef.current);
+      const resp = await sendChatMessage(text, requestHistory);
+      historyRef.current.push({ role: "user", content: text });
       historyRef.current.push({ role: "assistant", content: resp.answer });
       setMessages((prev) => [
         ...prev,
