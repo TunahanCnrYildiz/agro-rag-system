@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import { MarkdownText } from "../../src/MarkdownText";
 import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
 import { getGreeting } from "../../src/greeting";
+import { openExternalUrl } from "../../src/openExternalUrl";
 import {
   ChatTurn,
   RecommendedProduct,
@@ -123,7 +123,7 @@ export default function ChatScreen() {
                     <TouchableOpacity
                       key={i}
                       style={styles.productChip}
-                      onPress={() => Linking.openURL(p.link)}
+                      onPress={() => openExternalUrl(p.link)}
                     >
                       <View style={styles.dot} />
                       <Text style={styles.productText}>{p.title}</Text>

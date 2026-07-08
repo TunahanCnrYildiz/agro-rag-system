@@ -2,7 +2,6 @@ import React from "react";
 import {
   ActivityIndicator,
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { colors } from "../../src/theme";
 import { useProducts } from "../../src/data";
+import { openExternalUrl } from "../../src/openExternalUrl";
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,7 +46,7 @@ export default function ProductDetailScreen() {
 
       <TouchableOpacity
         style={styles.siteButton}
-        onPress={() => Linking.openURL(product.source_url)}
+        onPress={() => openExternalUrl(product.source_url)}
       >
         <Text style={styles.siteButtonText}>Sitede Görüntüle</Text>
       </TouchableOpacity>

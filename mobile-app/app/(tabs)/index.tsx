@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
+import { openExternalUrl } from "../../src/openExternalUrl";
 
 const HERO_IMAGE = require("../../assets/logo-wordmark.png");
 const SITE_URL = "https://www.ekolojiktarim.com.tr/";
@@ -108,7 +108,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.siteLink}
-          onPress={() => Linking.openURL(SITE_URL)}
+          onPress={() => openExternalUrl(SITE_URL)}
         >
           <Text style={styles.siteLinkText}>Web Sitemizi Ziyaret Edin</Text>
           <Ionicons name="open-outline" size={16} color={colors.green} />
