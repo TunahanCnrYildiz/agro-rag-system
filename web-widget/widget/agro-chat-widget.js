@@ -94,6 +94,7 @@
     "  flex: 1; border: 1px solid #d7dcd0; border-radius: 20px; padding: 10px 14px; font-size: 13.5px; outline: none;" +
     "}" +
     ".input-row input:focus { border-color: " + BRAND.green + "; }" +
+    ".input-row input:disabled { opacity: .6; }" +
     ".input-row button {" +
     "  width: 38px; height: 38px; border-radius: 50%; border: none; background: " + BRAND.green + ";" +
     "  color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" +
@@ -228,9 +229,13 @@
     ui.closeBtn.addEventListener("click", function () { togglePanel(false); });
 
     function send() {
+      // Guard against a second send while one is still in flight - Enter
+      // calls send() directly, bypassing the button's disabled state.
+      if (ui.sendBtn.disabled) return;
       var text = ui.input.value.trim();
       if (!text) return;
       ui.input.value = "";
+      ui.input.disabled = true;
       ui.sendBtn.disabled = true;
       addMessage(ui.messages, "user", text);
       // Snapshot prior turns only - the current message is sent separately
@@ -287,6 +292,8 @@
         })
         .finally(function () {
           ui.sendBtn.disabled = false;
+          ui.input.disabled = false;
+          ui.input.focus();
         });
     }
 
