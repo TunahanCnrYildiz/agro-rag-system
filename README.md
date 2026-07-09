@@ -11,6 +11,22 @@ matching.
 
 ---
 
+## Screenshots
+
+The mobile app (Expo / React Native) mirrors the company site with Home,
+Products, Academy, and AI Assistant tabs, all driven by live scraped data and
+the RAG backend.
+
+| Home | Products |
+| --- | --- |
+| ![Home](docs/screenshots/home.png) | ![Products](docs/screenshots/products.png) |
+
+| Academy | AI Assistant |
+| --- | --- |
+| ![Academy](docs/screenshots/articles.png) | ![AI Assistant](docs/screenshots/chat.png) |
+
+---
+
 ## Architecture
 
 ```
@@ -70,6 +86,14 @@ agro-rag-system/
 ---
 
 ## Quickstart
+
+> **Note on a fresh clone:** the repo ships the code and the scraped
+> `products.json` / `articles.json`, but **not** the botany knowledge base.
+> The vector store (`data/vector_store/`, ~700 MB) and the source PDFs
+> (`docs/books/`) are gitignored because of their size. On a new machine you
+> either copy those two folders over manually, or rebuild them with steps 4–5
+> below. Without them the API still runs, but the assistant has no botany
+> knowledge to ground its answers. See **Running on a new machine** at the end.
 
 ### 1. Install dependencies
 
@@ -161,6 +185,60 @@ then `token` events, then a `done` event.
 ### `GET /health`
 
 Liveness probe.
+
+---
+
+## Mobile app
+
+The `mobile-app/` folder is an Expo (React Native) app with Home, Products,
+Academy, and Chat tabs. It talks to the same backend API.
+
+```bash
+cd mobile-app
+npm install
+npm run web        # browser preview
+npx expo start     # dev server for Expo Go / device
+```
+
+**Point it at your backend.** A physical phone cannot reach `127.0.0.1` — that
+is the phone itself. Set `API_BASE` in `mobile-app/src/api.ts` to the host
+machine's LAN IP (both devices on the same Wi-Fi), e.g.:
+
+```ts
+export const API_BASE = "http://192.168.1.103:8000";
+```
+
+The IP is assigned by your router (DHCP) and can change; check it with
+`ipconfig` (Windows) / `ifconfig` (Unix) and update it here. Also allow the
+backend port through the OS firewall so the phone can connect.
+
+**Build an installable APK.** Cloud build via EAS
+(`eas build -p android --profile preview`), or a local Gradle build after
+`npx expo prebuild -p android` → `./gradlew assembleRelease`. The self-contained
+release APK lands in
+`android/app/build/outputs/apk/release/app-release.apk`.
+
+---
+
+## Running on a new machine
+
+A `git clone` alone is **not** a fully working system. Checklist:
+
+1. **Python deps** — `pip install -r requirements.txt`.
+2. **LM Studio** — install it, download a chat model (e.g. Gemma) and an
+   embedding model (e.g. bge-m3), start the local server on port `1234`, and
+   set the exact model ids in `.env` (copy `.env.example`).
+3. **Knowledge base** — copy `data/vector_store/` and `docs/books/` from the
+   original machine, **or** rebuild with `python -m src.fetch_books` +
+   `python -m src.ingest`. (A rebuild is *similar* but not identical — the
+   Internet Archive returns different books over time.)
+4. **Backend** — `uvicorn src.main:app --host 0.0.0.0 --port 8000`.
+5. **Mobile app** — `npm install`, set `API_BASE` to the new machine's LAN IP,
+   then rebuild the APK (see above).
+
+Catalog data (`products.json`, `articles.json`) is committed, so the Products
+and Academy tabs work immediately; re-run `python -m src.scraper` /
+`python -m src.articles_scraper` only to refresh them.
 
 ---
 
