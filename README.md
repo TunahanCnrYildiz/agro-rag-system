@@ -239,17 +239,3 @@ A `git clone` alone is **not** a fully working system. Checklist:
 Catalog data (`products.json`, `articles.json`) is committed, so the Products
 and Academy tabs work immediately; re-run `python -m src.scraper` /
 `python -m src.articles_scraper` only to refresh them.
-
----
-
-## Execution log
-
-- Project scaffolded with modular `src/` layout per spec.
-- `scraper.py` includes a curated mock catalog so the full pipeline runs
-  offline / when the live site rate-limits.
-- `ingest.py` streams files page-by-page and flushes to Chroma in fixed
-  batches to avoid loading hundreds of books into memory.
-- `engine.py` combines botany retrieval + lexical product matching and injects
-  the strict persona/guardrail prompt on every call.
-- `main.py` exposes `/api/chat` (unified + streaming) with permissive CORS for
-  mobile and web clients.

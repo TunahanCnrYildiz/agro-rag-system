@@ -20,8 +20,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude Code local (machine-specific permission allowlist)
-.claude/settings.local.json
+# Local editor / tooling config (not part of the project)
+.claude/
+CLAUDE.md
+AGENTS.md
 
 # Logs
 *.log

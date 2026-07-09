@@ -14,9 +14,9 @@ npm run ios        # iOS simulator (macOS only)
 
 ## API endpoint
 
-`src/api.ts` points at `API_BASE = "http://127.0.0.1:8000"` by default. This
-only works when the app and the API run on the same machine (e.g. web
-preview). For a physical device or emulator, change `API_BASE`:
+Set `API_BASE` in `src/api.ts` to wherever the backend runs. `127.0.0.1` only
+works when the app and API share a machine (e.g. web preview); a physical
+device or emulator needs a reachable address:
 
 - Android emulator → `http://10.0.2.2:8000`
 - Physical device → `http://<your-machine-LAN-IP>:8000`
@@ -24,10 +24,10 @@ preview). For a physical device or emulator, change `API_BASE`:
 
 ## Notes
 
-- Uses the API's **unified (non-streaming)** response mode (`stream: false`).
-  React Native's `fetch` doesn't reliably support reading a streaming response
-  body (no `ReadableStream` support), unlike the web widget. A "Yazıyor..."
-  indicator covers the wait instead of token-by-token streaming.
+- Streams the answer token-by-token over SSE using `XMLHttpRequest`'s
+  `onprogress` (React Native's `fetch` has no `ReadableStream` body, so the
+  browser widget's reader approach doesn't work here). A "Yazıyor..." indicator
+  covers the wait until the first token arrives.
 - `src/MarkdownText.tsx` renders the LLM's lightweight markdown (`**bold**`,
   `*italic*`, bullet lists) as native Text/View components — React Native has
   no `innerHTML`, so this can't reuse the web widget's HTML-based renderer.
