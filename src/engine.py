@@ -100,8 +100,10 @@ def detect_language(text: str) -> str:
 # Product catalog matching (embedding-based, language-agnostic)
 # --------------------------------------------------------------------------- #
 # Below this cosine similarity, a product is considered unrelated to the query
-# rather than forced into the top-k. Tuned empirically against bge-m3.
-MIN_PRODUCT_SIMILARITY = 0.35
+# rather than forced into the top-k. Tuned empirically against bge-m3; kept
+# fairly strict so only products that genuinely match the answer are shown
+# (better to recommend none than something off-topic).
+MIN_PRODUCT_SIMILARITY = 0.45
 
 
 @lru_cache(maxsize=1)
@@ -316,16 +318,12 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
 def stream_answer(
     message: str, history: list[dict] | None = None
 ) -> Iterator[str]:
-    """Yield Server-Sent-Event lines. First event carries product metadata,
-    subsequent events stream the answer text token-by-token."""
+    """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
+    once it's complete a single event carries the product recommendations, then
+    a final 'done' event closes the stream."""
     context = retrieve_context(message)
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
-
-    # Emit product recommendations up front so clients can render them early.
-    yield _sse(
-        {"type": "products", "recommended_products": [p.as_api() for p in products]}
-    )
 
     try:
         client = _get_llm()
@@ -349,6 +347,13 @@ def stream_answer(
                 ),
             }
         )
+
+    # Emit product recommendations only after the full answer has streamed, so
+    # clients render them beneath the completed reply rather than while it's
+    # still "typing".
+    yield _sse(
+        {"type": "products", "recommended_products": [p.as_api() for p in products]}
+    )
 
     yield _sse({"type": "done"})
 
