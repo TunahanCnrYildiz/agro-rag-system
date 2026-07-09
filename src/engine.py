@@ -155,18 +155,20 @@ def match_products(query: str, botany_context: str = "", k: int | None = None) -
     """Rank catalog products by embedding similarity to the query, so matches
     work regardless of the query's language versus the (Turkish) catalog.
 
-    Requires non-empty botany_context (i.e. retrieval already found the query
-    on-topic) - otherwise there's nothing to genuinely ground a recommendation
-    in, so we return no products rather than guess from the query alone.
+    Relevance is gated by MIN_PRODUCT_SIMILARITY alone: only products that
+    genuinely match the query clear the threshold, so off-topic questions
+    naturally get none. Retrieved botany_context, when present, is folded into
+    the embedding to sharpen the match, but its absence no longer suppresses
+    recommendations - an explicit on-topic request ("Fındık için gübre önerir
+    misin?") should still surface products even when the reference books don't
+    happen to cover that exact crop.
     """
     k = k or settings.product_match_k
-    if not botany_context or not botany_context.strip():
-        return []
     products = _load_products()
     if not products:
         return []
 
-    embed_input = f"{query}\n{botany_context[:1000]}"
+    embed_input = f"{query}\n{botany_context[:1000]}" if botany_context.strip() else query
     try:
         query_embedding = _get_embeddings_client().embed_query(embed_input)
     except Exception as exc:  # noqa: BLE001
