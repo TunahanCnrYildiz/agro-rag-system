@@ -20,15 +20,22 @@ from bs4 import BeautifulSoup
 
 try:
     from .config import DOCS_DIR
+    from .scrape_utils import (
+        BASE_URL,
+        REQUEST_DELAY_SECONDS,
+        extract_meta_description,
+        fetch,
+        make_session,
+    )
 except ImportError:  # pragma: no cover
     from config import DOCS_DIR  # type: ignore
-
-BASE_URL = "https://www.ekolojiktarim.com.tr/"
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; AgroBotanyBot/0.1; +https://ekolojiktarim.com.tr/)"
-)
-REQUEST_DELAY_SECONDS = 1.0
-REQUEST_TIMEOUT = 15
+    from scrape_utils import (  # type: ignore
+        BASE_URL,
+        REQUEST_DELAY_SECONDS,
+        extract_meta_description,
+        fetch,
+        make_session,
+    )
 
 ARTICLES_DIR = DOCS_DIR / "articles"
 ARTICLES_JSON = ARTICLES_DIR / "articles.json"
@@ -53,22 +60,6 @@ class Article:
     source_url: str
     image_url: str = ""
     content: str = ""
-
-
-def _make_session() -> requests.Session:
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "tr,en"})
-    return session
-
-
-def _fetch(session: requests.Session, url: str) -> BeautifulSoup | None:
-    try:
-        resp = session.get(url, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"[articles] request failed for {url}: {exc}")
-        return None
-    return BeautifulSoup(resp.text, "html.parser")
 
 
 def _parse_listing_page(soup: BeautifulSoup) -> list[dict]:
@@ -111,7 +102,7 @@ def _crawl_category(session: requests.Session, slug: str, max_pages: int = 3) ->
             if page_num == 1
             else f"{BASE_URL}category/{slug}/page/{page_num}/"
         )
-        soup = _fetch(session, url)
+        soup = fetch(session, url, "articles")
         if soup is None:
             break
         page_cards = _parse_listing_page(soup)
@@ -130,7 +121,7 @@ def _crawl_category(session: requests.Session, slug: str, max_pages: int = 3) ->
 
 def _fetch_content(session: requests.Session, url: str) -> tuple[str, str]:
     """Return (excerpt, full_content) for an article detail page."""
-    soup = _fetch(session, url)
+    soup = fetch(session, url, "articles")
     if soup is None:
         return "", ""
     body = soup.select_one(
@@ -138,20 +129,15 @@ def _fetch_content(session: requests.Session, url: str) -> tuple[str, str]:
     )
     content = body.get_text(" ", strip=True) if body else ""
 
-    excerpt = ""
-    meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
-        "meta", property="og:description"
-    )
-    if meta_desc and meta_desc.get("content"):
-        excerpt = meta_desc["content"].strip()
-    elif content:
+    excerpt = extract_meta_description(soup)
+    if not excerpt and content:
         excerpt = content[:200].rsplit(" ", 1)[0] + "..."
 
     return excerpt, content
 
 
 def crawl(max_articles: int = 60) -> list[Article]:
-    session = _make_session()
+    session = make_session()
     cards_by_url: dict[str, dict] = {}
     for slug in CATEGORY_SLUGS:
         print(f"[articles] category: {slug}")

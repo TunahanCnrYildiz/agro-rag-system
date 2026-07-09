@@ -246,6 +246,16 @@ def _get_llm() -> OpenAI:
     )
 
 
+def _llm_unavailable_message(exc: Exception) -> str:
+    """User-facing fallback shown when the LM Studio chat model can't be
+    reached, so both the unified and streaming paths return the same wording."""
+    return (
+        "Uzgunum, su anda dil modeline (LM Studio) ulasamiyorum. "
+        "Lutfen yerel sunucunun calistigindan emin oldugunuzu kontrol edin. "
+        f"(teknik detay: {exc})"
+    )
+
+
 def _build_messages(
     message: str,
     history: list[dict] | None,
@@ -308,11 +318,7 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         )
         answer_text = completion.choices[0].message.content or ""
     except Exception as exc:  # noqa: BLE001
-        answer_text = (
-            "Uzgunum, su anda dil modeline (LM Studio) ulasamiyorum. "
-            "Lutfen yerel sunucunun calistigindan emin olun. "
-            f"(teknik detay: {exc})"
-        )
+        answer_text = _llm_unavailable_message(exc)
 
     return ChatResult(answer=answer_text.strip(), recommended_products=products)
 
@@ -340,15 +346,7 @@ def stream_answer(
             if delta:
                 yield _sse({"type": "token", "content": delta})
     except Exception as exc:  # noqa: BLE001
-        yield _sse(
-            {
-                "type": "token",
-                "content": (
-                    "Uzgunum, dil modeline ulasamiyorum. LM Studio calisiyor mu? "
-                    f"(teknik detay: {exc})"
-                ),
-            }
-        )
+        yield _sse({"type": "token", "content": _llm_unavailable_message(exc)})
 
     # Emit product recommendations only after the full answer has streamed, so
     # clients render them beneath the completed reply rather than while it's

@@ -24,15 +24,23 @@ from bs4 import BeautifulSoup
 
 try:  # allow both "python -m src.scraper" and "python src/scraper.py"
     from .config import PRODUCTS_JSON, PRODUCTS_DIR
+    from .scrape_utils import (
+        BASE_URL,
+        REQUEST_DELAY_SECONDS,
+        extract_meta_description,
+        fetch,
+        make_session,
+    )
 except ImportError:  # pragma: no cover
     from config import PRODUCTS_JSON, PRODUCTS_DIR  # type: ignore
+    from scrape_utils import (  # type: ignore
+        BASE_URL,
+        REQUEST_DELAY_SECONDS,
+        extract_meta_description,
+        fetch,
+        make_session,
+    )
 
-BASE_URL = "https://www.ekolojiktarim.com.tr/"
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; AgroBotanyBot/0.1; +https://ekolojiktarim.com.tr/)"
-)
-REQUEST_DELAY_SECONDS = 1.0  # polite crawl delay
-REQUEST_TIMEOUT = 15
 MAX_PAGES_PER_CATEGORY = 10  # safety cap on pagination
 
 # Known WooCommerce category slugs (from the site's navigation).
@@ -56,25 +64,6 @@ class Product:
     category: str
     source_url: str
     image_url: str = ""
-
-
-# --------------------------------------------------------------------------- #
-# HTTP helpers
-# --------------------------------------------------------------------------- #
-def _make_session() -> requests.Session:
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "tr,en"})
-    return session
-
-
-def _fetch(session: requests.Session, url: str) -> BeautifulSoup | None:
-    try:
-        resp = session.get(url, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"[scraper] request failed for {url}: {exc}")
-        return None
-    return BeautifulSoup(resp.text, "html.parser")
 
 
 # --------------------------------------------------------------------------- #
@@ -114,7 +103,7 @@ def _crawl_category(session: requests.Session, slug: str) -> list[dict]:
             if page_num == 1
             else f"{BASE_URL}product-category/{slug}/page/{page_num}/"
         )
-        soup = _fetch(session, url)
+        soup = fetch(session, url, "scraper")
         if soup is None:
             break
         cards = _parse_category_page(soup)
@@ -133,14 +122,12 @@ def _crawl_category(session: requests.Session, slug: str) -> list[dict]:
 
 def _fetch_description(session: requests.Session, url: str) -> str:
     """Best-effort short description from a product detail page."""
-    soup = _fetch(session, url)
+    soup = fetch(session, url, "scraper")
     if soup is None:
         return ""
-    meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
-        "meta", property="og:description"
-    )
-    if meta_desc and meta_desc.get("content"):
-        return meta_desc["content"].strip()
+    desc = extract_meta_description(soup)
+    if desc:
+        return desc
     for p in soup.find_all("p"):
         text = p.get_text(strip=True)
         if len(text) > 40:
@@ -151,7 +138,7 @@ def _fetch_description(session: requests.Session, url: str) -> str:
 def crawl(max_products: int = 200) -> list[Product]:
     """Crawl all known product categories (with pagination), then fetch a
     short description per product."""
-    session = _make_session()
+    session = make_session()
     cards_by_url: dict[str, dict] = {}
     for slug in CATEGORY_SLUGS:
         print(f"[scraper] category: {slug}")
