@@ -25,5 +25,8 @@ Thumbs.db
 CLAUDE.md
 AGENTS.md
 
+# Local-only project notes (kept off the remote)
+spec.md
+
 # Logs
 *.log
