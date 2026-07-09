@@ -34,7 +34,8 @@ OAI_URL = f"{BASE}/api/public/oai/"
 USER_AGENT = "AgroBotanyBot/0.1 (+https://ekolojiktarim.com.tr/)"
 
 OAI_DELAY = 0.5   # polite delay between OAI API calls
-PDF_DELAY = 1.0   # polite delay between PDF downloads
+PDF_DELAY = 2.0   # polite delay between PDF downloads (DergiPark rate-limits)
+PDF_RETRIES = 4   # attempts when the download endpoint returns HTTP 429
 MIN_BYTES = 60_000  # skip tiny stubs / cover-only fragments
 # A full ListRecords page is generated on demand and can take ~30s server-side,
 # so use a generous timeout and retry a few times before giving up.
@@ -196,14 +197,28 @@ def _pdf_link(session: requests.Session, landing_url: str) -> str | None:
 
 
 def download(session: requests.Session, url: str, dest: Path) -> bool:
-    """Stream a PDF to disk; validate %PDF header + size. Returns True on success."""
-    try:
-        resp = session.get(url, stream=True, timeout=120)
-    except requests.RequestException as exc:
-        print(f"[dergipark]   ! download error: {exc}")
-        return False
-    if resp.status_code != 200:
-        print(f"[dergipark]   ! http {resp.status_code}, skipping")
+    """Stream a PDF to disk; validate %PDF header + size. Returns True on success.
+
+    DergiPark rate-limits the download endpoint, so a 429 is retried after the
+    server's Retry-After (or a growing backoff) rather than skipped outright.
+    """
+    resp = None
+    for attempt in range(1, PDF_RETRIES + 1):
+        try:
+            resp = session.get(url, stream=True, timeout=120)
+        except requests.RequestException as exc:
+            print(f"[dergipark]   ! download error: {exc}")
+            return False
+        if resp.status_code != 429:
+            break
+        wait = int(resp.headers.get("Retry-After", "0") or 0) or min(30, 5 * attempt)
+        resp.close()
+        if attempt < PDF_RETRIES:
+            print(f"[dergipark]   . rate-limited (429), waiting {wait}s")
+            time.sleep(wait)
+    if resp is None or resp.status_code != 200:
+        code = resp.status_code if resp is not None else "?"
+        print(f"[dergipark]   ! http {code}, skipping")
         return False
 
     tmp = dest.with_suffix(".part")
