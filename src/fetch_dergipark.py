@@ -36,12 +36,39 @@ USER_AGENT = "AgroBotanyBot/0.1 (+https://ekolojiktarim.com.tr/)"
 OAI_DELAY = 0.5   # polite delay between OAI API calls
 PDF_DELAY = 1.0   # polite delay between PDF downloads
 MIN_BYTES = 60_000  # skip tiny stubs / cover-only fragments
+# A full ListRecords page is generated on demand and can take ~30s server-side,
+# so use a generous timeout and retry a few times before giving up.
+OAI_TIMEOUT = 90
+OAI_RETRIES = 3
 
 # OAI-PMH XML namespaces.
 _NS = {
     "oai": "http://www.openarchives.org/OAI/2.0/",
     "dc": "http://purl.org/dc/elements/1.1/",
 }
+
+# Verified DergiPark agriculture journal setSpecs (Turkish agriculture faculty
+# and national agronomy journals). DergiPark's OAI ListSets only exposes ~100
+# journals with no pagination, so relying on it alone misses most; this curated
+# list is the primary source, with ListSets discovery merged in as a bonus.
+CURATED_JOURNALS = [
+    "akdenizfderg",   # Akdeniz Ü. Ziraat Fakültesi Dergisi
+    "ankutbd",        # Ankara Ü. - Journal of Agricultural Sciences
+    "anadolu",        # Ege Tarımsal Araştırma Enstitüsü Dergisi
+    "alinterizbd",    # Alınteri Journal of Agriculture Science
+    "tutad",          # Türkiye Tarımsal Araştırmalar Dergisi
+    "turkjans",       # Turkish Journal of Agricultural and Natural Sciences
+    "ataunizfd",      # Atatürk Ü. - Research in Agricultural Sciences
+    "omuanajas",      # OMÜ - Anadolu Tarım Bilimleri Dergisi
+    "yyutbd",         # Yüzüncü Yıl Ü. Journal of Agricultural Sciences
+    "ksutarimdoga",   # KSÜ Tarım ve Doğa Dergisi
+    "harranziraat",   # Harran Tarım ve Gıda Bilimleri Dergisi
+    "derim",          # Horticultural Studies
+    "gopzfd",         # Gaziosmanpaşa Ü. Ziraat Fakültesi Dergisi
+    "ejar",           # Eurasian Journal of Agricultural Research
+    "tabad",          # Research Journal of Agricultural Sciences
+    "mediterranean",  # Mediterranean Agricultural Sciences
+]
 
 # A journal is kept when its name matches one of these (plant/soil-side
 # agriculture faculties and agronomy journals).
@@ -69,14 +96,19 @@ def _session() -> requests.Session:
 
 
 def _oai(session: requests.Session, params: dict) -> ET.Element | None:
-    """Call the OAI-PMH endpoint and return the parsed root element."""
-    try:
-        resp = session.get(OAI_URL, params=params, timeout=30)
-        resp.raise_for_status()
-        return ET.fromstring(resp.content)
-    except (requests.RequestException, ET.ParseError) as exc:
-        print(f"[dergipark] OAI request failed ({params}): {exc}")
-        return None
+    """Call the OAI-PMH endpoint and return the parsed root element, retrying a
+    few times with backoff since a full page can be slow to generate."""
+    for attempt in range(1, OAI_RETRIES + 1):
+        try:
+            resp = session.get(OAI_URL, params=params, timeout=OAI_TIMEOUT)
+            resp.raise_for_status()
+            return ET.fromstring(resp.content)
+        except (requests.RequestException, ET.ParseError) as exc:
+            if attempt == OAI_RETRIES:
+                print(f"[dergipark] OAI failed after {OAI_RETRIES} tries ({params}): {exc}")
+                return None
+            time.sleep(2 * attempt)
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -205,13 +237,22 @@ def download(session: requests.Session, url: str, dest: Path) -> bool:
 # --------------------------------------------------------------------------- #
 # Drivers
 # --------------------------------------------------------------------------- #
+def _resolve_journals(session: requests.Session, set_pages: int) -> list[str]:
+    """Curated agriculture journals, plus any extra matches ListSets surfaces."""
+    discovered = [spec for spec, _ in discover_sets(session, set_pages)]
+    specs = list(dict.fromkeys(CURATED_JOURNALS + discovered))
+    print(f"[dergipark] targeting {len(specs)} journal(s) "
+          f"({len(CURATED_JOURNALS)} curated + {len(discovered)} discovered)")
+    return specs
+
+
 def _collect_candidates(
-    session: requests.Session, sets: list[tuple[str, str]], per_journal: int
+    session: requests.Session, specs: list[str], per_journal: int
 ) -> list[tuple[str, str]]:
     """Gather (article_id, landing_url) across journals, deduped by id."""
     seen: set[str] = set()
     out: list[tuple[str, str]] = []
-    for spec, name in sets:
+    for spec in specs:
         arts = list_articles(session, spec, per_journal)
         kept = 0
         for aid, url in arts:
@@ -220,7 +261,7 @@ def _collect_candidates(
             seen.add(aid)
             out.append((aid, url))
             kept += 1
-        print(f"[dergipark] journal '{spec}' ({name[:40]}): {kept} articles")
+        print(f"[dergipark] journal '{spec}': {kept} articles")
         time.sleep(OAI_DELAY)
     return out
 
@@ -232,14 +273,8 @@ def run(
     BOOKS_DIR.mkdir(parents=True, exist_ok=True)
     session = _session()
 
-    if set_spec:
-        sets = [(set_spec, set_spec)]
-    else:
-        print("[dergipark] discovering agriculture journals via OAI ListSets ...")
-        sets = discover_sets(session, set_pages)
-        print(f"[dergipark] matched {len(sets)} agriculture journal(s)")
-
-    candidates = _collect_candidates(session, sets, per_journal)
+    specs = [set_spec] if set_spec else _resolve_journals(session, set_pages)
+    candidates = _collect_candidates(session, specs, per_journal)
     print(f"[dergipark] {len(candidates)} candidate articles; target {max_books}\n")
 
     if dry_run:
@@ -290,10 +325,8 @@ def main() -> None:
 
     if args.list_sets:
         session = _session()
-        sets = discover_sets(session, args.set_pages)
-        print(f"[dergipark] {len(sets)} agriculture journal(s):")
-        for spec, name in sets:
-            print(f"  {spec:<24} {name}")
+        for spec in _resolve_journals(session, args.set_pages):
+            print(f"  {spec}")
         return
 
     run(
