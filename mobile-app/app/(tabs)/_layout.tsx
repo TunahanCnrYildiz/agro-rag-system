@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -5,6 +6,11 @@ import { colors } from "../../src/theme";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  // On web there's no OS safe-area inset, so the bar collapses to its base
+  // height and the icon+label barely fit (labels clip at the bottom). Give web
+  // an explicit, comfortable height; native keeps using the device's real
+  // bottom inset.
+  const isWeb = Platform.OS === "web";
   return (
     <Tabs
       screenOptions={{
@@ -12,9 +18,9 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.green,
         tabBarInactiveTintColor: "#9aa393",
         tabBarStyle: {
-          paddingBottom: Math.max(4, insets.bottom),
-          paddingTop: 4,
-          height: 54 + insets.bottom,
+          paddingBottom: isWeb ? 10 : Math.max(4, insets.bottom),
+          paddingTop: isWeb ? 6 : 4,
+          height: isWeb ? 64 : 54 + insets.bottom,
         },
         tabBarLabelStyle: { fontSize: 11 },
       }}
