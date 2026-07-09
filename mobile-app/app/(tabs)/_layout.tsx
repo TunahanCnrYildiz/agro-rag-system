@@ -22,7 +22,15 @@ export default function TabLayout() {
           paddingTop: isWeb ? 6 : 4,
           height: isWeb ? 64 : 54 + insets.bottom,
         },
-        tabBarLabelStyle: { fontSize: 11 },
+        // On web the label sits in a fixed-height, column flex tab button and
+        // gets shrunk to ~9px, clipping its own 11px text (overflow:hidden).
+        // Pin its height and stop it from flex-shrinking.
+        tabBarLabelStyle: {
+          fontSize: 11,
+          lineHeight: 16,
+          height: 16,
+          flexShrink: 0,
+        },
       }}
     >
       <Tabs.Screen
