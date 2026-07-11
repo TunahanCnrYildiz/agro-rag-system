@@ -30,3 +30,6 @@ spec.md
 
 # Logs
 *.log
+
+# Generated off-topic cleanup report (from `fetch_dergipark --clean-offtopic`)
+docs/offtopic_candidates.txt

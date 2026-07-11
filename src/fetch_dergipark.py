@@ -89,6 +89,22 @@ _OFFTOPIC_REC = re.compile(
     re.IGNORECASE,
 )
 
+# High-precision livestock/aquaculture filter for cleaning ALREADY-DOWNLOADED
+# PDFs. Unlike _OFFTOPIC_REC (applied to short, clean OAI title+subject), this
+# runs against noisy full-page text, so it must avoid terms that collide with
+# plant-science vocabulary: NOT `ekonomi` (Tarım Ekonomisi dept), `market`,
+# `hayvan` (Hayvancılık MYO name), `bal[ıi]k` (surname Balık), nor bare
+# `goat`/`dairy`/`cattle` (goat/cattle manure are on-topic organic fertilizers).
+# `rasyon`/`koyun` are whole-word anchored so they don't match
+# `konsantrasyon`/`Koyuncu`; cattle is reached only via `süt/besi sığır`.
+_OFFTOPIC_CLEANUP_REC = re.compile(
+    r"zootekni|veteriner|\bivesi\b|\bawassi\b|\bbroyler\b|\bbroiler\b|"
+    r"\bkarkas|\brasyon\b|\bbuza[ğg][ıi]|\bkuzu\b|\blamb\b|\bsheep\b|"
+    r"\bkoyun\b|\bkanatl[ıi]|su [üu]r[üu]nleri|aquacult|fisher|"
+    r"s[üu]t s[ıi][ğg][ıi]r|besi s[ıi][ğg][ıi]r",
+    re.IGNORECASE,
+)
+
 _ARTICLE_URL = re.compile(r"/pub/[^/]+/article/(\d+)")
 _DOWNLOAD_LINK = re.compile(r"/[a-z]{2}/download/article-file/\d+")
 
@@ -252,6 +268,76 @@ def download(session: requests.Session, url: str, dest: Path) -> bool:
     return False
 
 
+def _first_page_text(path: Path) -> str:
+    """Extract first-page text for local off-topic classification."""
+    from pypdf import PdfReader
+    try:
+        reader = PdfReader(str(path))
+    except Exception:  # noqa: BLE001
+        return ""
+    if not reader.pages:
+        return ""
+    try:
+        return reader.pages[0].extract_text() or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def is_offtopic_text(text: str) -> bool:
+    """True when first-page text matches the high-precision livestock/aquaculture
+    cleanup filter (distinct from the fetcher's broad topical _OFFTOPIC_REC)."""
+    return bool(_OFFTOPIC_CLEANUP_REC.search(text))
+
+
+def _offtopic_candidates(text_fn=_first_page_text) -> list[tuple[Path, list[str]]]:
+    """Return (path, matched_terms) for dp_*.pdf whose first page matches the
+    cleanup filter, so a human can review why each was flagged."""
+    parts = [(t, re.compile(t, re.IGNORECASE))
+             for t in _OFFTOPIC_CLEANUP_REC.pattern.split("|")]
+    out: list[tuple[Path, list[str]]] = []
+    for p in sorted(BOOKS_DIR.glob("dp_*.pdf")):
+        txt = text_fn(p)
+        if _OFFTOPIC_CLEANUP_REC.search(txt):
+            out.append((p, [t for t, c in parts if c.search(txt)]))
+    return out
+
+
+def clean_offtopic(store=None, apply: bool = False,
+                   text_fn=_first_page_text) -> int:
+    """Report (default) or apply removal of already-downloaded off-topic papers.
+
+    Report-only: scan dp_*.pdf, write flagged filenames + matched terms to a
+    ``offtopic_candidates.txt`` report beside docs/books/ and print them; move
+    and delete nothing. With ``apply=True`` each candidate is moved to
+    ``docs/books/_offtopic/`` and its chunks are deleted from the store. Local
+    only; no network. Returns the number of candidates."""
+    candidates = _offtopic_candidates(text_fn)
+    report = BOOKS_DIR.parent / "offtopic_candidates.txt"
+    lines = [f"{p.name}\t{','.join(terms)}" for p, terms in candidates]
+    report.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    print(f"[clean] {len(candidates)} off-topic candidate(s); report: {report}")
+    for line in lines:
+        print(f"[clean]   {line}")
+    if not apply:
+        print("[clean] report-only. Review the report, then re-run with --apply "
+              "to move these files and delete their chunks.")
+        return len(candidates)
+    if not candidates:
+        return 0
+    if store is None:
+        from .ingest import get_vector_store
+        store = get_vector_store()
+    offtopic_dir = BOOKS_DIR / "_offtopic"
+    offtopic_dir.mkdir(exist_ok=True)
+    for p, _terms in candidates:
+        got = store.get(where={"source": p.name})
+        if got.get("ids"):
+            store.delete(ids=got["ids"])
+        p.replace(offtopic_dir / p.name)
+        print(f"[clean]   moved {p.name} ({len(got.get('ids', []))} chunks removed)")
+    return len(candidates)
+
+
 # --------------------------------------------------------------------------- #
 # Drivers
 # --------------------------------------------------------------------------- #
@@ -339,7 +425,18 @@ def main() -> None:
                    help="Preview candidate articles without downloading.")
     p.add_argument("--list-sets", action="store_true",
                    help="List matched agriculture journals and exit.")
+    p.add_argument("--clean-offtopic", action="store_true",
+                   help="Scan already-downloaded PDFs and report off-topic "
+                        "(livestock/aquaculture) candidates. Report-only unless "
+                        "--apply is given.")
+    p.add_argument("--apply", action="store_true",
+                   help="With --clean-offtopic, actually move flagged PDFs to "
+                        "docs/books/_offtopic/ and delete their store chunks.")
     args = p.parse_args()
+
+    if args.clean_offtopic:
+        clean_offtopic(apply=args.apply)
+        return
 
     if args.list_sets:
         session = _session()

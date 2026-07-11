@@ -134,6 +134,28 @@ git commit -m "Add livestock terms to DergiPark off-topic filter"
 
 ### Task 2: `--clean-offtopic` cleanup pass
 
+> **REVISED during implementation.** A dry-run on the real corpus flagged 80/201
+> PDFs — mostly false positives, because the fetcher's broad `_OFFTOPIC_REC`
+> (designed for clean OAI title+subject) is far too aggressive on noisy full-page
+> text: it matched `ekonomi` ("Tarım Ekonomisi" dept), `market`/`hayvan`
+> (school names), `bal[ıi]k` (surname "Balık"), `rasyon` (⊂ "konsantrasyon"),
+> `koyun` (⊂ surname "Koyuncu"), and domain-overlap terms like goat/cattle
+> manure (on-topic organic fertilizers). Revised design (user-approved):
+> - A **separate high-precision** `_OFFTOPIC_CLEANUP_REC` with whole-word
+>   anchoring (`\brasyon\b`, `\bkoyun\b`, `\bsheep\b`, …) and no economics/
+>   manure-overlap terms. Cattle is reached only via `süt/besi sığır`.
+> - `clean_offtopic(store=None, apply=False, text_fn=...)` is **report-only by
+>   default**: it writes `docs/offtopic_candidates.txt` (filename + matched
+>   terms) and prints candidates, moving nothing. `apply=True` moves flagged
+>   files to `docs/books/_offtopic/` and deletes their chunks.
+> - CLI: `--clean-offtopic` reports; `--apply` executes. On the real corpus this
+>   flags 23 genuinely off-topic papers instead of 80.
+>
+> The steps below are the ORIGINAL plan; the committed code follows the revised
+> design above. Tests in `tests/test_fetch_dergipark.py` assert the false-positive
+> classes (Koyuncu, konsantrasyon, goat manure, Balık, Tarım Ekonomisi) are NOT
+> flagged.
+
 **Files:**
 - Modify: `src/fetch_dergipark.py` (add helpers + CLI flag)
 - Modify: `tests/test_fetch_dergipark.py` (add cleanup tests)
