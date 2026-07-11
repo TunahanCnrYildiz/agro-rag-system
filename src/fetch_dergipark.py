@@ -82,7 +82,10 @@ _AGRI_SET_TERMS = re.compile(
 # soil / botany scope (animal science, fisheries, pure economics, food eng.).
 _OFFTOPIC_REC = re.compile(
     r"hayvan|veteriner|zootekni|bal[ıi]k|su [üu]r[üu]nleri|fisher|aquacult|"
-    r"ekonomi|pazarlama|market|dairy|poultry|meat",
+    r"ekonomi|pazarlama|market|dairy|poultry|meat|"
+    r"\bkoyun|\bsheep|\bkuzu|\blamb|\bke[çc]i|\bgoat|\bs[ıi][ğg][ıi]r|\bcattle|"
+    r"\binek|\bbuza[ğg][ıi]|\bivesi|\bawassi|\bbroyler|\bbroiler|\bkanatl[ıi]|"
+    r"\brasyon|\bbesi\b|\bkarkas|\bcarcass|\bar[ıi]c[ıi]l[ıi]k|\bipekb[öo]ce[ğg]i",
     re.IGNORECASE,
 )
 
