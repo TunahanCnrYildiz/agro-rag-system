@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from src.ingest import _is_junk_chunk
+from src import ingest as ing
 
 # The exact fertilizer table chunk that is wrongly dropped today.
 NPK_CHUNK = (
@@ -27,3 +30,33 @@ def test_pure_numbers_dropped():
 
 def test_normal_prose_is_kept():
     assert _is_junk_chunk(NORMAL_PROSE) is False
+
+
+class _FakeStore:
+    def __init__(self, existing):
+        self._existing = existing  # set of source names already ingested
+
+    def get(self, where, limit=None):
+        name = where["source"]
+        return {"ids": [f"{name}:0"] if name in self._existing else []}
+
+
+def test_already_ingested_true_when_present():
+    store = _FakeStore({"dp_1.pdf"})
+    assert ing._already_ingested(store, "dp_1.pdf") is True
+
+
+def test_already_ingested_false_when_absent():
+    store = _FakeStore({"dp_1.pdf"})
+    assert ing._already_ingested(store, "dp_2.pdf") is False
+
+
+def test_iter_source_files_excludes_offtopic(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    (books / "_offtopic").mkdir(parents=True)
+    (books / "dp_1.pdf").write_bytes(b"x")
+    (books / "_offtopic" / "dp_2.pdf").write_bytes(b"x")
+    monkeypatch.setattr(ing, "BOOKS_DIR", books)
+
+    names = [p.name for p in ing._iter_source_files()]
+    assert names == ["dp_1.pdf"]

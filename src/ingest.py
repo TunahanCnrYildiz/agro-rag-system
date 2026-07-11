@@ -68,7 +68,9 @@ def _iter_source_files() -> list[Path]:
     files = sorted(
         p
         for p in BOOKS_DIR.rglob("*")
-        if p.suffix.lower() in {".pdf", ".txt"} and p.is_file()
+        if p.suffix.lower() in {".pdf", ".txt"}
+        and p.is_file()
+        and "_offtopic" not in p.parts
     )
     return files
 
@@ -165,8 +167,18 @@ def _is_junk_chunk(text: str) -> bool:
     return False
 
 
-def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
-    """Lazily yield chunked Documents across all source files."""
+def _already_ingested(store, source_name: str) -> bool:
+    """True when the store already holds at least one chunk for this file."""
+    got = store.get(where={"source": source_name}, limit=1)
+    return bool(got.get("ids"))
+
+
+def iter_chunks(
+    splitter: RecursiveCharacterTextSplitter, store=None, force: bool = False
+) -> Iterator[Document]:
+    """Lazily yield chunked Documents across all source files. When ``store`` is
+    given and ``force`` is False, files already present in the store are skipped
+    so re-ingestion does not re-embed the whole corpus."""
     files = _iter_source_files()
     if not files:
         print(f"[ingest] no .pdf/.txt files found under {BOOKS_DIR}")
@@ -174,6 +186,9 @@ def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
     print(f"[ingest] found {len(files)} source file(s)")
 
     for path in files:
+        if store is not None and not force and _already_ingested(store, path.name):
+            print(f"[ingest]   = {path.name} already ingested, skipping")
+            continue
         print(f"[ingest] processing {path.name}")
         for text, meta in _load_file_text(path):
             for i, chunk in enumerate(splitter.split_text(text)):
@@ -188,7 +203,7 @@ def iter_chunks(splitter: RecursiveCharacterTextSplitter) -> Iterator[Document]:
 # --------------------------------------------------------------------------- #
 # Ingestion driver
 # --------------------------------------------------------------------------- #
-def ingest(reset: bool = False) -> int:
+def ingest(reset: bool = False, force: bool = False) -> int:
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
@@ -219,7 +234,7 @@ def ingest(reset: bool = False) -> int:
         batch_docs.clear()
         batch_ids.clear()
 
-    for doc in iter_chunks(splitter):
+    for doc in iter_chunks(splitter, store=store, force=force):
         cid = _stable_chunk_id(
             doc.metadata.get("source", "unknown"),
             int(doc.metadata.get("page", 0)),
@@ -248,8 +263,12 @@ def main() -> None:
     parser.add_argument(
         "--reset", action="store_true", help="Delete the collection before ingesting."
     )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Re-ingest every file even if already in the store.",
+    )
     args = parser.parse_args()
-    ingest(reset=args.reset)
+    ingest(reset=args.reset, force=args.force)
 
 
 if __name__ == "__main__":
