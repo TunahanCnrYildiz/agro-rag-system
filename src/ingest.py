@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 from pathlib import Path
 from typing import Iterator
 
@@ -108,6 +109,7 @@ MIN_CHUNK_CHARS = 40
 MIN_ALPHA_RATIO = 0.6
 MIN_SPACE_RATIO = 0.08
 MAX_AVG_WORD_LEN = 20
+MIN_RESCUE_WORDS = 5  # real words needed to rescue a digit-heavy table
 
 # Recurring USDA scan boilerplate - real text, but metadata about the scan
 # itself, not agricultural content. Filtered by substring, case-insensitive.
@@ -115,18 +117,44 @@ _BOILERPLATE_MARKERS = (
     "do not assume content reflects current scientific knowledge",
 )
 
+# pypdf glyph-mapping failures surface as "/g32" etc. - always garbage.
+_GLYPH_ARTIFACT = re.compile(r"/g\d+")
+# NPK ratios (14-14-14, 46-0-0) and fertilizer/agronomy unit tokens mark
+# digit-heavy chunks worth keeping despite a low letter ratio.
+_NPK_RATIO = re.compile(r"\b\d{1,3}-\d{1,3}-\d{1,3}\b")
+_UNIT_TOKEN = re.compile(r"kg/ha|mg/kg|g/kg|ppm|p2o5|k2o|%", re.IGNORECASE)
+
+
+def _real_word_count(text: str) -> int:
+    """Count tokens with at least 3 alphabetic characters."""
+    return sum(1 for tok in text.split() if sum(c.isalpha() for c in tok) >= 3)
+
+
+def _has_agronomy_signal(text: str) -> bool:
+    """True when the chunk shows fertilizer/agronomy numeric structure."""
+    return bool(_NPK_RATIO.search(text) or _UNIT_TOKEN.search(text))
+
 
 def _is_junk_chunk(text: str) -> bool:
-    """Reject OCR-garbage chunks that would otherwise pollute similarity
-    search with low-quality, falsely "generic" embeddings: stray punctuation,
-    near-empty pages, OCR text with lost word-spacing (words run together),
-    and recurring scan-disclaimer boilerplate."""
+    """Reject OCR-garbage chunks while preserving valuable agronomy tables.
+
+    Stage 1 (hard junk): too short, glyph artifacts, or run-together words.
+    Stage 2 (rescue): keep digit-heavy chunks that carry an agronomy numeric
+    signal plus enough real words. Stage 3: the original quality heuristics.
+    """
+    # Stage 1: always reject, regardless of numeric content.
     if len(text) < MIN_CHUNK_CHARS:
         return True
-    letters = sum(c.isalpha() for c in text)
-    if (letters / len(text)) < MIN_ALPHA_RATIO:
+    if _GLYPH_ARTIFACT.search(text):
         return True
     if (text.count(" ") / len(text)) < MIN_SPACE_RATIO:
+        return True
+    # Stage 2: rescue digit-heavy fertilizer/agronomy tables.
+    if _has_agronomy_signal(text) and _real_word_count(text) >= MIN_RESCUE_WORDS:
+        return False
+    # Stage 3: original quality heuristics.
+    letters = sum(c.isalpha() for c in text)
+    if (letters / len(text)) < MIN_ALPHA_RATIO:
         return True
     words = text.split()
     if words and (len(text) / len(words)) > MAX_AVG_WORD_LEN:
