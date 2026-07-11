@@ -75,6 +75,37 @@ def _iter_source_files() -> list[Path]:
     return files
 
 
+def _normalize_text(text: str) -> str:
+    """Normalize PDF line endings to plain '\\n' (PDFium emits CRLF)."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _extract_pdf_pages(path: Path) -> Iterator[tuple[str, dict]]:
+    """Yield (text, metadata) per PDF page using pypdfium2, which preserves
+    word spacing on old scans that pypdf runs together. Unreadable PDFs print a
+    skip message and yield nothing."""
+    import pypdfium2 as pdfium
+
+    try:
+        pdf = pdfium.PdfDocument(str(path))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[ingest] skipping unreadable PDF {path.name}: {exc}")
+        return
+    try:
+        for page_num in range(len(pdf)):
+            page = pdf[page_num]
+            textpage = page.get_textpage()
+            try:
+                text = _normalize_text(textpage.get_text_range() or "")
+            finally:
+                textpage.close()
+                page.close()
+            if text.strip():
+                yield text, {"source": path.name, "page": page_num}
+    finally:
+        pdf.close()
+
+
 def _load_file_text(path: Path) -> Iterator[tuple[str, dict]]:
     """Yield (text, metadata) per logical unit (PDF page or whole TXT file)."""
     if path.suffix.lower() == ".txt":
@@ -83,21 +114,9 @@ def _load_file_text(path: Path) -> Iterator[tuple[str, dict]]:
             yield text, {"source": path.name, "page": 0}
         return
 
-    # PDF: stream page by page so we never hold the whole book in memory.
-    from pypdf import PdfReader
-
-    try:
-        reader = PdfReader(str(path))
-    except Exception as exc:  # noqa: BLE001
-        print(f"[ingest] skipping unreadable PDF {path.name}: {exc}")
-        return
-    for page_num, page in enumerate(reader.pages):
-        try:
-            text = page.extract_text() or ""
-        except Exception:  # noqa: BLE001
-            text = ""
-        if text.strip():
-            yield text, {"source": path.name, "page": page_num}
+    # PDF: pypdfium2 preserves word spacing on old scans that pypdf runs
+    # together (see docs/superpowers/specs/2026-07-11-ia-scan-pdf-extraction-design.md).
+    yield from _extract_pdf_pages(path)
 
 
 def _stable_chunk_id(source: str, page: int, index: int, text: str) -> str:
