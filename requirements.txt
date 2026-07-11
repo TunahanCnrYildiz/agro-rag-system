@@ -19,6 +19,7 @@ openai>=1.30.0
 
 # --- Document ingestion ---
 pypdf>=4.2.0
+pypdfium2>=4.0
 
 # --- Scraping ---
 beautifulsoup4>=4.12.0

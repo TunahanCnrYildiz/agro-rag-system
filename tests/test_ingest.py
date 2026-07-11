@@ -1,7 +1,16 @@
 from pathlib import Path
 
-from src.ingest import _is_junk_chunk
+from src.ingest import (
+    _extract_pdf_pages,
+    _is_junk_chunk,
+    _normalize_text,
+    MIN_SPACE_RATIO,
+)
 from src import ingest as ing
+from src.config import settings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+FIXTURE = Path(__file__).parent / "fixtures" / "ia_301ento00unit.pdf"
 
 # The exact fertilizer table chunk that is wrongly dropped today.
 NPK_CHUNK = (
@@ -30,6 +39,43 @@ def test_pure_numbers_dropped():
 
 def test_normal_prose_is_kept():
     assert _is_junk_chunk(NORMAL_PROSE) is False
+
+
+def test_normalize_text_collapses_crlf():
+    assert _normalize_text("a\r\nb\rc\nd") == "a\nb\nc\nd"
+
+
+def test_extract_pdf_pages_yields_page_metadata():
+    pages = list(_extract_pdf_pages(FIXTURE))
+    assert pages, "fixture should yield at least one page"
+    text, meta = pages[0]
+    assert meta["source"] == "ia_301ento00unit.pdf"
+    assert meta["page"] == 0
+    assert text.strip()
+
+
+def test_extract_pdf_pages_restores_word_spacing():
+    pages = list(_extract_pdf_pages(FIXTURE))
+    full = " ".join(text for text, _ in pages)
+    assert full, "fixture should produce text"
+    # pypdf gave ~0.001 here (words run together); pypdfium2 restores spacing.
+    assert full.count(" ") / len(full) >= MIN_SPACE_RATIO
+
+
+def test_extract_pdf_pages_survives_junk_filter():
+    # Under pypdf this file yielded 0 kept chunks; pypdfium2 must yield >= 1.
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    kept = 0
+    for text, _ in _extract_pdf_pages(FIXTURE):
+        for chunk in splitter.split_text(text):
+            chunk = chunk.strip()
+            if chunk and not _is_junk_chunk(chunk):
+                kept += 1
+    assert kept >= 1
 
 
 class _FakeStore:
