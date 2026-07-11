@@ -74,11 +74,17 @@ agro-rag-system/
 │   ├── books/             # put botany PDFs / TXTs here
 │   └── products/          # scraped products.json (generated)
 ├── src/
-│   ├── config.py          # endpoints, models, paths, SYSTEM_PROMPT
-│   ├── scraper.py         # crawl catalog (mock fallback)
-│   ├── ingest.py          # chunk + embed books -> Chroma
-│   ├── engine.py          # retrieval + product match + LM Studio
-│   └── main.py            # FastAPI app
+│   ├── config.py            # endpoints, models, paths, SYSTEM_PROMPT
+│   ├── scraper.py           # crawl product catalog (mock fallback)
+│   ├── articles_scraper.py  # crawl academy articles
+│   ├── scrape_utils.py      # shared HTTP crawl helpers (site scrapers)
+│   ├── fetch_books.py       # download English books from Internet Archive
+│   ├── fetch_dergipark.py   # harvest Turkish papers from DergiPark (OAI-PMH)
+│   ├── pdf_fetch_utils.py   # shared PDF stream/validate helpers (both fetchers)
+│   ├── ingest.py            # chunk + embed docs -> Chroma (incremental)
+│   ├── engine.py            # retrieval + product match + LM Studio
+│   └── main.py              # FastAPI app
+├── tests/                   # pytest unit tests
 ├── requirements.txt
 └── README.md
 ```
@@ -122,27 +128,40 @@ Writes `docs/products/products.json`.
 ### 4. Get botany documents
 
 Either drop your own PDFs / TXTs into `docs/books/`, or bulk-download
-open-access / public-domain botany books from the Internet Archive:
+open-access / public-domain material from two sources:
 
 ```bash
-python -m src.fetch_books --max 50          # plant-nutrition focused, 50 books
-python -m src.fetch_books --query "subject:(mycorrhiza)" --max 20
+# English books from the Internet Archive (curated plant-nutrition sources)
+python -m src.fetch_books --list-sources               # show curated sources
+python -m src.fetch_books --max 50                     # fetch from all sources
+python -m src.fetch_books --source soil_health --max 20  # one source only
+
+# Turkish agriculture papers from DergiPark (OAI-PMH)
+python -m src.fetch_dergipark --list-sets              # show matched journals
+python -m src.fetch_dergipark --max 120                # harvest PDFs
+python -m src.fetch_dergipark --clean-offtopic         # report livestock papers
+python -m src.fetch_dergipark --clean-offtopic --apply # move them out + prune store
 ```
 
 Only freely downloadable, non-restricted items are fetched (borrow-only / DRM
-items are skipped), and each PDF is validated before it is kept.
+items are skipped), and each PDF is validated before it is kept. The DergiPark
+fetcher filters out off-topic (animal-science / fisheries) papers; the
+`--clean-offtopic` pass reports (and with `--apply` removes) any that already
+slipped into the corpus.
 
 ### 5. Ingest botany documents
 
 With documents in `docs/books/`:
 
 ```bash
-python -m src.ingest           # incremental
-python -m src.ingest --reset   # rebuild collection
+python -m src.ingest           # incremental: skips files already in the store
+python -m src.ingest --force   # re-embed every file (e.g. after a filter change)
+python -m src.ingest --reset   # drop the collection and rebuild from scratch
 ```
 
 Persists embeddings to `data/vector_store/`. (Requires LM Studio's embedding
-model to be running.)
+model to be running.) Ingestion is incremental — already-embedded files are
+skipped, so re-runs only process new documents unless you pass `--force`.
 
 ### 6. Run the API
 
