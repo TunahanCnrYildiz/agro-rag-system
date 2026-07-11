@@ -22,13 +22,14 @@ import requests
 
 try:
     from .config import BOOKS_DIR
+    from .pdf_fetch_utils import pdf_session, stream_pdf_to_file
 except ImportError:  # pragma: no cover
     from config import BOOKS_DIR  # type: ignore
+    from pdf_fetch_utils import pdf_session, stream_pdf_to_file  # type: ignore
 
 SEARCH_URL = "https://archive.org/advancedsearch.php"
 METADATA_URL = "https://archive.org/metadata/{identifier}"
 DOWNLOAD_URL = "https://archive.org/download/{identifier}/{name}"
-USER_AGENT = "AgroBotanyBot/0.1 (+https://ekolojiktarim.com.tr/)"
 
 # Subject/title terms to exclude from every query.
 _UNRELIABLE = (
@@ -98,9 +99,7 @@ MIN_BYTES = 150_000  # skip tiny stubs / single-page fragments
 
 
 def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({"User-Agent": USER_AGENT})
-    return s
+    return pdf_session()
 
 
 def search_items(session: requests.Session, query: str, rows: int) -> list[dict]:
@@ -202,34 +201,9 @@ def download(session: requests.Session, identifier: str, name: str, dest: Path) 
         return False
     if resp.status_code != 200:
         print(f"[fetch]   ! http {resp.status_code}, skipping")
-        return False
-
-    tmp = dest.with_suffix(".part")
-    written = 0
-    first = b""
-    try:
-        with tmp.open("wb") as fh:
-            for chunk in resp.iter_content(chunk_size=65536):
-                if not chunk:
-                    continue
-                if not first:
-                    first = chunk[:4]
-                    if first != b"%PDF":
-                        print("[fetch]   ! not a real PDF, skipping")
-                        break
-                fh.write(chunk)
-                written += len(chunk)
-    finally:
         resp.close()
-
-    if first == b"%PDF" and written >= MIN_BYTES:
-        tmp.replace(dest)
-        print(f"[fetch]   + saved {dest.name} ({written // 1024} KB)")
-        return True
-    tmp.unlink(missing_ok=True)
-    if first == b"%PDF":
-        print(f"[fetch]   ! too small ({written // 1024} KB), skipping")
-    return False
+        return False
+    return stream_pdf_to_file(resp, dest, MIN_BYTES, "fetch")
 
 
 def run(source: str | None, max_books: int, delay: float) -> int:

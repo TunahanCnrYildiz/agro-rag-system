@@ -26,12 +26,13 @@ import requests
 
 try:
     from .config import BOOKS_DIR
+    from .pdf_fetch_utils import pdf_session, stream_pdf_to_file
 except ImportError:  # pragma: no cover
     from config import BOOKS_DIR  # type: ignore
+    from pdf_fetch_utils import pdf_session, stream_pdf_to_file  # type: ignore
 
 BASE = "https://dergipark.org.tr"
 OAI_URL = f"{BASE}/api/public/oai/"
-USER_AGENT = "AgroBotanyBot/0.1 (+https://ekolojiktarim.com.tr/)"
 
 OAI_DELAY = 0.5   # polite delay between OAI API calls
 PDF_DELAY = 2.0   # polite delay between PDF downloads (DergiPark rate-limits)
@@ -110,9 +111,7 @@ _DOWNLOAD_LINK = re.compile(r"/[a-z]{2}/download/article-file/\d+")
 
 
 def _session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "tr,en"})
-    return s
+    return pdf_session("tr,en")
 
 
 def _oai(session: requests.Session, params: dict) -> ET.Element | None:
@@ -238,34 +237,11 @@ def download(session: requests.Session, url: str, dest: Path) -> bool:
     if resp is None or resp.status_code != 200:
         code = resp.status_code if resp is not None else "?"
         print(f"[dergipark]   ! http {code}, skipping")
+        if resp is not None:
+            resp.close()
         return False
 
-    tmp = dest.with_suffix(".part")
-    written = 0
-    first = b""
-    try:
-        with tmp.open("wb") as fh:
-            for chunk in resp.iter_content(chunk_size=65536):
-                if not chunk:
-                    continue
-                if not first:
-                    first = chunk[:4]
-                    if first != b"%PDF":
-                        print("[dergipark]   ! not a real PDF, skipping")
-                        break
-                fh.write(chunk)
-                written += len(chunk)
-    finally:
-        resp.close()
-
-    if first == b"%PDF" and written >= MIN_BYTES:
-        tmp.replace(dest)
-        print(f"[dergipark]   + saved {dest.name} ({written // 1024} KB)")
-        return True
-    tmp.unlink(missing_ok=True)
-    if first == b"%PDF":
-        print(f"[dergipark]   ! too small ({written // 1024} KB), skipping")
-    return False
+    return stream_pdf_to_file(resp, dest, MIN_BYTES, "dergipark")
 
 
 def _first_page_text(path: Path) -> str:
