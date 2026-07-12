@@ -9,7 +9,13 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#f7f9f5",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kantura.ekolojiktarimasistani",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "android": {
       "package": "com.kantura.ekolojiktarimasistani",
