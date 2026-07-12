@@ -12,6 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.kantura.ekolojiktarimasistani",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
