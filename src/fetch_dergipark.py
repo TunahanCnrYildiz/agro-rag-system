@@ -346,6 +346,14 @@ def _collect_candidates(
     return out
 
 
+def _is_pruned(aid: str) -> bool:
+    """True if this article was already moved to ``docs/books/_offtopic/`` (as
+    off-topic or low-relevance). Such papers must NOT be re-downloaded, otherwise
+    every harvest re-introduces the ones we deliberately pruned."""
+    offtopic = BOOKS_DIR / "_offtopic"
+    return offtopic.exists() and any(offtopic.rglob(f"dp_{aid}.pdf"))
+
+
 def run(
     set_spec: str | None, max_books: int, per_journal: int,
     set_pages: int, dry_run: bool,
@@ -371,6 +379,9 @@ def run(
         dest = BOOKS_DIR / f"dp_{aid}.pdf"
         if dest.exists():
             print(f"[dergipark]   = already have {dest.name}, skipping")
+            continue
+        if _is_pruned(aid):
+            print(f"[dergipark]   = dp_{aid} previously pruned (_offtopic), skipping")
             continue
         pdf = _pdf_link(session, url)
         if not pdf:

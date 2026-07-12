@@ -131,3 +131,28 @@ def test_clean_offtopic_apply_moves_and_deletes(tmp_path, monkeypatch):
     assert (books / "_offtopic" / "dp_1.pdf").exists()
     assert keep.exists()
     assert store.deleted == ["dp_1.pdf:0"]
+
+
+# --------------------------------------------------------------------------- #
+# _is_pruned — a fetch must not re-download a paper already moved to _offtopic.
+# --------------------------------------------------------------------------- #
+
+def test_is_pruned_detects_offtopic_papers(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    (books / "_offtopic").mkdir(parents=True)
+    (books / "_offtopic" / "dp_123.pdf").write_bytes(b"x")
+    # nested (e.g. lowrelevance/) must also count as pruned
+    (books / "_offtopic" / "lowrelevance").mkdir()
+    (books / "_offtopic" / "lowrelevance" / "dp_456.pdf").write_bytes(b"x")
+    monkeypatch.setattr(fd, "BOOKS_DIR", books)
+
+    assert fd._is_pruned("123") is True
+    assert fd._is_pruned("456") is True
+    assert fd._is_pruned("999") is False
+
+
+def test_is_pruned_false_when_no_offtopic_dir(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    books.mkdir()
+    monkeypatch.setattr(fd, "BOOKS_DIR", books)
+    assert fd._is_pruned("123") is False
