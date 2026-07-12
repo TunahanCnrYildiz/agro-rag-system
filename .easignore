@@ -1,27 +1,26 @@
 # Files excluded from the EAS Build upload archive.
 #
-# This repo is a monorepo: the Python RAG backend lives at the root and the
-# Expo app lives in mobile-app/. EAS archives from the git root, so without this
-# file it uploads ~1 GB of backend data and node_modules that the app build does
-# not need. Keep the upload lean by excluding everything but the app sources.
-# (When .easignore exists EAS uses it INSTEAD of .gitignore, so it must also list
-# the usual node_modules / build-output excludes.)
+# Monorepo: Python RAG backend at the repo root, Expo app in mobile-app/. EAS
+# archives from the git root, so without this it uploads ~1 GB of backend data
+# and node_modules the app build does not need.
+#
+# IMPORTANT: root-level backend dirs are anchored with a leading "/" so they do
+# NOT also match same-named dirs inside the app (e.g. an unanchored "src/" would
+# wrongly exclude mobile-app/src/ and break the JS bundle).
 
-# --- Python RAG backend (irrelevant to the React Native app build) ---
-data/
-docs/
-src/
-tests/
-*.pdf
-requirements.txt
+# --- Python RAG backend (repo root only) ---
+/data/
+/docs/
+/src/
+/tests/
+/requirements.txt
 
-# --- Node / Expo / native build outputs ---
+# --- Node / Expo / native build outputs (any level) ---
 node_modules/
-**/node_modules/
 .expo/
-mobile-app/android/
-mobile-app/ios/
-mobile-app/builds/
+/mobile-app/android/
+/mobile-app/ios/
+/mobile-app/builds/
 
-# --- VCS / scratch ---
-.git/
+# --- VCS ---
+/.git/
