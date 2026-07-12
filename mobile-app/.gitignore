@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Build artifacts — keep the folder structure, ignore the large binaries
+builds/**/*.apk
+builds/**/*.aab
+builds/**/*.ipa
+builds/**/*.app
+builds/**/*.tar.gz
+builds/**/*.zip
