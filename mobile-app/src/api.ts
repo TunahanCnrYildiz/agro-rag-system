@@ -2,13 +2,18 @@
 // React Native's fetch does not reliably support reading a streaming
 // response body (no ReadableStream support), unlike the browser widget.
 //
+// Backend base URL. Override at build time with the EXPO_PUBLIC_API_BASE env var
+// (e.g. in mobile-app/.env or the shell) so pointing at a hosted backend needs
+// no code edit; the LAN IP below is only the local-dev default.
+//
 // Platform note: a physical device can't reach 127.0.0.1 (that's the phone
 // itself) - it needs the host machine's LAN IP instead, and both devices must
 // be on the same Wi-Fi. This IP is assigned by the router (DHCP) and can
 // change; if the app can't reach the API, check the PC's current IP
-// (ipconfig / Settings > Network) and update it here.
+// (ipconfig / Settings > Network) and set EXPO_PUBLIC_API_BASE (or edit below).
 // Android emulator (not a physical device) would instead use 10.0.2.2.
-export const API_BASE = "http://192.168.1.103:8000";
+export const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.103:8000";
 
 export type ChatRole = "user" | "assistant";
 
