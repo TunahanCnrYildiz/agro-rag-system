@@ -4,10 +4,13 @@ A production-ready, Python RAG backend that powers a mobile-app chatbot and a
 web widget for an ecological agriculture company
 ([ekolojiktarim.com.tr](https://www.ekolojiktarim.com.tr/)).
 
-The AI acts as an **expert Agricultural Engineer (Ziraat Mühendisi)** focused
-strictly on **organic plant nutrition, sustainable fertilization, soil health,
-and botany education** — with hard safety guardrails and automatic language
-matching.
+The AI acts as an **expert Agricultural Engineer (Ziraat Mühendisi)** covering
+**any plant-related topic** — nutrition, soil health, physiology, horticulture,
+agronomy, propagation, irrigation, post-harvest, and the **organic** management
+of plant diseases and pests — across all crops. Non-plant topics (animal
+husbandry, economics, machinery) are out of scope. Two hard rules always hold:
+**never give a definitive disease diagnosis** and **never recommend chemical
+pesticides/drugs**. Plus automatic language matching and off-scope refusal.
 
 ---
 
@@ -45,23 +48,29 @@ User query ─▶ FastAPI /api/chat ─▶ RAG Engine
 | RAG framework    | LangChain                                          |
 | Vector DB        | ChromaDB (persistent, local)                       |
 | Backend API      | FastAPI + Uvicorn                                  |
-| Doc processing   | pypdf + RecursiveCharacterTextSplitter (1000/200)  |
+| Doc processing   | pypdfium2 + RecursiveCharacterTextSplitter (1000/200)|
 | Scraping         | requests + BeautifulSoup                           |
+| Tests / quality  | pytest (50 tests) + `evals/` quality harness       |
 
 ---
 
 ## Safety guardrails (enforced on every query)
 
-- **No disease diagnosis.** Describes general symptom patterns only.
-- **No chemical pesticides / medical treatments / illegal substances.**
-- On such requests it **politely refuses and redirects** to professional
-  in-field analysis — in the user's own language.
+- **No definitive disease diagnosis.** Describes likely causes/symptoms as
+  possibilities and points to a professional for certainty.
+- **No chemical pesticides / medical treatments / illegal substances** — even
+  when asked directly. Disease/pest questions are answered with **organic,
+  cultural, and biological** management (a helpful organic path, not a dead end).
+- **Scope:** plant topics only. Non-plant questions get a brief refusal, and
+  product suggestions are suppressed for them (LLM `[OFFSCOPE]` marker →
+  `_strip_offscope` in `src/engine.py`).
 - **Advisory, non-prescriptive** tone ("bunun sebebi ... olabilir").
 - **Language matching:** the full response is generated in the same language
-  as the user's query.
+  as the user's query (works across languages via the multilingual embedder).
 
 Guardrails live in `src/config.py` (`SYSTEM_PROMPT`) and are injected into the
-system message on every call in `src/engine.py`.
+system message on every call in `src/engine.py`. They are covered by unit tests
+(`tests/test_engine.py`) and the eval harness (`evals/`).
 
 ---
 
@@ -80,11 +89,13 @@ agro-rag-system/
 │   ├── scrape_utils.py      # shared HTTP crawl helpers (site scrapers)
 │   ├── fetch_books.py       # download English books from Internet Archive
 │   ├── fetch_dergipark.py   # harvest Turkish papers from DergiPark (OAI-PMH)
-│   ├── pdf_fetch_utils.py   # shared PDF stream/validate helpers (both fetchers)
+│   ├── fetch_openalex.py    # harvest global-crop OA papers from OpenAlex
+│   ├── pdf_fetch_utils.py   # shared PDF stream/validate helpers (all fetchers)
 │   ├── ingest.py            # chunk + embed docs -> Chroma (incremental)
 │   ├── engine.py            # retrieval + product match + LM Studio
 │   └── main.py              # FastAPI app
-├── tests/                   # pytest unit tests
+├── tests/                   # pytest unit tests (fetchers, ingest, engine, API)
+├── evals/                   # repeatable RAG quality harness (run_eval.py)
 ├── requirements.txt
 └── README.md
 ```
@@ -128,7 +139,7 @@ Writes `docs/products/products.json`.
 ### 4. Get botany documents
 
 Either drop your own PDFs / TXTs into `docs/books/`, or bulk-download
-open-access / public-domain material from two sources:
+open-access / public-domain material from three sources:
 
 ```bash
 # English books from the Internet Archive (curated plant-nutrition sources)
@@ -141,6 +152,11 @@ python -m src.fetch_dergipark --list-sets              # show matched journals
 python -m src.fetch_dergipark --max 120                # harvest PDFs
 python -m src.fetch_dergipark --clean-offtopic         # report livestock papers
 python -m src.fetch_dergipark --clean-offtopic --apply # move them out + prune store
+
+# Global-crop open-access papers from OpenAlex (cassava, sorghum, rice, ...)
+python -m src.fetch_openalex --list-crops              # show curated gap crops
+python -m src.fetch_openalex --dry-run --max 25        # preview candidates
+python -m src.fetch_openalex --max 25 --per-crop 4     # harvest PDFs
 ```
 
 Only freely downloadable, non-restricted items are fetched (borrow-only / DRM
@@ -170,6 +186,23 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Open http://localhost:8000/docs for the interactive Swagger UI.
+
+---
+
+## Testing & quality
+
+```bash
+python -m pytest                    # 50 unit tests (fetchers, ingest, engine, API)
+
+# Repeatable RAG quality eval (needs LM Studio's embedding model; full mode also
+# needs the chat model). Measures retrieval, product gating, grounding, guardrails.
+python -m evals.run_eval --fast     # retrieval + product gating only (seconds)
+python -m evals.run_eval            # full: also generates answers + keyword checks
+```
+
+The eval turns corpus/scope changes into measured deltas rather than spot checks,
+and exits non-zero on any failure (so it can gate CI). Cases live in
+`evals/eval_set.py`.
 
 ---
 
