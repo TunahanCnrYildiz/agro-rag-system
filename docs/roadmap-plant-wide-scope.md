@@ -1,9 +1,9 @@
 # Yol Haritası: "Bitki ile Alakalı Her Şey" Kapsamına Geçiş
 
-**Durum:** Hipotetik / planlama. Şu an sistem bilinçli olarak **dar kapsamda**
-(bitki besleme + toprak sağlığı + organik gübreleme) ve öyle kalıyor. Bu belge,
-ileride kapsam genişletmeye karar verilirse ele alınacak konuları ve yapılacak
-işleri kaydeder.
+**Durum:** ✅ **UYGULANDI (2026-07-14).** "Önerilen kapsam" (bitki-geniş eksi
+teşhis/kimyasal) benimsendi ve `src/config.py` SYSTEM_PROMPT'una yansıtıldı;
+off-scope reddinde ürün önerisi de susturuldu (`[OFFSCOPE]` marker,
+`src/engine.py`). Sıradaki yön: aşağıdaki **Global / çok-bölgeli kapsam**.
 **Tarih:** 2026-07-14
 
 ## Üç kapsam seviyesi
@@ -125,3 +125,61 @@ Geçiş = esas olarak **guardrail felsefesi değişimi** (hastalık/zararlı/pes
 reddini kaldırmak) + hedefli korpus ekleme + ürün-linker'ın yalnızca besleme
 alt-kümesinde çalışacağını kabul etmek. Korpusun büyük kısmı zaten hazır; asıl
 karar bu genişlemenin **organik-firma kimliğiyle uyumlu olup olmadığı**.
+
+---
+
+# Global / Çok-Bölgeli Kapsam (sıradaki yön)
+
+**Motivasyon:** AI'a sadece TR/EN değil, farklı ülkelerden farklı dillerde soru
+gelecek. Afrikalı bir çiftçi manyok (cassava), plantain, teff; Latin Amerikalı
+biri yuca, quinoa sorabilir. Sistem bunlara "cahil" kalmamalı.
+
+## Kritik ayrım: DİL değil, İÇERİK (bilgi kapsamı)
+
+- **Soru dili — zaten çözülü.** `build_language_instruction` + dil algılama →
+  asistan kullanıcının dilinde cevaplıyor; bge-m3 her dildeki sorguyu embed edip
+  çapraz-dil retrieval yapıyor. Fransızca/Arapça/İspanyolca soru **teknik olarak
+  zaten çalışıyor.**
+- **Asıl boşluk — içerik kapsamı.** Korpus şu an **Türkiye tarımı (DergiPark,
+  ılıman/Akdeniz) + ABD/ılıman İngilizce** ağırlıklı. Tropik/Afrika/Asya bölgesel
+  ürünleri (manyok, plantain, sorgum, börülce, tropik meyveler, pirinç
+  çeşitleri) **zayıf kapsanıyor.** Afrikalı çiftçi manyok sorunca AI cahil kalır
+  çünkü **o ürün hakkında içerik yok** — dili bilmediğinden değil.
+
+## Strateji
+
+1. **Öncelik: bölgesel/global ürün İÇERİĞİ ekle.** Uluslararası tarım biliminin
+   çoğu **İngilizce** yayımlanır → dil değiştirmeden çok sayıda global ürünü
+   kapsayabiliriz. Güvenilir açık-erişim kaynaklar:
+   - **FAO** belge deposu (tropik/global bitki üretim & koruma, otoriter)
+   - **CGIAR merkezleri:** IITA (tropik Afrika), CIP (patates), ICRISAT (kurak
+     bölge tahılları: sorgum, darı), IRRI (pirinç), CIAT (fasulye/manyok)
+   - Uluslararası açık-erişim dergiler (DOAJ / OpenAlex üzerinden bölge+ürün
+     filtreli)
+2. **Yabancı-dil içeriği — sadece hedefli.** Bilgi özgün olarak o dilde varsa:
+   Frankofon Afrika için Fransızca, Latin Amerika için İspanyolca/Portekizce.
+   bge-m3 bunları kullanılabilir kılar. "Her dilde her şeyi tara" DEĞİL.
+
+## Dürüst uyarılar / kararlar
+
+- **Chat modeli (gemma-4-12b)** düşük-kaynaklı dillerde (Amharca, Svahili) kalite
+  düşürebilir; büyük dillerde (ES/FR/PT/AR/HI) sorun yok. bge-m3 de yüksek-kaynaklı
+  dillerde daha isabetli.
+- **Product-linker coğrafya sorunu:** Katalog Türk firmasının organik gübreleri.
+  Tavsiye globalleşebilir ama **ürünler globalleşemez** (yurt dışı çiftçi satın
+  alamaz). Karar: yurt dışı kullanıcıda ürün önerisi susturulacak mı (bölge/dil
+  bazlı), yoksa "sadece tavsiye" modu mu? — netleştirilmeli.
+- Her yeni kaynak = yeni fetcher (kod) + alaka/kalite filtresi + `--clean-offtopic`
+  benzeri temizlik. **Kalite > nicelik** kuralı burada da geçerli.
+
+## Aşamalı plan
+
+1. **Kaynak araştırması:** FAO / CGIAR / DOAJ / OpenAlex açık-erişim + PDF erişim
+   yollarını belirle.
+2. **İlk fetcher:** En yüksek getirili biriyle başla (ör. OpenAlex API — konu/ürün
+   filtreli, açık-erişim PDF linkleri; ya da FAO).
+3. **Hedefli hasat:** Boşluk olan global ürünlere odaklan (tropik/Afrika/Asya);
+   indir → ingest → cleanup.
+4. **Test:** Global ürün sorgularıyla (manyok, plantain, sorgum) ve farklı
+   dillerde (FR/ES) grounded cevap doğrula.
+5. **Product-linker/coğrafya kararını** uygula (yurt dışı için ürün politikası).
