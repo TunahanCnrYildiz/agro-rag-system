@@ -108,3 +108,25 @@ def test_is_pruned_detects_offtopic(tmp_path, monkeypatch):
     monkeypatch.setattr(fo, "BOOKS_DIR", books)
     assert fo._is_pruned("W9") is True
     assert fo._is_pruned("W8") is False
+
+
+def test_list_crops_prints_all(capsys, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["fetch_openalex", "--list-crops"])
+    fo.main()
+    printed = capsys.readouterr().out
+    assert "cassava" in printed and "sorghum" in printed
+
+
+def test_run_dry_run_downloads_nothing(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    monkeypatch.setattr(fo, "BOOKS_DIR", books)
+    monkeypatch.setattr(fo, "pdf_session", lambda *a, **k: object())
+    monkeypatch.setattr(
+        fo, "_collect_candidates",
+        lambda s, crops, per: [("W1", "u1.pdf", "d1", "cassava trial")],
+    )
+    # download must never be called in dry-run
+    monkeypatch.setattr(fo, "download",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("no download")))
+    n = fo.run(crop=None, max_books=25, per_crop=4, dry_run=True)
+    assert n == 0

@@ -137,3 +137,80 @@ def _is_pruned(oa_id: str) -> bool:
     re-download)."""
     offtopic = BOOKS_DIR / "_offtopic"
     return offtopic.exists() and any(offtopic.rglob(f"oa_{oa_id}.pdf"))
+
+
+def download(session: requests.Session, url: str, dest: Path) -> bool:
+    """Stream a candidate PDF to disk, validating the %PDF header + size."""
+    try:
+        resp = session.get(url, stream=True, timeout=120)
+    except requests.RequestException as exc:
+        print(f"[openalex]   ! download error: {exc}")
+        return False
+    if resp.status_code != 200:
+        print(f"[openalex]   ! http {resp.status_code}, skipping")
+        resp.close()
+        return False
+    return stream_pdf_to_file(resp, dest, MIN_BYTES, "openalex")
+
+
+def run(crop: str | None, max_books: int, per_crop: int, dry_run: bool) -> int:
+    BOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    session = pdf_session()
+    crops = [crop] if crop else CROP_TERMS
+    candidates = _collect_candidates(session, crops, per_crop)
+    print(f"[openalex] {len(candidates)} candidate(s); target {max_books}\n")
+
+    if dry_run:
+        for i, (oa_id, _url, _doi, title) in enumerate(candidates[:max_books], 1):
+            print(f"{i:>3}  {oa_id:>12}  {title[:60]}")
+        print("\n[openalex] preview only. Re-run without --dry-run to download.")
+        return 0
+
+    saved = 0
+    for oa_id, url, _doi, title in candidates:
+        if saved >= max_books:
+            break
+        dest = BOOKS_DIR / f"oa_{oa_id}.pdf"
+        if dest.exists():
+            print(f"[openalex]   = already have {dest.name}, skipping")
+            continue
+        if _is_pruned(oa_id):
+            print(f"[openalex]   = oa_{oa_id} previously pruned, skipping")
+            continue
+        print(f"[openalex] {title[:55]}")
+        if download(session, url, dest):
+            saved += 1
+        time.sleep(PDF_DELAY)
+
+    print(f"\n[openalex] DONE. downloaded {saved} paper(s) into {BOOKS_DIR}")
+    if saved:
+        print("[openalex] next: python -m src.ingest")
+    return saved
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="Harvest open-access global-crop papers from OpenAlex."
+    )
+    p.add_argument("--max", type=int, default=25, help="Max PDFs to download.")
+    p.add_argument("--per-crop", type=int, default=4,
+                   help="Max candidates pulled per crop.")
+    p.add_argument("--crop", default=None,
+                   help="Limit to one crop term (e.g. cassava).")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Preview candidates without downloading.")
+    p.add_argument("--list-crops", action="store_true",
+                   help="List curated crop terms and exit.")
+    args = p.parse_args()
+
+    if args.list_crops:
+        for c in CROP_TERMS:
+            print(f"  {c}")
+        return
+
+    run(crop=args.crop, max_books=args.max, per_crop=args.per_crop,
+        dry_run=args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
