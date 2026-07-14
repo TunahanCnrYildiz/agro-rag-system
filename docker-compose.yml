@@ -1,0 +1,24 @@
+# Run the backend in a container while still using the LOCAL LM Studio and the
+# LOCAL vector store. Running this does NOT affect local (non-Docker) dev.
+#
+#   docker compose up --build      # build + run; API on http://localhost:8000
+#
+# Requires Docker Desktop. LM Studio must be serving the embedding + chat models
+# on the host at :1234. See docs/roadmap-deployment.md.
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # persistent Chroma store on the host (not baked into the image)
+      - ./data:/app/data
+    environment:
+      # container -> host's LM Studio (Docker Desktop / host-gateway)
+      LM_STUDIO_BASE_URL: "http://host.docker.internal:1234/v1"
+      EMBEDDING_MODEL: "text-embedding-bge-m3"
+      CHAT_MODEL: "google/gemma-4-12b-qat"
+      CORS_ALLOW_ORIGINS: "*"
+    extra_hosts:
+      # makes host.docker.internal resolve on Linux too (native on Win/Mac)
+      - "host.docker.internal:host-gateway"

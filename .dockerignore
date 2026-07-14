@@ -1,0 +1,26 @@
+# Keep the build context small and never bake local state / large data in.
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Local config / secrets (compose supplies env instead)
+.env
+
+# Large or generated, not needed at runtime (store is mounted as a volume)
+data/
+docs/books/
+docs/screenshots/
+docs/offtopic_candidates.txt
+
+# Other subprojects
+mobile-app/
+web-widget/
+
+# Local notes / logs
+spec.md
+*.log
