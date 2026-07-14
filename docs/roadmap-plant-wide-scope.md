@@ -16,6 +16,38 @@ işleri kaydeder.
 
 "Bitki-geniş" bir **orta** kapsamdır: bugünkünden geniş, komple ziraatten dar.
 
+## ÖNERİLEN kapsam: "Bitki-geniş EKSİ teşhis/kimyasal"
+
+Bitki-geniş kapsamı al, ama **iki carve-out'u koru**: (a) kesin hastalık teşhisi
+koyma, (b) kimyasal pestisit/fungisit/herbisit/ilaç önerme. Geri kalan her şeyi
+(fizyoloji, toprak, bahçe pratiği, agronomi, çoğaltma, sulama, hasat-sonrası ve
+**organik/kültürel/biyolojik** hastalık-zararlı yönetimi) dahil et.
+
+Organik bir firma için bu **optimuma yakın** kapsamdır. Dezavantaj neredeyse yok:
+
+**Avantajlar**
+- **Marka uyumu:** Organik firma zaten kimyasal önermemeli — reddetmek eksiklik
+  değil, tutarlılık ve güçlü konumlanma.
+- **Sorumluluk koruması:** Teşhis ve ilaç dozu hukuki/güvenlik riski; dışarıda
+  kalması firmayı korur.
+- **Product-linker tutarlı:** Kimyasalda zaten ürün yok; ama organik hastalık/
+  zararlı yönetimi (mikoriza, biyolojik ürünler, kompost çayı) için ürün varsa
+  linker orada da devreye girer — genişleme değer bile katar.
+
+**Yönetilecek küçük dezavantajlar**
+- Hastalık/zararlı konusu "yarım" kapsanır: genel belirti + organik önlem +
+  profesyonele yönlendirme verilir, kesin teşhis/kimyasal verilmez. Tam-hizmet
+  danışman bekleyen kullanıcı eksik bulabilir.
+- **Sınır-sürtünmesi (asıl dikkat):** Konuya girip iki noktada "yapamam" demek,
+  temiz reddetmekten daha sinir bozucu olabilir. **Çözüm:** guardrail'i
+  "yapamadığın" değil, **"yapabildiğin organik çözüm" ekseninde** kur — cevap
+  çıkmaz sokak değil, faydalı organik tavsiye olsun.
+- Konumlanma algısı: "komple ziraat"e göre sınırlı görünür; ama bu bilinçli ve
+  organik marka için doğru bir tercih.
+
+**Sonuç:** Bu, genişleme yapılacaksa **önerilen hedeftir** — geniş kapsama ulaşır,
+ama markayı ve sorumluluğu koruyan iki sınırı korur.
+
 ## Ele alınacak konular
 
 Şu an olmayanlar **kalın**:
