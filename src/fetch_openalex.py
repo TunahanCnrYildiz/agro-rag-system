@@ -108,3 +108,32 @@ def search_crop(
         cursor = (data.get("meta") or {}).get("next_cursor")
         time.sleep(OA_DELAY)
     return out[:max_per_crop]
+
+
+def _collect_candidates(
+    session: requests.Session, crops: list[str], per_crop: int
+) -> list[tuple[str, str, str, str]]:
+    """Gather candidates across crops, deduped by oa_id AND doi."""
+    seen_ids: set[str] = set()
+    seen_dois: set[str] = set()
+    out: list[tuple[str, str, str, str]] = []
+    for crop in crops:
+        kept = 0
+        for oa_id, pdf_url, doi, title in search_crop(session, crop, per_crop):
+            if oa_id in seen_ids or (doi and doi in seen_dois):
+                continue
+            seen_ids.add(oa_id)
+            if doi:
+                seen_dois.add(doi)
+            out.append((oa_id, pdf_url, doi, title))
+            kept += 1
+        print(f"[openalex] crop '{crop}': {kept} candidates")
+        time.sleep(OA_DELAY)
+    return out
+
+
+def _is_pruned(oa_id: str) -> bool:
+    """True if this work was already moved to docs/books/_offtopic/ (don't
+    re-download)."""
+    offtopic = BOOKS_DIR / "_offtopic"
+    return offtopic.exists() and any(offtopic.rglob(f"oa_{oa_id}.pdf"))

@@ -87,3 +87,24 @@ def test_search_crop_filters_and_pages(monkeypatch):
     monkeypatch.setattr(fo.time, "sleep", lambda *a: None)
     out = fo.search_crop(object(), "cassava", 10)
     assert [c[0] for c in out] == ["W1"]  # W2 dropped (not English)
+
+
+def test_collect_dedups_by_id_and_doi(monkeypatch):
+    data = {
+        "cropA": [("W1", "u1", "d1", "t1"), ("W2", "u2", "d2", "t2")],
+        "cropB": [("W1", "u1", "d1", "t1"), ("W3", "u3", "d2", "t3")],
+    }
+    monkeypatch.setattr(fo, "search_crop", lambda s, crop, n: data[crop])
+    monkeypatch.setattr(fo.time, "sleep", lambda *a: None)
+    out = fo._collect_candidates(object(), ["cropA", "cropB"], 10)
+    # W1 kept once (dup id); W3 dropped (doi d2 already taken by W2)
+    assert [c[0] for c in out] == ["W1", "W2"]
+
+
+def test_is_pruned_detects_offtopic(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    (books / "_offtopic").mkdir(parents=True)
+    (books / "_offtopic" / "oa_W9.pdf").write_bytes(b"x")
+    monkeypatch.setattr(fo, "BOOKS_DIR", books)
+    assert fo._is_pruned("W9") is True
+    assert fo._is_pruned("W8") is False
