@@ -61,3 +61,50 @@ def _work_to_candidate(work: dict) -> tuple[str, str, str, str] | None:
     if _OFFTOPIC_REC.search(title):
         return None
     return oa_id, pdf_url, work.get("doi") or "", title
+
+
+def _oa_get(session: requests.Session, params: dict) -> dict | None:
+    """Call the OpenAlex /works endpoint (with mailto) and return parsed JSON,
+    retrying with backoff on 429 / 5xx."""
+    query = {**params, "mailto": POLITE_MAILTO}
+    for attempt in range(1, OA_RETRIES + 1):
+        try:
+            resp = session.get(OPENALEX_URL, params=query, timeout=OA_TIMEOUT)
+            if resp.status_code in (429, 500, 502, 503):
+                raise requests.RequestException(f"http {resp.status_code}")
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.RequestException, ValueError) as exc:
+            if attempt == OA_RETRIES:
+                print(f"[openalex] API failed ({params.get('filter', '')}): {exc}")
+                return None
+            time.sleep(2 * attempt)
+    return None
+
+
+def search_crop(
+    session: requests.Session, crop: str, max_per_crop: int
+) -> list[tuple[str, str, str, str]]:
+    """Return up to max_per_crop (oa_id, pdf_url, doi, title) candidates for a
+    crop: English, open-access, PDF-bearing, on-topic; well-cited first."""
+    out: list[tuple[str, str, str, str]] = []
+    seen: set[str] = set()
+    cursor = "*"
+    flt = f"title_and_abstract.search:{crop},open_access.is_oa:true,language:en"
+    while len(out) < max_per_crop and cursor:
+        data = _oa_get(session, {
+            "filter": flt,
+            "sort": "cited_by_count:desc",
+            "per-page": 50,
+            "cursor": cursor,
+        })
+        if not data:
+            break
+        for work in data.get("results", []):
+            cand = _work_to_candidate(work)
+            if cand and cand[0] not in seen:
+                seen.add(cand[0])
+                out.append(cand)
+        cursor = (data.get("meta") or {}).get("next_cursor")
+        time.sleep(OA_DELAY)
+    return out[:max_per_crop]
