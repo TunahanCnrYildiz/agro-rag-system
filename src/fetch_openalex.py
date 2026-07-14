@@ -14,6 +14,7 @@ DergiPark (dp_) and Internet Archive (ia_) corpora.
 from __future__ import annotations
 
 import argparse
+import re
 import time
 from pathlib import Path
 
@@ -22,11 +23,9 @@ import requests
 try:
     from .config import BOOKS_DIR
     from .pdf_fetch_utils import pdf_session, stream_pdf_to_file
-    from .fetch_dergipark import _OFFTOPIC_REC
 except ImportError:  # pragma: no cover
     from config import BOOKS_DIR  # type: ignore
     from pdf_fetch_utils import pdf_session, stream_pdf_to_file  # type: ignore
-    from fetch_dergipark import _OFFTOPIC_REC  # type: ignore
 
 OPENALEX_URL = "https://api.openalex.org/works"
 POLITE_MAILTO = "agrobotanybot@ekolojiktarim.com.tr"  # OpenAlex polite pool
@@ -44,6 +43,21 @@ CROP_TERMS = [
     "pigeon pea", "groundnut", "banana",
 ]
 
+# Restrict searches to plant-relevant OpenAlex subfields (Agronomy & Crop
+# Science, Plant Science, Soil Science, Horticulture) so a bare crop keyword
+# does not pull medical / economics / climate / food-processing papers that
+# merely mention the crop.
+PLANT_SUBFIELDS = "subfields/1102|subfields/1110|subfields/1111|subfields/1108"
+
+# Even within those subfields, drop animal-feed / aquaculture papers (a crop
+# used as livestock feed). Deliberately NOT matching bare "poultry"/"cattle" so
+# poultry/cattle *manure* fertilizer papers - which ARE on-topic - are kept.
+_OFFTOPIC_OA = re.compile(
+    r"\bruminant|\bsilage|\bforage|\bfodder|cattle feed|poultry feed|"
+    r"fish feed|\baquacult|\bfisher|dairy cattle",
+    re.IGNORECASE,
+)
+
 
 def _work_to_candidate(work: dict) -> tuple[str, str, str, str] | None:
     """Return (oa_id, pdf_url, doi, title) for an English OA work with a PDF,
@@ -58,7 +72,7 @@ def _work_to_candidate(work: dict) -> tuple[str, str, str, str] | None:
     if not oa_id.startswith("W"):
         return None
     title = work.get("title") or work.get("display_name") or ""
-    if _OFFTOPIC_REC.search(title):
+    if _OFFTOPIC_OA.search(title):
         return None
     return oa_id, pdf_url, work.get("doi") or "", title
 
@@ -90,7 +104,11 @@ def search_crop(
     out: list[tuple[str, str, str, str]] = []
     seen: set[str] = set()
     cursor = "*"
-    flt = f"title_and_abstract.search:{crop},open_access.is_oa:true,language:en"
+    flt = (
+        f"title_and_abstract.search:{crop},"
+        f"primary_topic.subfield.id:{PLANT_SUBFIELDS},"
+        "open_access.is_oa:true,language:en"
+    )
     while len(out) < max_per_crop and cursor:
         data = _oa_get(session, {
             "filter": flt,

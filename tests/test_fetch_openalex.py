@@ -37,8 +37,19 @@ def test_falls_back_to_oa_url_when_no_pdf_url():
 
 
 def test_none_when_offtopic_title():
-    # "cattle" is in _OFFTOPIC_REC -> livestock paper rejected
+    # animal-feed use of a crop is off-scope
     assert _work_to_candidate(_work(title="Cattle feed value of cassava peels")) is None
+
+
+def test_none_for_ruminant_and_silage_titles():
+    assert _work_to_candidate(_work(title="Novel feeds for ruminants: a review")) is None
+    assert _work_to_candidate(_work(title="Elephant grass silage with cassava scraps")) is None
+
+
+def test_keeps_manure_fertilizer_titles():
+    # poultry/cattle MANURE is an on-topic organic fertilizer -> must be kept
+    w = _work(title="Influence of poultry manure and NPK fertilizer on cassava yield")
+    assert _work_to_candidate(w) is not None
 
 
 class _FakeResp:
