@@ -26,16 +26,24 @@ chunks (+ FAO `fao_as087e`). The gap is language, not coverage.
 
 ## Solution
 
-**Query translation + multi-query fusion**, inside `retrieve_context`:
+**Conditional query translation + multi-query fusion**, inside `retrieve_context`:
 
-1. `_expand_query(q)` → `[q, translation]`. Translation target = **English** when
-   `detect_language(q) == "Turkish"`, else **Turkish**. Translation is produced
-   by the LM Studio chat model with a short, temperature-0 prompt.
-2. Retrieve top-`k` for each query in the list.
+1. Search in the query's own language first (`primary`).
+2. **Only if `primary` under-fills** (fewer than `k` chunks clear the floor) and
+   the toggle is on, translate and re-search: `_expand_query(q)` →
+   `[q, translation]`, target = **English** when `detect_language(q)=="Turkish"`,
+   else **Turkish**, via the LM Studio chat model (temperature 0). This
+   conditional trigger keeps well-covered queries (the majority) free of the
+   slow local-LLM translation call — only the TR/EN gap cases pay for it.
 3. `_fuse(result_lists, floor, k)`: pool `(Document, score)`, dedup by chunk text
-   keeping the **max** score, apply the floor, sort by score desc, take top `k`.
+   keeping the **max** score, apply the floor, sort desc, take top `k`.
 
 Rendering (the `[Kaynak: src, s.page]` headers) is unchanged.
+
+**Translation budget:** `max_tokens=512`. Gemma-QAT "thinks" before answering, so
+a tight budget (100–256) returns empty/truncated translations with
+`finish_reason="length"` on longer queries; 512 is reliable across query lengths
+(verified 2026-07-16), at ~3–8 s per call — hence the conditional trigger above.
 
 ## Decisions / constraints
 
