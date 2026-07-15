@@ -88,6 +88,7 @@ def test_retrieve_context_filters_below_threshold(monkeypatch):
         (_Doc("noise chunk", "bookB.pdf", 1), 0.20),  # below MIN_RETRIEVAL_RELEVANCE
     ])
     monkeypatch.setattr(engine, "_get_retriever_store", lambda: store)
+    monkeypatch.setattr(engine, "_expand_query", lambda q: [q])  # hermetic (no LLM)
     ctx = engine.retrieve_context("q")
     assert "good chunk" in ctx
     assert "noise chunk" not in ctx
@@ -97,6 +98,83 @@ def test_retrieve_context_filters_below_threshold(monkeypatch):
 def test_retrieve_context_empty_when_store_unavailable(monkeypatch):
     monkeypatch.setattr(engine, "_get_retriever_store", lambda: None)
     assert engine.retrieve_context("q") == ""
+
+
+# --- cross-lingual query expansion + fusion --- #
+def test_expand_query_translates_turkish_to_english(monkeypatch):
+    seen = {}
+
+    def fake_tr(q, target):
+        seen["target"] = target
+        return "grape pruning"
+
+    monkeypatch.setattr(engine, "_translate_query", fake_tr)
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    # a clearly-Turkish query (diacritics + stems) -> detect_language == Turkish
+    out = engine._expand_query("çilek yapraklarım neden sararıyor")
+    assert out == ["çilek yapraklarım neden sararıyor", "grape pruning"]
+    assert seen["target"] == "English"
+
+
+def test_expand_query_translates_english_to_turkish(monkeypatch):
+    monkeypatch.setattr(engine, "_translate_query", lambda q, t: "asma budama")
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert engine._expand_query("grape pruning")[1] == "asma budama"
+
+
+def test_expand_query_fallback_on_failure(monkeypatch):
+    def boom(q, t):
+        raise RuntimeError("no llm")
+
+    monkeypatch.setattr(engine, "_translate_query", boom)
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert engine._expand_query("asma budama") == ["asma budama"]
+
+
+def test_expand_query_disabled(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", False)
+    assert engine._expand_query("asma budama") == ["asma budama"]
+
+
+def test_expand_query_skips_noop_translation(monkeypatch):
+    monkeypatch.setattr(engine, "_translate_query", lambda q, t: "asma budama")
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert engine._expand_query("asma budama") == ["asma budama"]
+
+
+def test_fuse_dedups_keeping_max_score_and_applies_floor():
+    d_good = _Doc("good chunk", "a.pdf", 1)
+    d_dup = _Doc("good chunk", "a.pdf", 1)   # same content, different result list
+    d_noise = _Doc("noise", "b.pdf", 2)
+    fused = engine._fuse(
+        [[(d_good, 0.40)], [(d_dup, 0.55), (d_noise, 0.20)]],
+        floor=0.36, k=4,
+    )
+    assert [d.page_content for d, _ in fused] == ["good chunk"]  # noise dropped, dup collapsed
+    assert fused[0][1] == 0.55                                   # max score kept
+
+
+class _MultiStore:
+    """Returns different results per query, to prove both are retrieved + fused."""
+
+    def __init__(self, mapping):
+        self.mapping = mapping
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        return self.mapping[query]
+
+
+def test_retrieve_context_fuses_both_languages(monkeypatch):
+    store = _MultiStore({
+        "asma budama": [(_Doc("tr chunk", "dp_1.pdf", 1), 0.40)],
+        "grape pruning": [(_Doc("en chunk", "ia_2.pdf", 5), 0.50)],
+    })
+    monkeypatch.setattr(engine, "_get_retriever_store", lambda: store)
+    monkeypatch.setattr(engine, "_expand_query",
+                        lambda q: ["asma budama", "grape pruning"])
+    ctx = engine.retrieve_context("asma budama")
+    assert "tr chunk" in ctx and "en chunk" in ctx     # both languages surfaced
+    assert "[Kaynak: ia_2.pdf, s.5]" in ctx
 
 
 # --------------------------------------------------------------------------- #

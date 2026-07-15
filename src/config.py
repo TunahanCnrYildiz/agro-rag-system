@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     retrieval_k: int = Field(default=4, description="Botany chunks to retrieve.")
     product_match_k: int = Field(default=3, description="Products to recommend.")
     collection_name: str = Field(default="botany_knowledge")
+    # Cross-lingual retrieval: translate the query to the other major corpus
+    # language (TR<->EN) and fuse results, so a query reaches content stored in
+    # the other language. Set False to restore single-query retrieval.
+    cross_lingual_retrieval: bool = Field(default=True)
 
     # --- Ingestion params --- #
     chunk_size: int = Field(default=1000)

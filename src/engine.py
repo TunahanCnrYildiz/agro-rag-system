@@ -211,23 +211,75 @@ def _get_retriever_store():
 MIN_RETRIEVAL_RELEVANCE = 0.36
 
 
+def _translate_query(query: str, target_lang: str) -> str:
+    """Translate a search query to target_lang via the chat model (output-only,
+    deterministic). Raises on LLM error - the caller handles the fallback."""
+    prompt = (
+        f"Translate this agriculture/botany search query to {target_lang}. "
+        f"Output ONLY the translation, no quotes, no notes.\n\nQuery: {query}"
+    )
+    client = _get_llm()
+    completion = client.chat.completions.create(
+        model=settings.chat_model,
+        messages=[{"role": "user", "content": prompt}],
+        stream=False,
+        temperature=0.0,
+        max_tokens=100,
+    )
+    return (completion.choices[0].message.content or "").strip()
+
+
+def _expand_query(query: str) -> list[str]:
+    """Return [query, translation] to bridge the TR/EN corpus split, or [query]
+    if cross-lingual retrieval is off or the translation is unavailable/a no-op.
+
+    The corpus is ~half Turkish (dp_) and ~half English (ia_/oa_/fao_); bge-m3
+    scores cross-lingual matches lower, so a Turkish query about English-covered
+    content can fall below the relevance floor. Searching the translated query
+    too, then fusing, lets each query reach the other language's chunks.
+    """
+    if not settings.cross_lingual_retrieval:
+        return [query]
+    target = "English" if detect_language(query) == "Turkish" else "Turkish"
+    try:
+        translated = _translate_query(query, target)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] query translation failed: {exc}")
+        return [query]
+    if not translated or translated.strip().lower() == query.strip().lower():
+        return [query]
+    return [query, translated]
+
+
+def _fuse(result_lists, floor: float, k: int):
+    """Merge per-query result lists: dedup by chunk text keeping the max score,
+    drop anything below the floor, return the top-k by score."""
+    best: dict[str, tuple] = {}
+    for results in result_lists:
+        for doc, score in results:
+            key = doc.page_content
+            if key not in best or score > best[key][1]:
+                best[key] = (doc, score)
+    ranked = sorted(best.values(), key=lambda x: x[1], reverse=True)
+    return [(d, s) for d, s in ranked if s >= floor][:k]
+
+
 def retrieve_context(query: str, k: int | None = None) -> str:
-    """Return concatenated botany chunks relevant to the query, or an empty
-    string if nothing clears the relevance threshold (i.e. off-topic)."""
+    """Return concatenated botany chunks relevant to the query (across the TR/EN
+    corpus split via query expansion), or "" if nothing clears the floor."""
     k = k or settings.retrieval_k
     store = _get_retriever_store()
     if store is None:
         return ""
-    try:
-        results = store.similarity_search_with_relevance_scores(query, k=k)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[engine] retrieval failed: {exc}")
-        return ""
+    result_lists = []
+    for q in _expand_query(query):
+        try:
+            result_lists.append(store.similarity_search_with_relevance_scores(q, k=k))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[engine] retrieval failed: {exc}")
 
     parts: list[str] = []
-    for d, score in results:
-        if score < MIN_RETRIEVAL_RELEVANCE:
-            continue
+    for d, _score in _fuse(result_lists, MIN_RETRIEVAL_RELEVANCE, k):
         src = d.metadata.get("source", "?")
         page = d.metadata.get("page", "?")
         parts.append(f"[Kaynak: {src}, s.{page}]\n{d.page_content}")
