@@ -158,6 +158,18 @@ def test_keeps_plant_disease_and_pest_records():
     ) is not None
 
 
+def test_keeps_crop_residues_but_drops_food_residue_toxicology():
+    # "crop residues" (organic matter) is on-topic; "residues in food" is not
+    assert _record_to_candidate(
+        _rec(title="Using crop residues to improve soil organic matter",
+             description="Mulching and composting trial.")
+    ) is not None
+    assert _record_to_candidate(
+        _rec(title="Pesticide residues in food 2010",
+             description="Joint meeting on crop residue limits.")
+    ) is None
+
+
 def _root_xml(record_xmls, token=None):
     tok = f"<resumptionToken>{token}</resumptionToken>" if token else ""
     recs = "".join(record_xmls)

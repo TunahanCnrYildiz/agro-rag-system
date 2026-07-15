@@ -83,7 +83,13 @@ _OFFTOPIC_FAO = re.compile(
     r"nutrition security|food and nutrition|healthy diet|malnutrition|dietary|"
     r"\bfamine|humanitarian|"
     # animal / zoonotic disease (distinct from in-scope plant pests & diseases)
-    r"avian influenza|\bhpai\b|\bmers|coronavirus|\bcov\b|zoonos|influenza",
+    r"avian influenza|\bhpai\b|\bmers|coronavirus|\bcov\b|zoonos|influenza|"
+    r"rinderpest|foot-and-mouth|\bfmd\b|"
+    # food-safety toxicology (residue in food, not crop production) - keep the
+    # word "residue" itself, since "crop residues" are on-topic organic matter
+    r"residues? in food|residue analysis|"
+    # economics / weather-report series
+    r"crop situation|agrifood|public expenditure",
     re.IGNORECASE,
 )
 
