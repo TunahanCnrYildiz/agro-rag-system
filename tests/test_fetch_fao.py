@@ -128,6 +128,36 @@ def test_none_for_animal_market_machinery_even_with_plant_term():
     ) is None
 
 
+def test_none_for_zoonotic_disease_and_humanitarian():
+    # bare "nutrition"/"disease" are include terms, but these human/animal-crisis
+    # contexts must still be excluded
+    assert _record_to_candidate(
+        _rec(title="Technical meeting on MERS-CoV at the animal interface",
+             description="Understanding crop-region disease spread.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Avian influenza (HPAI) outbreaks in poultry",
+             description="Surveillance near crop areas.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Somalia famine prevention scale-up plan",
+             description="Emergency crop and seed distribution.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Quarterly food and nutrition security report",
+             description="Household diet and crop access.")
+    ) is None
+
+
+def test_keeps_plant_disease_and_pest_records():
+    # in-scope plant pest/disease management must NOT be caught by the animal
+    # disease excludes
+    assert _record_to_candidate(
+        _rec(title="Integrated management of crop pests and diseases",
+             description="Organic control of a plant disease outbreak.")
+    ) is not None
+
+
 def _root_xml(record_xmls, token=None):
     tok = f"<resumptionToken>{token}</resumptionToken>" if token else ""
     recs = "".join(record_xmls)

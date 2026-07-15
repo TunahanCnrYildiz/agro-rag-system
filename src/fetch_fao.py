@@ -77,7 +77,13 @@ _OFFTOPIC_FAO = re.compile(
     # greenhouse-GAS false hit on the "greenhouse" include term
     r"\bgender|child lab(?:our|or)|vocational|curriculum|"
     r"food security|food situation|food supply|crop prospects|greenhouse gas|"
-    r"country profile|social protection",
+    r"country profile|social protection|"
+    # human-nutrition / humanitarian docs (bare "nutrition" is an include term
+    # for PLANT nutrition, so exclude the human/food-crisis contexts here)
+    r"nutrition security|food and nutrition|healthy diet|malnutrition|dietary|"
+    r"\bfamine|humanitarian|"
+    # animal / zoonotic disease (distinct from in-scope plant pests & diseases)
+    r"avian influenza|\bhpai\b|\bmers|coronavirus|\bcov\b|zoonos|influenza",
     re.IGNORECASE,
 )
 
