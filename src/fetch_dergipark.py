@@ -98,6 +98,10 @@ _OFFTOPIC_REC = re.compile(
 # `goat`/`dairy`/`cattle` (goat/cattle manure are on-topic organic fertilizers).
 # `rasyon`/`koyun` are whole-word anchored so they don't match
 # `konsantrasyon`/`Koyuncu`; cattle is reached only via `süt/besi sığır`.
+# NOTE: silage/digestibility terms were tried here but removed - in Turkish
+# agronomy "silajlık mısır/sorgum" (silage maize/sorghum) is a common FIELD CROP,
+# so those terms flag legit weed-science/irrigation/breeding/physiology papers as
+# false positives (dry-run 2026-07-15). Not worth the ~4 true feed papers.
 _OFFTOPIC_CLEANUP_REC = re.compile(
     r"zootekni|veteriner|\bivesi\b|\bawassi\b|\bbroyler\b|\bbroiler\b|"
     r"\bkarkas|\brasyon\b|\bbuza[ğg][ıi]|\bkuzu\b|\blamb\b|\bsheep\b|"
