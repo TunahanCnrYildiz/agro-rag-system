@@ -100,3 +100,51 @@ def _record_to_candidate(rec: ET.Element) -> tuple[str, str, str] | None:
         return None
 
     return fao_id, pdf_url, (titles[0] if titles else "")
+
+
+def _oai(session: requests.Session, params: dict) -> ET.Element | None:
+    """Call the OAI-PMH endpoint and return the parsed root element, retrying a
+    few times with backoff since a full page can be slow to generate."""
+    for attempt in range(1, OAI_RETRIES + 1):
+        try:
+            resp = session.get(OAI_URL, params=params, timeout=OAI_TIMEOUT)
+            resp.raise_for_status()
+            return ET.fromstring(resp.content)
+        except (requests.RequestException, ET.ParseError) as exc:
+            if attempt == OAI_RETRIES:
+                print(f"[fao] OAI failed after {OAI_RETRIES} tries ({params}): {exc}")
+                return None
+            time.sleep(2 * attempt)
+    return None
+
+
+def _collect_candidates(
+    session: requests.Session, set_spec: str, max_books: int, max_scan: int
+) -> list[tuple[str, str, str]]:
+    """Page through a set's records, filtering to plant-relevant candidates.
+
+    Stops when max_books candidates are found or max_scan records are scanned
+    (the latter bounds walking a very large set). Dedupes by fao_id.
+    """
+    out: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    scanned = 0
+    params = {"verb": "ListRecords", "metadataPrefix": "oai_dc", "set": set_spec}
+    while len(out) < max_books and scanned < max_scan:
+        root = _oai(session, params)
+        if root is None:
+            break
+        for rec in root.findall(".//oai:record", _NS):
+            scanned += 1
+            cand = _record_to_candidate(rec)
+            if cand and cand[0] not in seen:
+                seen.add(cand[0])
+                out.append(cand)
+                if len(out) >= max_books:
+                    break
+        token = root.findtext(".//oai:resumptionToken", default="", namespaces=_NS)
+        if not token:
+            break
+        params = {"verb": "ListRecords", "resumptionToken": token}
+        time.sleep(OAI_DELAY)
+    return out[:max_books]

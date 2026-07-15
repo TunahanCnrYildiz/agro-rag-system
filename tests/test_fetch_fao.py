@@ -97,3 +97,66 @@ def test_keeps_manure_fertilizer_record():
 
 def test_none_when_no_pdf_identifier():
     assert _record_to_candidate(_rec(pdf=None)) is None
+
+
+def _root_xml(record_xmls, token=None):
+    tok = f"<resumptionToken>{token}</resumptionToken>" if token else ""
+    recs = "".join(record_xmls)
+    return ET.fromstring(
+        f'<OAI-PMH {_NS_DECL}><ListRecords>{recs}{tok}</ListRecords></OAI-PMH>'
+    )
+
+
+def test_collect_paginates_and_dedupes(monkeypatch):
+    p1 = _root_xml(
+        [_rec_xml(identifier="oai:x:20.500.14283/a", title="crop soil guide"),
+         _rec_xml(identifier="oai:x:20.500.14283/b", title="plant nutrition")],
+        token="t1",
+    )
+    p2 = _root_xml(
+        [_rec_xml(identifier="oai:x:20.500.14283/a", title="crop soil guide"),
+         _rec_xml(identifier="oai:x:20.500.14283/c", title="irrigation of maize")],
+        token=None,
+    )
+    pages = iter([p1, p2])
+    monkeypatch.setattr(ff, "_oai", lambda s, params: next(pages))
+    monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
+    out = ff._collect_candidates(object(), "set", max_books=10, max_scan=100)
+    assert [c[0] for c in out] == ["a", "b", "c"]  # dup "a" kept once
+
+
+def test_collect_stops_at_max_books(monkeypatch):
+    p1 = _root_xml(
+        [_rec_xml(identifier="oai:x:20.500.14283/a", title="crop guide"),
+         _rec_xml(identifier="oai:x:20.500.14283/b", title="plant soil")],
+        token="t1",
+    )
+    monkeypatch.setattr(ff, "_oai", lambda s, params: p1)
+    monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
+    out = ff._collect_candidates(object(), "set", max_books=1, max_scan=100)
+    assert [c[0] for c in out] == ["a"]
+
+
+def test_collect_respects_max_scan(monkeypatch):
+    p1 = _root_xml(
+        [_rec_xml(identifier="oai:x:20.500.14283/a", title="fisheries only")],
+        token="t1",
+    )
+    calls = []
+
+    def fake_oai(s, params):
+        calls.append(params)
+        return p1
+
+    monkeypatch.setattr(ff, "_oai", fake_oai)
+    monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
+    out = ff._collect_candidates(object(), "set", max_books=10, max_scan=1)
+    assert out == []          # the one record is off-topic
+    assert len(calls) == 1    # stopped after scanning 1 record (didn't page on)
+
+
+def test_collect_stops_when_oai_returns_none(monkeypatch):
+    monkeypatch.setattr(ff, "_oai", lambda s, params: None)
+    monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
+    out = ff._collect_candidates(object(), "set", max_books=10, max_scan=100)
+    assert out == []
