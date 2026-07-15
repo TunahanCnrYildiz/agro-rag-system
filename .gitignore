@@ -33,3 +33,6 @@ spec.md
 
 # Generated off-topic cleanup report (from `fetch_dergipark --clean-offtopic`)
 docs/offtopic_candidates.txt
+
+# Generated retrieval diagnostic report (from `evals.inspect_retrieval`)
+docs/retrieval_report.md
