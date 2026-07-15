@@ -90,6 +90,7 @@ agro-rag-system/
 │   ├── fetch_books.py       # download English books from Internet Archive
 │   ├── fetch_dergipark.py   # harvest Turkish papers from DergiPark (OAI-PMH)
 │   ├── fetch_openalex.py    # harvest global-crop OA papers from OpenAlex
+│   ├── fetch_fao.py         # harvest plant docs from FAO repository (OAI-PMH)
 │   ├── pdf_fetch_utils.py   # shared PDF stream/validate helpers (all fetchers)
 │   ├── ingest.py            # chunk + embed docs -> Chroma (incremental)
 │   ├── engine.py            # retrieval + product match + LM Studio
@@ -157,6 +158,11 @@ python -m src.fetch_dergipark --clean-offtopic --apply # move them out + prune s
 python -m src.fetch_openalex --list-crops              # show curated gap crops
 python -m src.fetch_openalex --dry-run --max 25        # preview candidates
 python -m src.fetch_openalex --max 25 --per-crop 4     # harvest PDFs
+
+# Plant-relevant English docs from the FAO Knowledge Repository (OAI-PMH)
+python -m src.fetch_fao --list-sets                    # show OAI sets
+python -m src.fetch_fao --dry-run --max 100            # preview candidates
+python -m src.fetch_fao --max 100                      # harvest PDFs (fao_<id>.pdf)
 ```
 
 Only freely downloadable, non-restricted items are fetched (borrow-only / DRM
