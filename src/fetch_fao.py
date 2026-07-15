@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -220,6 +221,14 @@ def run(set_spec: str, max_books: int, max_scan: int, dry_run: bool) -> int:
 
 
 def main() -> None:
+    # FAO set names and document titles span many scripts (Cyrillic, Chinese,
+    # Arabic, accented Latin); force UTF-8 output so printing them does not crash
+    # on a legacy-codepage console (e.g. Windows cp1252).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # pragma: no cover - non-reconfigurable stream
+        pass
+
     p = argparse.ArgumentParser(
         description="Harvest plant-relevant open-access PDFs from the FAO "
                     "Knowledge Repository."
