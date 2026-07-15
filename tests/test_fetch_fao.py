@@ -99,6 +99,35 @@ def test_none_when_no_pdf_identifier():
     assert _record_to_candidate(_rec(pdf=None)) is None
 
 
+def test_fao_id_lowercased():
+    # FAO exposes case-variant handles (I4774E / i4774e) for the same doc;
+    # the id must be lowercased so they collapse to one file / one dedup key.
+    cand = _record_to_candidate(
+        _rec(identifier="oai:openknowledge.fao.org:20.500.14283/I4774E")
+    )
+    assert cand[0] == "i4774e"
+
+
+def test_none_for_animal_market_machinery_even_with_plant_term():
+    # each has a plant term (crop/bananas/harvesting) but an off-scope term too
+    assert _record_to_candidate(
+        _rec(title="Global Animal Disease report on crop regions",
+             description="Intelligence report.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Market and value chain analysis of crop sectors",
+             description="Economic study of prices.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Roots, tubers and bananas in animal feeding",
+             description="Feeding trial with crop residues.")
+    ) is None
+    assert _record_to_candidate(
+        _rec(title="Agricultural robotics for crop harvesting",
+             description="Automated machinery.")
+    ) is None
+
+
 def _root_xml(record_xmls, token=None):
     tok = f"<resumptionToken>{token}</resumptionToken>" if token else ""
     recs = "".join(record_xmls)

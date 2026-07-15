@@ -60,14 +60,24 @@ _PLANT_INCLUDE = re.compile(
     re.IGNORECASE,
 )
 
-# Even with a plant term present, drop clearly off-scope docs. Mirrors the
-# OpenAlex fetcher's nuance: match "poultry/cattle FEED" but NOT bare
-# "poultry"/"cattle", so poultry/cattle MANURE fertilizer papers survive.
+# Even with a plant term present, drop clearly off-scope docs (animal, aquatic,
+# forestry, economics, machinery — all outside the assistant's plant scope).
+# Mirrors the OpenAlex fetcher's nuance: match "poultry/cattle FEED" and
+# "animal feed/nutrition" but NOT bare "poultry"/"cattle"/"animal manure", so
+# animal-MANURE organic-fertilizer papers survive.
 _OFFTOPIC_FAO = re.compile(
     r"\bfisher|\baquacult|\bfish\b|\bshrimp|\bmollusc|\baquatic|\bmarine\b|"
     r"\bforest|\btimber|\blogging|silvicultur|"
     r"\blivestock|poultry feed|cattle feed|fish feed|feed ration|"
-    r"\bruminant|\bsilage|\bfodder|\bforage|\bdairy\b|\bveterinar",
+    r"\bruminant|\bsilage|\bfodder|\bforage|\bdairy\b|\bveterinar|"
+    r"animal (?:health|disease|feed|feeding|nutrition|production|husbandry|welfare)|"
+    r"value chain|\bmarket|\btrade\b|\beconomic|\bprofitab|"
+    r"\brobot|machinery|mechaniz|"
+    # social / policy / education and food-security-report series, plus the
+    # greenhouse-GAS false hit on the "greenhouse" include term
+    r"\bgender|child lab(?:our|or)|vocational|curriculum|"
+    r"food security|food situation|food supply|crop prospects|greenhouse gas|"
+    r"country profile|social protection",
     re.IGNORECASE,
 )
 
@@ -96,7 +106,10 @@ def _record_to_candidate(rec: ET.Element) -> tuple[str, str, str] | None:
     header_id = rec.findtext(
         "oai:header/oai:identifier", default="", namespaces=_NS
     )
-    fao_id = header_id.rsplit("/", 1)[-1].strip()
+    # FAO exposes case-variant handles for the same document (e.g. I4774E and
+    # i4774e); lowercase the id so dedup and the fao_<id>.pdf filename collapse
+    # those into one.
+    fao_id = header_id.rsplit("/", 1)[-1].strip().lower()
     if not fao_id:
         return None
 
