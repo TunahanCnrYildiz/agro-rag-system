@@ -160,3 +160,76 @@ def test_collect_stops_when_oai_returns_none(monkeypatch):
     monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
     out = ff._collect_candidates(object(), "set", max_books=10, max_scan=100)
     assert out == []
+
+
+def test_is_pruned_detects_offtopic(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    (books / "_offtopic").mkdir(parents=True)
+    (books / "_offtopic" / "fao_z9.pdf").write_bytes(b"x")
+    monkeypatch.setattr(ff, "BOOKS_DIR", books)
+    assert ff._is_pruned("z9") is True
+    assert ff._is_pruned("z8") is False
+
+
+def test_list_sets_parses_specs_and_names(monkeypatch):
+    root = ET.fromstring(
+        f'<OAI-PMH {_NS_DECL}><ListSets>'
+        f'<set><setSpec>col_2</setSpec><setName>Publications</setName></set>'
+        f'<set><setSpec>col_3</setSpec><setName>Technical documents</setName></set>'
+        f'</ListSets></OAI-PMH>'
+    )
+    monkeypatch.setattr(ff, "_oai", lambda s, params: root)
+    out = ff.list_sets(object())
+    assert out == [("col_2", "Publications"), ("col_3", "Technical documents")]
+
+
+def test_run_dry_run_downloads_nothing(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    monkeypatch.setattr(ff, "BOOKS_DIR", books)
+    monkeypatch.setattr(ff, "pdf_session", lambda *a, **k: object())
+    monkeypatch.setattr(
+        ff, "_collect_candidates",
+        lambda s, spec, mb, ms: [("x1", "u1.pdf", "crop production guide")],
+    )
+    monkeypatch.setattr(
+        ff, "download",
+        lambda *a: (_ for _ in ()).throw(AssertionError("no download in dry-run")),
+    )
+    n = ff.run(set_spec="set", max_books=100, max_scan=8000, dry_run=True)
+    assert n == 0
+
+
+def test_run_skips_existing_and_counts_saved(tmp_path, monkeypatch):
+    books = tmp_path / "books"
+    books.mkdir()
+    (books / "fao_have.pdf").write_bytes(b"%PDF-old")  # already present -> skip
+    monkeypatch.setattr(ff, "BOOKS_DIR", books)
+    monkeypatch.setattr(ff, "pdf_session", lambda *a, **k: object())
+    monkeypatch.setattr(ff.time, "sleep", lambda *a: None)
+    monkeypatch.setattr(
+        ff, "_collect_candidates",
+        lambda s, spec, mb, ms: [
+            ("have", "u_have.pdf", "already here"),
+            ("new1", "u_new1.pdf", "new crop guide"),
+        ],
+    )
+    saved_urls = []
+
+    def fake_download(session, url, dest):
+        saved_urls.append(url)
+        dest.write_bytes(b"%PDF-new")
+        return True
+
+    monkeypatch.setattr(ff, "download", fake_download)
+    n = ff.run(set_spec="set", max_books=100, max_scan=8000, dry_run=False)
+    assert n == 1                       # only "new1" downloaded
+    assert saved_urls == ["u_new1.pdf"]  # existing "have" skipped
+
+
+def test_main_list_sets_prints(capsys, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["fetch_fao", "--list-sets"])
+    monkeypatch.setattr(ff, "pdf_session", lambda *a, **k: object())
+    monkeypatch.setattr(ff, "list_sets", lambda s: [("col_2", "Publications")])
+    ff.main()
+    printed = capsys.readouterr().out
+    assert "col_2" in printed and "Publications" in printed

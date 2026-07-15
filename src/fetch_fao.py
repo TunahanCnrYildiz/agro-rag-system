@@ -148,3 +148,101 @@ def _collect_candidates(
         params = {"verb": "ListRecords", "resumptionToken": token}
         time.sleep(OAI_DELAY)
     return out[:max_books]
+
+
+def _is_pruned(fao_id: str) -> bool:
+    """True if this doc was already moved to docs/books/_offtopic/ (don't
+    re-download)."""
+    offtopic = BOOKS_DIR / "_offtopic"
+    return offtopic.exists() and any(offtopic.rglob(f"fao_{fao_id}.pdf"))
+
+
+def list_sets(session: requests.Session) -> list[tuple[str, str]]:
+    """Return (setSpec, setName) for every OAI set (single page; FAO exposes ~17)."""
+    root = _oai(session, {"verb": "ListSets"})
+    if root is None:
+        return []
+    out: list[tuple[str, str]] = []
+    for s in root.findall(".//oai:set", _NS):
+        spec = (s.findtext("oai:setSpec", default="", namespaces=_NS) or "").strip()
+        name = (s.findtext("oai:setName", default="", namespaces=_NS) or "").strip()
+        if spec:
+            out.append((spec, name))
+    return out
+
+
+def download(session: requests.Session, url: str, dest: Path) -> bool:
+    """Stream a candidate PDF to disk, validating the %PDF header + size."""
+    try:
+        resp = session.get(url, stream=True, timeout=120)
+    except requests.RequestException as exc:
+        print(f"[fao]   ! download error: {exc}")
+        return False
+    if resp.status_code != 200:
+        print(f"[fao]   ! http {resp.status_code}, skipping")
+        resp.close()
+        return False
+    return stream_pdf_to_file(resp, dest, MIN_BYTES, "fao")
+
+
+def run(set_spec: str, max_books: int, max_scan: int, dry_run: bool) -> int:
+    BOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    session = pdf_session("en")
+    candidates = _collect_candidates(session, set_spec, max_books, max_scan)
+    print(f"[fao] {len(candidates)} candidate(s); target {max_books}\n")
+
+    if dry_run:
+        for i, (fao_id, _url, title) in enumerate(candidates, 1):
+            print(f"{i:>3}  {fao_id:>10}  {title[:60]}")
+        print("\n[fao] preview only. Re-run without --dry-run to download.")
+        return 0
+
+    saved = 0
+    for fao_id, url, title in candidates:
+        if saved >= max_books:
+            break
+        dest = BOOKS_DIR / f"fao_{fao_id}.pdf"
+        if dest.exists():
+            print(f"[fao]   = already have {dest.name}, skipping")
+            continue
+        if _is_pruned(fao_id):
+            print(f"[fao]   = fao_{fao_id} previously pruned, skipping")
+            continue
+        print(f"[fao] {title[:55]}")
+        if download(session, url, dest):
+            saved += 1
+        time.sleep(PDF_DELAY)
+
+    print(f"\n[fao] DONE. downloaded {saved} paper(s) into {BOOKS_DIR}")
+    if saved:
+        print("[fao] next: python -m src.ingest")
+    return saved
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="Harvest plant-relevant open-access PDFs from the FAO "
+                    "Knowledge Repository."
+    )
+    p.add_argument("--max", type=int, default=100, help="Max PDFs to download.")
+    p.add_argument("--max-scan", type=int, default=8000,
+                   help="Max OAI records to scan before stopping.")
+    p.add_argument("--set", default=PUBLICATIONS_SET,
+                   help="OAI setSpec to harvest (default: Publications).")
+    p.add_argument("--dry-run", action="store_true",
+                   help="Preview candidates without downloading.")
+    p.add_argument("--list-sets", action="store_true",
+                   help="List OAI sets and exit.")
+    args = p.parse_args()
+
+    if args.list_sets:
+        for spec, name in list_sets(pdf_session("en")):
+            print(f"  {spec}  {name}")
+        return
+
+    run(set_spec=args.set, max_books=args.max, max_scan=args.max_scan,
+        dry_run=args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
