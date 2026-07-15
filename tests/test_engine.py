@@ -177,6 +177,22 @@ def test_retrieve_context_fuses_both_languages(monkeypatch):
     assert "[Kaynak: ia_2.pdf, s.5]" in ctx
 
 
+def test_retrieve_context_skips_translation_when_primary_fills(monkeypatch):
+    # primary already returns k chunks above the floor -> no (slow) translation
+    strong = [(_Doc(f"c{i}", "dp.pdf", i), 0.50) for i in range(4)]
+    monkeypatch.setattr(engine, "_get_retriever_store", lambda: _Store(strong))
+    called = {"expand": False}
+
+    def spy(q):
+        called["expand"] = True
+        return [q]
+
+    monkeypatch.setattr(engine, "_expand_query", spy)
+    ctx = engine.retrieve_context("q")
+    assert called["expand"] is False        # translation skipped
+    assert "c0" in ctx
+
+
 # --------------------------------------------------------------------------- #
 # answer() — off-scope product suppression + marker stripping
 # --------------------------------------------------------------------------- #

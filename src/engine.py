@@ -224,7 +224,11 @@ def _translate_query(query: str, target_lang: str) -> str:
         messages=[{"role": "user", "content": prompt}],
         stream=False,
         temperature=0.0,
-        max_tokens=100,
+        # Reasoning-capable local builds (e.g. Gemma QAT) spend tokens "thinking"
+        # before the visible answer, so a tight budget returns empty/truncated
+        # content with finish_reason="length"; 512 reliably leaves room for the
+        # reasoning + the short translation across query lengths (verified 2026-07-16).
+        max_tokens=512,
     )
     return (completion.choices[0].message.content or "").strip()
 
@@ -264,19 +268,37 @@ def _fuse(result_lists, floor: float, k: int):
     return [(d, s) for d, s in ranked if s >= floor][:k]
 
 
+def _search(store, query: str, k: int):
+    """Vector search wrapper that returns [] instead of raising."""
+    try:
+        return store.similarity_search_with_relevance_scores(query, k=k)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] retrieval failed: {exc}")
+        return []
+
+
 def retrieve_context(query: str, k: int | None = None) -> str:
-    """Return concatenated botany chunks relevant to the query (across the TR/EN
-    corpus split via query expansion), or "" if nothing clears the floor."""
+    """Return concatenated botany chunks relevant to the query, or "" if nothing
+    clears the floor.
+
+    Cross-lingual rescue is CONDITIONAL: we first search in the query's own
+    language, and only translate + re-search + fuse when that under-fills the
+    context (fewer than k chunks clear the floor). That is the TR/EN gap case;
+    well-covered queries skip the (slow, local-LLM) translation entirely.
+    """
     k = k or settings.retrieval_k
     store = _get_retriever_store()
     if store is None:
         return ""
-    result_lists = []
-    for q in _expand_query(query):
-        try:
-            result_lists.append(store.similarity_search_with_relevance_scores(q, k=k))
-        except Exception as exc:  # noqa: BLE001
-            print(f"[engine] retrieval failed: {exc}")
+
+    primary = _search(store, query, k)
+    kept = [(d, s) for d, s in primary if s >= MIN_RETRIEVAL_RELEVANCE]
+
+    result_lists = [primary]
+    if settings.cross_lingual_retrieval and len(kept) < k:
+        # under-filled: bring in the other-language content via translation.
+        for translated in _expand_query(query)[1:]:
+            result_lists.append(_search(store, translated, k))
 
     parts: list[str] = []
     for d, _score in _fuse(result_lists, MIN_RETRIEVAL_RELEVANCE, k):
