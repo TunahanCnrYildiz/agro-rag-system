@@ -106,7 +106,14 @@ _OFFTOPIC_CLEANUP_REC = re.compile(
     r"zootekni|veteriner|\bivesi\b|\bawassi\b|\bbroyler\b|\bbroiler\b|"
     r"\bkarkas|\brasyon\b|\bbuza[ğg][ıi]|\bkuzu\b|\blamb\b|\bsheep\b|"
     r"\bkoyun\b|\bkanatl[ıi]|su [üu]r[üu]nleri|aquacult|fisher|"
-    r"s[üu]t s[ıi][ğg][ıi]r|besi s[ıi][ğg][ıi]r",
+    r"s[üu]t s[ıi][ğg][ıi]r|besi s[ıi][ğg][ıi]r|"
+    # cattle/dairy husbandry title terms (2026-07-16) - high precision, do not
+    # appear in plant-paper titles even though feed words like "yem"/"koza"
+    # (cotton boll!) collide in body text. Beekeeping terms (arıcılık/ana arı)
+    # were tried but removed: they false-flag bee-plant / pollination / medicinal-
+    # plant papers (e.g. Astragalus "geven", aromatic-plant surveys).
+    r"s[ıi][ğg][ıi]rc[ıi]l[ıi]k|besicilik|\bsa[ğg][ıi]m|mastitis|meme sa[ğg]l|"
+    r"dam[ıi]zl[ıi]k|laktasyon|s[üu]t verim",
     re.IGNORECASE,
 )
 
