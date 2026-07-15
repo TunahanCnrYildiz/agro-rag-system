@@ -106,3 +106,35 @@ def test_iter_source_files_excludes_offtopic(tmp_path, monkeypatch):
 
     names = [p.name for p in ing._iter_source_files()]
     assert names == ["dp_1.pdf"]
+
+
+def _splitter():
+    return RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+
+
+def test_iter_chunks_flags_zero_chunk_file(tmp_path, monkeypatch):
+    p = tmp_path / "fao_scan.pdf"
+    p.write_bytes(b"x")
+    monkeypatch.setattr(ing, "_iter_source_files", lambda: [p])
+    monkeypatch.setattr(ing, "_load_file_text", lambda path: iter([]))  # image-only: no text
+    zero: list[str] = []
+    chunks = list(ing.iter_chunks(_splitter(), store=None, zero_chunk_out=zero))
+    assert chunks == []
+    assert zero == ["fao_scan.pdf"]
+
+
+def test_iter_chunks_not_flagged_when_text_present(tmp_path, monkeypatch):
+    p = tmp_path / "dp_ok.pdf"
+    p.write_bytes(b"x")
+    monkeypatch.setattr(ing, "_iter_source_files", lambda: [p])
+    monkeypatch.setattr(
+        ing, "_load_file_text",
+        lambda path: iter([(NORMAL_PROSE, {"source": path.name, "page": 0})]),
+    )
+    zero: list[str] = []
+    chunks = list(ing.iter_chunks(_splitter(), store=None, zero_chunk_out=zero))
+    assert len(chunks) >= 1
+    assert zero == []

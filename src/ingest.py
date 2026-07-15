@@ -193,11 +193,17 @@ def _already_ingested(store, source_name: str) -> bool:
 
 
 def iter_chunks(
-    splitter: RecursiveCharacterTextSplitter, store=None, force: bool = False
+    splitter: RecursiveCharacterTextSplitter, store=None, force: bool = False,
+    zero_chunk_out: list[str] | None = None,
 ) -> Iterator[Document]:
     """Lazily yield chunked Documents across all source files. When ``store`` is
     given and ``force`` is False, files already present in the store are skipped
-    so re-ingestion does not re-embed the whole corpus."""
+    so re-ingestion does not re-embed the whole corpus.
+
+    Files that are processed but yield no usable chunks (image-only scans with no
+    text layer) are appended to ``zero_chunk_out`` so the driver can surface them
+    instead of letting them vanish silently as dead weight.
+    """
     files = _iter_source_files()
     if not files:
         print(f"[ingest] no .pdf/.txt files found under {BOOKS_DIR}")
@@ -209,6 +215,7 @@ def iter_chunks(
             print(f"[ingest]   = {path.name} already ingested, skipping")
             continue
         print(f"[ingest] processing {path.name}")
+        emitted = 0
         for text, meta in _load_file_text(path):
             for i, chunk in enumerate(splitter.split_text(text)):
                 chunk = chunk.strip()
@@ -216,7 +223,10 @@ def iter_chunks(
                     continue
                 meta_out = dict(meta)
                 meta_out["chunk_index"] = i
+                emitted += 1
                 yield Document(page_content=chunk, metadata=meta_out)
+        if emitted == 0 and zero_chunk_out is not None:
+            zero_chunk_out.append(path.name)
 
 
 # --------------------------------------------------------------------------- #
@@ -241,6 +251,7 @@ def ingest(reset: bool = False, force: bool = False) -> int:
 
     batch_docs: list[Document] = []
     batch_ids: list[str] = []
+    zero_chunk: list[str] = []
     total = 0
 
     def flush() -> None:
@@ -253,7 +264,8 @@ def ingest(reset: bool = False, force: bool = False) -> int:
         batch_docs.clear()
         batch_ids.clear()
 
-    for doc in iter_chunks(splitter, store=store, force=force):
+    for doc in iter_chunks(splitter, store=store, force=force,
+                           zero_chunk_out=zero_chunk):
         cid = _stable_chunk_id(
             doc.metadata.get("source", "unknown"),
             int(doc.metadata.get("page", 0)),
@@ -274,6 +286,11 @@ def ingest(reset: bool = False, force: bool = False) -> int:
         )
     else:
         print(f"[ingest] DONE. {total} chunks persisted to {VECTOR_STORE_DIR}")
+    if zero_chunk:
+        print(f"[ingest] WARNING: {len(zero_chunk)} file(s) produced 0 chunks "
+              f"(image-only scan? need OCR):")
+        for name in zero_chunk:
+            print(f"[ingest]   ! {name}")
     return total
 
 
