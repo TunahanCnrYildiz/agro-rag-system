@@ -52,6 +52,14 @@ User query ─▶ FastAPI /api/chat ─▶ RAG Engine
 | Scraping         | requests + BeautifulSoup                           |
 | Tests / quality  | pytest (50 tests) + `evals/` quality harness       |
 
+**Cross-lingual retrieval.** The corpus is ~half Turkish, ~half English. A Turkish
+query about a crop covered only in the English sources (FAO/OpenAlex) would
+otherwise never reach it — generic Turkish fertilization chunks clear the
+relevance floor and fill the result slots first. Each query is expanded through a
+TR→EN crop-name lexicon (`engine.CROP_LEXICON`, e.g. `manyok → cassava`) and the
+extra searches are fused by rank (RRF). It is deterministic and LLM-free; toggle
+with `cross_lingual_retrieval`.
+
 ---
 
 ## Safety guardrails (enforced on every query)
