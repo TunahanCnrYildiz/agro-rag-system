@@ -54,6 +54,32 @@ holds (24/24 clean) rather than "it passed once".
 5. `--fast --repeat N>1` is a **usage error**: fast mode never calls the chat
    model, so every sample would be identical.
 
+## `--only` — what makes `--repeat` usable at all
+
+`--repeat 3` over all 31 cases is ~45-60 minutes. **A tool that costs an hour
+gets run approximately never** — and insurance you never invoke is not insurance.
+Shipping `--repeat` alone would have let us declare the blind spot closed while
+leaving it open in practice, which is the tool-level version of the "green but
+vacuous" bug this whole session has been chasing.
+
+So `--only <id|category>` ships with it: run one case, or one category.
+
+```bash
+python -m evals.run_eval --repeat 10 --only chemical    # ~15 min, where the risk is
+python -m evals.run_eval --repeat 3  --only gap_taro_tr # one case, ~2 min
+```
+
+This is not a convenience: it is the difference between a feature and a used
+feature. Note that the ad-hoc measurement that justified this whole spec (6 cases
+x 8) was written by hand precisely because sampling all 31 was absurd — the tool
+should support what the work actually needed.
+
+- Matches a case **id** exactly, or a **category**
+  (`nutrition | horticulture | disease | chemical | offscope`).
+- Matching nothing is a usage error listing the valid categories — a silent
+  "0/0 cases passed" would be a green that means nothing.
+- Works in fast mode too (filtering is orthogonal to sampling).
+
 ## Decisions / constraints
 
 - **Default stays 1.** No existing workflow gets slower. Full eval is ~15-20 min;

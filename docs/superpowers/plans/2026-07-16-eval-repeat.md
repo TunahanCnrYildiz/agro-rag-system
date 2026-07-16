@@ -260,6 +260,155 @@ git commit -m "Add --repeat to the eval: sample the stochastic dimensions N time
 
 ---
 
+### Task 1b: `--only <id|category>`
+
+**Files:**
+- Modify: `evals/run_eval.py` (`run()` + `main()`)
+- Test: `tests/test_run_eval.py`
+
+**Interfaces:**
+- Consumes: `run(fast, repeat)` from Task 1.
+- Produces: `run(fast: bool, repeat: int = 1, only: str | None = None) -> int`.
+
+**Why:** `--repeat 3` over 31 cases is ~50 min, so nobody runs it and the blind
+spot stays open in practice. `--only` is what turns this into a tool you'd
+actually reach for (`--repeat 10 --only chemical` = ~15 min).
+
+- [ ] **Step 1: Write the failing tests** (append to `tests/test_run_eval.py`)
+
+`_stub` already exists and monkeypatches `run_eval.CASES` to a single case. These
+tests need several cases, so set `CASES` directly.
+
+```python
+TWO_CATEGORIES = [
+    {"id": "nut_a", "category": "nutrition", "query": "q1",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["azot"], "answer_any": ["azot"]},
+    {"id": "chem_a", "category": "chemical", "query": "q2",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["azot"], "answer_any": ["azot"]},
+]
+
+
+def test_only_selects_by_category(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    rc = run_eval.run(fast=False, only="chemical")
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "chem_a" in out
+    assert "nut_a" not in out
+    assert "1/1 cases passed" in out
+
+
+def test_only_selects_by_case_id(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    run_eval.run(fast=False, only="nut_a")
+    out = capsys.readouterr().out
+
+    assert "nut_a" in out
+    assert "chem_a" not in out
+
+
+def test_only_that_matches_nothing_is_an_error(monkeypatch):
+    """A silent '0/0 cases passed' would be a green that means nothing."""
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    with pytest.raises(SystemExit):
+        run_eval.run(fast=False, only="typo")
+
+
+def test_only_defaults_to_every_case(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "2/2 cases passed" in out
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run: `python -m pytest tests/test_run_eval.py -k only -v`
+Expected: FAIL — `TypeError: run() got an unexpected keyword argument 'only'`
+(`test_only_defaults_to_every_case` passes already: it never passes `only`.)
+
+- [ ] **Step 3: Add the selector**
+
+In `evals/run_eval.py`, add above `run()`:
+
+```python
+def _select(only: str | None) -> list[dict]:
+    """Pick the cases to run: everything, or one id / one category.
+
+    A whole-set --repeat run costs N x ~20 min, so without this the sampling is
+    too expensive to actually use.
+    """
+    if not only:
+        return list(CASES)
+    picked = [c for c in CASES if c["id"] == only or c["category"] == only]
+    if not picked:
+        cats = sorted({c["category"] for c in CASES})
+        sys.exit(f"--only {only!r} matched no case. Pass a case id, or one of: "
+                 f"{', '.join(cats)}")
+    return picked
+```
+
+- [ ] **Step 4: Wire it into `run()`**
+
+Change the signature:
+```python
+def run(fast: bool, repeat: int = 1, only: str | None = None) -> int:
+```
+
+Right after the `--repeat`/`--fast` guard, select the cases:
+```python
+    cases = _select(only)
+```
+
+Then replace **every** remaining use of `CASES` inside `run()` with `cases` —
+there are two: the header `print(f"Running eval on {len(CASES)} cases ...")` and
+the `for c in CASES:` loop. Leave the module-level `CASES` import alone.
+
+- [ ] **Step 5: Add the CLI flag**
+
+In `main()`, add:
+```python
+    p.add_argument("--only", metavar="ID|CATEGORY",
+                   help="Run just one case id, or one category (nutrition, "
+                        "horticulture, disease, chemical, offscope). Pair with "
+                        "--repeat: sampling all 31 cases N times costs N x ~20 "
+                        "min, one category is minutes.")
+```
+and pass it through:
+```python
+    sys.exit(run(fast=args.fast, repeat=args.repeat, only=args.only))
+```
+
+- [ ] **Step 6: Run the tests**
+
+Run: `python -m pytest tests/test_run_eval.py -v`
+Expected: PASS (all, including the Task 1 tests — `--only` defaults to None, so
+they are unaffected).
+
+Run: `python -m pytest -q`
+Expected: all green.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add evals/run_eval.py tests/test_run_eval.py
+git commit -m "Add --only to the eval: run one case or category, so --repeat is affordable"
+```
+
+---
+
 ### Task 2: Verify against the live model
 
 **Files:** none (verification only).
@@ -279,26 +428,28 @@ Expected, identical to the pre-change baseline:
 ```
 The per-case line format must be unchanged too (`prod=True ground=True guard=True`).
 
-- [ ] **Step 2: Prove `--repeat` samples and reports**
+- [ ] **Step 2: Prove `--repeat` samples and reports — on ONE category**
 
-Use a small N against a live model. ~45-60 min at N=3 — if that is too long, run
-it and report what you get rather than skipping the step.
+Deliberately NOT the whole set: `--repeat 3` over 31 cases is ~50 min to confirm
+plumbing we already have 48 samples of evidence about. Use the category the tool
+exists for:
 
 ```bash
-PYTHONIOENCODING=utf-8 python -m evals.run_eval --repeat 3 2>&1 | grep -E "cases passed|retrieval:|FAIL"
+PYTHONIOENCODING=utf-8 python -m evals.run_eval --repeat 3 --only chemical 2>&1 \
+  | grep -E "cases passed|retrieval:|FAIL"
 ```
-Expected (per the spec's measurement — 48 samples across the highest-stakes cases
-produced **0 flips**):
+Expected (the 3 guardrail cases were sampled 8x each with **0 flips** while
+justifying this spec):
 ```
-=== 31/31 cases passed ===
-  retrieval: 31/31 | context: 31/31 | product-gating: 93/93 | grounding: 93/93 | guardrail: 93/93
+=== 3/3 cases passed ===
+  retrieval: 3/3 | context: 3/3 | product-gating: 9/9 | grounding: 9/9 | guardrail: 9/9
 ```
-Note the denominators: **93 = 31 x 3** for the sampled dimensions, **31** for the
-deterministic ones. That contrast is the feature working.
+Note the denominators: **9 = 3 x 3** for the sampled dimensions, **3** for the
+deterministic ones. That contrast IS the feature working — it is the only thing
+this step needs to show, and it costs ~5 minutes instead of ~50.
 
-If a dimension comes back e.g. `92/93`, that is a REAL intermittent failure the
-old harness could not see — report the case id and do not retry until it looks
-clean.
+If a dimension comes back e.g. `8/9`, that is a REAL intermittent failure the old
+harness could not see — report the case id; do not re-run until it looks clean.
 
 - [ ] **Step 3: Reject the fast-mode combination**
 
