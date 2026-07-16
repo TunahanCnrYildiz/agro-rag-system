@@ -112,8 +112,15 @@ by **rank** (RRF). No LLM on the retrieval path.
 
 ## Out of scope / known gaps
 
-- **`gap_taro_tr` stays failing.** Bare `"taro"` doesn't surface the content
-  (short terms embed weakly); the English *sentence* did. Documented, not fixed.
+- ~~`gap_taro_tr` stays failing.~~ **FIXED 2026-07-16 (same day).** Root cause
+  measured: a bare one-word term can retrieve *nothing* — `"taro"` clears the
+  0.36 floor with **0 chunks** and shows no taro content in its top 8, while
+  `"taro cultivation"` puts the same FAO chunk at **rank 1 (0.434)**. Two words
+  embed where one does not. `_expand_query` now also emits `f"{en} cultivation"`
+  per lexicon hit. It is **added, not substituted** — measured across all lexicon
+  cases: bare-only 5/6 (taro red), phrase-only 5/6 (taro green but **sweet potato
+  breaks**), both **6/6, 0 regressions**. Cost: a third vector search per lexicon
+  hit (~ms, no LLM). Eval `--fast` is now **31/31**, context 31/31.
 - **EN→TR reverse gap: unmeasured.** Every English eval case passes today, so no
   reverse gap is demonstrated. Lexicon is TR→EN only until one is measured.
 - **Suffixed forms not matched** (`"Manyokta gübreleme"`): word-boundary matching

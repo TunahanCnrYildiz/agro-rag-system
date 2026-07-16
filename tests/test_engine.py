@@ -230,6 +230,17 @@ def test_expand_query_adds_bare_term_and_substituted_query(monkeypatch):
     assert "cassava yetiştiriciliğinde gübreleme nasıl olmalı?" in out
 
 
+def test_expand_query_adds_english_phrase_not_just_the_bare_term(monkeypatch):
+    """A bare short term can retrieve nothing at all: measured 2026-07-16, "taro"
+    returns 0 chunks above the floor, while "taro cultivation" puts the same FAO
+    content at rank 1. The phrase is ADDED, never substituted - replacing the
+    bare term rescues taro but breaks sweet potato."""
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    out = engine._expand_query("Gölevez yetiştiriciliğinde gübreleme nasıl olmalı?")
+    assert "taro" in out                 # bare term still there
+    assert "taro cultivation" in out     # ...and the phrase alongside it
+
+
 def test_expand_query_matches_without_diacritics(monkeypatch):
     monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
     assert "millet" in engine._expand_query("Dari yetistiriciliginde gubreleme")

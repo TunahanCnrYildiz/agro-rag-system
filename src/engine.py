@@ -273,6 +273,12 @@ def _expand_query(query: str) -> list[str]:
         if not match:
             continue
         out.append(english)
+        # A bare short term can retrieve nothing at all - measured 2026-07-16:
+        # "taro" clears the floor with ZERO chunks, while "taro cultivation" puts
+        # the same FAO content at rank 1. Two words embed where one does not.
+        # ADDED, never substituted: swapping the bare term out rescues taro but
+        # breaks sweet potato (measured: 5/6 either way, 6/6 with both).
+        out.append(f"{english} cultivation")
         # substitute into the ORIGINAL query: the fold is 1:1, so the span lines
         # up, and the untouched diacritics keep the embedding intact.
         out.append(query[:match.start()] + english + query[match.end():])
