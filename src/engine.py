@@ -369,6 +369,44 @@ def _llm_unavailable_message(exc: Exception) -> str:
     )
 
 
+def _empty_answer_message() -> str:
+    """Shown when the model REPLIED but produced no visible text.
+
+    Deliberately does not claim the model is unreachable - it answered, it just
+    produced nothing. Measured 2026-07-16: this happens ~2 in 10 on an ordinary
+    query; the model can spend the whole token budget on reasoning_content
+    (finish_reason="length"), and at least one other, faster mode exists that is
+    not diagnosed.
+    """
+    return (
+        "Uzgunum, bu soruya su anda bir yanit uretemedim. "
+        "Lutfen sorunuzu biraz daha kisa ya da farkli bir sekilde tekrar sorun."
+    )
+
+
+def _complete_text(messages: list[dict]) -> str:
+    """Return the model's answer text, never "".
+
+    Blank output is stochastic (temperature is non-zero and the failures scatter
+    across runs of an identical prompt), so one retry usually lands. Raises on
+    transport errors - the caller maps those to _llm_unavailable_message, which
+    is a different failure and must stay distinguishable.
+    """
+    client = _get_llm()
+    for _ in range(2):  # first attempt + one retry
+        completion = client.chat.completions.create(
+            model=settings.chat_model,
+            messages=messages,
+            stream=False,
+            **_sampling_kwargs(),
+        )
+        text = completion.choices[0].message.content or ""
+        if text.strip():
+            return text
+        print("[engine] model returned a blank answer; retrying once")
+    return _empty_answer_message()
+
+
 def _build_messages(
     message: str,
     history: list[dict] | None,

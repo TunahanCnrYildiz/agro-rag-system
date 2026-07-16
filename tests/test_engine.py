@@ -401,3 +401,78 @@ def test_stream_answer_emits_products_without_marker(monkeypatch):
 
     assert '"type": "products"' in out        # control: products still flow
     assert _sse_tokens(out) == "Azot eksikligi olabilir."
+
+
+# --------------------------------------------------------------------------- #
+# _complete_text() — never hand back a blank answer
+# --------------------------------------------------------------------------- #
+def _fake_llm_seq(contents):
+    """Chat client returning a different content per successive call."""
+    calls = {"n": 0}
+
+    class _Msg:
+        pass
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    msg = _Msg()
+                    msg.content = contents[min(calls["n"], len(contents) - 1)]
+                    calls["n"] += 1
+
+                    class _Choice:
+                        message = msg
+
+                    class _Comp:
+                        choices = [_Choice()]
+
+                    return _Comp()
+
+    return _Client(), calls
+
+
+def test_complete_text_returns_first_non_blank(monkeypatch):
+    client, calls = _fake_llm_seq(["Azot eksikligi olabilir."])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    assert engine._complete_text([]) == "Azot eksikligi olabilir."
+    assert calls["n"] == 1                    # no pointless retry
+
+
+def test_complete_text_retries_once_on_blank(monkeypatch):
+    """Measured: the same prompt fails ~2/10 and the failures scatter, so a second
+    attempt usually succeeds."""
+    client, calls = _fake_llm_seq(["", "Ikinci deneme basarili."])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    assert engine._complete_text([]) == "Ikinci deneme basarili."
+    assert calls["n"] == 2
+
+
+def test_complete_text_falls_back_when_blank_twice(monkeypatch):
+    client, calls = _fake_llm_seq(["", "   "])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    out = engine._complete_text([])
+    assert out == engine._empty_answer_message()
+    assert out.strip()                        # never blank
+    assert calls["n"] == 2                    # exactly one retry, not a loop
+
+
+def test_complete_text_does_not_retry_a_short_answer(monkeypatch):
+    """Short is legitimate - [OFFSCOPE] refusals are short. Only BLANK retries."""
+    client, calls = _fake_llm_seq(["Hayir.", "ikinci"])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    assert engine._complete_text([]) == "Hayir."
+    assert calls["n"] == 1
+
+
+def test_complete_text_propagates_transport_errors(monkeypatch):
+    """'LM Studio unreachable' must stay distinguishable from 'model said
+    nothing' - callers map the exception to _llm_unavailable_message."""
+    import pytest  # this module has no module-level pytest import; keep it local
+
+    def boom():
+        raise RuntimeError("connection refused")
+    monkeypatch.setattr(engine, "_get_llm", boom)
+    with pytest.raises(RuntimeError):
+        engine._complete_text([])
