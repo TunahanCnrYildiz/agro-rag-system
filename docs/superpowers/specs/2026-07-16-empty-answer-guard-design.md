@@ -31,9 +31,16 @@ empty string is stripped, `.strip()`ed, and handed to the client.
    `reasoning_content` **8135 chars** — the model spent the whole budget
    "thinking" and never emitted the visible answer. `max_tokens` is shared
    between reasoning and answer.
-2. **Fast empty.** At `max_tokens=4096` one run still came back empty **in 21.2 s
-   — the fastest of the batch** (the others took 25–46 s). A budget-exhausted run
-   is the *slowest*, so this is a different cause. **Not diagnosed.**
+2. ~~**Fast empty.**~~ **RETRACTED 2026-07-16 — not reproduced.** The claim was
+   that a blank at `max_tokens=4096` returning in 21.2 s (the fastest of its
+   batch) could not be budget exhaustion, so a second mode existed. It rested on
+   **one observation whose `finish_reason` was never recorded** — the field that
+   identifies the mode — and on timing alone.
+   A dedicated hunt then produced **0 blanks in 40 raw runs** under the
+   production config (2048/0.4): `finish_reason` = stop x39, length x1 (that one
+   truncated, not blank). Nothing to characterise. Treat "two modes" as
+   unconfirmed: the 21.2 s run may have been server state or measurement noise.
+   One mode is established: budget exhaustion.
 
 Same failure class as the (deleted) translation path: this model burns budget on
 `reasoning_content`. It is `temperature=0.4`, so it is stochastic — the same
@@ -138,8 +145,18 @@ it. The cost is paid only when the model actually returns nothing.
 
 ## Out of scope
 
-- **Mode 2 (fast empty) is not diagnosed.** The guard covers it by construction
-  but the cause is unknown. Worth a separate look if it survives the retry.
-- **Single-sample eval.** Making the eval repeat cases N times would surface
-  stochastic failures, but it multiplies a ~20-minute run. Recorded as a known
-  blind spot, not addressed here.
+- **Root cause of the blank.** Budget exhaustion is established; the retry and
+  fallback work without needing to explain every blank, which is the point of a
+  guard. The "fast empty" second mode was chased and did not reproduce (see
+  above) — do not re-open it without a NEW observation that records
+  `finish_reason`.
+- ~~**Single-sample eval.**~~ Addressed after this work: see
+  `2026-07-16-eval-repeat-design.md` (`--repeat` / `--only`).
+
+## Final rate (all first-attempt samples of the tomato query, 2026-07-16)
+
+**3 blanks / 100 runs = 3%**, CI ≈ [0.6%, 8.5%]. The estimate walked
+20% → 7% → 5% → 3% as n grew from 10 to 100: the opening 2/10 was variance, and
+every intermediate number in this document's history was over-confident. 3% is
+also precisely the band a single-sample eval can never see — which is why the
+guard is right even though the bug is rare.
