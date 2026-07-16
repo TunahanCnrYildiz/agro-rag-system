@@ -79,6 +79,49 @@ CASES = [
      "context_any": ["compost", "kompost"],
      "answer_any": ["compost", "organic", "carbon", "nitrogen", "decompos", "waste", "aerat"]},
 
+    # --- cross-lingual GAP crops: TR query, content exists ONLY in the English
+    # FAO/OpenAlex corpus. These FAIL today and are meant to: the Turkish corpus
+    # is dense with generic fertilization papers that clear the floor and fill k,
+    # so the on-topic English chunks never make the cut. Measured 2026-07-16
+    # (probed 7 crops; 6 are gaps, only coffee resolves). Verified NOT fixable by
+    # a bigger k / reranking (no cassava chunk in the TR query's top 30) nor by a
+    # score- or lexical-overlap trigger; even always-translating only rescues
+    # 3 of 6, because _fuse ranks the merged lists by RAW SCORE and Turkish
+    # filler (~0.45-0.52) outscores the right English chunk (~0.46-0.48).
+    {"id": "gap_cacao_tr", "category": "nutrition",
+     "query": "Kakao yetiştiriciliğinde gübreleme nasıl yapılır?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["kakao", "cacao", "cocoa", "theobroma"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+    {"id": "gap_sweetpotato_tr", "category": "nutrition",
+     "query": "Tatlı patates yetiştiriciliğinde gübreleme nasıl olmalı?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["tatlı patates", "sweet potato", "ipomoea"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+    {"id": "gap_oilpalm_tr", "category": "nutrition",
+     "query": "Yağ palmiyesi yetiştiriciliğinde gübreleme nasıl olmalı?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["palmiye", "oil palm", "elaeis"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+    {"id": "gap_millet_tr", "category": "nutrition",
+     "query": "Darı yetiştiriciliğinde gübreleme nasıl olmalı?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["darı", "millet", "pennisetum"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+    {"id": "gap_taro_tr", "category": "nutrition",
+     "query": "Gölevez (taro) yetiştiriciliğinde gübreleme nasıl olmalı?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["gölevez", "taro", "colocasia"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+    # Control: coffee is the ONE probed crop the TR query already reaches, so it
+    # must keep passing - if it ever fails, the regression is in retrieval, not
+    # in the gap above.
+    {"id": "coffee_tr_control", "category": "nutrition",
+     "query": "Kahve bitkisi yetiştiriciliğinde gübreleme nasıl olmalı?",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["kahve", "coffee", "coffea"],
+     "answer_any": ["azot", "potasyum", "organik", "toprak", "besin"]},
+
     # --- horticulture practices (breadth: thin subdomains of "all plant topics") ---
     {"id": "pruning_grape", "category": "horticulture",
      "query": "Asmada budama ne zaman ve nasıl yapılır?",
