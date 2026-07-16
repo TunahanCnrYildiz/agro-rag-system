@@ -134,6 +134,75 @@ def test_clean_offtopic_apply_moves_and_deletes(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# clean_offtopic --apply failure handling — one bad file must not corrupt the
+# store or abort the batch.
+# --------------------------------------------------------------------------- #
+
+class _FlakyStore(_FakeStore):
+    """Store whose delete() blows up for one source, to exercise rollback."""
+    def __init__(self, bad_source):
+        super().__init__()
+        self.bad = bad_source
+
+    def delete(self, ids):
+        if any(i.startswith(self.bad) for i in ids):
+            raise RuntimeError("chroma exploded")
+        super().delete(ids)
+
+
+def _make_two_offtopic(tmp_path, monkeypatch):
+    """Two flagged papers, so we can assert a failure on the first still lets
+    the second through."""
+    books = tmp_path / "books"
+    books.mkdir()
+    bad = books / "dp_1.pdf"
+    good = books / "dp_3.pdf"
+    bad.write_bytes(b"x")
+    good.write_bytes(b"x")
+    monkeypatch.setattr(fd, "BOOKS_DIR", books)
+    texts = {bad: "Zootekni koyun besleme rasyon",
+             good: "Zootekni koyun besleme rasyon"}
+    return books, bad, good, texts
+
+
+def test_clean_offtopic_rolls_back_move_when_chunk_delete_fails(tmp_path, monkeypatch):
+    books, bad, good, texts = _make_two_offtopic(tmp_path, monkeypatch)
+    store = _FlakyStore("dp_1.pdf")
+
+    n = fd.clean_offtopic(store=store, apply=True, text_fn=lambda p: texts[p])
+
+    assert n == 2
+    # the failed paper is back where it started, so a re-run retries it
+    assert bad.exists()
+    assert not (books / "_offtopic" / "dp_1.pdf").exists()
+    # ...and one failure must not abort the rest of the batch
+    assert not good.exists()
+    assert (books / "_offtopic" / "dp_3.pdf").exists()
+    assert store.deleted == ["dp_3.pdf:0"]
+
+
+def test_clean_offtopic_keeps_chunks_when_move_fails(tmp_path, monkeypatch):
+    books, bad, good, texts = _make_two_offtopic(tmp_path, monkeypatch)
+    store = _FakeStore()
+    real_replace = Path.replace
+
+    def flaky_replace(self, target):
+        if self.name == "dp_1.pdf":
+            raise PermissionError("file in use")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", flaky_replace)
+
+    n = fd.clean_offtopic(store=store, apply=True, text_fn=lambda p: texts[p])
+
+    assert n == 2
+    assert bad.exists()
+    # chunks must survive a failed move: the paper stays fully ingested rather
+    # than becoming an orphan the next ingest silently re-adds
+    assert store.deleted == ["dp_3.pdf:0"]
+
+
+# --------------------------------------------------------------------------- #
 # _is_pruned — a fetch must not re-download a paper already moved to _offtopic.
 # --------------------------------------------------------------------------- #
 

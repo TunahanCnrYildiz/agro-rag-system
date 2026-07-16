@@ -296,8 +296,10 @@ def clean_offtopic(store=None, apply: bool = False,
     Report-only: scan dp_*.pdf, write flagged filenames + matched terms to a
     ``offtopic_candidates.txt`` report beside docs/books/ and print them; move
     and delete nothing. With ``apply=True`` each candidate is moved to
-    ``docs/books/_offtopic/`` and its chunks are deleted from the store. Local
-    only; no network. Returns the number of candidates."""
+    ``docs/books/_offtopic/`` and its chunks are deleted from the store. A
+    candidate that fails is rolled back and reported, leaving the rest of the
+    batch to proceed. Local only; no network. Returns the number of
+    candidates."""
     candidates = _offtopic_candidates(text_fn)
     report = BOOKS_DIR.parent / "offtopic_candidates.txt"
     lines = [f"{p.name}\t{','.join(terms)}" for p, terms in candidates]
@@ -316,12 +318,39 @@ def clean_offtopic(store=None, apply: bool = False,
         store = get_vector_store()
     offtopic_dir = BOOKS_DIR / "_offtopic"
     offtopic_dir.mkdir(exist_ok=True)
+    failed: list[str] = []
     for p, _terms in candidates:
-        got = store.get(where={"source": p.name})
-        if got.get("ids"):
-            store.delete(ids=got["ids"])
-        p.replace(offtopic_dir / p.name)
-        print(f"[clean]   moved {p.name} ({len(got.get('ids', []))} chunks removed)")
+        dest = offtopic_dir / p.name
+        # Move before deleting chunks: a failed move then leaves the paper fully
+        # ingested (consistent) instead of stripping its chunks and leaving the
+        # file in place for the next ingest to silently re-add.
+        try:
+            p.replace(dest)
+        except OSError as exc:
+            failed.append(p.name)
+            print(f"[clean]   ! {p.name}: move failed: {type(exc).__name__}: {exc}")
+            continue
+        try:
+            got = store.get(where={"source": p.name})
+            ids = got.get("ids") or []
+            if ids:
+                store.delete(ids=ids)
+        except Exception as exc:  # noqa: BLE001
+            # Put the file back so a re-run retries it; without the rollback its
+            # chunks would linger with no file left in BOOKS_DIR to flag them.
+            failed.append(p.name)
+            print(f"[clean]   ! {p.name}: chunk delete failed: "
+                  f"{type(exc).__name__}: {exc}")
+            try:
+                dest.replace(p)
+            except OSError as rb:  # noqa: BLE001
+                print(f"[clean]   !! {p.name}: rollback failed ({rb}); file is in "
+                      f"{offtopic_dir} but its chunks are still in the store")
+            continue
+        print(f"[clean]   moved {p.name} ({len(ids)} chunks removed)")
+    if failed:
+        print(f"[clean] {len(failed)} of {len(candidates)} candidate(s) failed: "
+              f"{', '.join(failed)}")
     return len(candidates)
 
 
