@@ -9,9 +9,12 @@ by ad-hoc spot checks. Fields:
              assertion with teeth: "nonempty" only proves chunks cleared the
              score floor, not that they are on-topic (the pre-cross-lingual bug
              looked exactly like that). Listed in BOTH languages where relevant,
-             so it asserts the TOPIC was retrieved, not the language - e.g.
-             pruning_grape today matches only via English chunks, so this case
-             fails if cross-lingual retrieval regresses.
+             so it asserts the TOPIC was retrieved, not the language.
+             MEASURED 2026-07-16: no case here changes verdict with
+             cross_lingual_retrieval=False, so this does NOT yet guard that
+             feature - the only case that needs the rescue (cassava_nutrition_tr)
+             is the one the trigger misses. A real tripwire needs a query whose
+             topic has NO same-language content at all.
              NOTE: off-scope cases get no context_any - retrieval is NOT the
              guardrail. Measured: "traktör motoru" pulls real mechanization
              chunks (2.4k chars) and livestock pulls 3.8k; the floor does not
@@ -80,8 +83,6 @@ CASES = [
     {"id": "pruning_grape", "category": "horticulture",
      "query": "Asmada budama ne zaman ve nasıl yapılır?",
      "retrieval": "nonempty", "products": "any",
-     # today satisfied ONLY by English chunks (prun/vine) - no 'budama' in the
-     # retrieved context - so this is the cross-lingual regression tripwire.
      "context_any": ["budama", "prun", "asma", "vine", "vitis"],
      "answer_any": ["budama", "kış", "dinlenme", "sürgün", "göz", "çubuk", "dal"]},
     {"id": "grafting", "category": "horticulture",
@@ -125,7 +126,6 @@ CASES = [
     {"id": "banana_sigatoka", "category": "disease",
      "query": "Muz yapraklarında siyah leke hastalığı (Sigatoka) için organik önlemler nelerdir?",
      "retrieval": "nonempty", "products": "any",
-     # the other cross-lingual tripwire: TR query, EN-only Sigatoka literature.
      "context_any": ["sigatoka", "muz", "banana", "mycosphaerella", "pseudocercospora"],
      "answer_any": ["organik", "kültürel", "yaprak", "temizle", "havalandırma", "dayanıklı", "önlem"]},
     {"id": "diagnosis_push", "category": "disease",
