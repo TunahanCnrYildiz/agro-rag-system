@@ -51,9 +51,14 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
 
     # --- Generation params --- #
-    # Low temperature keeps answers grounded/consistent for a factual RAG
-    # assistant (less drift, fewer invented facts).
-    temperature: float = Field(default=0.2)
+    # Low temperature keeps answers grounded/consistent for a factual RAG.
+    # 0.4 matches the value actually in use (.env is gitignored, so a stale
+    # default here means a clone - and CI - silently runs a different model
+    # configuration than the maintainer does).
+    # NOTE: this is non-zero, so generation is stochastic - the same prompt can
+    # succeed and fail across runs. That is why blank answers are guarded rather
+    # than reasoned about; see the empty-answer-guard spec.
+    temperature: float = Field(default=0.4)
     top_p: float = Field(default=0.9)
     # min_p prunes low-probability "junk" tokens without hurting fluency -
     # a practical anti-hallucination lever alongside the RAG grounding.
