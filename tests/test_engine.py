@@ -274,11 +274,18 @@ def test_fuse_returns_at_most_k():
 
 
 def test_retrieve_context_searches_every_expanded_query(monkeypatch):
+    """The primary search FILLS k with above-floor chunks - the exact case the
+    old `len(kept) < k` trigger skipped, and the exact case that made cassava
+    fail (generic Turkish chunks fill k while being off-topic). Expansion must
+    happen anyway. Returning fewer than k here would let the old trigger pass
+    this test too, proving nothing.
+    """
     seen = []
 
     def fake_search(store, query, k):
         seen.append(query)
-        return [(_Doc(f"chunk for {query}", "x.pdf", 1), 0.50)]
+        return [(_Doc(f"chunk {i} for {query}", "x.pdf", i), 0.50)
+                for i in range(k)]
 
     monkeypatch.setattr(engine, "_get_retriever_store", lambda: object())
     monkeypatch.setattr(engine, "_search", fake_search)
@@ -286,7 +293,6 @@ def test_retrieve_context_searches_every_expanded_query(monkeypatch):
 
     ctx = engine.retrieve_context("Manyok gübreleme", k=4)
 
-    # expansion is unconditional now: the primary list filling k must NOT skip it
     assert seen == ["Manyok gübreleme", "cassava"]
-    assert "chunk for cassava" in ctx
-    assert "[Kaynak: x.pdf, s.1]" in ctx
+    assert "chunk 0 for cassava" in ctx   # the rescue list reached the context
+    assert "[Kaynak: x.pdf, s.0]" in ctx
