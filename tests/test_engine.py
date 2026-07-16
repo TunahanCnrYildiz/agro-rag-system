@@ -2,7 +2,7 @@
 embedding clients are all monkeypatched)."""
 
 from src import engine
-from src.engine import _cosine, _strip_offscope, detect_language
+from src.engine import _cosine, _strip_markers, detect_language
 
 
 # --------------------------------------------------------------------------- #
@@ -27,13 +27,26 @@ def test_detect_language_english():
     assert detect_language("how to improve soil health") == "English"
 
 
-def test_strip_offscope_marker():
-    assert _strip_offscope("[OFFSCOPE] Ben asistanim") == ("Ben asistanim", True)
-    assert _strip_offscope("  [offscope]: foo") == ("foo", True)
+def test_strip_markers_offscope():
+    assert _strip_markers("[OFFSCOPE] Ben asistanim") == ("Ben asistanim", True, False)
+    assert _strip_markers("  [offscope]: foo") == ("foo", True, False)
 
 
-def test_strip_offscope_no_marker():
-    assert _strip_offscope("Domates icin azot") == ("Domates icin azot", False)
+def test_strip_markers_noproduct():
+    assert _strip_markers("[NOPRODUCT] Budama kis aylarinda yapilir") == (
+        "Budama kis aylarinda yapilir", False, True)
+    assert _strip_markers("  [noproduct]: foo") == ("foo", False, True)
+
+
+def test_strip_markers_both_in_either_order():
+    assert _strip_markers("[OFFSCOPE][NOPRODUCT] foo") == ("foo", True, True)
+    assert _strip_markers("[NOPRODUCT] [OFFSCOPE] foo") == ("foo", True, True)
+
+
+def test_strip_markers_no_marker_returns_text_unchanged():
+    assert _strip_markers("Domates icin azot") == ("Domates icin azot", False, False)
+    # a marker in the MIDDLE is prose, not a control marker
+    assert _strip_markers("Bak [NOPRODUCT] dedi") == ("Bak [NOPRODUCT] dedi", False, False)
 
 
 # --------------------------------------------------------------------------- #

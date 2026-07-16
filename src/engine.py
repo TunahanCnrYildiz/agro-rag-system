@@ -413,15 +413,34 @@ def _sampling_kwargs() -> dict:
 # we can strip it and drop product suggestions - recommending catalog products
 # under a "that's outside my scope" reply would be incoherent.
 _OFFSCOPE_MARKER = "[OFFSCOPE]"
+_NOPRODUCT_MARKER = "[NOPRODUCT]"
+# stream_answer buffers until it can (dis)confirm a marker - size off the longest
+_LONGEST_MARKER = max(len(_OFFSCOPE_MARKER), len(_NOPRODUCT_MARKER))
 
 
-def _strip_offscope(text: str) -> tuple[str, bool]:
-    """Return (clean_text, is_off_scope). Detects the leading off-scope marker
-    (case-insensitive) and removes it along with any trailing separators."""
+def _strip_markers(text: str) -> tuple[str, bool, bool]:
+    """Return (clean_text, off_scope, no_product).
+
+    Detects the leading control markers (case-insensitive) and removes them with
+    any trailing separators. Loops, so both markers in either order are handled.
+    Text without a leading marker is returned UNCHANGED (not lstripped).
+    """
     lead = text.lstrip()
-    if lead[: len(_OFFSCOPE_MARKER)].upper() == _OFFSCOPE_MARKER:
-        return lead[len(_OFFSCOPE_MARKER):].lstrip(" :\n\t"), True
-    return text, False
+    off_scope = no_product = False
+    while True:
+        upper = lead.upper()
+        if upper.startswith(_OFFSCOPE_MARKER):
+            off_scope = True
+            lead = lead[len(_OFFSCOPE_MARKER):].lstrip(" :\n\t")
+            continue
+        if upper.startswith(_NOPRODUCT_MARKER):
+            no_product = True
+            lead = lead[len(_NOPRODUCT_MARKER):].lstrip(" :\n\t")
+            continue
+        break
+    if not (off_scope or no_product):
+        return text, False, False
+    return lead, off_scope, no_product
 
 
 def answer(message: str, history: list[dict] | None = None) -> ChatResult:
