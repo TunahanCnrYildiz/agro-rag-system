@@ -101,18 +101,6 @@ def test_retrieve_context_empty_when_store_unavailable(monkeypatch):
 
 
 # --- cross-lingual query expansion + fusion --- #
-def test_fuse_dedups_keeping_max_score_and_applies_floor():
-    d_good = _Doc("good chunk", "a.pdf", 1)
-    d_dup = _Doc("good chunk", "a.pdf", 1)   # same content, different result list
-    d_noise = _Doc("noise", "b.pdf", 2)
-    fused = engine._fuse(
-        [[(d_good, 0.40)], [(d_dup, 0.55), (d_noise, 0.20)]],
-        floor=0.36, k=4,
-    )
-    assert [d.page_content for d, _ in fused] == ["good chunk"]  # noise dropped, dup collapsed
-    assert fused[0][1] == 0.55                                   # max score kept
-
-
 class _MultiStore:
     """Returns different results per query, to prove both are retrieved + fused."""
 
@@ -271,3 +259,31 @@ def test_expand_query_makes_no_llm_call(monkeypatch):
     monkeypatch.setattr(engine, "_get_llm", boom)
     monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
     assert "cassava" in engine._expand_query("Manyok gübreleme")
+
+
+def test_fuse_applies_floor_per_list_before_ranking():
+    primary = [(_Doc("keep", "a.pdf", 1), 0.50), (_Doc("drop", "a.pdf", 2), 0.10)]
+    fused = engine._fuse([primary], floor=0.36, k=4)
+    assert [d.page_content for d in fused] == ["keep"]
+
+
+def test_fuse_ranks_by_rank_not_raw_score():
+    """The whole point: a list's own #1 gets in even when the other list's
+    chunks all score higher. Score-fusion dropped cacao by 0.003."""
+    turkish = [(_Doc(f"tr-junk-{i}", "dp.pdf", i), s)
+               for i, s in enumerate([0.459, 0.458, 0.457, 0.456])]
+    english = [(_Doc("en-cocoa", "fao.pdf", 1), 0.455)]
+    fused = engine._fuse([turkish, english], floor=0.36, k=2)
+    assert "en-cocoa" in [d.page_content for d in fused]
+
+
+def test_fuse_dedups_same_chunk_across_lists():
+    doc_a = _Doc("same text", "a.pdf", 1)
+    doc_b = _Doc("same text", "a.pdf", 1)
+    fused = engine._fuse([[(doc_a, 0.50)], [(doc_b, 0.49)]], floor=0.36, k=4)
+    assert len(fused) == 1
+
+
+def test_fuse_returns_at_most_k():
+    lst = [(_Doc(f"c{i}", "a.pdf", i), 0.5) for i in range(10)]
+    assert len(engine._fuse([lst], floor=0.36, k=4)) == 4

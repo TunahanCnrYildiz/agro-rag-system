@@ -279,17 +279,31 @@ def _expand_query(query: str) -> list[str]:
     return out
 
 
+# Reciprocal-rank-fusion constant; 60 is the standard damping value.
+_RRF_K = 60
+
+
 def _fuse(result_lists, floor: float, k: int):
-    """Merge per-query result lists: dedup by chunk text keeping the max score,
-    drop anything below the floor, return the top-k by score."""
-    best: dict[str, tuple] = {}
+    """Fuse result lists by RANK (RRF), returning up to k Documents.
+
+    Raw similarity scores are NOT comparable across queries: Turkish filler
+    scores ~0.45-0.52 for any Turkish agronomy query, which outranks the right
+    English chunk (~0.46-0.48). Ranking the merged pool by score therefore drops
+    correct content by hundredths of a point (measured: cacao lost by 0.003).
+    Each list contributes 1/(60 + rank) per document instead, so every list's own
+    best chunks get in regardless of absolute score. The floor still gates each
+    list first, which is what keeps off-scope queries empty.
+    """
+    scores: dict[str, float] = {}
+    docs: dict[str, object] = {}
     for results in result_lists:
-        for doc, score in results:
+        kept = [(d, s) for d, s in results if s >= floor]
+        for rank, (doc, _score) in enumerate(kept, start=1):
             key = doc.page_content
-            if key not in best or score > best[key][1]:
-                best[key] = (doc, score)
-    ranked = sorted(best.values(), key=lambda x: x[1], reverse=True)
-    return [(d, s) for d, s in ranked if s >= floor][:k]
+            docs[key] = doc
+            scores[key] = scores.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+    ranked = sorted(scores.items(), key=lambda item: -item[1])
+    return [docs[key] for key, _ in ranked[:k]]
 
 
 def _search(store, query: str, k: int):
