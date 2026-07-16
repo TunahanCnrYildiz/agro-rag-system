@@ -66,16 +66,33 @@ def _answer_ok(case: dict, answer: str) -> tuple[bool, bool]:
     return grounding, guardrail
 
 
-def run(fast: bool, repeat: int = 1) -> int:
+def _select(only: str | None) -> list[dict]:
+    """Pick the cases to run: everything, or one id / one category.
+
+    A whole-set --repeat run costs N x ~20 min, so without this the sampling is
+    too expensive to actually use.
+    """
+    if not only:
+        return list(CASES)
+    picked = [c for c in CASES if c["id"] == only or c["category"] == only]
+    if not picked:
+        cats = sorted({c["category"] for c in CASES})
+        sys.exit(f"--only {only!r} matched no case. Pass a case id, or one of: "
+                 f"{', '.join(cats)}")
+    return picked
+
+
+def run(fast: bool, repeat: int = 1, only: str | None = None) -> int:
     if fast and repeat > 1:
         sys.exit("--repeat needs the chat model; it does nothing with --fast.")
+    cases = _select(only)
     if not fast:
         settings.request_timeout = 400.0
     suffix = f", {repeat}x each" if repeat > 1 else ""
-    print(f"Running eval on {len(CASES)} cases "
+    print(f"Running eval on {len(cases)} cases "
           f"({'FAST' if fast else 'FULL'}{suffix})\n")
     rows = []
-    for c in CASES:
+    for c in cases:
         t = time.time()
         # retrieval/context are deterministic (embedding + vector search, no
         # sampling), so they are measured once however high `repeat` is.
@@ -155,8 +172,13 @@ def main() -> None:
                         "passes only if EVERY sample passes. Generation is "
                         "sampled, so a single run hides intermittent failures; "
                         "N>1 costs N x ~20 min.")
+    p.add_argument("--only", metavar="ID|CATEGORY",
+                   help="Run just one case id, or one category (nutrition, "
+                        "horticulture, disease, chemical, offscope). Pair with "
+                        "--repeat: sampling all 31 cases N times costs N x ~20 "
+                        "min, one category is minutes.")
     args = p.parse_args()
-    sys.exit(run(fast=args.fast, repeat=args.repeat))
+    sys.exit(run(fast=args.fast, repeat=args.repeat, only=args.only))
 
 
 if __name__ == "__main__":

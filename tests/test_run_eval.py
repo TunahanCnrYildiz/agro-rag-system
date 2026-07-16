@@ -101,3 +101,56 @@ def test_repeat_many_prints_the_fraction_format(monkeypatch, capsys):
 
     assert "prod=3/3 ground=3/3 guard=3/3" in out
     assert "grounding: 3/3" in out               # rate is over SAMPLES, not cases
+
+
+TWO_CATEGORIES = [
+    {"id": "nut_a", "category": "nutrition", "query": "q1",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["azot"], "answer_any": ["azot"]},
+    {"id": "chem_a", "category": "chemical", "query": "q2",
+     "retrieval": "nonempty", "products": "any",
+     "context_any": ["azot"], "answer_any": ["azot"]},
+]
+
+
+def test_only_selects_by_category(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    rc = run_eval.run(fast=False, only="chemical")
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "chem_a" in out
+    assert "nut_a" not in out
+    assert "1/1 cases passed" in out
+
+
+def test_only_selects_by_case_id(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    run_eval.run(fast=False, only="nut_a")
+    out = capsys.readouterr().out
+
+    assert "nut_a" in out
+    assert "chem_a" not in out
+
+
+def test_only_that_matches_nothing_is_an_error(monkeypatch):
+    """A silent '0/0 cases passed' would be a green that means nothing."""
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    with pytest.raises(SystemExit):
+        run_eval.run(fast=False, only="typo")
+
+
+def test_only_defaults_to_every_case(monkeypatch, capsys):
+    _stub(monkeypatch, ["azot verin."])
+    monkeypatch.setattr(run_eval, "CASES", TWO_CATEGORIES)
+
+    run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "2/2 cases passed" in out
