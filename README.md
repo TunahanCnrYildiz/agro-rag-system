@@ -50,7 +50,7 @@ User query ─▶ FastAPI /api/chat ─▶ RAG Engine
 | Backend API      | FastAPI + Uvicorn                                  |
 | Doc processing   | pypdfium2 + RecursiveCharacterTextSplitter (1000/200)|
 | Scraping         | requests + BeautifulSoup                           |
-| Tests / quality  | pytest (50 tests) + `evals/` quality harness       |
+| Tests / quality  | pytest (94 tests) + `evals/` quality harness       |
 
 **Cross-lingual retrieval.** The corpus is ~half Turkish, ~half English. A Turkish
 query about a crop covered only in the English sources (FAO/OpenAlex) would
