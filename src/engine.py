@@ -461,9 +461,12 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     except Exception as exc:  # noqa: BLE001
         answer_text = _llm_unavailable_message(exc)
 
-    answer_text, off_scope = _strip_offscope(answer_text)
-    if off_scope:
-        products = []  # no product suggestions under an off-scope refusal
+    answer_text, off_scope, no_product = _strip_markers(answer_text)
+    if off_scope or no_product:
+        # off-scope refusal, or an in-scope question the fertilizer catalog
+        # cannot answer (pruning, pests, storage...) - see the product intent
+        # gate spec.
+        products = []
     return ChatResult(answer=answer_text.strip(), recommended_products=products)
 
 
@@ -477,9 +480,10 @@ def stream_answer(
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
 
-    # Buffer the opening tokens so we can detect+strip a leading [OFFSCOPE]
-    # marker before streaming it to the client, and drop products if present.
+    # Buffer the opening tokens so we can detect+strip a leading control marker
+    # before streaming it to the client, and drop products if one fired.
     off_scope = False
+    no_product = False
     buffer = ""
     checked = False
     try:
@@ -499,8 +503,8 @@ def stream_answer(
                 continue
             buffer += delta
             # Decide once we have enough leading text to (dis)confirm the marker.
-            if len(buffer.lstrip()) >= len(_OFFSCOPE_MARKER) or len(buffer) > 40:
-                clean, off_scope = _strip_offscope(buffer)
+            if len(buffer.lstrip()) >= _LONGEST_MARKER or len(buffer) > 40:
+                clean, off_scope, no_product = _strip_markers(buffer)
                 checked = True
                 if clean:
                     yield _sse({"type": "token", "content": clean})
@@ -509,13 +513,13 @@ def stream_answer(
         yield _sse({"type": "token", "content": _llm_unavailable_message(exc)})
     # Flush any leftover (very short answers that never hit the decision point).
     if not checked and buffer:
-        clean, off_scope = _strip_offscope(buffer)
+        clean, off_scope, no_product = _strip_markers(buffer)
         if clean:
             yield _sse({"type": "token", "content": clean})
 
     # Emit product recommendations only after the full answer has streamed (and
     # only for in-scope answers), so clients render them beneath the reply.
-    if not off_scope:
+    if not (off_scope or no_product):
         yield _sse(
             {"type": "products",
              "recommended_products": [p.as_api() for p in products]}

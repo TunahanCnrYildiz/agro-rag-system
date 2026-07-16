@@ -1,6 +1,8 @@
 """Unit tests for the RAG engine core (deterministic; the LLM, vector store and
 embedding clients are all monkeypatched)."""
 
+import json
+
 from src import engine
 from src.engine import _cosine, _strip_markers, detect_language
 
@@ -185,6 +187,18 @@ def test_answer_keeps_products_in_scope(monkeypatch):
     assert r.answer == "Azot eksikligi olabilir."
 
 
+def test_answer_suppresses_products_on_noproduct(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_llm("[NOPRODUCT] Budama kis sonunda yapilir."))
+    r = engine.answer("Asmada budama ne zaman yapilir?")
+    assert r.recommended_products == []           # fertilizer cannot answer this
+    assert "[NOPRODUCT]" not in r.answer          # marker stripped
+    assert r.answer == "Budama kis sonunda yapilir."
+
+
 # --------------------------------------------------------------------------- #
 # _build_messages structure
 # --------------------------------------------------------------------------- #
@@ -309,3 +323,70 @@ def test_retrieve_context_searches_every_expanded_query(monkeypatch):
     assert seen == ["Manyok gübreleme", "cassava"]
     assert "chunk 0 for cassava" in ctx   # the rescue list reached the context
     assert "[Kaynak: x.pdf, s.0]" in ctx
+
+
+# --------------------------------------------------------------------------- #
+# stream_answer() — the production path (/api/chat with stream=true)
+# --------------------------------------------------------------------------- #
+def _fake_stream_llm(chunks):
+    """Minimal streaming client: yields chunks with .choices[0].delta.content."""
+    class _Delta:
+        def __init__(self, c):
+            self.content = c
+
+    class _Choice:
+        def __init__(self, c):
+            self.delta = _Delta(c)
+
+    class _Chunk:
+        def __init__(self, c):
+            self.choices = [_Choice(c)]
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    return iter([_Chunk(c) for c in chunks])
+
+    return _Client()
+
+
+def _sse_tokens(out):
+    """Reassemble the answer text from the SSE token events (it streams split
+    across events, so the raw wire text is never contiguous)."""
+    return "".join(
+        json.loads(line[len("data: "):])["content"]
+        for line in out.splitlines()
+        if line.startswith("data: ")
+        and json.loads(line[len("data: "):])["type"] == "token"
+    )
+
+
+def test_stream_answer_suppresses_products_on_noproduct(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    # marker deliberately SPLIT across chunks - exercises the leading buffer
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["[NOPRO", "DUCT] Budama ",
+                                                  "kis sonunda yapilir."]))
+
+    out = "".join(engine.stream_answer("Asmada budama ne zaman yapilir?"))
+
+    assert "[NOPRODUCT]" not in out            # marker never reaches the client
+    assert "Budama" in out                     # the answer itself still streams
+    assert '"type": "products"' not in out     # no product event at all
+
+
+def test_stream_answer_emits_products_without_marker(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["Azot eksikligi ", "olabilir."]))
+
+    out = "".join(engine.stream_answer("Bugdayda gubreleme?"))
+
+    assert '"type": "products"' in out        # control: products still flow
+    assert _sse_tokens(out) == "Azot eksikligi olabilir."
