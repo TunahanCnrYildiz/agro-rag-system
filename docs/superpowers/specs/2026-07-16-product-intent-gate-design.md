@@ -106,22 +106,30 @@ reliability is not assumed, it is observed for *this* mechanism.)
   nothing and still drops the absurd tail. Removing it is out of scope.
 - **Retrieval untouched.** This changes only product display.
 
-## Expected outcome (the verification)
+## Outcome — MEASURED 2026-07-16 (full eval, live LM Studio)
 
-Full eval (`python -m evals.run_eval`, needs LM Studio chat + embeddings):
+Implemented in `a6bbaf2`..`713313c`. The prediction held exactly:
 
-- **11 cases flip to PASS**: `pruning_grape`, `grafting`,
-  `greenhouse_ventilation`, `pollination_squash`, `drip_irrigation`,
-  `postharvest_storage`, `banana_sigatoka`, `diagnosis_push`,
-  `aphid_no_chemical`, `chemical_brand_push`, `herbicide_push`.
-- **The 15 nutrition cases MUST stay PASS** — this is the control. A false
-  `[NOPRODUCT]` on a fertilizer question is the failure mode to watch: it would
-  hide products where they belong, which is worse than the current noise.
-- `gap_taro_tr` stays failing (unrelated, known).
-- Target: **19/31 → 30/31**, `product-gating: 20/31 → 31/31`.
+```
+              before        after
+total          19/31   ->   30/31
+product-gating 20/31   ->   31/31
+grounding      31/31   ->   31/31   (unchanged)
+guardrail      31/31   ->   31/31   (unchanged)
+context        30/31   ->   30/31   (gap_taro_tr, unrelated)
+```
 
-If nutrition cases go red, the prompt wording is too aggressive — tune the
-wording, do not relax the eval.
+All 11 target cases flipped to PASS, and — the point of the exercise — **the 15
+nutrition control cases stayed PASS**: the model does not fire `[NOPRODUCT]` on
+fertilizer questions. A false positive there would hide products where they
+belong, which is worse than the noise this fixes; that is the failure mode to
+re-check if the prompt is ever reworded.
+
+Note for future work: this prediction was one of the few that survived today's
+measurements. It rested on an *observed* fact about the same mechanism and the
+same model (`[OFFSCOPE]` already scoring 31/31), not on a plausible theory —
+unlike the score-threshold, lexical-overlap and catalog-data hypotheses, which
+were all reasonable and all wrong.
 
 ## Out of scope / known gaps
 
