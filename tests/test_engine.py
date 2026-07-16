@@ -101,47 +101,6 @@ def test_retrieve_context_empty_when_store_unavailable(monkeypatch):
 
 
 # --- cross-lingual query expansion + fusion --- #
-def test_expand_query_translates_turkish_to_english(monkeypatch):
-    seen = {}
-
-    def fake_tr(q, target):
-        seen["target"] = target
-        return "grape pruning"
-
-    monkeypatch.setattr(engine, "_translate_query", fake_tr)
-    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
-    # a clearly-Turkish query (diacritics + stems) -> detect_language == Turkish
-    out = engine._expand_query("çilek yapraklarım neden sararıyor")
-    assert out == ["çilek yapraklarım neden sararıyor", "grape pruning"]
-    assert seen["target"] == "English"
-
-
-def test_expand_query_translates_english_to_turkish(monkeypatch):
-    monkeypatch.setattr(engine, "_translate_query", lambda q, t: "asma budama")
-    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
-    assert engine._expand_query("grape pruning")[1] == "asma budama"
-
-
-def test_expand_query_fallback_on_failure(monkeypatch):
-    def boom(q, t):
-        raise RuntimeError("no llm")
-
-    monkeypatch.setattr(engine, "_translate_query", boom)
-    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
-    assert engine._expand_query("asma budama") == ["asma budama"]
-
-
-def test_expand_query_disabled(monkeypatch):
-    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", False)
-    assert engine._expand_query("asma budama") == ["asma budama"]
-
-
-def test_expand_query_skips_noop_translation(monkeypatch):
-    monkeypatch.setattr(engine, "_translate_query", lambda q, t: "asma budama")
-    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
-    assert engine._expand_query("asma budama") == ["asma budama"]
-
-
 def test_fuse_dedups_keeping_max_score_and_applies_floor():
     d_good = _Doc("good chunk", "a.pdf", 1)
     d_dup = _Doc("good chunk", "a.pdf", 1)   # same content, different result list
@@ -261,3 +220,54 @@ def test_normalize_tr_folds_and_preserves_length():
     # 1:1 per character, so match spans map back onto the original query
     for s in ("Darı", "Gölevez", "Yağ Palmiyesi", "İğne", "ÇELTİK"):
         assert len(engine._normalize_tr(s)) == len(s)
+
+
+def test_expand_query_adds_bare_term_and_substituted_query(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    out = engine._expand_query("Manyok yetiştiriciliğinde gübreleme nasıl olmalı?")
+    assert out[0] == "Manyok yetiştiriciliğinde gübreleme nasıl olmalı?"
+    assert "cassava" in out
+    # substitution goes into the ORIGINAL query, diacritics intact
+    assert "cassava yetiştiriciliğinde gübreleme nasıl olmalı?" in out
+
+
+def test_expand_query_matches_without_diacritics(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert "millet" in engine._expand_query("Dari yetistiriciliginde gubreleme")
+
+
+def test_expand_query_requires_word_boundary(monkeypatch):
+    """'kahve' must not fire inside 'kahverengi', 'muz' not inside 'domuz'."""
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert engine._expand_query(
+        "Domates yapraklarında kahverengi lekeler var") == [
+        "Domates yapraklarında kahverengi lekeler var"]
+    assert engine._expand_query("Domuz gübresi nasıl kullanılır?") == [
+        "Domuz gübresi nasıl kullanılır?"]
+    # the bare words still match
+    assert "banana" in engine._expand_query("Muz yapraklarında leke var")
+
+
+def test_expand_query_prefers_longest_term(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    out = engine._expand_query("Tatlı patates yetiştiriciliği")
+    assert "sweet potato" in out
+
+
+def test_expand_query_no_lexicon_hit_returns_query_only(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert engine._expand_query("Asmada budama") == ["Asmada budama"]
+
+
+def test_expand_query_disabled(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", False)
+    assert engine._expand_query("Manyok gübreleme") == ["Manyok gübreleme"]
+
+
+def test_expand_query_makes_no_llm_call(monkeypatch):
+    """Retrieval must not touch the chat model any more."""
+    def boom(*a, **k):
+        raise AssertionError("chat model must not be called from retrieval")
+    monkeypatch.setattr(engine, "_get_llm", boom)
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert "cassava" in engine._expand_query("Manyok gübreleme")

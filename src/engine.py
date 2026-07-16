@@ -211,28 +211,6 @@ def _get_retriever_store():
 MIN_RETRIEVAL_RELEVANCE = 0.36
 
 
-def _translate_query(query: str, target_lang: str) -> str:
-    """Translate a search query to target_lang via the chat model (output-only,
-    deterministic). Raises on LLM error - the caller handles the fallback."""
-    prompt = (
-        f"Translate this agriculture/botany search query to {target_lang}. "
-        f"Output ONLY the translation, no quotes, no notes.\n\nQuery: {query}"
-    )
-    client = _get_llm()
-    completion = client.chat.completions.create(
-        model=settings.chat_model,
-        messages=[{"role": "user", "content": prompt}],
-        stream=False,
-        temperature=0.0,
-        # Reasoning-capable local builds (e.g. Gemma QAT) spend tokens "thinking"
-        # before the visible answer, so a tight budget returns empty/truncated
-        # content with finish_reason="length"; 512 reliably leaves room for the
-        # reasoning + the short translation across query lengths (verified 2026-07-16).
-        max_tokens=512,
-    )
-    return (completion.choices[0].message.content or "").strip()
-
-
 # Turkish -> ASCII fold, one character in, one character out, so a match span
 # found in the normalised text maps straight back onto the original query.
 _TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇI", "iigguussooccI")
@@ -247,26 +225,58 @@ def _normalize_tr(text: str) -> str:
     return text.translate(_TR_FOLD).lower()
 
 
-def _expand_query(query: str) -> list[str]:
-    """Return [query, translation] to bridge the TR/EN corpus split, or [query]
-    if cross-lingual retrieval is off or the translation is unavailable/a no-op.
+# Turkish crop name -> English crop name. Retrieval-only: a Turkish query about a
+# crop whose literature is English-only (FAO/OpenAlex) otherwise never reaches it,
+# because generic Turkish fertilization papers clear the floor and fill k.
+# Measured 2026-07-16: fixes 5 of 6 known gap crops, 0 regressions.
+# These entries are the crops measured as gaps - extend only with evidence.
+# NOTE: crop names for FINDING BOOK CHUNKS. Unrelated to the product catalog.
+CROP_LEXICON = {
+    "manyok": "cassava",
+    "kakao": "cocoa",
+    "tatlı patates": "sweet potato",
+    "yağ palmiyesi": "oil palm",
+    "darı": "millet",
+    "gölevez": "taro",
+    "kahve": "coffee",
+    "muz": "banana",
+    "çeltik": "rice",
+}
 
-    The corpus is ~half Turkish (dp_) and ~half English (ia_/oa_/fao_); bge-m3
-    scores cross-lingual matches lower, so a Turkish query about English-covered
-    content can fall below the relevance floor. Searching the translated query
-    too, then fusing, lets each query reach the other language's chunks.
+# longest first, so "tatlı patates" wins over a future "patates" entry
+_LEXICON_BY_LENGTH = sorted(
+    ((_normalize_tr(tr), en) for tr, en in CROP_LEXICON.items()),
+    key=lambda item: -len(item[0]),
+)
+
+
+def _expand_query(query: str) -> list[str]:
+    """Return [query, *extra queries] that reach the other language's chunks.
+
+    The corpus is ~half Turkish (dp_) and ~half English (ia_/oa_/fao_). For a
+    crop covered only in English, the Turkish query's own top-k fills with
+    generic Turkish fertilization chunks that clear the floor, so the English
+    content never surfaces. For each crop name found we add two searches:
+    the bare English term (carries most of the benefit) and the term substituted
+    into the original query (rescues the rest).
+
+    Deliberately unconditional and LLM-free: the old translate-when-under-filled
+    path was measured empty on ~half of these queries, mistranslated (darı ->
+    "sorghum"), cost 4.7-38 s, and fixed only 3 of 6 gaps.
     """
     if not settings.cross_lingual_retrieval:
         return [query]
-    target = "English" if detect_language(query) == "Turkish" else "Turkish"
-    try:
-        translated = _translate_query(query, target)
-    except Exception as exc:  # noqa: BLE001
-        print(f"[engine] query translation failed: {exc}")
-        return [query]
-    if not translated or translated.strip().lower() == query.strip().lower():
-        return [query]
-    return [query, translated]
+    normalized = _normalize_tr(query)
+    out = [query]
+    for term, english in _LEXICON_BY_LENGTH:
+        match = re.search(rf"(?<!\w){re.escape(term)}(?!\w)", normalized)
+        if not match:
+            continue
+        out.append(english)
+        # substitute into the ORIGINAL query: the fold is 1:1, so the span lines
+        # up, and the untouched diacritics keep the embedding intact.
+        out.append(query[:match.start()] + english + query[match.end():])
+    return out
 
 
 def _fuse(result_lists, floor: float, k: int):
