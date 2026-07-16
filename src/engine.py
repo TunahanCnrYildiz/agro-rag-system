@@ -494,14 +494,7 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     messages = _build_messages(message, history, context, products)
 
     try:
-        client = _get_llm()
-        completion = client.chat.completions.create(
-            model=settings.chat_model,
-            messages=messages,
-            stream=False,
-            **_sampling_kwargs(),
-        )
-        answer_text = completion.choices[0].message.content or ""
+        answer_text = _complete_text(messages)
     except Exception as exc:  # noqa: BLE001
         answer_text = _llm_unavailable_message(exc)
 
@@ -530,6 +523,8 @@ def stream_answer(
     no_product = False
     buffer = ""
     checked = False
+    emitted = False
+    failed = False
     try:
         client = _get_llm()
         stream = client.chat.completions.create(
@@ -544,6 +539,7 @@ def stream_answer(
                 continue
             if checked:
                 yield _sse({"type": "token", "content": delta})
+                emitted = True
                 continue
             buffer += delta
             # Decide once we have enough leading text to (dis)confirm the marker.
@@ -552,12 +548,26 @@ def stream_answer(
                 checked = True
                 if clean:
                     yield _sse({"type": "token", "content": clean})
+                    emitted = True
                 buffer = ""
     except Exception as exc:  # noqa: BLE001
+        failed = True
         yield _sse({"type": "token", "content": _llm_unavailable_message(exc)})
     # Flush any leftover (very short answers that never hit the decision point).
     if not checked and buffer:
         clean, off_scope, no_product = _strip_markers(buffer)
+        if clean:
+            yield _sse({"type": "token", "content": clean})
+            emitted = True
+
+    if not emitted and not failed:
+        # The model streamed nothing at all - the same blank-output bug answer()
+        # guards against. Nothing reached the client yet, so retrying is safe.
+        try:
+            text = _complete_text(messages)
+        except Exception as exc:  # noqa: BLE001
+            text = _llm_unavailable_message(exc)
+        clean, off_scope, no_product = _strip_markers(text)
         if clean:
             yield _sse({"type": "token", "content": clean})
 

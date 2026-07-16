@@ -476,3 +476,41 @@ def test_complete_text_propagates_transport_errors(monkeypatch):
     monkeypatch.setattr(engine, "_get_llm", boom)
     with pytest.raises(RuntimeError):
         engine._complete_text([])
+
+
+def test_answer_never_returns_empty(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    client, _ = _fake_llm_seq(["", ""])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+
+    r = engine.answer("Domates yapraklarim sarariyor")
+
+    assert r.answer == engine._empty_answer_message()
+    assert r.answer.strip()          # the bug: this used to be ""
+
+
+def test_answer_uses_the_retry(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    client, calls = _fake_llm_seq(["", "Azot eksikligi olabilir."])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+
+    r = engine.answer("Domates yapraklarim sarariyor")
+
+    assert r.answer == "Azot eksikligi olabilir."
+    assert calls["n"] == 2
+
+
+def test_stream_answer_never_streams_nothing(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    # the model streams no tokens at all, then the non-streaming retry is blank
+    monkeypatch.setattr(engine, "_get_llm", lambda: _fake_stream_llm([]))
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda msgs: engine._empty_answer_message())
+
+    out = "".join(engine.stream_answer("Domates yapraklarim sarariyor"))
+
+    assert _sse_tokens(out) == engine._empty_answer_message()
