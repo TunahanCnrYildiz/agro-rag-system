@@ -103,26 +103,38 @@ user must never receive an empty reply.
 
 Implemented in `729dd7e`..`e509943`. Suite 114/114.
 
-**Live check, 20 runs of the tomato query through `answer()`: 0 empty, 0
-fallback** — and the retry log line never appeared, i.e. **no first attempt was
-blank**, so this run did not exercise the guard at all. It shows no regression
-(20/20 normal answers, products intact); it is NOT live evidence that the retry
-rescues a blank. The guard's logic is covered by unit tests only.
+**Live: the guard is verified end to end.** Across 50 post-guard runs of the
+tomato query through `answer()`:
+
+| | runs | result |
+|---|---|---|
+| first check | 20 | 0 blank first attempts — guard never fired, no regression |
+| second check | 30 | **1 blank rescued by the retry**, 0 fallback, 0 blank to the user |
+
+The rescue (run #27) took **70.2 s** against ~21-32 s for its neighbours —
+exactly two generations, so the mechanism is confirmed, not inferred: the first
+attempt came back blank, the retry produced a normal 1239-char answer, and the
+user saw no gap. `fallback: 0` also supports (one observation, right direction)
+this spec's inference that the blanks are independent rather than correlated.
+
+**Full eval after the guard: 31/31**, every dimension 31/31 — normal answers
+undisturbed.
 
 **Correction to this spec's own framing.** The "2 / 10" above was written up as
 "roughly 1 user in 5". That was over-confident: two events at n=10 give a 95% CI
-of roughly **[2.5%, 56%]**. Pooling every run of this query (2 blanks in 30) puts
-the rate near **7%**, CI ≈ [0.8%, 22%]. The bug is real — 2 blanks, 1 truncation
-and a further blank were all directly observed — but its *frequency* was
-overstated. (The same spec correctly refuses to read 2/10 vs 1/10 as evidence for
-`max_tokens=4096`; that discipline should have been applied to the baseline too.)
+of roughly **[2.5%, 56%]**. Pooling every `answer()` run of this query — **3
+blanks in 60** — puts the real rate near **5%**, CI ≈ [1%, 14%]: a quarter of
+the number first claimed. The bug is real (3 blanks and 1 truncation directly
+observed) but its *frequency* was overstated.
 
-The guard stands regardless: rarity does not justify shipping a blank screen, and
-the cost is paid only when the model actually returns nothing.
+Note the asymmetry worth remembering: this spec correctly refuses to read 2/10
+vs 1/10 as evidence that `max_tokens=4096` helps — then built its own headline
+number the same way. It is easy to apply that discipline to a hypothesis you are
+rejecting and skip it for one you are advancing.
 
-**Still unverified:** that the retry rescues a real blank end-to-end. Observing
-one live needs ~30+ runs at a ~7% rate. The unit tests pin the logic; only the
-live rescue is unwitnessed.
+The guard stands regardless, and the rate is why: at ~5% a blank screen is rare
+enough to never show up in a single-sample eval, and common enough that users hit
+it. The cost is paid only when the model actually returns nothing.
 
 ## Out of scope
 
