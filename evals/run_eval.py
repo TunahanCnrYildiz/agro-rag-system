@@ -32,6 +32,21 @@ def _retrieval_ok(case: dict, ctx: str) -> bool:
     return True
 
 
+def _context_ok(case: dict, ctx: str) -> bool:
+    """The retrieved context must actually be ABOUT the query's topic.
+
+    'nonempty' only proves chunks cleared the score floor, not that they are
+    relevant - the pre-cross-lingual bug looked exactly like that (full context,
+    mostly unrelated chunks). Terms are listed in BOTH languages where relevant,
+    so this asserts the topic was found, not the language it was found in.
+    """
+    terms = case.get("context_any") or []
+    if not terms:
+        return True
+    c = ctx.lower()
+    return any(t.lower() in c for t in terms)
+
+
 def _products_ok(case: dict, n_products: int) -> bool:
     exp = case.get("products", "any")
     if exp == "some":
@@ -60,22 +75,24 @@ def run(fast: bool) -> int:
         t = time.time()
         ctx = engine.retrieve_context(c["query"])
         row = {"id": c["id"], "cat": c["category"],
-               "retrieval": _retrieval_ok(c, ctx)}
+               "retrieval": _retrieval_ok(c, ctx),
+               "context": _context_ok(c, ctx)}
         if fast:
             raw = engine.match_products(c["query"], ctx)
             row["raw_products"] = len(raw)
-            row["ok"] = row["retrieval"]
+            row["ok"] = all([row["retrieval"], row["context"]])
         else:
             r = engine.answer(c["query"])
             row["products"] = _products_ok(c, len(r.recommended_products))
             g, gr = _answer_ok(c, r.answer)
             row["grounding"] = g
             row["guardrail"] = gr
-            row["ok"] = all([row["retrieval"], row["products"], g, gr])
+            row["ok"] = all([row["retrieval"], row["context"],
+                             row["products"], g, gr])
         row["secs"] = time.time() - t
         rows.append(row)
         mark = "PASS" if row["ok"] else "FAIL"
-        print(f"  [{mark}] {c['id']:<24} ret={row['retrieval']} "
+        print(f"  [{mark}] {c['id']:<24} ret={row['retrieval']} ctx={row['context']} "
               + (f"rawprod={row.get('raw_products')}" if fast else
                  f"prod={row['products']} ground={row['grounding']} guard={row['guardrail']}")
               + f"  ({row['secs']:.0f}s)")
@@ -87,7 +104,7 @@ def run(fast: bool) -> int:
         vals = [r[key] for r in rows if key in r]
         return f"{sum(vals)}/{len(vals)}" if vals else "n/a"
 
-    print(f"  retrieval: {rate('retrieval')}", end="")
+    print(f"  retrieval: {rate('retrieval')} | context: {rate('context')}", end="")
     if not fast:
         print(f" | product-gating: {rate('products')}"
               f" | grounding: {rate('grounding')}"
