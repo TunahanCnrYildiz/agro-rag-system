@@ -249,12 +249,78 @@ with:
     if not (off_scope or no_product):
 ```
 
-- [ ] **Step 5: Run the full unit suite**
+- [ ] **Step 5: Cover `stream_answer` — the PRODUCTION path**
+
+`/api/chat` uses `stream_answer` whenever `stream=true` (`src/main.py:132-137`),
+but **no test touches its marker handling** and the eval only calls `answer()`.
+Without this test, a broken Step 4 edit would leave the eval green at 30/31 while
+real users still see fertilizer under a pruning answer. Append to
+`tests/test_engine.py`:
+
+```python
+def _fake_stream_llm(chunks):
+    """Minimal streaming client: yields chunks with .choices[0].delta.content."""
+    class _Delta:
+        def __init__(self, c):
+            self.content = c
+
+    class _Choice:
+        def __init__(self, c):
+            self.delta = _Delta(c)
+
+    class _Chunk:
+        def __init__(self, c):
+            self.choices = [_Choice(c)]
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    return iter([_Chunk(c) for c in chunks])
+
+    return _Client()
+
+
+def test_stream_answer_suppresses_products_on_noproduct(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    # marker deliberately SPLIT across chunks - exercises the leading buffer
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["[NOPRO", "DUCT] Budama ",
+                                                  "kis sonunda yapilir."]))
+
+    out = "".join(engine.stream_answer("Asmada budama ne zaman yapilir?"))
+
+    assert "[NOPRODUCT]" not in out            # marker never reaches the client
+    assert "Budama" in out                     # the answer itself still streams
+    assert '"type": "products"' not in out     # no product event at all
+
+
+def test_stream_answer_emits_products_without_marker(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["Azot eksikligi ", "olabilir."]))
+
+    out = "".join(engine.stream_answer("Bugdayda gubreleme?"))
+
+    assert '"type": "products"' in out        # control: products still flow
+    assert "Azot eksikligi olabilir." in out
+```
+
+Run: `python -m pytest tests/test_engine.py -k stream_answer -v`
+Expected: PASS (2 tests). If `test_stream_answer_suppresses_products_on_noproduct`
+fails, the Step 4 edits are wrong — fix them, not the test.
+
+- [ ] **Step 6: Run the full unit suite**
 
 Run: `python -m pytest -q`
 Expected: PASS, all green. Any failure is real — fix it, do not skip.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/engine.py tests/test_engine.py
