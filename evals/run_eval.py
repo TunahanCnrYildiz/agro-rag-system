@@ -66,13 +66,19 @@ def _answer_ok(case: dict, answer: str) -> tuple[bool, bool]:
     return grounding, guardrail
 
 
-def run(fast: bool) -> int:
+def run(fast: bool, repeat: int = 1) -> int:
+    if fast and repeat > 1:
+        sys.exit("--repeat needs the chat model; it does nothing with --fast.")
     if not fast:
         settings.request_timeout = 400.0
-    print(f"Running eval on {len(CASES)} cases ({'FAST' if fast else 'FULL'})\n")
+    suffix = f", {repeat}x each" if repeat > 1 else ""
+    print(f"Running eval on {len(CASES)} cases "
+          f"({'FAST' if fast else 'FULL'}{suffix})\n")
     rows = []
     for c in CASES:
         t = time.time()
+        # retrieval/context are deterministic (embedding + vector search, no
+        # sampling), so they are measured once however high `repeat` is.
         ctx = engine.retrieve_context(c["query"])
         row = {"id": c["id"], "cat": c["category"],
                "retrieval": _retrieval_ok(c, ctx),
@@ -82,20 +88,38 @@ def run(fast: bool) -> int:
             row["raw_products"] = len(raw)
             row["ok"] = all([row["retrieval"], row["context"]])
         else:
-            r = engine.answer(c["query"])
-            row["products"] = _products_ok(c, len(r.recommended_products))
-            g, gr = _answer_ok(c, r.answer)
-            row["grounding"] = g
-            row["guardrail"] = gr
+            samples = []
+            for _ in range(repeat):
+                r = engine.answer(c["query"])
+                g, gr = _answer_ok(c, r.answer)
+                samples.append({
+                    "products": _products_ok(c, len(r.recommended_products)),
+                    "grounding": g,
+                    "guardrail": gr,
+                })
+            for dim in ("products", "grounding", "guardrail"):
+                vals = [s[dim] for s in samples]
+                # every sample must pass: "leaks 1 time in 8" is a failure
+                row[dim] = all(vals)
+                row[dim + "_hits"] = (sum(vals), len(vals))
             row["ok"] = all([row["retrieval"], row["context"],
-                             row["products"], g, gr])
+                             row["products"], row["grounding"],
+                             row["guardrail"]])
         row["secs"] = time.time() - t
         rows.append(row)
         mark = "PASS" if row["ok"] else "FAIL"
-        print(f"  [{mark}] {c['id']:<24} ret={row['retrieval']} ctx={row['context']} "
-              + (f"rawprod={row.get('raw_products')}" if fast else
-                 f"prod={row['products']} ground={row['grounding']} guard={row['guardrail']}")
-              + f"  ({row['secs']:.0f}s)")
+        if fast:
+            detail = f"rawprod={row.get('raw_products')}"
+        elif repeat > 1:
+            detail = " ".join(
+                f"{name}={row[dim + '_hits'][0]}/{row[dim + '_hits'][1]}"
+                for name, dim in (("prod", "products"), ("ground", "grounding"),
+                                  ("guard", "guardrail")))
+        else:
+            detail = (f"prod={row['products']} ground={row['grounding']} "
+                      f"guard={row['guardrail']}")
+        print(f"  [{mark}] {c['id']:<24} ret={row['retrieval']} "
+              f"ctx={row['context']} " + detail + f"  ({row['secs']:.0f}s)")
 
     passed = sum(1 for r in rows if r["ok"])
     print(f"\n=== {passed}/{len(rows)} cases passed ===")
@@ -104,11 +128,19 @@ def run(fast: bool) -> int:
         vals = [r[key] for r in rows if key in r]
         return f"{sum(vals)}/{len(vals)}" if vals else "n/a"
 
+    def sample_rate(dim):
+        """Rate over SAMPLES, not cases: 'guardrail: 23/24' reads very
+        differently from 'guardrail: 30/31', and that difference is the point."""
+        hits = [r[dim + "_hits"] for r in rows if dim + "_hits" in r]
+        if not hits:
+            return "n/a"
+        return f"{sum(h for h, _ in hits)}/{sum(n for _, n in hits)}"
+
     print(f"  retrieval: {rate('retrieval')} | context: {rate('context')}", end="")
     if not fast:
-        print(f" | product-gating: {rate('products')}"
-              f" | grounding: {rate('grounding')}"
-              f" | guardrail: {rate('guardrail')}")
+        print(f" | product-gating: {sample_rate('products')}"
+              f" | grounding: {sample_rate('grounding')}"
+              f" | guardrail: {sample_rate('guardrail')}")
     else:
         print()
     return 0 if passed == len(rows) else 1
@@ -118,8 +150,13 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Run the RAG quality eval.")
     p.add_argument("--fast", action="store_true",
                    help="Retrieval + raw product gating only (skip chat LLM).")
+    p.add_argument("--repeat", type=int, default=1, metavar="N",
+                   help="Sample each case N times (full mode only). A case "
+                        "passes only if EVERY sample passes. Generation is "
+                        "sampled, so a single run hides intermittent failures; "
+                        "N>1 costs N x ~20 min.")
     args = p.parse_args()
-    sys.exit(run(fast=args.fast))
+    sys.exit(run(fast=args.fast, repeat=args.repeat))
 
 
 if __name__ == "__main__":
