@@ -319,27 +319,22 @@ def retrieve_context(query: str, k: int | None = None) -> str:
     """Return concatenated botany chunks relevant to the query, or "" if nothing
     clears the floor.
 
-    Cross-lingual rescue is CONDITIONAL: we first search in the query's own
-    language, and only translate + re-search + fuse when that under-fills the
-    context (fewer than k chunks clear the floor). That is the TR/EN gap case;
-    well-covered queries skip the (slow, local-LLM) translation entirely.
+    Every expanded query (see `_expand_query`) is searched and the results are
+    fused by rank. Expansion used to be conditional on the primary search
+    under-filling; that trigger was removed because it is exactly wrong for the
+    case it was meant to catch - generic Turkish chunks FILL k while being
+    off-topic, so the rescue never fired (measured: it fired on 1 of 25 cases).
+    Expansion is now LLM-free, so there is no latency reason to gate it.
     """
     k = k or settings.retrieval_k
     store = _get_retriever_store()
     if store is None:
         return ""
 
-    primary = _search(store, query, k)
-    kept = [(d, s) for d, s in primary if s >= MIN_RETRIEVAL_RELEVANCE]
-
-    result_lists = [primary]
-    if settings.cross_lingual_retrieval and len(kept) < k:
-        # under-filled: bring in the other-language content via translation.
-        for translated in _expand_query(query)[1:]:
-            result_lists.append(_search(store, translated, k))
+    result_lists = [_search(store, q, k) for q in _expand_query(query)]
 
     parts: list[str] = []
-    for d, _score in _fuse(result_lists, MIN_RETRIEVAL_RELEVANCE, k):
+    for d in _fuse(result_lists, MIN_RETRIEVAL_RELEVANCE, k):
         src = d.metadata.get("source", "?")
         page = d.metadata.get("page", "?")
         parts.append(f"[Kaynak: {src}, s.{page}]\n{d.page_content}")
