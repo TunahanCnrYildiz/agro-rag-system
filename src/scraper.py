@@ -121,10 +121,23 @@ def _crawl_category(session: requests.Session, slug: str) -> list[dict]:
 
 
 def _fetch_description(session: requests.Session, url: str) -> str:
-    """Best-effort short description from a product detail page."""
+    """Best-effort short description from a product detail page.
+
+    The WooCommerce short-description block comes FIRST, deliberately: Yoast
+    fills <meta name="description"> from the product TITLE when the product has
+    no excerpt, so trusting meta silently stores "FLY AZOT" as FLY AZOT's whole
+    description - which is what happened to 22 of 48 products (measured
+    2026-07-16) and left the embedder nothing to match a nitrogen query on. Even
+    where meta does hold real text it is just this block truncated to ~155 chars.
+    """
     soup = fetch(session, url, "scraper")
     if soup is None:
         return ""
+    short = soup.select_one(".woocommerce-product-details__short-description")
+    if short:
+        text = short.get_text(" ", strip=True).replace("\xa0", " ")
+        if text:
+            return " ".join(text.split())
     desc = extract_meta_description(soup)
     if desc:
         return desc
