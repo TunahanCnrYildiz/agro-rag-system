@@ -233,6 +233,20 @@ def _translate_query(query: str, target_lang: str) -> str:
     return (completion.choices[0].message.content or "").strip()
 
 
+# Turkish -> ASCII fold, one character in, one character out, so a match span
+# found in the normalised text maps straight back onto the original query.
+_TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇI", "iigguussooccI")
+
+
+def _normalize_tr(text: str) -> str:
+    """Lowercase + fold Turkish letters to ASCII, for lexicon MATCHING only.
+
+    Never feed the result to the embedder: stripping diacritics from the whole
+    query degrades retrieval (measured - it costs the millet rescue).
+    """
+    return text.translate(_TR_FOLD).lower()
+
+
 def _expand_query(query: str) -> list[str]:
     """Return [query, translation] to bridge the TR/EN corpus split, or [query]
     if cross-lingual retrieval is off or the translation is unavailable/a no-op.

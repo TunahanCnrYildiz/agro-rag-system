@@ -251,3 +251,13 @@ def test_build_messages_structure():
     assert "CTX" in msgs[0]["content"]          # retrieved context injected
     assert msgs[-1] == {"role": "user", "content": "soru"}
     assert {"role": "user", "content": "onceki"} in msgs
+
+
+def test_normalize_tr_folds_and_preserves_length():
+    assert engine._normalize_tr("Darı") == "dari"
+    assert engine._normalize_tr("Gölevez") == "golevez"
+    assert engine._normalize_tr("Yağ Palmiyesi") == "yag palmiyesi"
+    assert engine._normalize_tr("Tatlı Patates") == "tatli patates"
+    # 1:1 per character, so match spans map back onto the original query
+    for s in ("Darı", "Gölevez", "Yağ Palmiyesi", "İğne", "ÇELTİK"):
+        assert len(engine._normalize_tr(s)) == len(s)
