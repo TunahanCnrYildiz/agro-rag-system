@@ -99,15 +99,30 @@ user must never receive an empty reply.
   different behaviour, and `config.py`'s comment describes 0.2. Align the default
   to the value actually in use and say so in the comment.
 
-## Expected outcome (the verification)
+## Outcome — MEASURED 2026-07-16
 
-- Unit tests: blank content → retry; blank twice → fallback message, never `""`.
-  Both for `answer()` and `stream_answer()`.
-- **Live check, 20 runs of the tomato query through `answer()`**: **0 empty**
-  answers. Baseline is 2/10 without the guard.
-  - If empties remain, the retry does not help and the failures are correlated,
-    not independent — report that; do not raise `max_tokens` to paper over it.
-- Full eval must stay **31/31** (the guard must not disturb normal answers).
+Implemented in `729dd7e`..`e509943`. Suite 114/114.
+
+**Live check, 20 runs of the tomato query through `answer()`: 0 empty, 0
+fallback** — and the retry log line never appeared, i.e. **no first attempt was
+blank**, so this run did not exercise the guard at all. It shows no regression
+(20/20 normal answers, products intact); it is NOT live evidence that the retry
+rescues a blank. The guard's logic is covered by unit tests only.
+
+**Correction to this spec's own framing.** The "2 / 10" above was written up as
+"roughly 1 user in 5". That was over-confident: two events at n=10 give a 95% CI
+of roughly **[2.5%, 56%]**. Pooling every run of this query (2 blanks in 30) puts
+the rate near **7%**, CI ≈ [0.8%, 22%]. The bug is real — 2 blanks, 1 truncation
+and a further blank were all directly observed — but its *frequency* was
+overstated. (The same spec correctly refuses to read 2/10 vs 1/10 as evidence for
+`max_tokens=4096`; that discipline should have been applied to the baseline too.)
+
+The guard stands regardless: rarity does not justify shipping a blank screen, and
+the cost is paid only when the model actually returns nothing.
+
+**Still unverified:** that the retry rescues a real blank end-to-end. Observing
+one live needs ~30+ runs at a ~7% rate. The unit tests pin the logic; only the
+live rescue is unwitnessed.
 
 ## Out of scope
 
