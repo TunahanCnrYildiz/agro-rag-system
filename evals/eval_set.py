@@ -10,11 +10,12 @@ by ad-hoc spot checks. Fields:
              score floor, not that they are on-topic (the pre-cross-lingual bug
              looked exactly like that). Listed in BOTH languages where relevant,
              so it asserts the TOPIC was retrieved, not the language.
-             MEASURED 2026-07-16: no case here changes verdict with
-             cross_lingual_retrieval=False, so this does NOT yet guard that
-             feature - the only case that needs the rescue (cassava_nutrition_tr)
-             is the one the trigger misses. A real tripwire needs a query whose
-             topic has NO same-language content at all.
+             This DOES guard cross-lingual retrieval, via the gap-crop cases
+             below. Verified 2026-07-16 by flipping the toggle: with
+             cross_lingual_retrieval=False the 5 gap crops all go red while
+             coffee_tr_control and the same-language cases stay green.
+             (Only the gap crops have this property - a query whose topic also
+             has Turkish content passes either way.)
              NOTE: off-scope cases get no context_any - retrieval is NOT the
              guardrail. Measured: "traktör motoru" pulls real mechanization
              chunks (2.4k chars) and livestock pulls 3.8k; the floor does not
