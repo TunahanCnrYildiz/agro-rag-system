@@ -1,13 +1,12 @@
 # Crop-Lexicon Cross-Lingual Retrieval Implementation Plan
 
-> **For agentic workers:** Implement task-by-task, in order; each task is
-> self-contained and ends green + committed. Steps use checkbox (`- [ ]`) syntax
-> for tracking.
+> **For agentic workers:** Use superpowers:subagent-driven-development
+> (recommended) or superpowers:executing-plans to implement this plan
+> task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> NOTE: the `superpowers:subagent-driven-development` / `superpowers:executing-plans`
-> skills referenced by the writing-plans boilerplate are **not installed here**
-> (only `brainstorming`, `systematic-debugging`, `writing-plans` are). Invoking
-> them errors. Dispatch one agent per task with this file as the brief instead.
+> (Historical note: this plan was executed on 2026-07-16 BEFORE those skills were
+> installed — one agent per task, with this file as the brief. That worked fine;
+> the plan carries the protocol.)
 
 **Goal:** Let Turkish queries reach English-only crop content by expanding the
 query through a deterministic TR→EN crop-name lexicon and fusing results by rank,
