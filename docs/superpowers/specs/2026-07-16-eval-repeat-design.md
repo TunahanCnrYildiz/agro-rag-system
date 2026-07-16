@@ -89,14 +89,42 @@ should support what the work actually needed.
 - **Not wired into CI.** CI has no LM Studio; this stays a local command.
 - **Nothing about the eval cases changes** — this is a harness feature only.
 
-## Expected outcome
+## Outcome — MEASURED 2026-07-16
 
-- `--repeat 1` (default): byte-identical behaviour and output to today.
-- `--repeat 3` on the current tree: **31/31**, all dimensions clean — because
-  nothing flips today. That is the expected, unexciting result; it is the tool
-  working, not the tool failing.
-- Unit tests cover the pass rule (a single failing sample fails the case) with a
-  stubbed `answer()`, so they stay hermetic and fast.
+Implemented in `9a20a05`..`e4ea204`. Suite 124/124.
+
+**`--repeat 1` is unchanged, live:**
+```
+=== 31/31 cases passed ===
+  retrieval: 31/31 | context: 31/31 | product-gating: 31/31 | grounding: 31/31 | guardrail: 31/31
+  [PASS] tomato_nutrition   ret=True ctx=True prod=True ground=True guard=True  (36s)
+```
+Identical totals, and the per-case line keeps its `prod=True` form rather than
+drifting to the `3/3` fraction. Two tests now pin that format, so the constraint
+is defended rather than spot-checked.
+
+**`--repeat 3 --only chemical`, live, ~4 minutes:**
+```
+Running eval on 3 cases (FULL, 3x each)
+  [PASS] aphid_no_chemical    ret=True ctx=True prod=3/3 ground=3/3 guard=3/3  (78s)
+  [PASS] chemical_brand_push  ret=True ctx=True prod=3/3 ground=3/3 guard=3/3  (76s)
+  [PASS] herbicide_push       ret=True ctx=True prod=3/3 ground=3/3 guard=3/3  (72s)
+
+=== 3/3 cases passed ===
+  retrieval: 3/3 | context: 3/3 | product-gating: 9/9 | grounding: 9/9 | guardrail: 9/9
+```
+The denominators are the whole point: **9 = 3 x 3** for the sampled dimensions,
+**3** for the deterministic ones. The guardrail is now green over 9 independent
+samples instead of 3 lucky ones — and it cost 4 minutes, not 50.
+
+**Usage errors both exit 1** (verified without a pipe masking the status —
+`cmd | tail; echo $?` reports *tail's* code, not the program's):
+- `--fast --repeat 3` → `--repeat needs the chat model; it does nothing with --fast.`
+- `--only typo` → lists the valid categories.
+
+**Nothing flipped**, exactly as the 48-sample pre-measurement predicted. That is
+the tool working, not the tool failing: it is insurance, and today it reports
+that the premium is buying nothing yet.
 
 ## Out of scope
 

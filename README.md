@@ -50,7 +50,7 @@ User query ─▶ FastAPI /api/chat ─▶ RAG Engine
 | Backend API      | FastAPI + Uvicorn                                  |
 | Doc processing   | pypdfium2 + RecursiveCharacterTextSplitter (1000/200)|
 | Scraping         | requests + BeautifulSoup                           |
-| Tests / quality  | pytest (94 tests) + `evals/` quality harness       |
+| Tests / quality  | pytest + `evals/` quality harness + CI on push/PR  |
 
 **Cross-lingual retrieval.** The corpus is ~half Turkish, ~half English. A Turkish
 query about a crop covered only in the English sources (FAO/OpenAlex) would
@@ -206,12 +206,21 @@ Open http://localhost:8000/docs for the interactive Swagger UI.
 ## Testing & quality
 
 ```bash
-python -m pytest                    # 50 unit tests (fetchers, ingest, engine, API)
+python -m pytest                    # unit tests (fetchers, ingest, engine, API)
 
 # Repeatable RAG quality eval (needs LM Studio's embedding model; full mode also
 # needs the chat model). Measures retrieval, product gating, grounding, guardrails.
 python -m evals.run_eval --fast     # retrieval + product gating only (seconds)
 python -m evals.run_eval            # full: also generates answers + keyword checks
+
+# Generation is sampled (temperature > 0), so ONE run can hide an intermittent
+# failure - a ~5% blank-answer bug once survived four consecutive clean evals.
+# --repeat samples each case N times; a case passes only if EVERY sample passes,
+# and the sampled dimensions then report over samples (guardrail: 9/9). Retrieval
+# and context are deterministic, so they stay single-sample either way.
+# --only keeps that affordable: all 31 cases x N costs N x ~20 min.
+python -m evals.run_eval --repeat 10 --only chemical   # guardrails, ~15 min
+python -m evals.run_eval --repeat 3  --only gap_taro_tr # one case, ~2 min
 ```
 
 The eval turns corpus/scope changes into measured deltas rather than spot checks,
