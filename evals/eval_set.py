@@ -79,15 +79,13 @@ CASES = [
      "context_any": ["compost", "kompost"],
      "answer_any": ["compost", "organic", "carbon", "nitrogen", "decompos", "waste", "aerat"]},
 
-    # --- cross-lingual GAP crops: TR query, content exists ONLY in the English
-    # FAO/OpenAlex corpus. These FAIL today and are meant to: the Turkish corpus
-    # is dense with generic fertilization papers that clear the floor and fill k,
-    # so the on-topic English chunks never make the cut. Measured 2026-07-16
-    # (probed 7 crops; 6 are gaps, only coffee resolves). Verified NOT fixable by
-    # a bigger k / reranking (no cassava chunk in the TR query's top 30) nor by a
-    # score- or lexical-overlap trigger; even always-translating only rescues
-    # 3 of 6, because _fuse ranks the merged lists by RAW SCORE and Turkish
-    # filler (~0.45-0.52) outscores the right English chunk (~0.46-0.48).
+    # --- cross-lingual gap crops: TR query, content exists ONLY in the English
+    # FAO/OpenAlex corpus. Fixed 2026-07-16 by the TR->EN crop lexicon
+    # (engine.CROP_LEXICON) + RRF fusion; they FAILED before it. Kept as the
+    # regression guard for that path: if the lexicon or the fusion breaks, these
+    # go red while the same-language cases stay green.
+    # gap_taro_tr is the known remaining gap - bare "taro" embeds too weakly to
+    # surface the content (see the design spec).
     {"id": "gap_cacao_tr", "category": "nutrition",
      "query": "Kakao yetiştiriciliğinde gübreleme nasıl yapılır?",
      "retrieval": "nonempty", "products": "any",
