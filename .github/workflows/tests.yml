@@ -1,0 +1,40 @@
+name: tests
+
+# Unit tests only. The eval harness (`python -m evals.run_eval`) is deliberately
+# NOT run here: it needs a local LM Studio serving bge-m3 + the chat model, and
+# the ingested Chroma store (data/vector_store/ is gitignored). Run it locally.
+#
+# The suite is safe without either: verified 2026-07-16 with LM_STUDIO_BASE_URL
+# pointed at a dead port and data/vector_store/ moved away -> 103 passed in 1.3s.
+# Keep it that way: tests monkeypatch the LLM, embedding and vector-store clients.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the version used locally, so CI can't pass on a Python the
+          # project doesn't actually run.
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        # Point the LLM client at a dead port: a test that quietly reaches out to
+        # a real service fails loudly here instead of passing by accident.
+        env:
+          LM_STUDIO_BASE_URL: http://127.0.0.1:9/v1
+        run: python -m pytest -q
