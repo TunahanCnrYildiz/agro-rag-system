@@ -359,11 +359,16 @@ def _get_llm() -> OpenAI:
     )
 
 
+# Stable opening of the unavailable message; the tail carries the exception text,
+# so `_has_advice` matches on this prefix rather than the whole string.
+_LLM_UNAVAILABLE_PREFIX = "Uzgunum, su anda dil modeline (LM Studio) ulasamiyorum."
+
+
 def _llm_unavailable_message(exc: Exception) -> str:
     """User-facing fallback shown when the LM Studio chat model can't be
     reached, so both the unified and streaming paths return the same wording."""
     return (
-        "Uzgunum, su anda dil modeline (LM Studio) ulasamiyorum. "
+        f"{_LLM_UNAVAILABLE_PREFIX} "
         "Lutfen yerel sunucunun calistigindan emin oldugunuzu kontrol edin. "
         f"(teknik detay: {exc})"
     )
@@ -382,6 +387,19 @@ def _empty_answer_message() -> str:
         "Uzgunum, bu soruya su anda bir yanit uretemedim. "
         "Lutfen sorunuzu biraz daha kisa ya da farkli bir sekilde tekrar sorun."
     )
+
+
+def _has_advice(text: str) -> bool:
+    """False when `text` is one of our own fallbacks rather than a real answer.
+
+    Both fallbacks mean "there is no advice here", so nothing should be
+    recommended underneath them - same rule the [NOPRODUCT] gate applies.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    return not (stripped == _empty_answer_message()
+                or stripped.startswith(_LLM_UNAVAILABLE_PREFIX))
 
 
 def _complete_text(messages: list[dict]) -> str:
@@ -498,6 +516,11 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     except Exception as exc:  # noqa: BLE001
         answer_text = _llm_unavailable_message(exc)
 
+    if not _has_advice(answer_text):
+        # There is no advice for products to sit under - a "sorry, I couldn't
+        # answer" reply with three fertilizers beneath it is an ad, not help.
+        products = []
+
     answer_text, off_scope, no_product = _strip_markers(answer_text)
     if off_scope or no_product:
         # off-scope refusal, or an in-scope question the fertilizer catalog
@@ -525,6 +548,7 @@ def stream_answer(
     checked = False
     emitted = False
     failed = False
+    has_advice = True   # cleared when we fall back instead of answering
     try:
         client = _get_llm()
         stream = client.chat.completions.create(
@@ -552,6 +576,7 @@ def stream_answer(
                 buffer = ""
     except Exception as exc:  # noqa: BLE001
         failed = True
+        has_advice = False
         yield _sse({"type": "token", "content": _llm_unavailable_message(exc)})
     # Flush any leftover (very short answers that never hit the decision point).
     if not checked and buffer:
@@ -567,13 +592,16 @@ def stream_answer(
             text = _complete_text(messages)
         except Exception as exc:  # noqa: BLE001
             text = _llm_unavailable_message(exc)
+        has_advice = _has_advice(text)
         clean, off_scope, no_product = _strip_markers(text)
         if clean:
             yield _sse({"type": "token", "content": clean})
 
     # Emit product recommendations only after the full answer has streamed (and
     # only for in-scope answers), so clients render them beneath the reply.
-    if not (off_scope or no_product):
+    # `has_advice` covers the fallbacks: there is no advice for products to sit
+    # under when we could not answer at all.
+    if not (off_scope or no_product) and has_advice:
         yield _sse(
             {"type": "products",
              "recommended_products": [p.as_api() for p in products]}

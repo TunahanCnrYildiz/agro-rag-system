@@ -514,3 +514,32 @@ def test_stream_answer_never_streams_nothing(monkeypatch):
     out = "".join(engine.stream_answer("Domates yapraklarim sarariyor"))
 
     assert _sse_tokens(out) == engine._empty_answer_message()
+
+
+def test_answer_hides_products_under_the_empty_fallback(monkeypatch):
+    """"I could not produce an answer" + 3 fertilizer ads is incoherent: there is
+    no advice for the products to sit under. Same rule as [NOPRODUCT]."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    client, _ = _fake_llm_seq(["", ""])          # blank twice -> fallback
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+
+    r = engine.answer("Domates yapraklarim sarariyor")
+
+    assert r.answer == engine._empty_answer_message()
+    assert r.recommended_products == []
+
+
+def test_stream_answer_hides_products_under_the_empty_fallback(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm", lambda: _fake_stream_llm([]))
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda msgs: engine._empty_answer_message())
+
+    out = "".join(engine.stream_answer("Domates yapraklarim sarariyor"))
+
+    assert _sse_tokens(out) == engine._empty_answer_message()
+    assert '"type": "products"' not in out
