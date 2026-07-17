@@ -287,6 +287,14 @@ def test_expand_query_uzum_entry(monkeypatch):
     assert "grape" in engine._expand_query("Üzümde ben düşmesi")
 
 
+def test_expand_query_findik_entry(monkeypatch):
+    """Fındık is a major Turkish crop; its English literature (fao_/ia_) is
+    otherwise unreachable from a TR query. Measured 2026-07-18: the entry lifts
+    'Fındık bahçesi nasıl kurulur?' from 1 to 4 grounded chunks (modern sources)."""
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert "hazelnut" in engine._expand_query("Fındık bahçesi nasıl kurulur?")
+
+
 def test_expand_query_suffix_generalizes(monkeypatch):
     """Suffix-awareness is not grape-specific: an existing crop with a Turkish
     case suffix ('muzda' = muz + -da) must now match too."""

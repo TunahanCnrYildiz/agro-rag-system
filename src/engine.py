@@ -243,6 +243,7 @@ CROP_LEXICON = {
     "çeltik": "rice",
     "asma": "grapevine",
     "üzüm": "grape",
+    "fındık": "hazelnut",
 }
 
 # Common Turkish inflectional suffixes, longest-first, so the matcher can see a
