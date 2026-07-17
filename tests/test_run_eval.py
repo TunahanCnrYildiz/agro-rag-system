@@ -220,3 +220,23 @@ def test_no_context_rejects_fast(monkeypatch):
     _stub(monkeypatch, ["azot verin."])
     with pytest.raises(SystemExit):
         run_eval.run(fast=True, no_context=True)
+
+
+def test_classify_corpus_carried():
+    # green normally, red ablated -> the corpus supplies the fact
+    assert run_eval._classify(True, False) == "corpus-carried"
+
+
+def test_classify_model_carried():
+    # green both ways -> the model knew it; corpus adds nothing detectable
+    assert run_eval._classify(True, True) == "model-carried"
+
+
+def test_classify_retrieval_broken():
+    # red both ways -> cannot answer even WITH the corpus
+    assert run_eval._classify(False, False) == "retrieval-broken"
+
+
+def test_classify_corpus_harmful():
+    # red normally but green ablated -> the corpus BROKE a right answer
+    assert run_eval._classify(False, True) == "corpus-harmful"

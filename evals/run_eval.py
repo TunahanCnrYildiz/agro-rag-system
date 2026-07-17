@@ -119,6 +119,20 @@ def _ablation_verdict(rows: list[dict]) -> tuple[int, list[str]]:
     return (1 if decorative else 0), decorative
 
 
+def _classify(normal_all_green: bool, ablated_all_green: bool) -> str:
+    """Label a case by how its grounding moves when the corpus is removed.
+
+    corpus-carried : green normally, red ablated -> the corpus supplies the fact.
+    model-carried  : green both ways -> the model knew it (or the mark is wrong).
+    retrieval-broken: red both ways -> cannot answer even with the corpus.
+    corpus-harmful : red normally, green ablated -> retrieval injected noise that
+                     broke an answer the model would otherwise have gotten right.
+    """
+    if normal_all_green:
+        return "corpus-carried" if not ablated_all_green else "model-carried"
+    return "corpus-harmful" if ablated_all_green else "retrieval-broken"
+
+
 def run(fast: bool, repeat: int = 1, only: str | None = None,
         no_context: bool = False) -> int:
     if fast and repeat > 1:
