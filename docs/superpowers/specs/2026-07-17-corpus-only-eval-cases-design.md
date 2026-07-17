@@ -128,19 +128,34 @@ Behaviour:
   `answer()`, so `--no-context --fast` has nothing to ablate. Exit 1, as
   `--fast --repeat N>1` already does.
 
-### Scope: 5 candidates, survivors only
+### Scope: 3 candidates, survivors only
 
-Five cultivars with real DergiPark coverage (chunk counts measured 2026-07-17):
-`deveci` 84, `amasya` 33, `gemlik` 27, `santa maria` 27, `0900 ziraat` 23.
+**Amended after mining (2026-07-17).** This section first named five cultivars
+picked by chunk count — `deveci` 84, `amasya` 33, `gemlik` 27, `santa maria` 27,
+`0900 ziraat` 23. Reading the sources killed two of them, and the reason matters:
+**a chunk count measures a WORD, not what the document is about.**
 
-For each: read the source chunks, extract a specific finding, write a natural
-question, then ablation-validate.
+- **Amasya apple — the cultivar is not in the corpus.** `"amasya elma"` and
+  `"amasya kırmızısı"` both scan to **0 chunks**. The 33 `amasya` hits are the
+  PROVINCE name in the distribution lists of a Scarabaeidae fauna survey
+  (`dp_1052881.pdf`).
+- **Gemlik olive — wrong topic.** `"gemlik zeytin"` scans to 2 chunks, both in
+  `dp_1869487.pdf`, a metabolomics study of the geographic origin of Gemlik olive
+  OIL (food authenticity, adulteration). No natural grower question lands there.
 
-**Fewer than five may survive, and that is an accepted outcome.** A cultivar whose
-corpus content is not specific enough, or whose facts gemma already knows, yields
-a case that does not discriminate — and it does not ship. Two survivors would mean
-the eval guards retrieval in two more places than it does today, which is two more
-than zero. Deveci is already validated.
+That is the same error this project measured and closed hours earlier: FAO breadth
+was chased on chunk share, and chunk share turned out to be a vanity metric
+(handoff item 1). It was repeated here within the same day, at a smaller scale.
+
+The surviving candidates are **`deveci`, `santa maria`, `0900 ziraat`**. For each:
+read the source chunks, extract a specific finding, write a natural question, then
+ablation-validate.
+
+**Fewer than three may survive, and that is an accepted outcome.** A cultivar
+whose corpus content is not specific enough, or whose facts gemma already knows,
+yields a case that does not discriminate — and it does not ship. One survivor
+would mean the eval guards retrieval in one more place than it does today, which
+is one more than zero. Deveci is already validated.
 
 ## Out of scope
 
