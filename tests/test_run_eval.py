@@ -3,6 +3,8 @@
 import pytest
 
 from evals import run_eval
+from src import engine
+from src.engine import ChatResult
 
 
 class _R:
@@ -240,3 +242,70 @@ def test_classify_retrieval_broken():
 def test_classify_corpus_harmful():
     # red normally but green ablated -> the corpus BROKE a right answer
     assert run_eval._classify(False, True) == "corpus-harmful"
+
+
+def _optin_case(answer_any):
+    return {"id": "probe", "category": "local", "corpus_fact": True,
+            "query": "q", "answer_any": answer_any}
+
+
+def test_faithfulness_corpus_carried_exits_0(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)  # respects _corpus_ablated
+        return ChatResult("depo 2±0,5 derece" if ctx else "genel tavsiye", [])
+    monkeypatch.setattr(engine, "answer", fake)
+
+    assert run_eval.run_faithfulness() == 0
+
+
+def test_faithfulness_model_carried_exits_1(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    # states the fact regardless of context -> the model carries it
+    monkeypatch.setattr(engine, "answer",
+                        lambda msg, history=None: ChatResult("hep 2±0,5 der", []))
+    assert run_eval.run_faithfulness() == 1
+
+
+def test_faithfulness_corpus_harmful_exits_1(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)
+        # right ONLY when context is absent -> retrieval broke it
+        return ChatResult("genel" if ctx else "2±0,5 dogru", [])
+    monkeypatch.setattr(engine, "answer", fake)
+    assert run_eval.run_faithfulness() == 1
+
+
+def test_faithfulness_no_optin_case_exits_1(monkeypatch):
+    plain = {"id": "z", "category": "nutrition", "query": "q", "answer_any": ["x"]}
+    monkeypatch.setattr(run_eval, "_select", lambda only: [plain])
+    assert run_eval.run_faithfulness() == 1
+
+
+def test_faithfulness_fast_exits(monkeypatch):
+    with pytest.raises(SystemExit):
+        run_eval.run_faithfulness(fast=True)
+
+
+def test_faithfulness_one_red_normal_sample_drops_corpus_carried(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    calls = {"n": 0}
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)
+        calls["n"] += 1
+        if not ctx:
+            return ChatResult("genel", [])           # ablated: always red
+        text = "genel" if calls["n"] == 1 else "2±0,5 var"  # 1st normal red
+        return ChatResult(text, [])
+    monkeypatch.setattr(engine, "answer", fake)
+
+    # repeat=2: normal samples red+green -> not unanimous -> not corpus-carried
+    assert run_eval.run_faithfulness(repeat=2) == 1
