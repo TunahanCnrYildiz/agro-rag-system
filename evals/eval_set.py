@@ -261,10 +261,10 @@ CASES = [
      # dp_19393 (Eğirdir): selfed fruit had very low seed set and was judged
      # parthenocarpic - the study's own conclusion term.
      "answer_any": ["partenokarp"]},
-    {"id": "local_0900ziraat_cherry", "category": "local",
-     "query": "0900 Ziraat kirazında kalsiyumu yapraktan mı topraktan mı uygulamalı?",
-     "retrieval": "nonempty", "products": "any",
-     "context_any": ["0900 ziraat"],
-     # dp_1154776: foliar application gave the highest mean fruit weight, 8.91 g.
-     "answer_any": ["8.91", "8,91"]},
+    # DROPPED 2026-07-17: local_0900ziraat_cherry, "0900 Ziraat kirazında
+    # kalsiyumu yapraktan mı topraktan mı uygulamalı?" asserting dp_1154776's
+    # 8.91 g foliar fruit weight. Retrieval found the paper (context_any
+    # "0900 ziraat" green) but the answer never carries the number: grounding
+    # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
+    # was not retuned - a case tuned until green asserts nothing.
 ]
