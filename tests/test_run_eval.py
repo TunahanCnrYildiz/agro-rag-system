@@ -154,3 +154,69 @@ def test_only_defaults_to_every_case(monkeypatch, capsys):
     out = capsys.readouterr().out
 
     assert "2/2 cases passed" in out
+
+
+def test_ablation_verdict_all_local_cases_lost_grounding():
+    rows = [{"id": "local_a", "cat": "local", "grounding": False},
+            {"id": "local_b", "cat": "local", "grounding": False}]
+    assert run_eval._ablation_verdict(rows) == (0, [])
+
+
+def test_ablation_verdict_flags_a_local_case_that_survives_ablation():
+    rows = [{"id": "local_a", "cat": "local", "grounding": False},
+            {"id": "local_b", "cat": "local", "grounding": True}]
+    assert run_eval._ablation_verdict(rows) == (1, ["local_b"])
+
+
+def test_ablation_verdict_ignores_non_local_cases():
+    """Ordinary cases fail under ablation by construction - if they moved the
+    exit code it would be 1 on every run and mean nothing."""
+    rows = [{"id": "local_a", "cat": "local", "grounding": False},
+            {"id": "tomato_nutrition", "cat": "nutrition", "grounding": True},
+            {"id": "compost", "cat": "nutrition", "grounding": True}]
+    assert run_eval._ablation_verdict(rows) == (0, [])
+
+
+def test_ablation_verdict_with_no_local_case_fails_rather_than_passing_vacuously():
+    """'0 of 0 discriminate' must not read as success - same shape as the
+    all([]) bug this project already shipped once."""
+    rows = [{"id": "compost", "cat": "nutrition", "grounding": True}]
+    assert run_eval._ablation_verdict(rows) == (1, [])
+
+
+def test_corpus_ablated_empties_the_path_answer_uses(monkeypatch):
+    from src import engine
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "REAL")
+    assert engine.retrieve_context("x") == "REAL"
+    with run_eval._corpus_ablated():
+        assert engine.retrieve_context("x") == ""
+    assert engine.retrieve_context("x") == "REAL"
+
+
+LOCAL_CASE = [{
+    "id": "local_probe", "category": "local", "query": "q",
+    "retrieval": "nonempty", "products": "none",
+    "context_any": ["deveci"],
+    "answer_any": ["2±0,5"],
+}]
+
+
+def test_no_context_reports_retrieval_and_context_as_n_a(monkeypatch, capsys):
+    """The flag EMPTIES those two dimensions, so scoring them would print a wall
+    of tautological FAILs and bury the ablation's actual signal."""
+    _stub(monkeypatch, ["genel bir cevap"])
+    monkeypatch.setattr(run_eval, "CASES", LOCAL_CASE)
+
+    run_eval.run(fast=False, no_context=True)
+    out = capsys.readouterr().out
+
+    assert "ret=n/a ctx=n/a" in out
+    assert "ret=False" not in out
+    assert "retrieval: n/a" in out
+
+
+def test_no_context_rejects_fast(monkeypatch):
+    """--fast never calls answer(), so there is nothing to ablate."""
+    _stub(monkeypatch, ["azot verin."])
+    with pytest.raises(SystemExit):
+        run_eval.run(fast=True, no_context=True)
