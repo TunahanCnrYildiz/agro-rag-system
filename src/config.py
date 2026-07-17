@@ -30,8 +30,13 @@ PRODUCTS_JSON: Path = PRODUCTS_DIR / "products.json"
 class Settings(BaseSettings):
     """Runtime settings, overridable through environment variables / .env."""
 
+    # Anchor .env to PROJECT_ROOT, never the CWD: a relative ".env" is resolved
+    # against the working directory, so a script run from anywhere else silently
+    # got the defaults below instead of the real config (measured 2026-07-17 -
+    # embedding_model fell back to nomic/768 against a bge-m3/1024 store and
+    # every retrieval died, which read like a corpus problem, not a config one).
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
