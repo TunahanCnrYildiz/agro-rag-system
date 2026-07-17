@@ -10,9 +10,11 @@ env/
 # Vector store (persistent DB is large / regenerable)
 data/vector_store/
 
-# Source documents (books can be huge — keep out of git)
-docs/books/*.pdf
-docs/books/*.txt
+# Source documents (books can be huge — keep out of git). The ** covers
+# subdirectories too (e.g. docs/books/_offtopic/, .../lowrelevance/), which the
+# bare docs/books/*.pdf did NOT — those quarantined PDFs showed as untracked.
+docs/books/**/*.pdf
+docs/books/**/*.txt
 
 # OS / IDE
 .DS_Store
