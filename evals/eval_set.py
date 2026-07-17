@@ -3,7 +3,7 @@
 Each case declares what we EXPECT, so quality is measured repeatably rather than
 by ad-hoc spot checks. Fields:
 
-- category: nutrition | horticulture | disease | chemical | offscope
+- category: nutrition | horticulture | disease | chemical | offscope | local
 - retrieval: "nonempty" | "empty" | "any"  -> expected retrieve_context() state
 - context_any: list; the RETRIEVED CONTEXT must contain at least one. This is the
              assertion with teeth: "nonempty" only proves chunks cleared the
@@ -54,6 +54,15 @@ by ad-hoc spot checks. Fields:
 - answer_none: list; the answer must contain none of these (guardrail leak check).
               Used on chemical/disease cases to prove the two hard lines hold -
               no chemical pesticide/herbicide names, no brand recommendations.
+
+`local` cases are different in kind from the rest: they exist to prove RETRIEVAL
+contributes, not that the answer is nice. Measured 2026-07-17 by ablation
+(retrieve_context forced to ""): grounding stayed 31/31 and guardrail stayed
+31/31 with an EMPTY corpus - i.e. every other case is passing on gemma's own
+knowledge plus the prompt, and the corpus's only measurable job was feeding
+match_products (product-gating 31/31 -> 27/31). A `local` case asserts a specific
+finding from ONE source paper, so the model cannot bluff it. Validate with
+`--no-context`: a local case MUST go red there, or it guards nothing.
 
 Keywords are chosen to be robust (several alternatives) rather than brittle.
 """
@@ -233,4 +242,29 @@ CASES = [
      "query": "Traktörümün motoru çalışmıyor, ne yapmalıyım?",
      "retrieval": "any", "products": "none",
      "answer_any": ["yanıt veremem", "alan dış", "asistan", "bitki"]},
+
+    # --- local: Turkey-specific cultivar facts that only the corpus carries ---
+    # Each answer_any is the SOURCE PAPER's own finding (see the plan's table),
+    # chosen before any run. These are the only cases that go red when the corpus
+    # is removed - verify with: python -m evals.run_eval --no-context --only local
+    {"id": "local_deveci_pear", "category": "local",
+     "query": "Deveci armudu ne zaman hasat edilmeli ve soğukta ne kadar depolanabilir?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["deveci"],
+     # dp_21747: stored at 2±0.5 °C. Ablated, the model says "0-2°C" and
+     # "3 ila 6 ay" - so "6 ay" would NOT discriminate, but this does.
+     "answer_any": ["2±0,5", "2±0.5", "2 ± 0,5", "2 ± 0.5"]},
+    {"id": "local_santamaria_pear", "category": "local",
+     "query": "Santa Maria armudu kendine verimli mi, bahçeye dölleyici çeşit dikmek gerekir mi?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["santa maria"],
+     # dp_19393 (Eğirdir): selfed fruit had very low seed set and was judged
+     # parthenocarpic - the study's own conclusion term.
+     "answer_any": ["partenokarp"]},
+    # DROPPED 2026-07-17: local_0900ziraat_cherry, "0900 Ziraat kirazında
+    # kalsiyumu yapraktan mı topraktan mı uygulamalı?" asserting dp_1154776's
+    # 8.91 g foliar fruit weight. Retrieval found the paper (context_any
+    # "0900 ziraat" green) but the answer never carries the number: grounding
+    # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
+    # was not retuned - a case tuned until green asserts nothing.
 ]
