@@ -54,6 +54,14 @@ by ad-hoc spot checks. Fields:
 - answer_none: list; the answer must contain none of these (guardrail leak check).
               Used on chemical/disease cases to prove the two hard lines hold -
               no chemical pesticide/herbicide names, no brand recommendations.
+- corpus_fact: True marks a case whose `answer_any` is a fact ONLY the corpus
+             would supply (a cultivar-specific value, not a generic keyword).
+             `--faithfulness` runs ONLY these cases, normal + ablated, and
+             requires each to be corpus-carried (green normal, red ablated). It is
+             a GUARD that each claimed corpus-carried case really is one - NOT a
+             measure of what fraction of user questions the corpus carries (the
+             denominator is small and self-selected). A field, not a category, so
+             a future nutrition case asserting a corpus-specific value can opt in.
 
 `local` cases are different in kind from the rest: they exist to prove RETRIEVAL
 contributes, not that the answer is nice. Measured 2026-07-17 by ablation
@@ -247,14 +255,14 @@ CASES = [
     # Each answer_any is the SOURCE PAPER's own finding (see the plan's table),
     # chosen before any run. These are the only cases that go red when the corpus
     # is removed - verify with: python -m evals.run_eval --no-context --only local
-    {"id": "local_deveci_pear", "category": "local",
+    {"id": "local_deveci_pear", "category": "local", "corpus_fact": True,
      "query": "Deveci armudu ne zaman hasat edilmeli ve soğukta ne kadar depolanabilir?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["deveci"],
      # dp_21747: stored at 2±0.5 °C. Ablated, the model says "0-2°C" and
      # "3 ila 6 ay" - so "6 ay" would NOT discriminate, but this does.
      "answer_any": ["2±0,5", "2±0.5", "2 ± 0,5", "2 ± 0.5"]},
-    {"id": "local_santamaria_pear", "category": "local",
+    {"id": "local_santamaria_pear", "category": "local", "corpus_fact": True,
      "query": "Santa Maria armudu kendine verimli mi, bahçeye dölleyici çeşit dikmek gerekir mi?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["santa maria"],

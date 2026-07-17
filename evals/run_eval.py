@@ -119,6 +119,20 @@ def _ablation_verdict(rows: list[dict]) -> tuple[int, list[str]]:
     return (1 if decorative else 0), decorative
 
 
+def _classify(normal_all_green: bool, ablated_all_green: bool) -> str:
+    """Label a case by how its grounding moves when the corpus is removed.
+
+    corpus-carried : green normally, red ablated -> the corpus supplies the fact.
+    model-carried  : green both ways -> the model knew it (or the mark is wrong).
+    retrieval-broken: red both ways -> cannot answer even with the corpus.
+    corpus-harmful : red normally, green ablated -> retrieval injected noise that
+                     broke an answer the model would otherwise have gotten right.
+    """
+    if normal_all_green:
+        return "corpus-carried" if not ablated_all_green else "model-carried"
+    return "corpus-harmful" if ablated_all_green else "retrieval-broken"
+
+
 def run(fast: bool, repeat: int = 1, only: str | None = None,
         no_context: bool = False) -> int:
     if fast and repeat > 1:
@@ -226,6 +240,55 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
     return 0 if passed == len(rows) else 1
 
 
+def run_faithfulness(repeat: int = 1, only: str | None = None,
+                     fast: bool = False) -> int:
+    """Corpus-contribution check over `corpus_fact` cases only.
+
+    For each opted-in case: run answer() normal and ablated, and classify by how
+    its grounding moves (see _classify). Exit 0 only if every such case is
+    corpus-carried - opting in is a claim ("this case needs the corpus") that this
+    verifies, exactly as --no-context requires every local case to lose grounding.
+
+    NOT a coverage meter: the score sees only cases we deliberately built to need
+    the corpus, so "2/2" means "both of the two we bothered to make corpus-specific
+    work", not "the corpus carries 100% of user questions". The denominator is
+    small and self-selected - do not read it as corpus coverage.
+    """
+    if fast:
+        sys.exit("--faithfulness needs the chat model; --fast never calls answer().")
+    cases = [c for c in _select(only) if c.get("corpus_fact")]
+    if not cases:
+        print("[faithfulness] no `corpus_fact` case in this selection - "
+              "nothing to measure")
+        return 1
+    settings.request_timeout = 400.0
+
+    def grounded_hits(case: dict) -> int:
+        return sum(_answer_ok(case, engine.answer(case["query"]).answer)[0]
+                   for _ in range(repeat))
+
+    suffix = f", {repeat}x each" if repeat > 1 else ""
+    print(f"=== faithfulness (corpus contribution), "
+          f"{len(cases)} corpus_fact case(s){suffix} ===\n")
+    counts = {"corpus-carried": 0, "model-carried": 0,
+              "retrieval-broken": 0, "corpus-harmful": 0}
+    for c in cases:
+        normal_hits = grounded_hits(c)
+        with _corpus_ablated():
+            ablated_hits = grounded_hits(c)
+        label = _classify(normal_hits == repeat, ablated_hits == repeat)
+        counts[label] += 1
+        print(f"  {c['id']:<24} {label:<16} "
+              f"normal {normal_hits}/{repeat}  ablated {ablated_hits}/{repeat}")
+
+    total = len(cases)
+    print(f"\n  corpus-carried: {counts['corpus-carried']}/{total}  |  "
+          f"harmful: {counts['corpus-harmful']}  |  "
+          f"retrieval-broken: {counts['retrieval-broken']}  |  "
+          f"model-carried: {counts['model-carried']}")
+    return 0 if counts["corpus-carried"] == total else 1
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Run the RAG quality eval.")
     p.add_argument("--fast", action="store_true",
@@ -244,7 +307,15 @@ def main() -> None:
                    help="Ablation: run with an EMPTY corpus to prove the `local` "
                         "cases actually depend on retrieval. Exit 0 only if every "
                         "local case loses grounding.")
+    p.add_argument("--faithfulness", action="store_true",
+                   help="Corpus-contribution check: for each corpus_fact case, "
+                        "run normal + ablated and classify. Exit 0 only if every "
+                        "such case is corpus-carried. Pair with --repeat to expose "
+                        "flaky wins.")
     args = p.parse_args()
+    if args.faithfulness:
+        sys.exit(run_faithfulness(repeat=args.repeat, only=args.only,
+                                  fast=args.fast))
     sys.exit(run(fast=args.fast, repeat=args.repeat, only=args.only,
                  no_context=args.no_context))
 
