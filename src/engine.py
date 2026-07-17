@@ -241,7 +241,19 @@ CROP_LEXICON = {
     "kahve": "coffee",
     "muz": "banana",
     "çeltik": "rice",
+    "asma": "grapevine",
+    "üzüm": "grape",
 }
+
+# Common Turkish inflectional suffixes, longest-first, so the matcher can see a
+# crop name through a case/plural/possessive ending ("asma" in "asmada") WITHOUT
+# firing on a different morpheme ("kahve" in "kahverengi" - "rengi" is not here,
+# so that branch fails the trailing (?!\w)). `bağ` was deliberately kept out of
+# the lexicon; the suffix list also protects the crops that ARE in it.
+_TR_SUFFIXES = (
+    "nda|nde|dan|den|tan|ten|lar|ler|yla|yle|nın|nin|nun|nün|sı|si|su|sü"
+    "|da|de|ta|te|ya|ye|na|ne|la|le|yı|yi|yu|yü|ın|in|un|ün|ı|i|u|ü|a|e"
+)
 
 # longest first, so "tatlı patates" wins over a future "patates" entry
 _LEXICON_BY_LENGTH = sorted(
@@ -269,7 +281,9 @@ def _expand_query(query: str) -> list[str]:
     normalized = _normalize_tr(query)
     out = [query]
     for term, english in _LEXICON_BY_LENGTH:
-        match = re.search(rf"(?<!\w){re.escape(term)}(?!\w)", normalized)
+        match = re.search(
+            rf"(?<!\w){re.escape(term)}(?:{_TR_SUFFIXES})?(?!\w)", normalized
+        )
         if not match:
             continue
         out.append(english)

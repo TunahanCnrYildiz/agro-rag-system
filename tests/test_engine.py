@@ -266,7 +266,32 @@ def test_expand_query_prefers_longest_term(monkeypatch):
 
 def test_expand_query_no_lexicon_hit_returns_query_only(monkeypatch):
     monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
-    assert engine._expand_query("Asmada budama") == ["Asmada budama"]
+    q = "Domateste yaprak sararması neden olur?"
+    assert engine._expand_query(q) == [q]
+
+
+def test_expand_query_viticulture_suffix(monkeypatch):
+    """The one measured 0-chunk case (2026-07-18): 'Asmada kış budaması' reaches
+    no context because CROP_LEXICON had no grape entry AND the matcher couldn't
+    see through the -da suffix. Needs BOTH the asma->grapevine entry and the
+    suffix-aware match."""
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    out = engine._expand_query("Asmada kış budaması nasıl yapılır?")
+    assert "grapevine" in out
+    # the suffixed word is replaced whole in the substituted query
+    assert "grapevine kış budaması nasıl yapılır?" in out
+
+
+def test_expand_query_uzum_entry(monkeypatch):
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert "grape" in engine._expand_query("Üzümde ben düşmesi")
+
+
+def test_expand_query_suffix_generalizes(monkeypatch):
+    """Suffix-awareness is not grape-specific: an existing crop with a Turkish
+    case suffix ('muzda' = muz + -da) must now match too."""
+    monkeypatch.setattr(engine.settings, "cross_lingual_retrieval", True)
+    assert "banana" in engine._expand_query("Muzda leke var")
 
 
 def test_expand_query_disabled(monkeypatch):
