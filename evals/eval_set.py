@@ -319,4 +319,27 @@ CASES = [
     # "0900 ziraat" green) but the answer never carries the number: grounding
     # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
     # was not retuned - a case tuned until green asserts nothing.
+
+    # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
+    {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Keçiboynuzu (harnup) aşılamasında anaç çöğür çapı en az ne kadar olmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["çöğür çapı"],
+     # dp_19394 (keçiboynuzu aşılama): the study states in prose that grafting
+     # success drops when seedling diameter is below 10 mm ("çapın 10 mm'nin
+     # altında olduğu durumlarda... aşı tutma oranının olumsuz yönde
+     # etkilendiği") - a threshold a practical grafting answer states, not a
+     # results-table cell.
+     "answer_any": ["10 mm", "10mm"]},
+    {"id": "technique_grape_bud_load", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Trakya İlkeren üzüm çeşidinde en yüksek verim için asma başına kaç göz bırakılmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["göz bırakılan asmalarda"],
+     # dp_19531 (plastik serada Trakya İlkeren, terbiye/asma şarjı): the study's
+     # own conclusion is "15 göz bırakılan asmalarda en yüksek verim sağlanmıştır"
+     # (18 in dikey kordon) - the bud-load a natural pruning answer would state,
+     # not a table cell.
+     "answer_any": ["15 göz", "18 göz"]},
 ]
