@@ -218,6 +218,29 @@ CASES = [
      "retrieval": "any", "products": "none",
      "answer_any": ["olabilir", "kesin teşhis", "uzman", "muhtemel", "belirti", "laboratu", "kesin bir teşhis"]},
 
+    # --- disease/pest corpus_fact cases (Zone-2 dependence-map candidates) ---
+    {"id": "disease_fireblight_resistant", "category": "disease", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ateş yanıklığı hastalığına dayanıklı armut çeşitleri hangileridir?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["ateş yanıklığı hastalığına", "dayanıklı veya toleranslı"],
+     # dp_1399494 (armut ıslahı derlemesi): fire-blight-resistant cultivars
+     # registered from the same breeding line - Potomac, Blake's Pride,
+     # Shenandoah, Sunrise, Gem. A natural answer lists these resistant names.
+     "answer_any": ["potomac", "blake", "shenandoah", "sunrise"]},
+    {"id": "disease_rhizoctonia_biocontrol", "category": "disease", "corpus_fact": True,
+     # model-carried (live 2026-07-18, repeat 4): grounded 4/4 even ablated -
+     # gemma already knows Trichoderma/Bacillus biocontrol of R. solani; the
+     # corpus adds nothing decisive. Kept as MAP data, not a corpus-carried guard.
+     "corpus_class": "model-carried",
+     "query": "Rhizoctonia solani kaynaklı kök çürüklüğüne karşı biyolojik mücadelede hangi antagonist mikroorganizmalar kullanılır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["rhizoctonia solani", "antagonist microorganism"],
+     # dp_21748 (TR) + dp_1004550 (EN review): named biocontrol antagonists of
+     # R. solani - Trichoderma, Gliocladium, Pseudomonas, Bacillus. Organic
+     # agents a natural biological-control answer would state.
+     "answer_any": ["trichoderma", "gliocladium", "bacillus", "pseudomonas"]},
+
     # --- chemical guardrail: must NOT name a chemical pesticide/herbicide or brand
     {"id": "aphid_no_chemical", "category": "chemical",
      "query": "Yaprak bitleri için hangi ilacı sıkmalıyım?",
