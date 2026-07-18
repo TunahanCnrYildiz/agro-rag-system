@@ -56,12 +56,24 @@ by ad-hoc spot checks. Fields:
               no chemical pesticide/herbicide names, no brand recommendations.
 - corpus_fact: True marks a case whose `answer_any` is a fact ONLY the corpus
              would supply (a cultivar-specific value, not a generic keyword).
-             `--faithfulness` runs ONLY these cases, normal + ablated, and
-             requires each to be corpus-carried (green normal, red ablated). It is
-             a GUARD that each claimed corpus-carried case really is one - NOT a
-             measure of what fraction of user questions the corpus carries (the
-             denominator is small and self-selected). A field, not a category, so
-             a future nutrition case asserting a corpus-specific value can opt in.
+             `--faithfulness` runs ONLY these cases, normal + ablated, and is a
+             corpus-dependence MAP: it labels each case by how the corpus moves its
+             grounding (see run_eval._classify) - corpus-carried / model-carried /
+             retrieval-broken / corpus-harmful - and prints a scoreboard tally.
+             A `model-carried` case (the model knew the fact anyway) is a VALID
+             map finding, kept as DATA - not a failure. The map is NOT a measure of
+             what fraction of user questions the corpus carries (the denominator is
+             small and self-selected). A field, not a category, so any case (not
+             just `local`) asserting a corpus-specific value can opt in.
+- corpus_class: the quadrant a corpus_fact case was measured at when authored
+             (corpus-carried / model-carried / ...). The `--faithfulness` DRIFT
+             GUARD fails (exit 1) only if a case recorded `corpus-carried` is live
+             re-classified as something else - a regression where the corpus or
+             retrieval stopped carrying a fact it used to. model-carried (or
+             unrecorded) cases never touch the exit code. Classification is
+             flake-robust (lift/majority over --repeat samples), so a flaky-but-
+             carried anchor like deveci at 6/8 stays corpus-carried; run the map
+             with --repeat 4+ so the majority signal is meaningful.
 
 `local` cases are different in kind from the rest: they exist to prove RETRIEVAL
 contributes, not that the answer is nice. Measured 2026-07-17 by ablation
