@@ -62,6 +62,82 @@ def test_extract_pdf_pages_restores_word_spacing():
     assert full.count(" ") / len(full) >= MIN_SPACE_RATIO
 
 
+# --------------------------------------------------------------------------- #
+# year / era metadata (2026-07-18)
+# --------------------------------------------------------------------------- #
+def test_year_to_era_buckets():
+    assert ing._year_to_era(1908) == "pre-1950"
+    assert ing._year_to_era(1975) == "1950-1989"
+    assert ing._year_to_era(2001) == "1990-2009"
+    assert ing._year_to_era(2018) == "2010+"
+    assert ing._year_to_era(None) == "unknown"
+    # boundaries land in the newer bucket
+    assert ing._year_to_era(1950) == "1950-1989"
+    assert ing._year_to_era(1990) == "1990-2009"
+    assert ing._year_to_era(2010) == "2010+"
+
+
+def test_derive_year_override_wins(monkeypatch):
+    monkeypatch.setattr(ing, "_source_year_overrides", lambda: {"x.pdf": 1911})
+    year, conf = ing.derive_source_year("x.pdf", "full of 2003 and 2007 text")
+    assert (year, conf) == (1911, "override")
+
+
+def test_derive_year_oa_constant():
+    # a hand-checked OpenAlex year; no text needed
+    year, conf = ing.derive_source_year("oa_W2115917750.pdf", "")
+    assert (year, conf) == (2009, "api")
+
+
+def test_derive_year_dp_from_text(monkeypatch):
+    monkeypatch.setattr(ing, "_source_year_overrides", lambda: {})
+    text = "Akd. Univ. Ziraat Fak. Derg. (2012) 25(1): 53-57 ... Polat 1999, Acar 2006"
+    year, conf = ing.derive_source_year("dp_19411.pdf", text)
+    # the header year that appears FIRST, not a later reference year
+    assert (year, conf) == (2012, "text")
+
+
+def test_derive_year_garbled_returns_none(monkeypatch):
+    monkeypatch.setattr(ing, "_source_year_overrides", lambda: {})
+    year, conf = ing.derive_source_year("ia_scan.pdf", "no plausible year here !!!")
+    assert year is None
+
+
+def test_build_backfill_metadata_merges_and_omits_none():
+    records = [
+        ("id1", "dp_a.pdf", {"source": "dp_a.pdf", "page": 0, "chunk_index": 0}),
+        ("id2", "ia_b.pdf", {"source": "ia_b.pdf", "page": 3, "chunk_index": 1,
+                             "year": 9999}),  # stale year must be cleared
+    ]
+    year_of = {"dp_a.pdf": (2015, "2010+"), "ia_b.pdf": (None, "unknown")}.get
+    ids, metas = ing.build_backfill_metadata(records, year_of)
+    assert ids == ["id1", "id2"]
+    # existing fields preserved, era added, year set when known
+    assert metas[0] == {"source": "dp_a.pdf", "page": 0, "chunk_index": 0,
+                        "era": "2010+", "year": 2015}
+    # unknown -> era set, year key removed (Chroma rejects None)
+    assert metas[1]["era"] == "unknown" and "year" not in metas[1]
+
+
+def test_iter_chunks_tags_era(monkeypatch):
+    """Every emitted chunk carries era, and year when known."""
+    fake = Path("dp_fake.pdf")
+    monkeypatch.setattr(ing, "_iter_source_files", lambda: [fake])
+    monkeypatch.setattr(ing, "_source_year_overrides", lambda: {})
+    page = ("Ziraat Fak. Derg. (2015). Azotlu gübreleme bitki büyümesini artırır "
+            "ve toprak besin dengesini korumak için oldukça önemlidir.",
+            {"source": "dp_fake.pdf", "page": 0})
+    monkeypatch.setattr(ing, "_load_file_text", lambda path: iter([page]))
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.chunk_size, chunk_overlap=settings.chunk_overlap,
+        separators=["\n\n", "\n", ". ", " ", ""])
+    docs = list(ing.iter_chunks(splitter))
+    assert docs, "fixture should emit at least one chunk"
+    for d in docs:
+        assert d.metadata["era"] == "2010+"
+        assert d.metadata["year"] == 2015
+
+
 def test_extract_pdf_pages_survives_junk_filter():
     # Under pypdf this file yielded 0 kept chunks; pypdfium2 must yield >= 1.
     splitter = RecursiveCharacterTextSplitter(

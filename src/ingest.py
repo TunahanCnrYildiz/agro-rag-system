@@ -13,7 +13,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
+import json
 import re
+from datetime import date
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator
 
@@ -24,11 +28,12 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 try:
     from .config import (
         BOOKS_DIR,
+        DATA_DIR,
         VECTOR_STORE_DIR,
         settings,
     )
 except ImportError:  # pragma: no cover
-    from config import BOOKS_DIR, VECTOR_STORE_DIR, settings  # type: ignore
+    from config import BOOKS_DIR, DATA_DIR, VECTOR_STORE_DIR, settings  # type: ignore
 
 
 def get_embeddings() -> OpenAIEmbeddings:
@@ -117,6 +122,113 @@ def _load_file_text(path: Path) -> Iterator[tuple[str, dict]]:
     # PDF: pypdfium2 preserves word spacing on old scans that pypdf runs
     # together (see docs/superpowers/specs/2026-07-11-ia-scan-pdf-extraction-design.md).
     yield from _extract_pdf_pages(path)
+
+
+# --------------------------------------------------------------------------- #
+# Publication year / era (2026-07-18)
+# Behaviour-neutral metadata: nothing in retrieval reads it yet. See
+# docs/superpowers/specs/2026-07-18-year-era-metadata-design.md.
+# --------------------------------------------------------------------------- #
+
+# Hand-checked OpenAlex publication_year per oa_ work (offline; no network at
+# ingest). All 27 are modern (1979-2020), confirming the freshness audit.
+_OA_YEARS: dict[str, int] = {
+    "oa_W1602737021.pdf": 1979, "oa_W1979210892.pdf": 2002,
+    "oa_W1994145712.pdf": 2007, "oa_W2001465005.pdf": 1994,
+    "oa_W2047116407.pdf": 2015, "oa_W2053238406.pdf": 2008,
+    "oa_W2061918046.pdf": 2012, "oa_W2088669320.pdf": 2004,
+    "oa_W2103202119.pdf": 2000, "oa_W2115917750.pdf": 2009,
+    "oa_W2117574536.pdf": 2007, "oa_W2118755534.pdf": 2003,
+    "oa_W2124603595.pdf": 2004, "oa_W2167719861.pdf": 2011,
+    "oa_W2170232199.pdf": 2003, "oa_W2175948239.pdf": 2005,
+    "oa_W2469754973.pdf": 2016, "oa_W2511554536.pdf": 2016,
+    "oa_W2518767628.pdf": 2016, "oa_W2609103951.pdf": 2017,
+    "oa_W2791140682.pdf": 2018, "oa_W2791209575.pdf": 2018,
+    "oa_W2895907234.pdf": 2018, "oa_W3006638720.pdf": 2020,
+    "oa_W3020289656.pdf": 2020, "oa_W3026648603.pdf": 2020,
+    "oa_W3038546650.pdf": 2020,
+}
+
+_OVERRIDES_PATH = DATA_DIR / "source_years.json"
+_MIN_PLAUSIBLE_YEAR = 1850
+_YEAR_RE = re.compile(r"\b(1[89]\d\d|20\d\d)\b")
+
+
+@lru_cache(maxsize=1)
+def _source_year_overrides() -> dict[str, int]:
+    """Manual source->year map that WINS over derivation. Missing file -> {}."""
+    try:
+        raw = json.loads(_OVERRIDES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {k: int(v) for k, v in raw.items() if not k.startswith("_")}
+
+
+def derive_source_year(source_name: str, text: str) -> tuple[int | None, str]:
+    """Best-effort publication year for a source, with a confidence tag.
+
+    Order (cheapest-reliable-first): manual override -> oa_ constant -> the first
+    plausible 4-digit year (1850..current) scanning the text left-to-right (a
+    title/header year appears before reference-list years) -> None. Never
+    fabricates: garbled text yields (None, "none"), not a guess.
+    """
+    override = _source_year_overrides().get(source_name)
+    if override is not None:
+        return override, "override"
+    if source_name in _OA_YEARS:
+        return _OA_YEARS[source_name], "api"
+    current = date.today().year
+    for m in _YEAR_RE.finditer(text):
+        year = int(m.group(1))
+        if _MIN_PLAUSIBLE_YEAR <= year <= current:
+            return year, "text"
+    return None, "none"
+
+
+def _year_to_era(year: int | None) -> str:
+    if year is None:
+        return "unknown"
+    if year < 1950:
+        return "pre-1950"
+    if year < 1990:
+        return "1950-1989"
+    if year < 2010:
+        return "1990-2009"
+    return "2010+"
+
+
+def _first_pages_text(path: Path, n: int = 6) -> str:
+    """Concatenated text of a source's first ``n`` logical units, for year
+    derivation. Shares `_load_file_text` so backfill and ingest can't disagree.
+
+    n=6, not 2: measured 2026-07-18, FAO guides and many IA scans print the year
+    on a later imprint/copyright page, not the cover. Widening 2->6 rescued 65
+    sources / ~11k chunks from `unknown` (18.3% -> ~4%), at 4 extra page reads."""
+    parts = [text for text, _meta in itertools.islice(_load_file_text(path), n)]
+    return "\n".join(parts)
+
+
+def build_backfill_metadata(records, year_of):
+    """Pure core of the backfill (tested without Chroma).
+
+    ``records`` is an iterable of (chunk_id, source, existing_metadata);
+    ``year_of`` maps a source name -> (year|None, era). Returns (ids, metadatas)
+    where each metadata is the FULL existing dict plus era (+ year when known),
+    so `collection.update` never drops a field it isn't setting.
+    """
+    ids: list[str] = []
+    metas: list[dict] = []
+    for cid, source, meta in records:
+        year, era = year_of(source)
+        new = dict(meta)
+        new["era"] = era
+        if year is not None:
+            new["year"] = year
+        else:
+            new.pop("year", None)
+        ids.append(cid)
+        metas.append(new)
+    return ids, metas
 
 
 def _stable_chunk_id(source: str, page: int, index: int, text: str) -> str:
@@ -215,6 +327,8 @@ def iter_chunks(
             print(f"[ingest]   = {path.name} already ingested, skipping")
             continue
         print(f"[ingest] processing {path.name}")
+        year, _conf = derive_source_year(path.name, _first_pages_text(path))
+        era = _year_to_era(year)
         emitted = 0
         for text, meta in _load_file_text(path):
             for i, chunk in enumerate(splitter.split_text(text)):
@@ -223,6 +337,9 @@ def iter_chunks(
                     continue
                 meta_out = dict(meta)
                 meta_out["chunk_index"] = i
+                meta_out["era"] = era
+                if year is not None:
+                    meta_out["year"] = year
                 emitted += 1
                 yield Document(page_content=chunk, metadata=meta_out)
         if emitted == 0 and zero_chunk_out is not None:

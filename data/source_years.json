@@ -1,0 +1,6 @@
+{
+  "_comment": "Manual publication-year overrides that WIN over auto-derivation. Seed only with sources whose text-derived year is known-wrong (scan-date leakage) or high-value. See docs/superpowers/specs/2026-07-18-year-era-metadata-design.md.",
+  "ia_soilfertilityper00hopkiala.pdf": 1910,
+  "ia_plantphysiologyw00dugg.pdf": 1911,
+  "ia_morphologyofangi00couluoft.pdf": 1903
+}
