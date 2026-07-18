@@ -256,6 +256,7 @@ CASES = [
     # chosen before any run. These are the only cases that go red when the corpus
     # is removed - verify with: python -m evals.run_eval --no-context --only local
     {"id": "local_deveci_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
      "query": "Deveci armudu ne zaman hasat edilmeli ve soğukta ne kadar depolanabilir?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["deveci"],
@@ -263,6 +264,7 @@ CASES = [
      # "3 ila 6 ay" - so "6 ay" would NOT discriminate, but this does.
      "answer_any": ["2±0,5", "2±0.5", "2 ± 0,5", "2 ± 0.5"]},
     {"id": "local_santamaria_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
      "query": "Santa Maria armudu kendine verimli mi, bahçeye dölleyici çeşit dikmek gerekir mi?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["santa maria"],

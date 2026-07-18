@@ -244,42 +244,74 @@ def test_classify_corpus_harmful():
     assert run_eval._classify(False, True) == "corpus-harmful"
 
 
-def _optin_case(answer_any):
+def _optin_case(answer_any, corpus_class="corpus-carried"):
     return {"id": "probe", "category": "local", "corpus_fact": True,
+            "corpus_class": corpus_class,
             "query": "q", "answer_any": answer_any}
 
 
-def test_faithfulness_corpus_carried_exits_0(monkeypatch):
-    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+def test_verdict_recorded_carried_still_carried_passes():
+    cases = [{"id": "a", "corpus_class": "corpus-carried"}]
+    assert run_eval._faithfulness_verdict(cases, {"a": "corpus-carried"}) == (0, [])
+
+
+def test_verdict_recorded_carried_regressed_fails_and_names_it():
+    cases = [{"id": "a", "corpus_class": "corpus-carried"}]
+    assert run_eval._faithfulness_verdict(cases, {"a": "model-carried"}) == (1, ["a"])
+
+
+def test_verdict_recorded_carried_now_retrieval_broken_fails():
+    cases = [{"id": "a", "corpus_class": "corpus-carried"}]
+    assert run_eval._faithfulness_verdict(cases, {"a": "retrieval-broken"}) == (1, ["a"])
+
+
+def test_verdict_model_carried_case_never_gates():
+    cases = [{"id": "b", "corpus_class": "model-carried"}]
+    assert run_eval._faithfulness_verdict(cases, {"b": "retrieval-broken"}) == (0, [])
+
+
+def test_verdict_missing_class_never_gates():
+    cases = [{"id": "c"}]
+    assert run_eval._faithfulness_verdict(cases, {"c": "corpus-harmful"}) == (0, [])
+
+
+def test_verdict_mixed_reports_only_the_regressed():
+    cases = [{"id": "a", "corpus_class": "corpus-carried"},
+             {"id": "b", "corpus_class": "model-carried"}]
+    assert run_eval._faithfulness_verdict(
+        cases, {"a": "model-carried", "b": "model-carried"}) == (1, ["a"])
+
+
+def test_faithfulness_recorded_carried_still_carried_exits_0(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select",
+                        lambda only: [_optin_case(["2±0,5"], "corpus-carried")])
     monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
 
     def fake(msg, history=None):
         ctx = engine.retrieve_context(msg)  # respects _corpus_ablated
         return ChatResult("depo 2±0,5 derece" if ctx else "genel tavsiye", [])
     monkeypatch.setattr(engine, "answer", fake)
-
     assert run_eval.run_faithfulness() == 0
 
 
-def test_faithfulness_model_carried_exits_1(monkeypatch):
-    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+def test_faithfulness_recorded_carried_regressed_to_model_exits_1(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select",
+                        lambda only: [_optin_case(["2±0,5"], "corpus-carried")])
     monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
-    # states the fact regardless of context -> the model carries it
+    # states the fact regardless of context -> now model-carried = REGRESSION
     monkeypatch.setattr(engine, "answer",
                         lambda msg, history=None: ChatResult("hep 2±0,5 der", []))
     assert run_eval.run_faithfulness() == 1
 
 
-def test_faithfulness_corpus_harmful_exits_1(monkeypatch):
-    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+def test_faithfulness_recorded_model_carried_never_gates(monkeypatch):
+    # a case we recorded as model-carried is DATA - it must not fail the run
+    monkeypatch.setattr(run_eval, "_select",
+                        lambda only: [_optin_case(["2±0,5"], "model-carried")])
     monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
-
-    def fake(msg, history=None):
-        ctx = engine.retrieve_context(msg)
-        # right ONLY when context is absent -> retrieval broke it
-        return ChatResult("genel" if ctx else "2±0,5 dogru", [])
-    monkeypatch.setattr(engine, "answer", fake)
-    assert run_eval.run_faithfulness() == 1
+    monkeypatch.setattr(engine, "answer",
+                        lambda msg, history=None: ChatResult("hep 2±0,5 der", []))
+    assert run_eval.run_faithfulness() == 0
 
 
 def test_faithfulness_no_optin_case_exits_1(monkeypatch):

@@ -133,6 +133,25 @@ def _classify(normal_all_green: bool, ablated_all_green: bool) -> str:
     return "corpus-harmful" if ablated_all_green else "retrieval-broken"
 
 
+def _faithfulness_verdict(
+    cases: list[dict], live_labels: dict[str, str]
+) -> tuple[int, list[str]]:
+    """(exit_code, regressed_ids) for the corpus-dependence map.
+
+    The map is DATA: model-carried cases are a legitimate finding, not a
+    failure. The only regression worth failing on is a case we RECORDED as
+    corpus-carried that no longer is - the corpus or retrieval stopped
+    carrying a fact it used to. Cases with any other (or no) recorded
+    corpus_class never touch the exit code.
+    """
+    regressed = [
+        c["id"] for c in cases
+        if c.get("corpus_class") == "corpus-carried"
+        and live_labels.get(c["id"]) != "corpus-carried"
+    ]
+    return (1 if regressed else 0), regressed
+
+
 def run(fast: bool, repeat: int = 1, only: str | None = None,
         no_context: bool = False) -> int:
     if fast and repeat > 1:
@@ -242,12 +261,15 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
 
 def run_faithfulness(repeat: int = 1, only: str | None = None,
                      fast: bool = False) -> int:
-    """Corpus-contribution check over `corpus_fact` cases only.
+    """Corpus-contribution MAP over `corpus_fact` cases only.
 
     For each opted-in case: run answer() normal and ablated, and classify by how
-    its grounding moves (see _classify). Exit 0 only if every such case is
-    corpus-carried - opting in is a claim ("this case needs the corpus") that this
-    verifies, exactly as --no-context requires every local case to lose grounding.
+    its grounding moves (see _classify). This is a MAP, not an all-green gate -
+    it does not require every case to be corpus-carried; model-carried,
+    retrieval-broken, and corpus-harmful are legitimate findings, not failures.
+    The only thing that fails the run is DRIFT: a case we recorded (via
+    `corpus_class`) as corpus-carried that is no longer corpus-carried live -
+    see _faithfulness_verdict.
 
     NOT a coverage meter: the score sees only cases we deliberately built to need
     the corpus, so "2/2" means "both of the two we bothered to make corpus-specific
@@ -272,11 +294,13 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
           f"{len(cases)} corpus_fact case(s){suffix} ===\n")
     counts = {"corpus-carried": 0, "model-carried": 0,
               "retrieval-broken": 0, "corpus-harmful": 0}
+    live_labels: dict[str, str] = {}
     for c in cases:
         normal_hits = grounded_hits(c)
         with _corpus_ablated():
             ablated_hits = grounded_hits(c)
         label = _classify(normal_hits == repeat, ablated_hits == repeat)
+        live_labels[c["id"]] = label
         counts[label] += 1
         print(f"  {c['id']:<24} {label:<16} "
               f"normal {normal_hits}/{repeat}  ablated {ablated_hits}/{repeat}")
@@ -286,7 +310,12 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
           f"harmful: {counts['corpus-harmful']}  |  "
           f"retrieval-broken: {counts['retrieval-broken']}  |  "
           f"model-carried: {counts['model-carried']}")
-    return 0 if counts["corpus-carried"] == total else 1
+
+    code, regressed = _faithfulness_verdict(cases, live_labels)
+    if regressed:
+        print(f"\n  [drift] corpus-carried cases that REGRESSED: "
+              f"{', '.join(regressed)}")
+    return code
 
 
 def main() -> None:
