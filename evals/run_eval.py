@@ -334,10 +334,11 @@ def main() -> None:
     p.add_argument("--fast", action="store_true",
                    help="Retrieval + raw product gating only (skip chat LLM).")
     p.add_argument("--repeat", type=int, default=1, metavar="N",
-                   help="Sample each case N times (full mode only). A case "
-                        "passes only if EVERY sample passes. Generation is "
-                        "sampled, so a single run hides intermittent failures; "
-                        "N>1 costs N x ~20 min.")
+                   help="Sample each case N times (full mode only). In a normal "
+                        "run a case passes only if EVERY sample passes; under "
+                        "--faithfulness the label is majority-based instead. "
+                        "Generation is sampled, so a single run hides intermittent "
+                        "failures; N>1 costs N x ~20 min.")
     p.add_argument("--only", metavar="ID|CATEGORY",
                    help="Run just one case id, or one category (nutrition, "
                         "horticulture, disease, chemical, offscope). Pair with "
@@ -348,10 +349,13 @@ def main() -> None:
                         "cases actually depend on retrieval. Exit 0 only if every "
                         "local case loses grounding.")
     p.add_argument("--faithfulness", action="store_true",
-                   help="Corpus-contribution check: for each corpus_fact case, "
-                        "run normal + ablated and classify. Exit 0 only if every "
-                        "such case is corpus-carried. Pair with --repeat to expose "
-                        "flaky wins.")
+                   help="Corpus-dependence MAP: for each corpus_fact case, run "
+                        "normal + ablated and label it (corpus-carried / "
+                        "model-carried / retrieval-broken / corpus-harmful), then "
+                        "print a scoreboard. Drift guard: exit 1 only if a case "
+                        "recorded corpus-carried regresses; model-carried cases are "
+                        "data, not failures. Pair with --repeat 4+ (labels are "
+                        "majority-based, so the signal needs samples).")
     args = p.parse_args()
     if args.faithfulness:
         sys.exit(run_faithfulness(repeat=args.repeat, only=args.only,

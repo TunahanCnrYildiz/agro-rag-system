@@ -239,6 +239,7 @@ CASES = [
      # dp_1399494 (armut ıslahı derlemesi): fire-blight-resistant cultivars
      # registered from the same breeding line - Potomac, Blake's Pride,
      # Shenandoah, Sunrise, Gem. A natural answer lists these resistant names.
+     # corpus-carried (live 2026-07-18, repeat 4): normal 4/4, ablated 0/4.
      "answer_any": ["potomac", "blake", "shenandoah", "sunrise"]},
     {"id": "disease_rhizoctonia_biocontrol", "category": "disease", "corpus_fact": True,
      # model-carried (live 2026-07-18, repeat 4): grounded 4/4 even ablated -
