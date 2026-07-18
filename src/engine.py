@@ -18,6 +18,7 @@ from openai import OpenAI
 
 try:
     from .config import (
+        EmbeddingModelMismatchError,
         PRODUCTS_JSON,
         SYSTEM_PROMPT,
         build_language_instruction,
@@ -25,6 +26,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from config import (  # type: ignore
+        EmbeddingModelMismatchError,
         PRODUCTS_JSON,
         SYSTEM_PROMPT,
         build_language_instruction,
@@ -197,6 +199,11 @@ def _get_retriever_store():
         except ImportError:
             from ingest import get_vector_store  # type: ignore
         return get_vector_store()
+    except EmbeddingModelMismatchError:
+        # A config error, not "unavailable": retrieval is broken until a human
+        # fixes .env or re-ingests, and no retry helps. Falling back to a
+        # context-free answer would hide it - surface it instead.
+        raise
     except Exception as exc:  # noqa: BLE001
         print(f"[engine] vector store unavailable: {exc}")
         return None

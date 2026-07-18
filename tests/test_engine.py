@@ -576,3 +576,30 @@ def test_stream_answer_hides_products_under_the_empty_fallback(monkeypatch):
 
     assert _sse_tokens(out) == engine._empty_answer_message()
     assert '"type": "products"' not in out
+
+
+# --------------------------------------------------------------------------- #
+# embedding-model guard: read path (2026-07-18)
+# --------------------------------------------------------------------------- #
+import pytest
+from src import ingest as _ing
+from src.config import EmbeddingModelMismatchError
+
+
+def test_get_retriever_store_reraises_mismatch(monkeypatch):
+    engine._get_retriever_store.cache_clear()
+    def boom(*a, **k):
+        raise EmbeddingModelMismatchError("model mismatch")
+    monkeypatch.setattr(_ing, "get_vector_store", boom)
+    with pytest.raises(EmbeddingModelMismatchError):
+        engine._get_retriever_store()
+    engine._get_retriever_store.cache_clear()
+
+
+def test_get_retriever_store_none_on_generic_error(monkeypatch):
+    engine._get_retriever_store.cache_clear()
+    def boom(*a, **k):
+        raise ValueError("boom")
+    monkeypatch.setattr(_ing, "get_vector_store", boom)
+    assert engine._get_retriever_store() is None
+    engine._get_retriever_store.cache_clear()

@@ -30,10 +30,17 @@ try:
         BOOKS_DIR,
         DATA_DIR,
         VECTOR_STORE_DIR,
+        EmbeddingModelMismatchError,
         settings,
     )
 except ImportError:  # pragma: no cover
-    from config import BOOKS_DIR, DATA_DIR, VECTOR_STORE_DIR, settings  # type: ignore
+    from config import (  # type: ignore
+        BOOKS_DIR,
+        DATA_DIR,
+        VECTOR_STORE_DIR,
+        EmbeddingModelMismatchError,
+        settings,
+    )
 
 
 def get_embeddings() -> OpenAIEmbeddings:
@@ -48,20 +55,54 @@ def get_embeddings() -> OpenAIEmbeddings:
     )
 
 
-def get_vector_store():
+def _check_embedding_model(recorded: str | None, configured: str) -> None:
+    """Guard the store against a swapped embedding model.
+
+    - recorded == configured -> silent (happy path).
+    - recorded is None -> warn: the collection predates this check and can't be
+      verified (the live store is unstamped today). Unknown is not mismatched, so
+      we don't break a working setup - but we say we can't verify.
+    - otherwise -> raise: query vectors from a different model land in a space the
+      store was never indexed in; a same-dimension swap is silent otherwise.
+    """
+    if recorded == configured:
+        return
+    if recorded is None:
+        print(
+            f"[ingest] WARNING: collection '{settings.collection_name}' has no "
+            f"recorded embedding model (created before this check). Configured: "
+            f"{configured}. Cannot verify - re-ingest with --reset to stamp it."
+        )
+        return
+    raise EmbeddingModelMismatchError(
+        f"Store was indexed with embedding model '{recorded}' but the configured "
+        f"model is '{configured}'. Retrieval would be garbage. Fix .env to match, "
+        f"or re-ingest with --reset to rebuild the store with '{configured}'."
+    )
+
+
+def get_vector_store(verify_model: bool = True):
     """Open (or create) the persistent Chroma collection.
 
     Imported lazily so that lightweight commands (e.g. --help) don't pay the
-    heavy chromadb import cost.
+    heavy chromadb import cost. Stamps the configured embedding model into the
+    collection metadata at creation (a no-op on an existing collection), then
+    verifies the recorded model matches - unless ``verify_model`` is False, which
+    the --reset path needs so it can open a mismatched store in order to delete it.
     """
     from langchain_chroma import Chroma
 
     VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
-    return Chroma(
+    store = Chroma(
         collection_name=settings.collection_name,
         embedding_function=get_embeddings(),
         persist_directory=str(VECTOR_STORE_DIR),
+        collection_metadata={"embedding_model": settings.embedding_model},
     )
+    if verify_model:
+        recorded = (store._collection.metadata or {}).get("embedding_model")
+        _check_embedding_model(recorded, settings.embedding_model)
+    return store
 
 
 # --------------------------------------------------------------------------- #
@@ -356,7 +397,9 @@ def ingest(reset: bool = False, force: bool = False) -> int:
         separators=["\n\n", "\n", ". ", " ", ""],
     )
 
-    store = get_vector_store()
+    # --reset must open a possibly-mismatched store in order to delete it, so the
+    # guard would deadlock the one command that fixes a mismatch: skip it here.
+    store = get_vector_store(verify_model=not reset)
 
     if reset:
         try:
@@ -364,7 +407,7 @@ def ingest(reset: bool = False, force: bool = False) -> int:
             print("[ingest] existing collection deleted (--reset).")
         except Exception as exc:  # noqa: BLE001
             print(f"[ingest] reset warning: {exc}")
-        store = get_vector_store()
+        store = get_vector_store()  # fresh collection: stamped + verified by default
 
     batch_docs: list[Document] = []
     batch_ids: list[str] = []

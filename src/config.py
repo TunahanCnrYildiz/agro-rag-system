@@ -12,6 +12,13 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
+class EmbeddingModelMismatchError(RuntimeError):
+    """Raised when the store's recorded embedding model differs from the
+    configured one. Defined here (not ingest.py) so engine.py, which imports it
+    at module top, can name it in an `except` even if the lazy ingest import
+    fails - see the embedding-model-guard spec."""
+
 # --------------------------------------------------------------------------- #
 # Filesystem layout
 # --------------------------------------------------------------------------- #

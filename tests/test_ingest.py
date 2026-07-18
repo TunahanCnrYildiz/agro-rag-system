@@ -214,3 +214,73 @@ def test_iter_chunks_not_flagged_when_text_present(tmp_path, monkeypatch):
     chunks = list(ing.iter_chunks(_splitter(), store=None, zero_chunk_out=zero))
     assert len(chunks) >= 1
     assert zero == []
+
+
+# --------------------------------------------------------------------------- #
+# embedding-model guard (2026-07-18)
+# --------------------------------------------------------------------------- #
+import pytest
+
+
+def test_check_embedding_model_match_silent():
+    assert ing._check_embedding_model("bge-m3", "bge-m3") is None
+
+
+def test_check_embedding_model_mismatch_raises():
+    with pytest.raises(ing.EmbeddingModelMismatchError) as exc:
+        ing._check_embedding_model("nomic-embed", "bge-m3")
+    msg = str(exc.value)
+    assert "nomic-embed" in msg and "bge-m3" in msg
+
+
+def test_check_embedding_model_none_warns(capsys):
+    assert ing._check_embedding_model(None, "bge-m3") is None
+    out = capsys.readouterr().out
+    assert "bge-m3" in out and "WARNING" in out
+
+
+def test_check_embedding_model_error_names_reset():
+    with pytest.raises(ing.EmbeddingModelMismatchError) as exc:
+        ing._check_embedding_model("wrong", "bge-m3")
+    assert "--reset" in str(exc.value)
+
+
+class _FakeCollection:
+    def __init__(self, metadata):
+        self.metadata = metadata
+
+
+class _FakeChroma:
+    last_kwargs: dict = {}
+    recorded_metadata = None  # what an existing collection reports back
+
+    def __init__(self, **kwargs):
+        _FakeChroma.last_kwargs = kwargs
+        self._collection = _FakeCollection(_FakeChroma.recorded_metadata)
+
+
+def _patch_chroma(monkeypatch, recorded):
+    _FakeChroma.recorded_metadata = recorded
+    _FakeChroma.last_kwargs = {}
+    monkeypatch.setattr("langchain_chroma.Chroma", _FakeChroma)
+    monkeypatch.setattr(ing, "get_embeddings", lambda: object())
+
+
+def test_get_vector_store_passes_collection_metadata(monkeypatch):
+    _patch_chroma(monkeypatch, {"embedding_model": settings.embedding_model})
+    ing.get_vector_store()
+    assert _FakeChroma.last_kwargs.get("collection_metadata") == {
+        "embedding_model": settings.embedding_model
+    }
+
+
+def test_get_vector_store_verifies_by_default(monkeypatch):
+    _patch_chroma(monkeypatch, {"embedding_model": "SOME-OTHER-MODEL"})
+    with pytest.raises(ing.EmbeddingModelMismatchError):
+        ing.get_vector_store()
+
+
+def test_get_vector_store_verify_false_skips(monkeypatch):
+    _patch_chroma(monkeypatch, {"embedding_model": "SOME-OTHER-MODEL"})
+    store = ing.get_vector_store(verify_model=False)
+    assert store is not None
