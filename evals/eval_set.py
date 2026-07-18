@@ -357,19 +357,19 @@ CASES = [
      # yetiştiriciligi için yeterli" - an unconditioned recommendation a natural
      # fertilization answer states, not a single results-table cell.
      "answer_any": ["16 kg/da", "16 kg saf azot", "16 kg n"]},
-    {"id": "quant_vetch_phosphorus", "category": "nutrition", "corpus_fact": True,
-     "corpus_class": "corpus-carried",
-     "query": "Fiğ (yem bitkisi) yetiştiriciliğinde dekara ne kadar fosforlu gübre (P2O5) önerilir?",
-     "retrieval": "nonempty", "products": "some",
-     "context_any": ["6 kg/da P2O5", "fosfor gübrelemesinin"],
-     # dp_30458 (Kuzeydogu Anadolu baklagil yem bitkileri): the source recommends
-     # "6 kg/da P2O5" for fig - both as the inoculated-crop dose and as the figure
-     # multiple cited researchers agree is sufficient ("sadece 6 kg/da P2O5 ...
-     # fosfor gübrelemesinin yeterli"). The N figure varies (3, 4-5), so the
-     # answer-natural, source-agreed value asserted here is the phosphorus rate.
-     # NOTE: gemma renders the compound as LaTeX "$P_2O_5$", so the assertion
-     # lists that form alongside the plain and unicode-subscript renderings -
-     # the asserted VALUE (6 kg/da P2O5) is one, only its spelling is broadened.
-     "answer_any": ["6 kg/da p2o5", "6 kg p2o5", "6 kg $p_2o_5$", "6 kg p₂o₅",
-                    "6 kg/da fosfor", "6 kg fosfor"]},
+    # DROPPED 2026-07-18: quant_vetch_phosphorus, "Fiğ (yem bitkisi)
+    # yetiştiriciliğinde dekara ne kadar fosforlu gübre (P2O5) önerilir?"
+    # asserting dp_30458's "6 kg/da P2O5" figure. Code review found two defects
+    # in the original assertion: (1) context_any's "6 kg/da P2O5" phrase is not
+    # discriminating - it appears verbatim in 5 corpus sources, including an
+    # unrelated soybean trial (dp_21743) and soil-test data (dp_1419647/57);
+    # (2) answer_any included "6 kg/da fosfor"/"6 kg fosfor", which substitute
+    # the specific compound P2O5 with the generic element word "fosfor" -
+    # forbidden broadening, not a same-value notation. After narrowing
+    # context_any to the source-unique "fosfor gübrelemesinin" and answer_any
+    # to the four true P2O5-notation variants only, live re-validation showed
+    # retrieval-broken (normal 1/4, ablated 0/4) - the model does not reliably
+    # carry the number even with the corpus present, so the case does not
+    # clear the GREEN-normal bar. Not retuned by re-adding the "fosfor"
+    # variants or any looser value - that would be re-broadening to green.
 ]
