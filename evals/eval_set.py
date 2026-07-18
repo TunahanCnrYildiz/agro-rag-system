@@ -275,7 +275,7 @@ CASES = [
      "corpus_class": "corpus-carried",
      "query": "Ankara armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
      "retrieval": "nonempty", "products": "none",
-     "context_any": ["ankara"],
+     "context_any": ["ankara çeşidinin kendine kısır"],
      # dp_19393 (Eğirdir): selfing gave zero fruit set both years - the study
      # judged Ankara "tamamen kendine kısır" (completely self-sterile).
      "answer_any": ["kendine kısır", "kendine verimsiz"]},
