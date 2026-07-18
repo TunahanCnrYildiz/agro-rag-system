@@ -344,4 +344,32 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+
+    # --- Zone-4 corpus_fact cases (gap-crop / quantitative findings) ---
+    {"id": "quant_wheat_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ekmeklik buğdayda yüksek ve ekonomik tane verimi için dekara kaç kilogram saf azot uygulanmalıdır?",
+     "retrieval": "nonempty", "products": "some",
+     "context_any": ["azot dozu daha ekonomik", "16 kg/da azot dozu"],
+     # dp_21735 (Öncan-Sümer ve ark., ANADOLU 2010; ekmeklik buğday N x sıklık):
+     # the study's own SONUÇ states "yüksek verim için her iki yılda da 16 kg/da
+     # azot dozu daha ekonomik" and again "16 kg/da azot dozunun ... bölge buğday
+     # yetiştiriciligi için yeterli" - an unconditioned recommendation a natural
+     # fertilization answer states, not a single results-table cell.
+     "answer_any": ["16 kg/da", "16 kg saf azot", "16 kg n"]},
+    {"id": "quant_vetch_phosphorus", "category": "nutrition", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Fiğ (yem bitkisi) yetiştiriciliğinde dekara ne kadar fosforlu gübre (P2O5) önerilir?",
+     "retrieval": "nonempty", "products": "some",
+     "context_any": ["6 kg/da P2O5", "fosfor gübrelemesinin"],
+     # dp_30458 (Kuzeydogu Anadolu baklagil yem bitkileri): the source recommends
+     # "6 kg/da P2O5" for fig - both as the inoculated-crop dose and as the figure
+     # multiple cited researchers agree is sufficient ("sadece 6 kg/da P2O5 ...
+     # fosfor gübrelemesinin yeterli"). The N figure varies (3, 4-5), so the
+     # answer-natural, source-agreed value asserted here is the phosphorus rate.
+     # NOTE: gemma renders the compound as LaTeX "$P_2O_5$", so the assertion
+     # lists that form alongside the plain and unicode-subscript renderings -
+     # the asserted VALUE (6 kg/da P2O5) is one, only its spelling is broadened.
+     "answer_any": ["6 kg/da p2o5", "6 kg p2o5", "6 kg $p_2o_5$", "6 kg p₂o₅",
+                    "6 kg/da fosfor", "6 kg fosfor"]},
 ]
