@@ -79,12 +79,25 @@ model-carried cases in the panel, that exit condition would fail every run.
   regression: the corpus or retrieval stopped carrying a fact it used to). Cases
   recorded as `model-carried` (or other) do NOT gate — they are data. This keeps
   the 2 pears protected exactly as item 27 intended, while letting the panel hold
-  model-carried cases.
-- **Flakiness:** deveci is intermittently red normally (item 25). The gate must
-  not flap. `--repeat N` already averages; a `corpus-carried` case counts as
-  regressed only if it fails green-normal *under the requested repeat*. Document:
-  run the drift gate with `--repeat 8` when a red appears, to separate flake from
-  regression (same protocol item 25 mandates).
+  model-carried cases. The verdict helper `_faithfulness_verdict(cases,
+  live_labels)` is unchanged; flake-robustness lives entirely in how the live
+  label is derived (next bullet).
+- **Flakiness — LIFT-based classification (revised 2026-07-18 after Task 1
+  surfaced the flaw).** `--repeat N` does NOT average — a case passes a sample
+  only if it grounds, and the old `_classify(normal_hits == repeat, ...)` demanded
+  UNANIMITY. That is exactly wrong for a flaky-but-carried anchor: deveci grounds
+  ~6–7/8 normally, so higher repeat makes it MORE likely to be mislabelled
+  retrieval-broken and trip the gate. Fix: `_classify` takes hit COUNTS and judges
+  by whether the corpus **reliably lifts** grounding, not by unanimity:
+  `_classify(normal_hits, ablated_hits, repeat) -> str` with, in order —
+  `ablated > normal` → **corpus-harmful**; `2*normal < repeat` (not a majority
+  grounded even with the corpus) → **retrieval-broken**; `2*ablated >= repeat`
+  (grounded a majority even without the corpus) → **model-carried**; else
+  **corpus-carried**. At `repeat=1` this reduces exactly to the old boolean
+  classifier, so single-run behaviour is unchanged. deveci at 6/8 vs 0/8 →
+  corpus-carried (no false drift); a genuine regression (normal collapses to a
+  minority, e.g. 1/8) → retrieval-broken → gate fires. Run the map with
+  `--repeat 4`+ so the majority signal is meaningful.
 
 Rejected alternative: a separate `--faithfulness-map` flag leaving `--faithfulness`
 untouched. Two code paths, more surface, and the existing tally already does the

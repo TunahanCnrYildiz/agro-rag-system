@@ -119,18 +119,48 @@ def _ablation_verdict(rows: list[dict]) -> tuple[int, list[str]]:
     return (1 if decorative else 0), decorative
 
 
-def _classify(normal_all_green: bool, ablated_all_green: bool) -> str:
-    """Label a case by how its grounding moves when the corpus is removed.
+def _classify(normal_hits: int, ablated_hits: int, repeat: int) -> str:
+    """Label a corpus_fact case by how the corpus moves its grounding, over
+    `repeat` samples. Flake-robust: judged by whether the corpus RELIABLY lifts
+    grounding, not by unanimity - the deveci anchor grounds ~6-7/8 normally and
+    must still read as corpus-carried (item 25).
 
-    corpus-carried : green normally, red ablated -> the corpus supplies the fact.
-    model-carried  : green both ways -> the model knew it (or the mark is wrong).
-    retrieval-broken: red both ways -> cannot answer even with the corpus.
-    corpus-harmful : red normally, green ablated -> retrieval injected noise that
-                     broke an answer the model would otherwise have gotten right.
+    corpus-carried : grounded a majority WITH the corpus, a minority without
+                     -> the corpus supplies the fact.
+    model-carried  : grounded a majority even WITHOUT the corpus -> the model
+                     knew it; the corpus adds nothing decisive.
+    retrieval-broken: not a majority grounded even WITH the corpus.
+    corpus-harmful : grounded MORE often ablated than normally -> retrieval
+                     injected noise that broke an answer the model had right.
+
+    At repeat=1 this reduces exactly to the old boolean classifier.
     """
-    if normal_all_green:
-        return "corpus-carried" if not ablated_all_green else "model-carried"
-    return "corpus-harmful" if ablated_all_green else "retrieval-broken"
+    if ablated_hits > normal_hits:
+        return "corpus-harmful"
+    if 2 * normal_hits < repeat:
+        return "retrieval-broken"
+    if 2 * ablated_hits >= repeat:
+        return "model-carried"
+    return "corpus-carried"
+
+
+def _faithfulness_verdict(
+    cases: list[dict], live_labels: dict[str, str]
+) -> tuple[int, list[str]]:
+    """(exit_code, regressed_ids) for the corpus-dependence map.
+
+    The map is DATA: model-carried cases are a legitimate finding, not a
+    failure. The only regression worth failing on is a case we RECORDED as
+    corpus-carried that no longer is - the corpus or retrieval stopped
+    carrying a fact it used to. Cases with any other (or no) recorded
+    corpus_class never touch the exit code.
+    """
+    regressed = [
+        c["id"] for c in cases
+        if c.get("corpus_class") == "corpus-carried"
+        and live_labels.get(c["id"]) != "corpus-carried"
+    ]
+    return (1 if regressed else 0), regressed
 
 
 def run(fast: bool, repeat: int = 1, only: str | None = None,
@@ -242,12 +272,15 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
 
 def run_faithfulness(repeat: int = 1, only: str | None = None,
                      fast: bool = False) -> int:
-    """Corpus-contribution check over `corpus_fact` cases only.
+    """Corpus-contribution MAP over `corpus_fact` cases only.
 
     For each opted-in case: run answer() normal and ablated, and classify by how
-    its grounding moves (see _classify). Exit 0 only if every such case is
-    corpus-carried - opting in is a claim ("this case needs the corpus") that this
-    verifies, exactly as --no-context requires every local case to lose grounding.
+    its grounding moves (see _classify). This is a MAP, not an all-green gate -
+    it does not require every case to be corpus-carried; model-carried,
+    retrieval-broken, and corpus-harmful are legitimate findings, not failures.
+    The only thing that fails the run is DRIFT: a case we recorded (via
+    `corpus_class`) as corpus-carried that is no longer corpus-carried live -
+    see _faithfulness_verdict.
 
     NOT a coverage meter: the score sees only cases we deliberately built to need
     the corpus, so "2/2" means "both of the two we bothered to make corpus-specific
@@ -272,11 +305,13 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
           f"{len(cases)} corpus_fact case(s){suffix} ===\n")
     counts = {"corpus-carried": 0, "model-carried": 0,
               "retrieval-broken": 0, "corpus-harmful": 0}
+    live_labels: dict[str, str] = {}
     for c in cases:
         normal_hits = grounded_hits(c)
         with _corpus_ablated():
             ablated_hits = grounded_hits(c)
-        label = _classify(normal_hits == repeat, ablated_hits == repeat)
+        label = _classify(normal_hits, ablated_hits, repeat)
+        live_labels[c["id"]] = label
         counts[label] += 1
         print(f"  {c['id']:<24} {label:<16} "
               f"normal {normal_hits}/{repeat}  ablated {ablated_hits}/{repeat}")
@@ -286,7 +321,12 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
           f"harmful: {counts['corpus-harmful']}  |  "
           f"retrieval-broken: {counts['retrieval-broken']}  |  "
           f"model-carried: {counts['model-carried']}")
-    return 0 if counts["corpus-carried"] == total else 1
+
+    code, regressed = _faithfulness_verdict(cases, live_labels)
+    if regressed:
+        print(f"\n  [drift] corpus-carried cases that REGRESSED: "
+              f"{', '.join(regressed)}")
+    return code
 
 
 def main() -> None:
@@ -294,10 +334,11 @@ def main() -> None:
     p.add_argument("--fast", action="store_true",
                    help="Retrieval + raw product gating only (skip chat LLM).")
     p.add_argument("--repeat", type=int, default=1, metavar="N",
-                   help="Sample each case N times (full mode only). A case "
-                        "passes only if EVERY sample passes. Generation is "
-                        "sampled, so a single run hides intermittent failures; "
-                        "N>1 costs N x ~20 min.")
+                   help="Sample each case N times (full mode only). In a normal "
+                        "run a case passes only if EVERY sample passes; under "
+                        "--faithfulness the label is majority-based instead. "
+                        "Generation is sampled, so a single run hides intermittent "
+                        "failures; N>1 costs N x ~20 min.")
     p.add_argument("--only", metavar="ID|CATEGORY",
                    help="Run just one case id, or one category (nutrition, "
                         "horticulture, disease, chemical, offscope). Pair with "
@@ -308,10 +349,13 @@ def main() -> None:
                         "cases actually depend on retrieval. Exit 0 only if every "
                         "local case loses grounding.")
     p.add_argument("--faithfulness", action="store_true",
-                   help="Corpus-contribution check: for each corpus_fact case, "
-                        "run normal + ablated and classify. Exit 0 only if every "
-                        "such case is corpus-carried. Pair with --repeat to expose "
-                        "flaky wins.")
+                   help="Corpus-dependence MAP: for each corpus_fact case, run "
+                        "normal + ablated and label it (corpus-carried / "
+                        "model-carried / retrieval-broken / corpus-harmful), then "
+                        "print a scoreboard. Drift guard: exit 1 only if a case "
+                        "recorded corpus-carried regresses; model-carried cases are "
+                        "data, not failures. Pair with --repeat 4+ (labels are "
+                        "majority-based, so the signal needs samples).")
     args = p.parse_args()
     if args.faithfulness:
         sys.exit(run_faithfulness(repeat=args.repeat, only=args.only,

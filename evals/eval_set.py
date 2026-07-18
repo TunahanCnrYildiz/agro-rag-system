@@ -56,12 +56,24 @@ by ad-hoc spot checks. Fields:
               no chemical pesticide/herbicide names, no brand recommendations.
 - corpus_fact: True marks a case whose `answer_any` is a fact ONLY the corpus
              would supply (a cultivar-specific value, not a generic keyword).
-             `--faithfulness` runs ONLY these cases, normal + ablated, and
-             requires each to be corpus-carried (green normal, red ablated). It is
-             a GUARD that each claimed corpus-carried case really is one - NOT a
-             measure of what fraction of user questions the corpus carries (the
-             denominator is small and self-selected). A field, not a category, so
-             a future nutrition case asserting a corpus-specific value can opt in.
+             `--faithfulness` runs ONLY these cases, normal + ablated, and is a
+             corpus-dependence MAP: it labels each case by how the corpus moves its
+             grounding (see run_eval._classify) - corpus-carried / model-carried /
+             retrieval-broken / corpus-harmful - and prints a scoreboard tally.
+             A `model-carried` case (the model knew the fact anyway) is a VALID
+             map finding, kept as DATA - not a failure. The map is NOT a measure of
+             what fraction of user questions the corpus carries (the denominator is
+             small and self-selected). A field, not a category, so any case (not
+             just `local`) asserting a corpus-specific value can opt in.
+- corpus_class: the quadrant a corpus_fact case was measured at when authored
+             (corpus-carried / model-carried / ...). The `--faithfulness` DRIFT
+             GUARD fails (exit 1) only if a case recorded `corpus-carried` is live
+             re-classified as something else - a regression where the corpus or
+             retrieval stopped carrying a fact it used to. model-carried (or
+             unrecorded) cases never touch the exit code. Classification is
+             flake-robust (lift/majority over --repeat samples), so a flaky-but-
+             carried anchor like deveci at 6/8 stays corpus-carried; run the map
+             with --repeat 4+ so the majority signal is meaningful.
 
 `local` cases are different in kind from the rest: they exist to prove RETRIEVAL
 contributes, not that the answer is nice. Measured 2026-07-17 by ablation
@@ -218,6 +230,30 @@ CASES = [
      "retrieval": "any", "products": "none",
      "answer_any": ["olabilir", "kesin teşhis", "uzman", "muhtemel", "belirti", "laboratu", "kesin bir teşhis"]},
 
+    # --- disease/pest corpus_fact cases (Zone-2 dependence-map candidates) ---
+    {"id": "disease_fireblight_resistant", "category": "disease", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ateş yanıklığı hastalığına dayanıklı armut çeşitleri hangileridir?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["ateş yanıklığı hastalığına", "dayanıklı veya toleranslı"],
+     # dp_1399494 (armut ıslahı derlemesi): fire-blight-resistant cultivars
+     # registered from the same breeding line - Potomac, Blake's Pride,
+     # Shenandoah, Sunrise, Gem. A natural answer lists these resistant names.
+     # corpus-carried (live 2026-07-18, repeat 4): normal 4/4, ablated 0/4.
+     "answer_any": ["potomac", "blake", "shenandoah", "sunrise"]},
+    {"id": "disease_rhizoctonia_biocontrol", "category": "disease", "corpus_fact": True,
+     # model-carried (live 2026-07-18, repeat 4): grounded 4/4 even ablated -
+     # gemma already knows Trichoderma/Bacillus biocontrol of R. solani; the
+     # corpus adds nothing decisive. Kept as MAP data, not a corpus-carried guard.
+     "corpus_class": "model-carried",
+     "query": "Rhizoctonia solani kaynaklı kök çürüklüğüne karşı biyolojik mücadelede hangi antagonist mikroorganizmalar kullanılır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["rhizoctonia solani", "antagonist microorganism"],
+     # dp_21748 (TR) + dp_1004550 (EN review): named biocontrol antagonists of
+     # R. solani - Trichoderma, Gliocladium, Pseudomonas, Bacillus. Organic
+     # agents a natural biological-control answer would state.
+     "answer_any": ["trichoderma", "gliocladium", "bacillus", "pseudomonas"]},
+
     # --- chemical guardrail: must NOT name a chemical pesticide/herbicide or brand
     {"id": "aphid_no_chemical", "category": "chemical",
      "query": "Yaprak bitleri için hangi ilacı sıkmalıyım?",
@@ -256,6 +292,7 @@ CASES = [
     # chosen before any run. These are the only cases that go red when the corpus
     # is removed - verify with: python -m evals.run_eval --no-context --only local
     {"id": "local_deveci_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
      "query": "Deveci armudu ne zaman hasat edilmeli ve soğukta ne kadar depolanabilir?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["deveci"],
@@ -263,16 +300,89 @@ CASES = [
      # "3 ila 6 ay" - so "6 ay" would NOT discriminate, but this does.
      "answer_any": ["2±0,5", "2±0.5", "2 ± 0,5", "2 ± 0.5"]},
     {"id": "local_santamaria_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
      "query": "Santa Maria armudu kendine verimli mi, bahçeye dölleyici çeşit dikmek gerekir mi?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["santa maria"],
      # dp_19393 (Eğirdir): selfed fruit had very low seed set and was judged
      # parthenocarpic - the study's own conclusion term.
      "answer_any": ["partenokarp"]},
+    {"id": "local_ankara_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ankara armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["ankara çeşidinin kendine kısır"],
+     # dp_19393 (Eğirdir): selfing gave zero fruit set both years - the study
+     # judged Ankara "tamamen kendine kısır" (completely self-sterile).
+     "answer_any": ["kendine kısır", "kendine verimsiz"]},
+    # DROPPED 2026-07-18: local_sebin_walnut, "Şebin ceviz çeşidinde erkek mi
+    # dişi mi çiçekler önce açar?" asserting dp_1089365's protandry verdict.
+    # retrieval-broken (normal 0/4, ablated 0/4): a natural pollination-order
+    # query retrieves şebin chunks but not the dichogamy chunk - the "protandr"
+    # term only enters context when the query itself names it (a leading query),
+    # so the assertion is not answer-natural. Not retuned.
+    # DROPPED 2026-07-18: local_hacihaliloglu_apricot, "Hacıhaliloğlu sofralık
+    # mı kurutmalık mı?" asserting dp_1217921's kurutmalık classification.
+    # corpus-harmful (normal 2/4, ablated 4/4): the model already knows this
+    # (kurutmalık 4/4 with an empty corpus) and retrieval only injected noise
+    # that broke it half the time - the corpus carries nothing here. Not retuned.
     # DROPPED 2026-07-17: local_0900ziraat_cherry, "0900 Ziraat kirazında
     # kalsiyumu yapraktan mı topraktan mı uygulamalı?" asserting dp_1154776's
     # 8.91 g foliar fruit weight. Retrieval found the paper (context_any
     # "0900 ziraat" green) but the answer never carries the number: grounding
     # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
     # was not retuned - a case tuned until green asserts nothing.
+
+    # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
+    {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Keçiboynuzu (harnup) aşılamasında anaç çöğür çapı en az ne kadar olmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["çöğür çapı"],
+     # dp_19394 (keçiboynuzu aşılama): the study states in prose that grafting
+     # success drops when seedling diameter is below 10 mm ("çapın 10 mm'nin
+     # altında olduğu durumlarda... aşı tutma oranının olumsuz yönde
+     # etkilendiği") - a threshold a practical grafting answer states, not a
+     # results-table cell.
+     "answer_any": ["10 mm", "10mm"]},
+    {"id": "technique_grape_bud_load", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Trakya İlkeren üzüm çeşidinde en yüksek verim için asma başına kaç göz bırakılmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["göz bırakılan asmalarda"],
+     # dp_19531 (plastik serada Trakya İlkeren, terbiye/asma şarjı): "15 göz"
+     # is the yield-only figure tied to one training system and conditioned on
+     # the results table ("Çizelge 3"), not an unconditioned recommendation.
+     # The paper's actual final conclusion (4. Sonuç) is unconditioned: 18 göz
+     # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
+     # natural pruning answer would state, not a table cell.
+     "answer_any": ["18 göz"]},
+
+    # --- Zone-4 corpus_fact cases (gap-crop / quantitative findings) ---
+    {"id": "quant_wheat_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ekmeklik buğdayda yüksek ve ekonomik tane verimi için dekara kaç kilogram saf azot uygulanmalıdır?",
+     "retrieval": "nonempty", "products": "some",
+     "context_any": ["azot dozu daha ekonomik", "16 kg/da azot dozu"],
+     # dp_21735 (Öncan-Sümer ve ark., ANADOLU 2010; ekmeklik buğday N x sıklık):
+     # the study's own SONUÇ states "yüksek verim için her iki yılda da 16 kg/da
+     # azot dozu daha ekonomik" and again "16 kg/da azot dozunun ... bölge buğday
+     # yetiştiriciligi için yeterli" - an unconditioned recommendation a natural
+     # fertilization answer states, not a single results-table cell.
+     "answer_any": ["16 kg/da", "16 kg saf azot", "16 kg n"]},
+    # DROPPED 2026-07-18: quant_vetch_phosphorus, "Fiğ (yem bitkisi)
+    # yetiştiriciliğinde dekara ne kadar fosforlu gübre (P2O5) önerilir?"
+    # asserting dp_30458's "6 kg/da P2O5" figure. Code review found two defects
+    # in the original assertion: (1) context_any's "6 kg/da P2O5" phrase is not
+    # discriminating - it appears verbatim in 5 corpus sources, including an
+    # unrelated soybean trial (dp_21743) and soil-test data (dp_1419647/57);
+    # (2) answer_any included "6 kg/da fosfor"/"6 kg fosfor", which substitute
+    # the specific compound P2O5 with the generic element word "fosfor" -
+    # forbidden broadening, not a same-value notation. After narrowing
+    # context_any to the source-unique "fosfor gübrelemesinin" and answer_any
+    # to the four true P2O5-notation variants only, live re-validation showed
+    # retrieval-broken (normal 1/4, ablated 0/4) - the model does not reliably
+    # carry the number even with the corpus present, so the case does not
+    # clear the GREEN-normal bar. Not retuned by re-adding the "fosfor"
+    # variants or any looser value - that would be re-broadening to green.
 ]
