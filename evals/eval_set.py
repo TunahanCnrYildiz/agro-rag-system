@@ -271,6 +271,25 @@ CASES = [
      # dp_19393 (Eğirdir): selfed fruit had very low seed set and was judged
      # parthenocarpic - the study's own conclusion term.
      "answer_any": ["partenokarp"]},
+    {"id": "local_ankara_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Ankara armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["ankara"],
+     # dp_19393 (Eğirdir): selfing gave zero fruit set both years - the study
+     # judged Ankara "tamamen kendine kısır" (completely self-sterile).
+     "answer_any": ["kendine kısır", "kendine verimsiz"]},
+    # DROPPED 2026-07-18: local_sebin_walnut, "Şebin ceviz çeşidinde erkek mi
+    # dişi mi çiçekler önce açar?" asserting dp_1089365's protandry verdict.
+    # retrieval-broken (normal 0/4, ablated 0/4): a natural pollination-order
+    # query retrieves şebin chunks but not the dichogamy chunk - the "protandr"
+    # term only enters context when the query itself names it (a leading query),
+    # so the assertion is not answer-natural. Not retuned.
+    # DROPPED 2026-07-18: local_hacihaliloglu_apricot, "Hacıhaliloğlu sofralık
+    # mı kurutmalık mı?" asserting dp_1217921's kurutmalık classification.
+    # corpus-harmful (normal 2/4, ablated 4/4): the model already knows this
+    # (kurutmalık 4/4 with an empty corpus) and retrieval only injected noise
+    # that broke it half the time - the corpus carries nothing here. Not retuned.
     # DROPPED 2026-07-17: local_0900ziraat_cherry, "0900 Ziraat kirazında
     # kalsiyumu yapraktan mı topraktan mı uygulamalı?" asserting dp_1154776's
     # 8.91 g foliar fruit weight. Retrieval found the paper (context_any
