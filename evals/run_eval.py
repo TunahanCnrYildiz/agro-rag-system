@@ -119,18 +119,29 @@ def _ablation_verdict(rows: list[dict]) -> tuple[int, list[str]]:
     return (1 if decorative else 0), decorative
 
 
-def _classify(normal_all_green: bool, ablated_all_green: bool) -> str:
-    """Label a case by how its grounding moves when the corpus is removed.
+def _classify(normal_hits: int, ablated_hits: int, repeat: int) -> str:
+    """Label a corpus_fact case by how the corpus moves its grounding, over
+    `repeat` samples. Flake-robust: judged by whether the corpus RELIABLY lifts
+    grounding, not by unanimity - the deveci anchor grounds ~6-7/8 normally and
+    must still read as corpus-carried (item 25).
 
-    corpus-carried : green normally, red ablated -> the corpus supplies the fact.
-    model-carried  : green both ways -> the model knew it (or the mark is wrong).
-    retrieval-broken: red both ways -> cannot answer even with the corpus.
-    corpus-harmful : red normally, green ablated -> retrieval injected noise that
-                     broke an answer the model would otherwise have gotten right.
+    corpus-carried : grounded a majority WITH the corpus, a minority without
+                     -> the corpus supplies the fact.
+    model-carried  : grounded a majority even WITHOUT the corpus -> the model
+                     knew it; the corpus adds nothing decisive.
+    retrieval-broken: not a majority grounded even WITH the corpus.
+    corpus-harmful : grounded MORE often ablated than normally -> retrieval
+                     injected noise that broke an answer the model had right.
+
+    At repeat=1 this reduces exactly to the old boolean classifier.
     """
-    if normal_all_green:
-        return "corpus-carried" if not ablated_all_green else "model-carried"
-    return "corpus-harmful" if ablated_all_green else "retrieval-broken"
+    if ablated_hits > normal_hits:
+        return "corpus-harmful"
+    if 2 * normal_hits < repeat:
+        return "retrieval-broken"
+    if 2 * ablated_hits >= repeat:
+        return "model-carried"
+    return "corpus-carried"
 
 
 def _faithfulness_verdict(
@@ -299,7 +310,7 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
         normal_hits = grounded_hits(c)
         with _corpus_ablated():
             ablated_hits = grounded_hits(c)
-        label = _classify(normal_hits == repeat, ablated_hits == repeat)
+        label = _classify(normal_hits, ablated_hits, repeat)
         live_labels[c["id"]] = label
         counts[label] += 1
         print(f"  {c['id']:<24} {label:<16} "

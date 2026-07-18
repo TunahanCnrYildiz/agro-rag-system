@@ -226,22 +226,28 @@ def test_no_context_rejects_fast(monkeypatch):
 
 def test_classify_corpus_carried():
     # green normally, red ablated -> the corpus supplies the fact
-    assert run_eval._classify(True, False) == "corpus-carried"
+    assert run_eval._classify(1, 0, 1) == "corpus-carried"
+    # flaky-but-carried: a normal majority with the corpus, none without
+    assert run_eval._classify(6, 0, 8) == "corpus-carried"
 
 
 def test_classify_model_carried():
     # green both ways -> the model knew it; corpus adds nothing detectable
-    assert run_eval._classify(True, True) == "model-carried"
+    assert run_eval._classify(1, 1, 1) == "model-carried"
+    assert run_eval._classify(8, 8, 8) == "model-carried"
 
 
 def test_classify_retrieval_broken():
     # red both ways -> cannot answer even WITH the corpus
-    assert run_eval._classify(False, False) == "retrieval-broken"
+    assert run_eval._classify(0, 0, 1) == "retrieval-broken"
+    # not a majority grounded even with the corpus -> a real collapse, not flake
+    assert run_eval._classify(3, 0, 8) == "retrieval-broken"
 
 
 def test_classify_corpus_harmful():
-    # red normally but green ablated -> the corpus BROKE a right answer
-    assert run_eval._classify(False, True) == "corpus-harmful"
+    # grounded MORE often ablated than normally -> the corpus broke a right answer
+    assert run_eval._classify(0, 1, 1) == "corpus-harmful"
+    assert run_eval._classify(2, 5, 8) == "corpus-harmful"
 
 
 def _optin_case(answer_any, corpus_class="corpus-carried"):
@@ -325,7 +331,7 @@ def test_faithfulness_fast_exits(monkeypatch):
         run_eval.run_faithfulness(fast=True)
 
 
-def test_faithfulness_one_red_normal_sample_drops_corpus_carried(monkeypatch):
+def test_faithfulness_flaky_normal_majority_stays_corpus_carried(monkeypatch):
     monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
     monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
     calls = {"n": 0}
@@ -334,10 +340,30 @@ def test_faithfulness_one_red_normal_sample_drops_corpus_carried(monkeypatch):
         ctx = engine.retrieve_context(msg)
         calls["n"] += 1
         if not ctx:
-            return ChatResult("genel", [])           # ablated: always red
-        text = "genel" if calls["n"] == 1 else "2±0,5 var"  # 1st normal red
+            return ChatResult("genel", [])            # ablated: always red
+        text = "genel" if calls["n"] == 1 else "2±0,5 var"  # 1 of 4 normal red
         return ChatResult(text, [])
     monkeypatch.setattr(engine, "answer", fake)
 
-    # repeat=2: normal samples red+green -> not unanimous -> not corpus-carried
-    assert run_eval.run_faithfulness(repeat=2) == 1
+    # repeat=4: normal 3/4 green (a majority), ablated 0/4 -> corpus-carried,
+    # NOT a regression - one flaky red must not drop the anchor.
+    assert run_eval.run_faithfulness(repeat=4) == 0
+
+
+def test_faithfulness_normal_minority_green_is_a_regression(monkeypatch):
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    calls = {"n": 0}
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)
+        calls["n"] += 1
+        if not ctx:
+            return ChatResult("genel", [])            # ablated: always red
+        text = "2±0,5 var" if calls["n"] == 1 else "genel"  # only 1 of 4 normal green
+        return ChatResult(text, [])
+    monkeypatch.setattr(engine, "answer", fake)
+
+    # repeat=4: normal 1/4 green (a minority) -> retrieval-broken -> a recorded
+    # corpus-carried case that collapsed -> drift, exit 1.
+    assert run_eval.run_faithfulness(repeat=4) == 1
