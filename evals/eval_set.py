@@ -337,9 +337,11 @@ CASES = [
      "query": "Trakya İlkeren üzüm çeşidinde en yüksek verim için asma başına kaç göz bırakılmalıdır?",
      "retrieval": "nonempty", "products": "none",
      "context_any": ["göz bırakılan asmalarda"],
-     # dp_19531 (plastik serada Trakya İlkeren, terbiye/asma şarjı): the study's
-     # own conclusion is "15 göz bırakılan asmalarda en yüksek verim sağlanmıştır"
-     # (18 in dikey kordon) - the bud-load a natural pruning answer would state,
-     # not a table cell.
-     "answer_any": ["15 göz", "18 göz"]},
+     # dp_19531 (plastik serada Trakya İlkeren, terbiye/asma şarjı): "15 göz"
+     # is the yield-only figure tied to one training system and conditioned on
+     # the results table ("Çizelge 3"), not an unconditioned recommendation.
+     # The paper's actual final conclusion (4. Sonuç) is unconditioned: 18 göz
+     # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
+     # natural pruning answer would state, not a table cell.
+     "answer_any": ["18 göz"]},
 ]
