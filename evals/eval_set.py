@@ -433,7 +433,12 @@ CASES = [
      "corpus_class": "corpus-carried",
      "query": "Meranın otlatma kapasitesini artırmak için dekara kaç kilogram azotlu gübre uygulanmalıdır?",
      "retrieval": "nonempty", "products": "some",
-     "context_any": ["otlatma kapasitesini artırmak"],
+     # context_any drawn from the paper's aspect finding + comparative result,
+     # NOT the query-echoing "otlatma kapasitesini artırmak" (a query substring,
+     # a tautological anchor - code review 2026-07-19); both fragments are in the
+     # retrieved dp_30475 context and absent from the query wording.
+     "context_any": ["farklı yöneylerde meranın otlatma kapasitesi",
+                     "gübrelenen parsellerde otlatma kapasitesi"],
      # dp_30475 (Daşcı ve ark.; yöney ve gübrelemenin meranın otlatma kapasitesi
      # üzerine etkileri): the study's own "4. SONUÇ ve ÖNERİLER" states "mera
      # alanlarına 10kg/da azot uygulaması meranın otlatma kapasitesini artırmak
