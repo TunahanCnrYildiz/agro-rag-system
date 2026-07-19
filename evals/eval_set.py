@@ -386,6 +386,19 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+    {"id": "technique_guarbean_row_spacing", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Sakız fasulyesi ot üretimi için en uygun sıra arası mesafe kaç cm olmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["sakız fasulyesinin en yüksek yeşil"],
+     # dp_257760 (Cebeci ve ark.; sakız fasulyesinde ekim sıklığı denemesi): the
+     # paper's own "4. SONUÇ VE ÖNERİLER" states the recommendation in prose -
+     # "en yüksek ot üretimi için bitkilerin 20 veya 40 cm aralıkla ekilmesi
+     # gerektiği sonucuna ulaşılmıştır" - an unconditioned agronomic
+     # recommendation a practical answer would state, not a results-table cell
+     # (20 cm alone is only the single highest-yield row in Çizelge 2/3).
+     # corpus-carried (live 2026-07-19): normal 4/4, ablated 0/4.
+     "answer_any": ["20-40 cm", "20 ila 40 cm", "20 veya 40 cm", "20-40cm"]},
 
     # --- Zone-4 corpus_fact cases (gap-crop / quantitative findings) ---
     {"id": "quant_wheat_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
