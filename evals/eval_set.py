@@ -324,13 +324,6 @@ CASES = [
      # zero fruit set both years - the study's own verdict is "tamamen kendine
      # verimsiz" (completely self-sterile), the same verdict class as Ankara.
      "answer_any": ["kendine verimsiz", "kendine kısır"]},
-    # DROPPED 2026-07-19: local_akca_pear, "Akça armudu kendine verimli mi,
-    # bahçeye tozlayıcı çeşit dikmek gerekir mi?" asserting dp_19393's Akça
-    # parthenocarpic verdict (same conclusion class as Santa Maria).
-    # retrieval-broken (normal 0/4, ablated 0/4): context retrieves the
-    # abstract/conclusion sentence naming Akça, but the answer never states
-    # "partenokarp" for this cultivar - unlike Santa Maria, where it does.
-    # Not retuned.
     {"id": "local_bpmorettini_pear", "category": "local", "corpus_fact": True,
      "corpus_class": "corpus-carried",
      "query": "B.P. Morettini armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
@@ -339,7 +332,18 @@ CASES = [
      # dp_19393 (Eğirdir): B.P.Morettini selfed fruit had very low seed set and
      # was judged parthenocarpic - the study's own conclusion term, same
      # verdict class as Santa Maria.
+     # corpus-carried (live 2026-07-19): repeat 4 read 2/4 (sampling noise), but
+     # repeat 8 read 7/8, ablated 0/8 - a robust guard, not a boundary case.
      "answer_any": ["partenokarp"]},
+    # DROPPED 2026-07-19: local_akca_pear, "Akça armudu kendine verimli mi,
+    # bahçeye tozlayıcı çeşit dikmek gerekir mi?" asserting dp_19393's Akça
+    # parthenocarpic verdict (same conclusion class as Santa Maria). Note
+    # B.P.Morettini above ships on the same verdict: the difference is retrieval -
+    # its query surfaces the direct "...partenokarpik meyve oluşumunun" sentence.
+    # retrieval-broken (normal 0/4, ablated 0/4): context retrieves the
+    # abstract/conclusion sentence naming Akça, but the answer never states
+    # "partenokarp" for this cultivar - unlike Santa Maria, where it does.
+    # Not retuned.
     # DROPPED 2026-07-18: local_sebin_walnut, "Şebin ceviz çeşidinde erkek mi
     # dişi mi çiçekler önce açar?" asserting dp_1089365's protandry verdict.
     # retrieval-broken (normal 0/4, ablated 0/4): a natural pollination-order
