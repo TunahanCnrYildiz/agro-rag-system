@@ -361,6 +361,47 @@ CASES = [
     # "0900 ziraat" green) but the answer never carries the number: grounding
     # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
     # was not retuned - a case tuned until green asserts nothing.
+    {"id": "local_scarletspur_apple", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Scarlet Spur elma çeşidinde kabuk yanıklığını önlemek için hasat ne zaman yapılmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["scarlet spur"],
+     # dp_1292456 (Onursal ve Koyuncu; Isparta-Eğirdir): the study's own
+     # conclusion states fruit harvested "tam çiçeklenmeden 150 gün sonra"
+     # avoided superficial scald and kept sensory quality best - a harvest
+     # window a natural answer states, not a results-table cell.
+     # corpus-carried (live 2026-07-19): normal 3/4, ablated 0/4. Source tests
+     # "139 ve 150 gün"; the conclusion picks 150, which the corpus carries.
+     "answer_any": ["150 gün"]},
+    # DROPPED 2026-07-19: local_avocado_antalya, "Antalya koşullarında hangi
+    # avokado çeşitleri düşük sıcaklığa dayanıklıdır?" asserting dp_19510's
+    # 'Bacon'/'Ettinger'/'Fuerte' regional recommendation. model-carried (normal
+    # 4/4, ablated 4/4): gemma already names these internationally-common
+    # cold-tolerant avocado cultivars with an EMPTY corpus, so the corpus adds
+    # nothing decisive. A valid map finding, not shipped as a corpus-carried guard
+    # (rhizoctonia already covers the model-carried exemplar). Not retuned.
+    {"id": "local_hachiya_persimmon", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Hachiya Trabzon hurması kurutulduktan sonra raf ömrünü uzatmak için hangi ön işlem uygulanmalı?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["hachiya"],
+     # dp_1797532 (Akev, Kuzucu, Şen; Denizli): the study's own conclusion
+     # recommends SMB (sodyum metabisülfit) pretreatment for drying 'Hachiya'
+     # persimmon - a practical recommendation a natural answer states.
+     # corpus-carried (live 2026-07-19): normal 4/4, ablated 0/4 - decisive.
+     "answer_any": ["smb", "sodyum metabisülfit"]},
+    {"id": "local_canernar_pomegranate", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Canernar-1 nar tipi soğukta kaç ay süreyle depolanabilir?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["canernar"],
+     # dp_19373 (Selçuk ve Erkan; Antalya): the study's own SONUÇ states
+     # "'Canernar-1' narları 7 ay süreyle muhafaza edilebilmiştir" - a storage
+     # duration a natural answer states, not a results-table cell.
+     # corpus-carried (live 2026-07-19): normal 4/4, ablated 0/4 - decisive. The
+     # context also cites a generic "6 ay" (Bayram 2009), so the ablated model
+     # says "6 ay"; the corpus carries the study's own "7 ay".
+     "answer_any": ["7 ay"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
