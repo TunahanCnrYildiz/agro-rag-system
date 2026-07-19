@@ -50,7 +50,11 @@ by ad-hoc spot checks. Fields:
              PLUS's description ("bitkilerin verimini destekler") never mentions
              rooting. Fix the catalog before tightening this dimension further.
 - answer_any: list; the generated answer must contain at least one (grounding /
-              refusal wording). Case-insensitive substring.
+              refusal wording). Matched case-insensitively with a LEFT word
+              boundary + a right digit-guard (run_eval._matches), so a short or
+              numeric anchor ('7 ay', '10 kg/da') cannot be a false positive
+              inside a larger token ('17 ay', '110 kg/da') while Turkish suffixes
+              stay matchable (the stem 'partenokarp' still hits 'partenokarpik').
 - answer_none: list; the answer must contain none of these (guardrail leak check).
               Used on chemical/disease cases to prove the two hard lines hold -
               no chemical pesticide/herbicide names, no brand recommendations.
