@@ -315,6 +315,35 @@ CASES = [
      # dp_19393 (Eğirdir): selfing gave zero fruit set both years - the study
      # judged Ankara "tamamen kendine kısır" (completely self-sterile).
      "answer_any": ["kendine kısır", "kendine verimsiz"]},
+    {"id": "local_beurrehardy_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Beurre Hardy armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["beurre hardy çeşitlerinin tamamen kendine verimsiz"],
+     # dp_19393 (Eğirdir): Ankara, Deveci, Williams and Beurre Hardy selfed with
+     # zero fruit set both years - the study's own verdict is "tamamen kendine
+     # verimsiz" (completely self-sterile), the same verdict class as Ankara.
+     "answer_any": ["kendine verimsiz", "kendine kısır"]},
+    {"id": "local_bpmorettini_pear", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "B.P. Morettini armudu kendine verimli mi, bahçeye tozlayıcı çeşit dikmek gerekir mi?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["akça ve b.p.morettini çeşitlerinde"],
+     # dp_19393 (Eğirdir): B.P.Morettini selfed fruit had very low seed set and
+     # was judged parthenocarpic - the study's own conclusion term, same
+     # verdict class as Santa Maria.
+     # corpus-carried (live 2026-07-19): repeat 4 read 2/4 (sampling noise), but
+     # repeat 8 read 7/8, ablated 0/8 - a robust guard, not a boundary case.
+     "answer_any": ["partenokarp"]},
+    # DROPPED 2026-07-19: local_akca_pear, "Akça armudu kendine verimli mi,
+    # bahçeye tozlayıcı çeşit dikmek gerekir mi?" asserting dp_19393's Akça
+    # parthenocarpic verdict (same conclusion class as Santa Maria). Note
+    # B.P.Morettini above ships on the same verdict: the difference is retrieval -
+    # its query surfaces the direct "...partenokarpik meyve oluşumunun" sentence.
+    # retrieval-broken (normal 0/4, ablated 0/4): context retrieves the
+    # abstract/conclusion sentence naming Akça, but the answer never states
+    # "partenokarp" for this cultivar - unlike Santa Maria, where it does.
+    # Not retuned.
     # DROPPED 2026-07-18: local_sebin_walnut, "Şebin ceviz çeşidinde erkek mi
     # dişi mi çiçekler önce açar?" asserting dp_1089365's protandry verdict.
     # retrieval-broken (normal 0/4, ablated 0/4): a natural pollination-order
@@ -332,6 +361,47 @@ CASES = [
     # "0900 ziraat" green) but the answer never carries the number: grounding
     # 0/5 in normal runs. Failed the GREEN-normal bar, so it does not ship and
     # was not retuned - a case tuned until green asserts nothing.
+    {"id": "local_scarletspur_apple", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Scarlet Spur elma çeşidinde kabuk yanıklığını önlemek için hasat ne zaman yapılmalıdır?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["scarlet spur"],
+     # dp_1292456 (Onursal ve Koyuncu; Isparta-Eğirdir): the study's own
+     # conclusion states fruit harvested "tam çiçeklenmeden 150 gün sonra"
+     # avoided superficial scald and kept sensory quality best - a harvest
+     # window a natural answer states, not a results-table cell.
+     # corpus-carried (live 2026-07-19): normal 3/4, ablated 0/4. Source tests
+     # "139 ve 150 gün"; the conclusion picks 150, which the corpus carries.
+     "answer_any": ["150 gün"]},
+    # DROPPED 2026-07-19: local_avocado_antalya, "Antalya koşullarında hangi
+    # avokado çeşitleri düşük sıcaklığa dayanıklıdır?" asserting dp_19510's
+    # 'Bacon'/'Ettinger'/'Fuerte' regional recommendation. model-carried (normal
+    # 4/4, ablated 4/4): gemma already names these internationally-common
+    # cold-tolerant avocado cultivars with an EMPTY corpus, so the corpus adds
+    # nothing decisive. A valid map finding, not shipped as a corpus-carried guard
+    # (rhizoctonia already covers the model-carried exemplar). Not retuned.
+    {"id": "local_hachiya_persimmon", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Hachiya Trabzon hurması kurutulduktan sonra raf ömrünü uzatmak için hangi ön işlem uygulanmalı?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["hachiya"],
+     # dp_1797532 (Akev, Kuzucu, Şen; Denizli): the study's own conclusion
+     # recommends SMB (sodyum metabisülfit) pretreatment for drying 'Hachiya'
+     # persimmon - a practical recommendation a natural answer states.
+     # corpus-carried (live 2026-07-19): normal 4/4, ablated 0/4 - decisive.
+     "answer_any": ["smb", "sodyum metabisülfit"]},
+    {"id": "local_canernar_pomegranate", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Canernar-1 nar tipi soğukta kaç ay süreyle depolanabilir?",
+     "retrieval": "nonempty", "products": "none",
+     "context_any": ["canernar"],
+     # dp_19373 (Selçuk ve Erkan; Antalya): the study's own SONUÇ states
+     # "'Canernar-1' narları 7 ay süreyle muhafaza edilebilmiştir" - a storage
+     # duration a natural answer states, not a results-table cell.
+     # corpus-carried (live 2026-07-19): normal 4/4, ablated 0/4 - decisive. The
+     # context also cites a generic "6 ay" (Bayram 2009), so the ablated model
+     # says "6 ay"; the corpus carries the study's own "7 ay".
+     "answer_any": ["7 ay"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
@@ -357,6 +427,21 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+    # DROPPED 2026-07-19: technique_guarbean_row_spacing, "Sakız fasulyesi ot
+    # üretimi için en uygun sıra arası mesafe kaç cm olmalıdır?" asserting
+    # dp_257760's "4. SONUÇ VE ÖNERİLER" disjunction ("bitkilerin 20 veya 40 cm
+    # aralıkla ekilmesi gerektiği"). Originally shipped with a broadened
+    # answer_any ("20-40 cm"/"20 ila 40 cm"/"20-40cm") that converts the source's
+    # either/or claim into a continuous-range claim - a looser, different
+    # assertion, not an alternate notation of the same value. Code review
+    # flagged this; tightened to disjunction-only forms ("20 veya 40 cm", "20
+    # veya 40cm", "20 ya da 40 cm") and re-validated: repeat 4 read normal 2/4
+    # ablated 0/4 (borderline), but repeat 8 read normal 0/8 ablated 0/8 -
+    # retrieval-broken. The clean disjunction assertion is not answer-natural
+    # (the model doesn't reliably state "20 veya 40 cm" even with the corpus
+    # chunk in context) - the prior green was an artifact of the broadened
+    # range matching the model's own smoothing of the odd disjunction into
+    # "20-40 cm". Not retuned back to green (cherry rule).
 
     # --- Zone-4 corpus_fact cases (gap-crop / quantitative findings) ---
     {"id": "quant_wheat_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
@@ -385,4 +470,25 @@ CASES = [
     # carry the number even with the corpus present, so the case does not
     # clear the GREEN-normal bar. Not retuned by re-adding the "fosfor"
     # variants or any looser value - that would be re-broadening to green.
+    {"id": "quant_mera_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Meranın otlatma kapasitesini artırmak için dekara kaç kilogram azotlu gübre uygulanmalıdır?",
+     "retrieval": "nonempty", "products": "some",
+     # context_any drawn from the paper's aspect finding + comparative result,
+     # NOT the query-echoing "otlatma kapasitesini artırmak" (a query substring,
+     # a tautological anchor - code review 2026-07-19); both fragments are in the
+     # retrieved dp_30475 context and absent from the query wording.
+     "context_any": ["farklı yöneylerde meranın otlatma kapasitesi",
+                     "gübrelenen parsellerde otlatma kapasitesi"],
+     # dp_30475 (Daşcı ve ark.; yöney ve gübrelemenin meranın otlatma kapasitesi
+     # üzerine etkileri): the study's own "4. SONUÇ ve ÖNERİLER" states "mera
+     # alanlarına 10kg/da azot uygulaması meranın otlatma kapasitesini artırmak
+     # amacıyla önerilebilir" - an unconditioned recommendation a natural
+     # pasture-fertilization answer states, not a single results-table cell.
+     # corpus-carried (live 2026-07-19): repeat 4 read normal 4/4, ablated 0/4 -
+     # decisive, no repeat-8 recheck needed. answer_any includes "10 kg azot"
+     # (no "/da") because the model consistently paraphrases as "dekara 10 kg
+     # azot" - same value, alternate notation, matching the wheat case's "16 kg
+     # saf azot" precedent.
+     "answer_any": ["10 kg/da", "10 kg/da azot", "10 kg n", "10 kg azot"]},
 ]
