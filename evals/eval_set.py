@@ -429,4 +429,20 @@ CASES = [
     # carry the number even with the corpus present, so the case does not
     # clear the GREEN-normal bar. Not retuned by re-adding the "fosfor"
     # variants or any looser value - that would be re-broadening to green.
+    {"id": "quant_mera_nitrogen_dose", "category": "nutrition", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Meranın otlatma kapasitesini artırmak için dekara kaç kilogram azotlu gübre uygulanmalıdır?",
+     "retrieval": "nonempty", "products": "some",
+     "context_any": ["otlatma kapasitesini artırmak"],
+     # dp_30475 (Daşcı ve ark.; yöney ve gübrelemenin meranın otlatma kapasitesi
+     # üzerine etkileri): the study's own "4. SONUÇ ve ÖNERİLER" states "mera
+     # alanlarına 10kg/da azot uygulaması meranın otlatma kapasitesini artırmak
+     # amacıyla önerilebilir" - an unconditioned recommendation a natural
+     # pasture-fertilization answer states, not a single results-table cell.
+     # corpus-carried (live 2026-07-19): repeat 4 read normal 4/4, ablated 0/4 -
+     # decisive, no repeat-8 recheck needed. answer_any includes "10 kg azot"
+     # (no "/da") because the model consistently paraphrases as "dekara 10 kg
+     # azot" - same value, alternate notation, matching the wheat case's "16 kg
+     # saf azot" precedent.
+     "answer_any": ["10 kg/da", "10 kg/da azot", "10 kg n", "10 kg azot"]},
 ]
