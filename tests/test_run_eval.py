@@ -350,6 +350,72 @@ def test_faithfulness_flaky_normal_majority_stays_corpus_carried(monkeypatch):
     assert run_eval.run_faithfulness(repeat=4) == 0
 
 
+def test_matches_rejects_numeric_left_superset():
+    """The recurring false positive: a short numeric anchor inside a bigger
+    number. '7 ay' must not fire inside '17 ay'."""
+    assert run_eval._matches("7 ay", "bitki 17 ay sonra") is False
+
+
+def test_matches_accepts_the_bare_numeric_anchor():
+    assert run_eval._matches("7 ay", "bitki 7 ay sonra") is True
+
+
+def test_matches_preserves_turkish_suffix_on_the_right():
+    """Turkish inflects by SUFFIX, so anchors are stems - a right word boundary
+    would break every stem in the set. '7 ay' still matches '7 aydir', and the
+    stem 'partenokarp' still matches its only real surface forms."""
+    assert run_eval._matches("7 ay", "bitki 7 aydir bekler") is True
+    assert run_eval._matches("partenokarp", "meyve partenokarpik olusur") is True
+    assert run_eval._matches("partenokarp", "partenokarpi gorulur") is True
+
+
+def test_matches_rejects_letter_left_superset():
+    """'smb' buried inside a larger token (preceded by a letter) is not a hit."""
+    assert run_eval._matches("smb", "kelime asmbol icinde") is False
+    assert run_eval._matches("smb", "smb uygulamasi") is True
+
+
+def test_matches_rejects_trailing_digit_superset():
+    """A digit glued to the right turns the anchor into a different number:
+    '2±0,5' must not fire inside '2±0,50'."""
+    assert run_eval._matches("2±0,5", "depo 2±0,50 derece") is False
+    assert run_eval._matches("2±0,5", "depo 2±0,5 derece") is True
+
+
+def test_matches_handles_slash_anchor_boundaries():
+    """Entries with '/' like '10 kg/da' must survive escaping and still get the
+    left boundary: '110 kg/da' is not '10 kg/da'."""
+    assert run_eval._matches("10 kg/da", "gubre 110 kg/da verildi") is False
+    assert run_eval._matches("10 kg/da", "gubre 10 kg/da verildi") is True
+
+
+def test_matches_treats_turkish_letters_as_word_chars_on_the_left():
+    """A Unicode-aware boundary: a Turkish letter glued to the left blocks the
+    match (so the anchor is a real token), while a suffix on the right does not."""
+    assert run_eval._matches("azot", "kazot") is False
+    assert run_eval._matches("azot", "azotlu toprak") is True
+
+
+def test_answer_any_uses_boundary_matching():
+    case = {"answer_any": ["7 ay"]}
+    assert run_eval._answer_ok(case, "bitki 17 ay boyunca")[0] is False
+    assert run_eval._answer_ok(case, "bitki 7 ay boyunca")[0] is True
+
+
+def test_context_any_uses_boundary_matching():
+    case = {"context_any": ["7 ay"]}
+    assert run_eval._context_ok(case, "sure 17 ay olarak") is False
+    assert run_eval._context_ok(case, "sure 7 ay olarak") is True
+
+
+def test_answer_none_stays_plain_substring():
+    """The guardrail (answer_none) is OUT of scope: it must keep plain-substring
+    matching, or a boundary would let '17 gun' hide a banned '7 gun' leak."""
+    case = {"answer_none": ["7 gun"]}
+    # plain substring still finds the banned phrase inside a bigger token
+    assert run_eval._answer_ok(case, "17 gun beklemeyin")[1] is False
+
+
 def test_faithfulness_normal_minority_green_is_a_regression(monkeypatch):
     monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
     monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")

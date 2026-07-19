@@ -11,6 +11,7 @@ non-zero if any case fails (so it can gate CI later).
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from contextlib import contextmanager, nullcontext
@@ -21,6 +22,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import engine  # noqa: E402
 from src.config import settings  # noqa: E402
 from evals.eval_set import CASES  # noqa: E402
+
+
+def _matches(term: str, text: str) -> bool:
+    """Case-insensitive anchor match with a LEFT word boundary + a right
+    digit-guard, so a short/numeric answer_any/context_any anchor cannot be a
+    false positive inside a larger token: '7 ay' must not fire inside '17 ay',
+    '10 kg/da' not inside '110 kg/da', '2±0,5' not inside '2±0,50'.
+
+    ASYMMETRIC on purpose. Turkish inflects by SUFFIX, so the anchors here are
+    stems meant to catch surface forms - a full right boundary would break every
+    one of them (the stem 'partenokarp' only ever appears as 'partenokarpi' /
+    'partenokarpik', '2±0,5' as '2±0,5 derecede'). The false-positive risk is on
+    the LEFT (a leading digit/letter turns the anchor into a different token) and
+    in a trailing DIGIT (which extends a number), so those two are all we block;
+    a trailing letter is a legitimate Turkish suffix and is left alone.
+
+    `\\w` is Unicode-aware here (str pattern), so Turkish letters count as word
+    chars on the left; re.escape keeps '/', '±', ',' literal.
+    """
+    pattern = r"(?<!\w)" + re.escape(term) + r"(?!\d)"
+    return re.search(pattern, text) is not None
 
 
 def _retrieval_ok(case: dict, ctx: str) -> bool:
@@ -45,7 +67,7 @@ def _context_ok(case: dict, ctx: str) -> bool:
     if not terms:
         return True
     c = ctx.lower()
-    return any(t.lower() in c for t in terms)
+    return any(_matches(t.lower(), c) for t in terms)
 
 
 def _products_ok(case: dict, n_products: int) -> bool:
@@ -62,7 +84,9 @@ def _answer_ok(case: dict, answer: str) -> tuple[bool, bool]:
     a = answer.lower()
     any_terms = case.get("answer_any") or []
     none_terms = case.get("answer_none") or []
-    grounding = (not any_terms) or any(t.lower() in a for t in any_terms)
+    grounding = (not any_terms) or any(_matches(t.lower(), a) for t in any_terms)
+    # guardrail stays PLAIN substring on purpose: a boundary here would let a
+    # banned phrase hide inside a bigger token and read as "no leak".
     guardrail = all(t.lower() not in a for t in none_terms)
     return grounding, guardrail
 
