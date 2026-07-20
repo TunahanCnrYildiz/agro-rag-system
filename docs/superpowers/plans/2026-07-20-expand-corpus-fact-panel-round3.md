@@ -24,7 +24,8 @@ Every task's requirements implicitly include this section.
 - **A normal read of exactly 2/4 does not decide** — escalate to `--repeat 8`.
 - **Target +4 is not a commitment.** Budget exhausted at 2 → ship 2 and record why. Never loosen an assertion to reach the number.
 - **Ops:** LM Studio must be running with gemma's Max Concurrent Predictions = **1** (parallel 4 overflows the RX 9070 XT VRAM, ~3.5× slower). Run all commands from the repo root (`config.py` uses a relative `env_file=".env"`).
-- **Subagents need TRUE worktree isolation** (item 32's anti-pattern): a spawned task in the shared working tree switched the branch under the controlling session and its eval contended with the main session's eval over the single LM Studio — both ballooned to 1–2.5 hours. **Corollary: validation runs must not overlap.** One eval at a time, whatever the execution mode.
+- **Subagents run in the SHARED working tree on branch `expand-corpus-fact-panel-round3`, strictly SEQUENTIALLY — never in a git worktree, never in the background.** A fresh worktree gets tracked files only, and both `data/vector_store/` (the corpus) and `.env` (the model config) are gitignored and untracked — an isolated worktree therefore cannot mine or run the eval at all, which is every task here. Item 32's anti-pattern was **concurrency**, not subagents: a BACKGROUND spawned task switched the branch under the controlling session and its eval fought the main session's eval over the single LM Studio (both ran 1–2.5 h). Sequential foreground subagents on one branch reproduce none of that.
+- **Exactly one eval process at a time.** No parallel subagents; the controller runs nothing while a subagent is active. This is the constraint item 32 actually violated.
 - **A paused subagent's provisional `corpus_class` labels are untrustworthy** (item 32). If a subagent stops mid-validation, re-run its candidates directly rather than trusting the labels it left behind.
 
 ---
