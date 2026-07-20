@@ -406,6 +406,87 @@ CASES = [
      # context also cites a generic "6 ay" (Bayram 2009), so the ablated model
      # says "6 ay"; the corpus carries the study's own "7 ay".
      "answer_any": ["7 ay"]},
+    # DROPPED 2026-07-20: local_ege_durum_wheat, "Ege Bölgesi koşullarında
+    # makarnalık buğday ekeceğim, verimi istikrarlı hangi çeşitler önerilir?"
+    # asserting dp_21741's (Ünsal, Geren ve Sevim, ANADOLU 2009) own conclusion
+    # "bölgede tavsiye edilebilecek stabil çeşitler; Sarıçanak 98, Ege 88 ve
+    # Salihli 92 çeşitleridir." The faithfulness read looked decisive (normal
+    # 4/4, ablated 0/4, labelled corpus-carried) but it is an ARTIFACT, caught
+    # by the normal run going ctx=False: retrieval never surfaces the
+    # conclusion chunk at all. The only dp_21741 chunk it lands on is the
+    # materials/methods list of all TWELVE trial cultivars ("Amanos 97, Aydın
+    # 93, Ceylan 95, Diyarbakır 81, Ege 88, ... Salihli 92, Sarıçanak 98 ve
+    # Sham I"), and the answer recites that roster verbatim as "çalışmalar
+    # kapsamında değerlendirilen örnekler" - it never states a recommendation.
+    # answer_any's tokens are members of that list, so grounding fires on the
+    # roster, not on the paper's verdict: the case measures list-echo, not
+    # corpus dependence. Not retuned - repointing context_any at the methods
+    # chunk would green it while asserting a DIFFERENT, weaker claim (that the
+    # trial exists) than the answer_any claim (which cultivars are recommended).
+    # Wheat's rule-2 crop slot is therefore NOT consumed by this round.
+    {"id": "local_diyarbakir_safflower", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Diyarbakır koşullarında hangi aspir çeşidi önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate's first anchor was "bitkide tabla sayısı", which appears
+     # NOWHERE in dp_1514564 (the paper writes "bitki başına tabla sayısı");
+     # corrected to the source's own wording. This is a transcription fix to a
+     # context anchor, not a loosened assertion - "ham yağ oranı" alone already
+     # carried ctx=True before and after.
+     "context_any": ["bitki başına tabla sayısı", "ham yağ oranı"],
+     # dp_1514564 (2025; Diyarbakır, üç yıllık aspir çeşit denemesi): the
+     # study's own conclusion states "Sonuç olarak, üç yıllık bu çalışmanın
+     # sonuçlarına dayanarak, Remzibey-05 çeşidi Diyarbakır ekolojik koşulları
+     # için önerilebilir." - a single-cultivar verdict, stated twice (TR abstract
+     # + English conclusion), which is what a recommendation answer says out
+     # loud, not a results-table cell. The three answer_any forms are notations
+     # of the SAME cultivar name, not a broadening.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     "answer_any": ["remzibey-05", "remzibey 05", "remzibey"]},
+    {"id": "local_oltu_raspberry", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Erzurum Oltu yöresinde hangi ahududu çeşitleri iyi adapte olur?",
+     "retrieval": "nonempty", "products": "none",
+     # both anchors come from the CONCLUSION sentence itself, so ctx=True proves
+     # the verdict chunk - not merely the trial roster - is what retrieval lands
+     # on. That is exactly the check local_ege_durum_wheat failed above.
+     "context_any": ["g meyve/sürgün", "yılda iki ürün veren"],
+     # dp_30474 (Pehluvan ve Güleryüz, 2010; Erzurum-Oltu, 9 ahududu çeşidi,
+     # 1999-2000): the study's own
+     # conclusion states "Sonuç olarak yılda iki ürün veren Heritage, Hollanda
+     # Boduru ve Summit çeşitleri ile yılda tek ürün veren Newburg çeşidinin
+     # diğer çeşitlere göre yörede daha iyi adapte oldukları belirlenmiştir." -
+     # an adaptation verdict a natural answer states by cultivar NAME.
+     # "Heritage" and "Summit" are deliberately EXCLUDED from answer_any even
+     # though the paper names them: both are internationally famous raspberry
+     # cultivars a model can emit with an empty corpus. Applying the
+     # local_avocado_antalya lesson at authoring time TIGHTENS the assertion to
+     # the corpus-specific names; it does not loosen it.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     "answer_any": ["hollanda boduru", "newburg"]},
+    {"id": "local_chickpea_blight_cultivars", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Nohutta yanıklık hastalığına dayanıklılık bakımından hangi çeşitler öne çıkıyor?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate froze ["ilk bakla yüksekliği", "yüz tane ağırlığı"], but those
+     # are YIELD-trait phrases from the results tables (14 occurrences each) and
+     # retrieval never lands on those chunks - ctx read False while the verdict
+     # chunks WERE retrieved. Repointed at the paper's own disease-scale finding,
+     # which is what this case actually asserts; answer_any is untouched. Both
+     # anchors are source text absent from the query wording (no query echo -
+     # the quant_mera_nitrogen_dose precedent).
+     "context_any": ["hastalık skala değeri",
+                     "en duyarlı çeşitler olarak belirlenmiştir"],
+     # dp_1559843 (Kavlak ve ark., ANADOLU 2024; Ankara-Gölbaşı, 8 yazlık nohut
+     # çeşidi, 2 yıl): the study's own SONUÇ VE ÖNERİLER states "Araştırma
+     # sonucunda, Göktürk, Azkan ve Arda çeşitlerinin yanıklık hastalığına karşı
+     # daha dayanıklı oldukları ve bu nedenle bölge için daha uygun genotipler
+     # olduğu belirlenmiştir." - a resistant-cultivar verdict a natural answer
+     # states by NAME. Yield itself did NOT differ significantly between
+     # cultivars, so disease resistance is the paper's whole finding. "Arda" is
+     # excluded from answer_any: too short and common a token to anchor on.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     "answer_any": ["göktürk", "azkan"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
@@ -431,6 +512,21 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+    # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
+    # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
+    # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
+    # yapılan ekimlerden sağlandığı". retrieval-broken (normal 0/4, ablated
+    # 0/4) - decisive at repeat 4, so no repeat-8 escalation (that is only for
+    # an exact 2/4 read). NOT a retrieval-plumbing failure: all four retrieved
+    # chunks are dp_21712 and "22 Kasım" IS in the context. The assertion is
+    # simply not answer-natural, because the SAME document carries a COMPETING
+    # date - its literature review cites Soya ve ark. (1989), Bornova, whose
+    # best sowing date was 25 Ekim. The model reads both and states the cited
+    # "25 Ekim" (and generic "erken dönem ekimi") rather than the paper's own
+    # 22 Kasım verdict. The only way to green this is to accept a different
+    # claim, which is the guarbean rule. Not retuned. A sowing-date candidate
+    # from a source WITHOUT a competing in-document date could still work
+    # (slate rank 6, dp_21713 maize, is untested).
     # DROPPED 2026-07-19: technique_guarbean_row_spacing, "Sakız fasulyesi ot
     # üretimi için en uygun sıra arası mesafe kaç cm olmalıdır?" asserting
     # dp_257760's "4. SONUÇ VE ÖNERİLER" disjunction ("bitkilerin 20 veya 40 cm
