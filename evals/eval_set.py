@@ -514,6 +514,34 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+    {"id": "technique_maize_sowing_date", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Alaşehir koşullarında ana ürün mısırda en uygun ekim zamanı nedir?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate froze ["maverick", "c-955"], but neither is unique corpus-wide:
+     # a case-insensitive pass over the store finds "maverick" in fao_bt155e too
+     # and "c-955" in dp_21696, so a green ctx on those would not prove dp_21713
+     # was retrieved - the local_ege_durum_wheat lesson. Replaced BEFORE the
+     # first run with three phrases each unique to dp_21713 (2, 1 and 2 chunk
+     # hits respectively, one source each), drawn from the abstract's result
+     # sentence and the discussion/SONUÇ chunks. None echoes the query wording.
+     "context_any": ["20 mayıs ekimi",
+                     "mayıs ortası ile sonu arasındaki",
+                     "en yüksek tane verimi 20 mayıs ekim tarihinde"],
+     # dp_21713 (Kaya ve Kuşaksız, ANADOLU 2012; Alaşehir/Manisa, 4 melez mısır
+     # çeşidi x 4 ekim zamanı, 2003-2004): the study's own discussion states
+     # "20 Mayıs ekimi, en uygun ekim zamanı olarak tespit edilmiştir" and its
+     # SONUÇ VE ÖNERİLER corroborates without contradicting it - "20 Mayıs'tan
+     # sonra yapılan ekimlerde tane veriminin nispeten düşmeye başladığı...
+     # Alaşehir bölgesi için en uygun ekim zamanı Mayıs ortası ile sonu
+     # arasındaki dönemdir." A calendar date is exactly what a sowing-time
+     # answer states, not a results-table cell, and unlike dp_21712 (the dropped
+     # pea case) this document carries NO competing date: its literature
+     # citations agree that later sowing lowers yield.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["20 mayıs"]},
     # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
     # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
     # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
