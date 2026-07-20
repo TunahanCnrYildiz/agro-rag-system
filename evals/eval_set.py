@@ -447,9 +447,11 @@ CASES = [
      "corpus_class": "corpus-carried",
      "query": "Erzurum Oltu yöresinde hangi ahududu çeşitleri iyi adapte olur?",
      "retrieval": "nonempty", "products": "none",
-     # both anchors come from the CONCLUSION sentence itself, so ctx=True proves
-     # the verdict chunk - not merely the trial roster - is what retrieval lands
-     # on. That is exactly the check local_ege_durum_wheat failed above.
+     # both anchors are unique to dp_30474 corpus-wide (one is from the abstract's
+     # RESULTS sentence, the other recurs in materials + conclusion), so ctx=True
+     # still proves the source paper - not some other raspberry doc - is what
+     # retrieval lands on. That is exactly the check local_ege_durum_wheat failed
+     # above.
      "context_any": ["g meyve/sürgün", "yılda iki ürün veren"],
      # dp_30474 (Pehluvan ve Güleryüz, 2010; Erzurum-Oltu, 9 ahududu çeşidi,
      # 1999-2000): the study's own
@@ -475,7 +477,7 @@ CASES = [
      # which is what this case actually asserts; answer_any is untouched. Both
      # anchors are source text absent from the query wording (no query echo -
      # the quant_mera_nitrogen_dose precedent).
-     "context_any": ["hastalık skala değeri",
+     "context_any": ["en düşük hastalık skala değeri",
                      "en duyarlı çeşitler olarak belirlenmiştir"],
      # dp_1559843 (Kavlak ve ark., ANADOLU 2024; Ankara-Gölbaşı, 8 yazlık nohut
      # çeşidi, 2 yıl): the study's own SONUÇ VE ÖNERİLER states "Araştırma
