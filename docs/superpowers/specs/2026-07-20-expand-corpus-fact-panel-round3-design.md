@@ -134,6 +134,27 @@ is cheap.
 **Validation — every candidate, both directions:**
 - `python -m evals.run_eval --faithfulness --repeat 4 --only <id>`, recording the
   normal and ablated hit counts and the `_classify` label.
+- **`--faithfulness` alone cannot validate a case (learned in Task 2, confirmed
+  at `run_eval.py:323-325`).** It classifies on `answer_any` grounding only and
+  never reads `context_any`. A case can read a textbook `corpus-carried 4/4 vs
+  0/4` while retrieval never surfaces the source's finding at all — the grounding
+  firing on a list-echo (a trial's methods section names every cultivar tested,
+  and the model recites the roster). Slate rank 1 died exactly this way.
+  **Every candidate must ALSO pass a normal `python -m evals.run_eval --only <id>`
+  run with `ret=True ctx=True` before it ships.** This is doubly binding for the
+  cultivar-naming claim shape: there the asserted value is structurally present in
+  the source's own trial ROSTER as well as in its verdict — a trial's methods
+  section names every cultivar it tested — so `--faithfulness` alone can never
+  distinguish verdict from roster for that shape. The normal-run `ctx` check is
+  what proves retrieval landed on the verdict chunk and not the roster, which
+  makes it mandatory there, not merely advisable.
+- **Every `context_any` anchor must be verified UNIQUE to its source before the
+  case runs.** `context_any` is ANY-semantics, so one non-unique anchor makes a
+  green `ctx` meaningless — it cannot prove the intended document was retrieved.
+  Task 2 shipped an anchor occurring in the very paper Task 1 had rejected. Check
+  uniqueness by paginating the store, **case-insensitively** (the harness's
+  `_matches` is case-insensitive, and a source sentence starting "En düşük…" reads
+  as zero hits under a naive case-sensitive scan).
 - **A normal read of exactly 2/4 does not decide.** Escalate to `--repeat 8`:
   bpmorettini read 2/4 and was noise (7/8 real); guarbean read 2/4 and was
   retrieval-broken (0/8). `--repeat N` is all-or-nothing per sample, so mid reads
@@ -156,13 +177,20 @@ comments. No other file changes.
 3. `python -m pytest -q` — **180**, unchanged. No code changed, so a different
    number means something is wrong.
 
-**Process constraint (item 32's anti-pattern).** If subagents are used they need a
-**true worktree isolation**. Item 32's spawned task ran in the shared working tree,
-switched the branch under the controlling session, and its eval contended with the
-main session's eval over a single LM Studio — both runs ballooned to 1–2.5 hours.
-Also: a subagent that pauses mid-validation leaves provisional `corpus_class`
-labels that are untrustworthy; re-validate its work directly rather than trusting
-its labels.
+**Process constraint (item 32's anti-pattern).** **Subagents run in the SHARED
+working tree on branch `expand-corpus-fact-panel-round3`, strictly SEQUENTIALLY —
+never in a git worktree, never in the background.** A fresh worktree gets tracked
+files only, and both `data/vector_store/` (the corpus) and `.env` (the model
+config) are gitignored and untracked — an isolated worktree therefore cannot mine
+or run the eval at all, which is every task here. Item 32's anti-pattern was
+**concurrency**, not subagents: a BACKGROUND spawned task switched the branch under
+the controlling session and its eval fought the main session's eval over the single
+LM Studio (both ran 1–2.5 h). Sequential foreground subagents on one branch
+reproduce none of that. **Exactly one eval process at a time** — the controller runs
+nothing while a subagent is active; this is the constraint item 32 actually
+violated. Also: a subagent that pauses mid-validation leaves provisional
+`corpus_class` labels that are untrustworthy; re-validate its work directly rather
+than trusting its labels.
 
 **Ops reminder:** validation needs LM Studio serving bge-m3 + gemma at :1234, with
 gemma's Max Concurrent Predictions = 1 (parallel 4 overflows the RX 9070 XT VRAM

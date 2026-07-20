@@ -441,7 +441,9 @@ CASES = [
      # + English conclusion), which is what a recommendation answer says out
      # loud, not a results-table cell. The three answer_any forms are notations
      # of the SAME cultivar name, not a broadening.
-     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["remzibey-05", "remzibey 05", "remzibey"]},
     {"id": "local_oltu_raspberry", "category": "local", "corpus_fact": True,
      "corpus_class": "corpus-carried",
@@ -464,7 +466,9 @@ CASES = [
      # cultivars a model can emit with an empty corpus. Applying the
      # local_avocado_antalya lesson at authoring time TIGHTENS the assertion to
      # the corpus-specific names; it does not loosen it.
-     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["hollanda boduru", "newburg"]},
     {"id": "local_chickpea_blight_cultivars", "category": "local", "corpus_fact": True,
      "corpus_class": "corpus-carried",
@@ -487,7 +491,10 @@ CASES = [
      # states by NAME. Yield itself did NOT differ significantly between
      # cultivars, so disease resistance is the paper's whole finding. "Arda" is
      # excluded from answer_any: too short and common a token to anchor on.
-     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True (after the context-anchor
+     # realignment above), so the grounding is not a list-echo artifact off a
+     # methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["göktürk", "azkan"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
@@ -535,9 +542,22 @@ CASES = [
      # sonra yapılan ekimlerde tane veriminin nispeten düşmeye başladığı...
      # Alaşehir bölgesi için en uygun ekim zamanı Mayıs ortası ile sonu
      # arasındaki dönemdir." A calendar date is exactly what a sowing-time
-     # answer states, not a results-table cell, and unlike dp_21712 (the dropped
-     # pea case) this document carries NO competing date: its literature
-     # citations agree that later sowing lowers yield.
+     # answer states, not a results-table cell.
+     # NOTE, corrected 2026-07-20 after review: an earlier version of this
+     # comment claimed dp_21713 carries NO competing date and cites only
+     # Sağlamtimur (1994) on sowing time. Both claims are FALSE, verified
+     # against the store. Chunk 0 (page 1) carries a competing in-document date
+     # WINDOW from the literature review - Konak ve Demir (1987), "15 Nisan ile
+     # 1 Haziran tarihleri arasında yapılan ekimlerden elde edilen tane
+     # verimlerine, ekim tarihinin etkisinin olmadığını" - and Lauer et al.
+     # (1999) is a third cited sowing-date work. The case measured green
+     # ANYWAY. That is the sharper finding: a competing in-document date is NOT
+     # by itself disqualifying. What killed dp_21712 was narrower - there the
+     # rival figure was a single SPECIFIC date (25 Ekim) directly substitutable
+     # for the paper's own verdict, and the model stated it instead. Here the
+     # rival is a no-difference WINDOW, not a competing point value, and the
+     # paper's own "20 Mayıs" survives. Treat "carries a competing date" as a
+     # risk flag to screen, not as a rejection rule.
      # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
@@ -555,8 +575,14 @@ CASES = [
     # "25 Ekim" (and generic "erken dönem ekimi") rather than the paper's own
     # 22 Kasım verdict. The only way to green this is to accept a different
     # claim, which is the guarbean rule. Not retuned. A sowing-date candidate
-    # from a source WITHOUT a competing in-document date could still work
-    # (slate rank 6, dp_21713 maize, is untested).
+    # whose OWN verdict is not displaced by a substitutable competing POINT date
+    # can still work: slate rank 6 (dp_21713 maize, "20 Mayıs") was subsequently
+    # validated and SHIPPED above as technique_maize_sowing_date (corpus-carried,
+    # normal 4/4 ablated 0/4). Note dp_21713 is NOT free of a competing date - it
+    # carries one - but that rival is a no-difference WINDOW (Konak ve Demir's
+    # 15 Nisan-1 Haziran), not a single point value directly substitutable for the
+    # verdict the way this case's cited 25 Ekim is. See that case's NOTE for why
+    # "carries a competing date" is a risk flag to screen, not a rejection rule.
     # DROPPED 2026-07-19: technique_guarbean_row_spacing, "Sakız fasulyesi ot
     # üretimi için en uygun sıra arası mesafe kaç cm olmalıdır?" asserting
     # dp_257760's "4. SONUÇ VE ÖNERİLER" disjunction ("bitkilerin 20 veya 40 cm
