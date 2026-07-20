@@ -406,6 +406,96 @@ CASES = [
      # context also cites a generic "6 ay" (Bayram 2009), so the ablated model
      # says "6 ay"; the corpus carries the study's own "7 ay".
      "answer_any": ["7 ay"]},
+    # DROPPED 2026-07-20: local_ege_durum_wheat, "Ege Bölgesi koşullarında
+    # makarnalık buğday ekeceğim, verimi istikrarlı hangi çeşitler önerilir?"
+    # asserting dp_21741's (Ünsal, Geren ve Sevim, ANADOLU 2009) own conclusion
+    # "bölgede tavsiye edilebilecek stabil çeşitler; Sarıçanak 98, Ege 88 ve
+    # Salihli 92 çeşitleridir." The faithfulness read looked decisive (normal
+    # 4/4, ablated 0/4, labelled corpus-carried) but it is an ARTIFACT, caught
+    # by the normal run going ctx=False: retrieval never surfaces the
+    # conclusion chunk at all. The only dp_21741 chunk it lands on is the
+    # materials/methods list of all TWELVE trial cultivars ("Amanos 97, Aydın
+    # 93, Ceylan 95, Diyarbakır 81, Ege 88, ... Salihli 92, Sarıçanak 98 ve
+    # Sham I"), and the answer recites that roster verbatim as "çalışmalar
+    # kapsamında değerlendirilen örnekler" - it never states a recommendation.
+    # answer_any's tokens are members of that list, so grounding fires on the
+    # roster, not on the paper's verdict: the case measures list-echo, not
+    # corpus dependence. Not retuned - repointing context_any at the methods
+    # chunk would green it while asserting a DIFFERENT, weaker claim (that the
+    # trial exists) than the answer_any claim (which cultivars are recommended).
+    # Wheat's rule-2 crop slot is therefore NOT consumed by this round.
+    {"id": "local_diyarbakir_safflower", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Diyarbakır koşullarında hangi aspir çeşidi önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate's first anchor was "bitkide tabla sayısı", which appears
+     # NOWHERE in dp_1514564 (the paper writes "bitki başına tabla sayısı");
+     # corrected to the source's own wording. This is a transcription fix to a
+     # context anchor, not a loosened assertion - "ham yağ oranı" alone already
+     # carried ctx=True before and after.
+     "context_any": ["bitki başına tabla sayısı", "ham yağ oranı"],
+     # dp_1514564 (2025; Diyarbakır, üç yıllık aspir çeşit denemesi): the
+     # study's own conclusion states "Sonuç olarak, üç yıllık bu çalışmanın
+     # sonuçlarına dayanarak, Remzibey-05 çeşidi Diyarbakır ekolojik koşulları
+     # için önerilebilir." - a single-cultivar verdict, stated twice (TR abstract
+     # + English conclusion), which is what a recommendation answer says out
+     # loud, not a results-table cell. The three answer_any forms are notations
+     # of the SAME cultivar name, not a broadening.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["remzibey-05", "remzibey 05", "remzibey"]},
+    {"id": "local_oltu_raspberry", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Erzurum Oltu yöresinde hangi ahududu çeşitleri iyi adapte olur?",
+     "retrieval": "nonempty", "products": "none",
+     # both anchors are unique to dp_30474 corpus-wide (one is from the abstract's
+     # RESULTS sentence, the other recurs in materials + conclusion), so ctx=True
+     # still proves the source paper - not some other raspberry doc - is what
+     # retrieval lands on. That is exactly the check local_ege_durum_wheat failed
+     # above.
+     "context_any": ["g meyve/sürgün", "yılda iki ürün veren"],
+     # dp_30474 (Pehluvan ve Güleryüz, 2010; Erzurum-Oltu, 9 ahududu çeşidi,
+     # 1999-2000): the study's own
+     # conclusion states "Sonuç olarak yılda iki ürün veren Heritage, Hollanda
+     # Boduru ve Summit çeşitleri ile yılda tek ürün veren Newburg çeşidinin
+     # diğer çeşitlere göre yörede daha iyi adapte oldukları belirlenmiştir." -
+     # an adaptation verdict a natural answer states by cultivar NAME.
+     # "Heritage" and "Summit" are deliberately EXCLUDED from answer_any even
+     # though the paper names them: both are internationally famous raspberry
+     # cultivars a model can emit with an empty corpus. Applying the
+     # local_avocado_antalya lesson at authoring time TIGHTENS the assertion to
+     # the corpus-specific names; it does not loosen it.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["hollanda boduru", "newburg"]},
+    {"id": "local_chickpea_blight_cultivars", "category": "local", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Nohutta yanıklık hastalığına dayanıklılık bakımından hangi çeşitler öne çıkıyor?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate froze ["ilk bakla yüksekliği", "yüz tane ağırlığı"], but those
+     # are YIELD-trait phrases from the results tables (14 occurrences each) and
+     # retrieval never lands on those chunks - ctx read False while the verdict
+     # chunks WERE retrieved. Repointed at the paper's own disease-scale finding,
+     # which is what this case actually asserts; answer_any is untouched. Both
+     # anchors are source text absent from the query wording (no query echo -
+     # the quant_mera_nitrogen_dose precedent).
+     "context_any": ["en düşük hastalık skala değeri",
+                     "en duyarlı çeşitler olarak belirlenmiştir"],
+     # dp_1559843 (Kavlak ve ark., ANADOLU 2024; Ankara-Gölbaşı, 8 yazlık nohut
+     # çeşidi, 2 yıl): the study's own SONUÇ VE ÖNERİLER states "Araştırma
+     # sonucunda, Göktürk, Azkan ve Arda çeşitlerinin yanıklık hastalığına karşı
+     # daha dayanıklı oldukları ve bu nedenle bölge için daha uygun genotipler
+     # olduğu belirlenmiştir." - a resistant-cultivar verdict a natural answer
+     # states by NAME. Yield itself did NOT differ significantly between
+     # cultivars, so disease resistance is the paper's whole finding. "Arda" is
+     # excluded from answer_any: too short and common a token to anchor on.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True (after the context-anchor
+     # realignment above), so the grounding is not a list-echo artifact off a
+     # methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["göktürk", "azkan"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
@@ -431,6 +521,68 @@ CASES = [
      # bırakılan asmalarda en yüksek verim sağlanmıştır - the bud-load a
      # natural pruning answer would state, not a table cell.
      "answer_any": ["18 göz"]},
+    {"id": "technique_maize_sowing_date", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Alaşehir koşullarında ana ürün mısırda en uygun ekim zamanı nedir?",
+     "retrieval": "nonempty", "products": "none",
+     # the slate froze ["maverick", "c-955"], but neither is unique corpus-wide:
+     # a case-insensitive pass over the store finds "maverick" in fao_bt155e too
+     # and "c-955" in dp_21696, so a green ctx on those would not prove dp_21713
+     # was retrieved - the local_ege_durum_wheat lesson. Replaced BEFORE the
+     # first run with three phrases each unique to dp_21713 (2, 1 and 2 chunk
+     # hits respectively, one source each), drawn from the abstract's result
+     # sentence and the discussion/SONUÇ chunks. None echoes the query wording.
+     "context_any": ["20 mayıs ekimi",
+                     "mayıs ortası ile sonu arasındaki",
+                     "en yüksek tane verimi 20 mayıs ekim tarihinde"],
+     # dp_21713 (Kaya ve Kuşaksız, ANADOLU 2012; Alaşehir/Manisa, 4 melez mısır
+     # çeşidi x 4 ekim zamanı, 2003-2004): the study's own discussion states
+     # "20 Mayıs ekimi, en uygun ekim zamanı olarak tespit edilmiştir" and its
+     # SONUÇ VE ÖNERİLER corroborates without contradicting it - "20 Mayıs'tan
+     # sonra yapılan ekimlerde tane veriminin nispeten düşmeye başladığı...
+     # Alaşehir bölgesi için en uygun ekim zamanı Mayıs ortası ile sonu
+     # arasındaki dönemdir." A calendar date is exactly what a sowing-time
+     # answer states, not a results-table cell.
+     # NOTE, corrected 2026-07-20 after review: an earlier version of this
+     # comment claimed dp_21713 carries NO competing date and cites only
+     # Sağlamtimur (1994) on sowing time. Both claims are FALSE, verified
+     # against the store. Chunk 0 (page 1) carries a competing in-document date
+     # WINDOW from the literature review - Konak ve Demir (1987), "15 Nisan ile
+     # 1 Haziran tarihleri arasında yapılan ekimlerden elde edilen tane
+     # verimlerine, ekim tarihinin etkisinin olmadığını" - and Lauer et al.
+     # (1999) is a third cited sowing-date work. The case measured green
+     # ANYWAY. That is the sharper finding: a competing in-document date is NOT
+     # by itself disqualifying. What killed dp_21712 was narrower - there the
+     # rival figure was a single SPECIFIC date (25 Ekim) directly substitutable
+     # for the paper's own verdict, and the model stated it instead. Here the
+     # rival is a no-difference WINDOW, not a competing point value, and the
+     # paper's own "20 Mayıs" survives. Treat "carries a competing date" as a
+     # risk flag to screen, not as a rejection rule.
+     # corpus-carried (live 2026-07-20): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["20 mayıs"]},
+    # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
+    # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
+    # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
+    # yapılan ekimlerden sağlandığı". retrieval-broken (normal 0/4, ablated
+    # 0/4) - decisive at repeat 4, so no repeat-8 escalation (that is only for
+    # an exact 2/4 read). NOT a retrieval-plumbing failure: all four retrieved
+    # chunks are dp_21712 and "22 Kasım" IS in the context. The assertion is
+    # simply not answer-natural, because the SAME document carries a COMPETING
+    # date - its literature review cites Soya ve ark. (1989), Bornova, whose
+    # best sowing date was 25 Ekim. The model reads both and states the cited
+    # "25 Ekim" (and generic "erken dönem ekimi") rather than the paper's own
+    # 22 Kasım verdict. The only way to green this is to accept a different
+    # claim, which is the guarbean rule. Not retuned. A sowing-date candidate
+    # whose OWN verdict is not displaced by a substitutable competing POINT date
+    # can still work: slate rank 6 (dp_21713 maize, "20 Mayıs") was subsequently
+    # validated and SHIPPED above as technique_maize_sowing_date (corpus-carried,
+    # normal 4/4 ablated 0/4). Note dp_21713 is NOT free of a competing date - it
+    # carries one - but that rival is a no-difference WINDOW (Konak ve Demir's
+    # 15 Nisan-1 Haziran), not a single point value directly substitutable for the
+    # verdict the way this case's cited 25 Ekim is. See that case's NOTE for why
+    # "carries a competing date" is a risk flag to screen, not a rejection rule.
     # DROPPED 2026-07-19: technique_guarbean_row_spacing, "Sakız fasulyesi ot
     # üretimi için en uygun sıra arası mesafe kaç cm olmalıdır?" asserting
     # dp_257760's "4. SONUÇ VE ÖNERİLER" disjunction ("bitkilerin 20 veya 40 cm
