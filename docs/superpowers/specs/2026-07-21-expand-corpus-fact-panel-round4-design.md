@@ -108,6 +108,23 @@ crop-free (a soil pathogen) and consumes no crop slot.
 | sowing date | 1 | 2 |
 | (any brand-new shape) | 0 | 3 |
 
+**How a claim shape is defined — added 2026-07-21 after round 4's slate review found
+the cap being evaded by relabelling.** A shape is defined by the **STRUCTURE of the
+assertion** — a recommended value plus its unit; a named plant material; a duration; a
+list of named agents — **not by the application context or the unit's denominator.**
+Compost t/da, seed-treatment g/100 kg, pot fertilizer g/saksı and micronutrient ppm are
+therefore **ONE shape** (an input application rate), the same bucket as `nitrogen dose`.
+Likewise, "which rootstock is recommended for region X" is the same shape as "which
+cultivar is recommended for region X" — a region-adapted plant-material recommendation.
+**Slicing an existing shape finely enough to open a "new" bucket defeats the cap**, and
+round 4's first slate did exactly that: 9 of its 10 rows claimed brand-new buckets, four
+of which collapsed into the dose family under this definition.
+
+This is the failure this spec predicted for the ROUND-3 rule and did not fully close:
+"'same shape' is a judgment call, and a rule applied by judgment bends under mining
+pressure." Making the cap a cap rather than a ban was right; leaving the LABELLING free
+was the remaining gap.
+
 ### Do NOT re-mine these — already measured and dropped
 
 Re-trying them burns budget on known answers: Şebin walnut (`dp_1089365`),
