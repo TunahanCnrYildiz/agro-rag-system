@@ -62,6 +62,26 @@ which has not happened. Repairs applied:
 - **M-3** — row 3's low-discrimination `"oda sıcaklığ"` removed in favour of the
   25 °C notations.
 
+### Repair pass 2 — 2026-07-21 (second review, still pre-run)
+
+The slate failed a SECOND review before any run. Again nothing had been
+validated, so the frozen values were repaired in place.
+
+- **I-A — row 3 is a FALSE GUARD and is now UNSHIPPABLE.** Its `answer_any` is
+  satisfied by an answer that prescribes the very outcome the paper rejects. No
+  `answer_none` guardrail survives scrutiny. Full evidence in the row.
+- **I-B — row 8 had an undisclosed retrieval collision.** `dp_19566` recorded in
+  the row and in §3.
+- **I-C / M-A — row 10's contiguous-only compound forms created a false
+  negative.** Replaced with an ordered `answer_any` + `answer_none` pair that
+  keeps the wrong half unsatisfiable. The M-A self-contradiction dissolves with
+  the `+` form's removal.
+- **M-B — row 1's `"8 ton da"` removed** as a strict prefix of `"8 ton da-1"`
+  that also matches `8 ton daha`.
+
+**Shippable count falls from 7 to 6** — row 3's loss also empties the storage
+shape's last slot, which no other slate row can consume.
+
 **Rank order for the four shape-capped dose rows (Task 2 tries ONE):**
 **2 → 4 → 1 → 5.** Row 2 is strongest (the LOWEST tested dose won, so a
 "more is better" prior gives the wrong answer). Row 4 is a clean own-voice
@@ -82,10 +102,28 @@ the verdict in CODED form only.
 - **Rule check:** R1 pass · R2 pass (Ranunculus new to panel, 0 → 1; no slate-mate
   on this crop) · **R3 FAIL as a slate-mate** — only one of rows 1/2/4/5 may ship.
 - **proposed_query:** `Serada düğün çiçeği yetiştiriciliğinde dekara ne kadar kompost uygulamalıyım?`
-- **frozen_answer_any:** `["8 ton da-1", "8 ton da", "8 ton/da", "dekara 8 ton"]`
+- **frozen_answer_any:** `["8 ton da-1", "8 ton/da", "dekara 8 ton"]`
   (C-2: the bare `"8 ton"` is REMOVED — it also matched `8 ton/ha` and `8 tonluk`,
-  which are different values. All four remaining forms are fully denominated
+  which are different values. All three remaining forms are fully denominated
   notations of the same per-dekar rate; the paper writes it `8 ton da-1`.)
+- **M-B applied — `"8 ton da"` REMOVED.** It added no legitimate coverage and was
+  actively unsafe on both sides. It is a strict PREFIX of `"8 ton da-1"`, so every
+  answer it could legitimately catch was already caught by the denominated form;
+  and the right-hand guard is `(?!\d)` only, so a trailing LETTER passes:
+  ```
+  _matches("8 ton da", "8 ton daha fazla") = True     # false positive
+  _matches("8 ton da", "8 ton da-1")       = True     # already covered
+  ```
+  This is the same defect class as C-2's bare `"8 ton"`, missed on the first pass.
+- **Corpus-attestation of the remaining forms (stated, not a defect).** Only
+  `8 ton da-1` occurs in the store (dp_19434.pdf, pages 0, 2, 3, 4 — unique
+  corpus-wide). `"8 ton/da"` and `"dekara 8 ton"` return **ZERO corpus chunks**:
+  they are ANSWER-SIDE notations only. That is legitimate — `answer_any` is
+  matched against the model's answer, not against chunk text, and a model may
+  well denominate the rate in a notation the paper does not use. It is recorded
+  here so a later reader does not mistake the zero counts for dead anchors of the
+  kind C-1 removed. (The `context_any` anchors, which DO have to exist in the
+  store, are verified separately below.)
 - **frozen_context_any:** `["uygulama dozunun toprağa zarar",
   "Artan kompost seviyeleri, kontrol"]`
 - **Anchor locators (verified 2026-07-21):**
@@ -156,8 +194,13 @@ the verdict in CODED form only.
 *(round-3 slate row 7, unmeasured — carried forward verbatim)*
 
 - **claim_shape:** storage condition (panel 2 → 3 — **SHAPE NOW AT CAP**)
+- **STATUS: UNSHIPPABLE (I-A). Do NOT run this row.** The assertion does not test
+  what the case claims, and no guardrail repairs it. Evidence below. The row is
+  kept, not deleted, so round 5 does not re-mine dp_1338811 expecting it to work.
 - **Rule check:** R1 pass · R2 pass (tulip new, 0 → 1) · R3 pass at the cap; this
   is the ONE storage row rule 3 allows, so no other storage candidate may ship.
+  **Because this row is unshippable, the storage slot goes UNUSED this round** —
+  no other slate row is a storage claim, so it cannot be reallocated.
 - **proposed_query:** `Muş lalesi soğanlarını söküm sonrası yaz boyunca nasıl saklamalıyım?`
 - **frozen_answer_any:** `["25 °c", "25°c", "25 0c"]`
   (M-3: `"oda sıcaklığ"` REMOVED — the paper's own Methods call the control
@@ -179,10 +222,79 @@ the verdict in CODED form only.
   özelliklerinin incelendiği çalışmada incelenen bütün özelikler bakımından en iyi
   sonuçlar soğanların yaz döneminde **oda sıcaklığında (yaklaşık 25 0C'de)**
   bekletildiği kontrol uygulamasından elde edilmiştir."
-- **Why it should discriminate:** general knowledge says tulip bulbs need
+- **Why it was thought to discriminate:** general knowledge says tulip bulbs need
   chilling; this paper found the OPPOSITE for *T. sintenisii* (emergence 93.3 % at
   room temperature vs 56.6 % / 46.6 % after 1–2 months cold). An ablated model is
   likely to recommend chilling.
+
+#### I-A — why this row is a FALSE GUARD, and why no guardrail fixes it
+
+**The defect.** The row's stated discrimination is "an ablated model will
+recommend chilling; this paper found the opposite." But `answer_any` is a set of
+25 °C NOTATIONS, and 25 °C also appears inside answers that PRESCRIBE chilling —
+as a drying or curing step before the cold period. Verified:
+
+```
+_matches("25 °c", "soğanları 20-25 °c de kurutup sonra 4 °c de soğuklamaya alın")
+  = True
+```
+
+That answer is wrong in exactly the way the case exists to catch, and it grounds
+GREEN. So a green normal run would NOT establish that the model gave the paper's
+verdict, and the case would ship as a false guard.
+
+**Every candidate guardrail fails.** `answer_none` uses PLAIN substring matching,
+not `_matches` (`run_eval.py:88-90` — "guardrail stays PLAIN substring on
+purpose"), so it has no word boundary and no negation awareness. Tested against
+the wrong answer above and against four phrasings a CORRECT, corpus-grounded
+answer could plausibly take:
+
+| candidate | blocks the wrong answer? | also fires on a CORRECT answer? | verdict |
+|---|---|---|---|
+| `soğuklama` | yes | **YES** | rejected |
+| `soğuklamaya` | yes | **YES** | rejected |
+| `soğukta bekletme` | **no** | **YES** | rejected |
+| `ay soğukta` | **no** | **YES** | rejected |
+| `4 °c` | yes | no (in sample) | rejected — see below |
+| `+4 °c` | **no** | no | rejected |
+| `+6 °c` | **no** | no | rejected |
+| `buzdolab` | **no** | no | rejected |
+
+- `soğuklama` / `soğuklamaya` are **disqualified by the paper's own conclusion**,
+  which uses the word to state the CORRECT mechanism: "…kışın kar örtüsü altında
+  **soğuklama** ihtiyaçlarını karşıladığını…". The better an answer is grounded in
+  this source, the more likely it reproduces the guard term. Blocking it would
+  penalise precisely the answers the case wants.
+- `soğukta bekletme` / `ay soğukta` fire on a correct answer citing the paper's
+  own numbers ("1 ay soğukta bekletmede çıkış %56,6'ya düştü") while NOT blocking
+  the wrong answer, which says `soğuklamaya`. Wrong on both sides.
+- `4 °c` and `+4 °c` rest on a **false premise in the finding itself.** The paper's
+  cold treatment was **+6 °C in a buzdolabı** (Materyal ve Metot, p2: "…+6 0C'de
+  buzdolabında 1 ay süre ile bekletilmiş"), not 4 °C. So 4 °C is not "the outcome
+  the paper rejects" — it is a guess at one temperature a wrong model might name.
+  A model prescribing tulip chilling is at least as likely to say 5 °C or 9 °C
+  (the standard forcing range), neither of which `4 °c` blocks. And as a plain
+  substring with no boundary, `4 °c` fires inside `24 °c` and `14 °c`
+  (both verified True), so a correct answer giving a range like "20-24 °C" is
+  falsely blocked.
+
+**The general reason no guardrail exists.** The paper's verdict is a NEGATIVE
+claim — *do not chill*. A correct answer must therefore talk about chilling in
+order to reject it. Any lexical guard specific enough to catch a chilling
+PRESCRIPTION also catches a chilling REFUTATION, because plain substring matching
+cannot see the negation. The two answers differ in syntax, not vocabulary, and
+`answer_none` only sees vocabulary.
+
+**Why not repair it on the `answer_any` side instead.** Tying 25 °C to a storage
+verb would need a regex or a multi-term conjunction; `answer_any` is a flat
+ANY-list of `re.escape`d terms, so neither is expressible. Requiring a single
+long contiguous run (e.g. `yaz boyunca oda sıcaklığında`) reintroduces exactly
+the false-negative defect I-C removes from row 10.
+
+**Verdict: UNSHIPPABLE, recorded as slate-time map data.** Under this project's
+rule that a red case is DROPPED and never tuned green, shipping this row would
+have been worse than losing it: it could only have gone green for the wrong
+reason. Losing it costs the storage-shape slot, which no other row can use.
 
 ### 4. dp_21749 (2009) — gül (rose), saksıda fidan
 
@@ -388,6 +500,35 @@ the verdict in CODED form only.
   kontrol sistemi kullanılması önerilmektedir."
 - **RISK, carried from round 3:** double-disc openers are standard no-till
   practice; a plausible model-carried outcome. Kept as map data, ranked low.
+- **RISK — RETRIEVAL COLLISION with `dp_19566` (I-B, added on the second review).**
+  `dp_19566.pdf` (Karayel & Özmerzi — the SAME authors, same journal, same
+  research programme as dp_19517) also compares furrow openers, `çift diskli`
+  among them, and it **recommends a DIFFERENT opener**. Both `answer_any` terms hit
+  it hard:
+
+  | term | dp_19517 (the source) | dp_19566 (the collider) |
+  |---|---|---|
+  | `çift disk` | pages 0, 2, 3, 4, 5, 6, 7, 8 | **pages 0, 1, 2, 3, 4, 6, 7** |
+  | `çift diskli` | pages 0, 2, 3, 4, 5, 6, 7, 8 | **pages 0, 1, 2, 3, 4, 6, 7** |
+
+  dp_19566's own `4. Sonuç` (p7–8) reads: "…gömücü ayaklar arasında en düşük çizi
+  kesit alanı ve toprak kabarması **balta** gömücü ayak, en yüksek … ise çapa
+  gömücü ayak…". It judges openers on furrow cross-section and soil disturbance;
+  dp_19517 judges them on field emergence rate. Same vocabulary, different
+  criterion, **opposite winner.**
+
+  **Why the row still stands, unlike row 3.** Both `context_any` anchors are
+  dp_19517-unique corpus-wide (verified above), so `ctx=True` still pins the right
+  document — the collision cannot forge a green ctx. The hazard is to the
+  INTERPRETATION of a green run, not to its validity.
+
+  **What Task 2 must watch for.** If this row reads green, check that the retrieved
+  context is dp_19517 and not dp_19566 before recording it corpus-carried. A green
+  `answer_any` off a dp_19566 chunk would be grounding on a paper that recommends
+  balta — the answer would be right by accident. Conversely, if the row reads RED
+  with dp_19566 in context, that is a retrieval-collision finding, not a
+  model-carried one; record it as such and do not re-mine either paper in round 5.
+  This mirrors how row 10 already records dp_19448/dp_19471.
 
 ### 9. dp_257759 (2016) — Macar fiği + yem bezelyesi (forage legumes)
 
@@ -424,15 +565,103 @@ the verdict in CODED form only.
 - **claim_shape:** graft-material state — **NEW shape** (0 → 1; cap 3)
 - **Rule check:** R1 pass · R2 pass (grape 1 → 2, AT the absolute cap) · R3 pass
 - **proposed_query:** `Asma aşısında anaç çeliği ve kalem hangi sürme durumunda olmalı?`
-- **frozen_answer_any (I-5 — the COMBINATION, not its halves):**
-  `["sürmüş çelik x sürmemiş kalem", "sürmüş çelik × sürmemiş kalem",
-  "sürmüş çelik + sürmemiş kalem", "sürmüş çelik ile sürmemiş kalem"]`
-  (As previously frozen, `["sürmüş çelik", "sürmemiş kalem"]` split a compound
-  claim: under ANY-semantics an answer saying `sürmemiş çelik × sürmemiş kalem` —
-  **wrong on the rootstock cutting** — would still have grounded green on the
-  `"sürmemiş kalem"` half. The paper's verdict is the pairing. All four forms
-  above are notations of the SAME pairing; `_matches` is case-insensitive, so the
-  paper's capital `X` and a model's lowercase `x` both hit.)
+- **frozen_answer_any (I-C — the ORDERED claim, no contiguity demanded):**
+  `["sürmüş çelik", "sürmüş anaç", "çeliği sürmüş", "çeliğin sürmüş",
+  "çeliğinin sürmüş"]`
+- **frozen_answer_none (I-C — blocks the wrong half):** `["sürmüş kalem"]`
+
+#### I-C — why the four contiguous forms were replaced
+
+**The defect.** All four previously frozen forms (`A x B`, `A × B`, `A + B`,
+`A ile B`) required the answer to reproduce the compound notation as ONE
+CONTIGUOUS STRING. A perfectly correct, natural Turkish answer —
+"anaç çeliği sürmüş, kalem ise sürmemiş olmalıdır" — matches **none** of them,
+because the two halves are separated by a comma and an inflected clause. Under
+this project's rule that a red case is DROPPED as map data and never tuned green,
+that false negative would have been permanently recorded as a real finding about
+the corpus.
+
+**Two of the four were not even corpus-attested.** Verified against the store:
+
+| frozen form | corpus chunks |
+|---|---|
+| `sürmüş çelik x sürmemiş kalem` | dp_19426 pages 0, 7 |
+| `sürmüş çelik + sürmemiş kalem` | dp_19426 pages 3, 5 · **dp_19448 page 0** |
+| `sürmüş çelik × sürmemiş kalem` (U+00D7) | **ZERO** |
+| `sürmüş çelik ile sürmemiş kalem` | **ZERO** |
+
+**The replacement, and how it preserves the ordered claim.** The claim is a
+CONJUNCTION — *rootstock cutting sprouted* **AND** *scion unsprouted*. `answer_any`
+is an ANY-list and cannot express a conjunction. But the case does not need to;
+it needs the conjunction's TRUTH CONDITIONS, and those decompose:
+
+- `answer_any` asserts the **rootstock half** — the discriminating half. General
+  viticultural knowledge says graft material should be dormant, so the ablated
+  failure mode is `sürmemiş çelik × sürmemiş kalem`: right on the scion, **wrong on
+  the rootstock**. Requiring the rootstock half is what the old fix was reaching
+  for, and it is what actually carries the paper's surprise.
+- `answer_none` blocks the **wrong scion half**, `sürmüş kalem`. This closes the
+  only gap the `answer_any` list leaves open: an answer saying
+  `sürmüş çelik × sürmüş kalem` satisfies the rootstock half but is wrong on the
+  scion. With the guardrail it fails.
+
+Together the two fields are satisfied exactly when the answer asserts the
+rootstock cutting sprouted and does NOT assert the scion sprouted — the paper's
+pairing, with no contiguity required. Case analysis:
+
+| answer | `answer_any` | `answer_none` | result | correct? |
+|---|---|---|---|---|
+| `sürmüş çelik X sürmemiş kalem` | hit | clear | **green** | ✔ the verdict |
+| `anaç çeliği sürmüş, kalem ise sürmemiş olmalıdır` | hit (`çeliği sürmüş`) | clear | **green** | ✔ **false negative fixed** |
+| `sürmüş anaç çeliği ile sürmemiş kalem` | hit (`sürmüş anaç`) | clear | **green** | ✔ |
+| `sürmemiş çelik × sürmemiş kalem` | **no hit** | — | **red** | ✔ wrong rootstock half blocked |
+| `sürmüş çelik × sürmüş kalem` | hit | **tripped** | **red** | ✔ wrong scion half blocked |
+| `sürmemiş çelik × sürmüş kalem` | **no hit** | — | **red** | ✔ both halves wrong |
+
+Note the guardrail is safe against the CORRECT pairing: `answer_none` is plain
+substring, and `sürmemiş kalem` does **not** contain `sürmüş kalem`
+(`sürm-emiş` ≠ `sürm-üş`), so the right answer never trips its own guard.
+
+**Corpus attestation of the new forms (stated, per row 1's note).**
+`sürmüş çelik` → dp_19426 pages 0, 2, 3, 4, 5, 7 and dp_19448 pages 0, 2, 3, 4, 5.
+`sürmüş anaç` → dp_19448 page 2 only. `çeliği sürmüş`, `çeliğin sürmüş` and
+`çeliğinin sürmüş` → **ZERO corpus chunks** — answer-side inflections only, which
+is legitimate and is the whole point of the fix: the natural ANSWER phrasing is
+not the paper's phrasing.
+
+**Broadening test — same claim, or a different one?** All five `answer_any` forms
+assert one thing: the rootstock cutting had sprouted. They differ only by Turkish
+suffix (`çeliği` / `çeliğin` / `çeliğinin`) and word order. The bare form
+`anaç sürmüş` was CONSIDERED AND EXCLUDED: it drops the `çelik` noun, so it would
+also be satisfied by a claim about the rootstock VARIETY rather than the rootstock
+CUTTING — a different claim.
+
+**Residual limitation, recorded not hidden.** Neither field sees negation, so
+"sürmüş çelik kullanılmamalıdır" grounds green. This is inherent to substring
+matching and is NOT introduced by this fix — the four contiguous forms were
+equally negation-blind. It is recorded so a green run is not over-read.
+
+#### M-A — the self-contradiction is resolved
+
+The row previously argued that "dp_19448 writes the pairing with `+`, so no
+sibling can satisfy the anchors" while simultaneously listing
+`sürmüş çelik + sürmemiş kalem` in `answer_any` — a form that does match dp_19448
+page 0 (verified above). **The contradiction dissolves because the `+` form is now
+gone entirely.**
+
+The underlying confusion is worth naming, since it caused the error: the sibling
+argument is about **`context_any`**, which is matched against retrieved CHUNK TEXT
+and therefore must be source-unique. `answer_any` is matched against the MODEL'S
+ANSWER, where corpus uniqueness is not the relevant property at all. Mixing the
+two is what let a sibling-matching string sit inside a paragraph arguing that no
+sibling could match. Both `context_any` anchors remain dp_19426-unique and confined
+to the page-7 verdict chunk, so the sibling argument stands where it actually
+applies.
+
+One consequence must still be flagged for Task 2: `sürmüş çelik` occurs in
+dp_19448 as well as dp_19426, so if retrieval lands on dp_19448 the model could
+ground green off the SIBLING. That is why `ctx` must be checked, not just
+grounding — and it is the same discipline the row's existing risk note demands.
 - **frozen_context_any:** `["sürmüş çelik X sürmemiş kalem durumunun aşıda kullanılması",
   "Filizi kesilmemiş kalem durumunun en düşük değerleri"]`
 - **Anchor locators (verified 2026-07-21):**
@@ -487,7 +716,7 @@ the verdict in CODED form only.
 | Shape | Panel now | New allowed | Slate rows | Verdict |
 |---|---|---|---|---|
 | self-fertility verdict | 4 | 0 | **0** | ✔ |
-| storage duration / condition | 2 | 1 | **1** (row 3) | ✔ at cap |
+| storage duration / condition | 2 | 1 | **1** (row 3) | ✘ **row 3 UNSHIPPABLE (I-A) — slot goes unused** |
 | nitrogen dose | 2 | 1 | **0** | ✔ |
 | resistant-cultivar list | 2 | 1 | **0** | ✔ |
 | region-adapted cultivar rec. | 2 | 1 | **0** | ✔ |
@@ -513,7 +742,7 @@ shape and row 6 is not new at all.
 |---|---|---|---|---|
 | 1 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 3) |
 | 2 | input application rate | 1 | 0 | **ELIGIBLE — try first** (rank 1) |
-| 3 | storage duration / condition | 1 | 0 | ELIGIBLE, at cap |
+| 3 | storage duration / condition | 1 | 1 | **UNSHIPPABLE (I-A)** — false guard, no guardrail repairs it |
 | 4 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 2) |
 | 5 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 4) |
 | 6 | region-adapted plant-material rec. | 1 | 0 | ELIGIBLE, consumes last slot |
@@ -522,9 +751,15 @@ shape and row 6 is not new at all.
 | 9 | irrigation level (new) | 3 | 2 | ELIGIBLE |
 | 10 | graft-material state (new) | 3 | 2 | ELIGIBLE |
 
-**Maximum shippable this round is therefore 7, not 10** (one of rows 1/2/4/5,
-plus rows 3, 6, 7, 8, 9, 10). Rows 1, 4 and 5 are kept, not deleted, so round 5
+**Maximum shippable this round is therefore 6, not 10** (one of rows 1/2/4/5,
+plus rows 6, 7, 8, 9, 10). Rows 1, 4 and 5 are kept, not deleted, so round 5
 can reconsider them once the input-application-rate bucket's cap is revisited.
+
+**Was 7 before the second review; row 3 is now UNSHIPPABLE (I-A).** Row 3 was the
+slate's only storage-shape row, so its slot cannot be reallocated and the storage
+bucket stays at 2 of 3. The shortfall against the spec's +4 target is therefore
+NOT driven by the shape caps alone — one row was lost to assertion quality, found
+at slate time rather than after a run. That is the cheap place to find it.
 
 Four of ten rows open a brand-new shape bucket (was: nine). Every shape the panel
 already uses is at or near its cap, so the headroom left is in those four new
@@ -643,3 +878,20 @@ re-learn a recorded lesson):**
   on the same graft combination with UV-C. Shipping one of these AND dp_19426
   would put two cases on one retrieval path. They are recorded here as dp_19426's
   anchor-uniqueness hazard, not as independent candidates.
+  **Second-review addendum:** dp_19448 also matches row 10's new `answer_any` term
+  `sürmüş çelik` (pages 0, 2, 3, 4, 5) and `sürmüş anaç` (page 2). Row 10's
+  `context_any` anchors remain dp_19426-unique, so `ctx` still discriminates — but
+  a green grounding with dp_19448 in context is grounding off the SIBLING and must
+  not be recorded as corpus-carried for dp_19426.
+
+- `dp_19566` — **added on the second review (I-B) as slate row 8's collision
+  hazard.** Karayel & Özmerzi, the same authors and journal as row 8's source
+  `dp_19517`, comparing the same furrow openers. `çift disk` / `çift diskli` — both
+  of row 8's `answer_any` terms — hit it on **7 pages (0, 1, 2, 3, 4, 6, 7)**. Its
+  conclusion recommends **balta**, a DIFFERENT opener, because it judges openers on
+  furrow cross-section and soil disturbance rather than on emergence rate.
+  Recorded here, not as a candidate: it is not being mined, it is being watched.
+  Row 8's ctx anchors are dp_19517-unique so ctx still pins the right document, but
+  Task 2 must confirm the retrieved context is dp_19517 before recording a green as
+  corpus-carried. Do not mine dp_19566 in round 5 either — as a candidate in its own
+  right it would collide with row 8 the same way in reverse.

@@ -144,6 +144,56 @@ binding constraint was assertion QUALITY, not supply — most were results-table
 that fail the answer-naturalness test. Never shortlist on a match count alone: `amasya`'s
 hits were a province in a beetle survey, `gemlik`'s were olive-oil authenticity.
 
+### STANDING RULE — verify every anchor against the STORED CHUNK TEXT, never against the PDF
+
+**Added 2026-07-21 after round 4's first slate review. This is the round's most
+transferable lesson and it binds every future round.**
+
+An anchor must be confirmed present **as a contiguous run in the vector store**,
+queried programmatically, before it is written into a slate. A PDF reader, a
+copy-paste of the paper, or the source quote in a slate row is **NOT evidence that
+an anchor matches.** The store's text is the product of PDF extraction, and it
+differs from what the paper looks like.
+
+**Round 4's first slate had TEN of its twenty anchors dead on arrival** — rows 1,
+2, 6 and 9 had ZERO working anchors, so `ctx` could never have gone green for
+them. Every one had been read off the PDF and looked perfect. Three defect classes,
+all invisible in a PDF reader:
+
+1. **Line breaks mid-phrase.** Extraction preserves the paper's line wrapping, so
+   the store holds `toprağa zarar \nvermeden`, `kentsel \nkatı atık`,
+   `ekimden önce \nayçiçeği`, `çıkış oranı\nindeksi`. `_matches` does **no
+   whitespace normalization** — it is `re.escape(term)` against raw chunk text — so
+   a space in the anchor cannot match a newline in the store. This killed 8 of the
+   10. Any anchor longer than a few words is likely to straddle a line break
+   somewhere; the longer the anchor, the likelier it is dead.
+2. **Curly punctuation.** The store holds U+2019 (`’`), not ASCII `'`. An anchor
+   typed with a straight apostrophe silently matches nothing.
+3. **Replacement characters.** Extraction can emit U+FFFD where the PDF had a
+   glyph it could not map — the store holds `gonca�çiçek sayısı` where the paper
+   shows `gonca-çiçek sayısı`.
+
+**This check belongs at slate time, not at validation time.** It costs one
+read-only store query per anchor and no model time. Deferred to validation it
+costs a full generation run to discover, and — worse — a dead anchor does not fail
+loudly: it produces `ctx=False`, which reads as a *retrieval-broken finding about
+the corpus* rather than as a typo in the slate. A round-3 candidate was nearly
+recorded that way. **A dead anchor is a slate bug that disguises itself as map
+data**, which is why it must be caught before it can contaminate the map.
+
+Practical form of the check: for each anchor, scan the store's chunks with the
+exact `_matches` semantics, case-insensitively and corpus-wide, and record the
+hit count, the source, and the pages. That same query simultaneously satisfies the
+uniqueness rule above, so the two checks are one query, not two. **If an anchor
+returns zero chunks, do not shorten it by guesswork — read the stored chunk and
+pick a run that exists in it.**
+
+Note the rule is about `context_any`, which is matched against retrieved CHUNK
+TEXT. `answer_any` is matched against the MODEL'S ANSWER, so an `answer_any` form
+with zero corpus hits is legitimate — a model may use a notation the paper does
+not. Slates should say so explicitly where it occurs, so a zero count is not later
+mistaken for a dead anchor of the kind this rule exists to catch.
+
 **Per-candidate validation, in this order — the order is deliberate:**
 
 1. **Anchor uniqueness** (before any run, case-insensitive). Cheapest check, and round 3
