@@ -244,6 +244,15 @@ CASES = [
      # registered from the same breeding line - Potomac, Blake's Pride,
      # Shenandoah, Sunrise, Gem. A natural answer lists these resistant names.
      # corpus-carried (live 2026-07-18, repeat 4): normal 4/4, ablated 0/4.
+     # LIST-ECHO AUDIT 2026-07-20 - CLEAR. This case predates the normal-run ctx
+     # gate, and its cultivar-naming shape is the one structurally exposed to the
+     # local_ege_durum_wheat artifact (names can come from a trial ROSTER instead
+     # of the verdict). Audited directly: normal run reads ret=True ctx=True, and
+     # the retrieved dp_1399494 p.9 chunk IS the verdict chunk - it carries BOTH
+     # context_any anchors AND the Potomac/Blake's Pride/Shenandoah/Sunrise/Gem
+     # registration sentence in the same chunk, so ctx=True proves the finding was
+     # retrieved, not a roster. Both anchors also verified UNIQUE to dp_1399494
+     # corpus-wide (7 and 1 chunks respectively, no other source).
      "answer_any": ["potomac", "blake", "shenandoah", "sunrise"]},
     {"id": "disease_rhizoctonia_biocontrol", "category": "disease", "corpus_fact": True,
      # model-carried (live 2026-07-18, repeat 4): grounded 4/4 even ablated -
@@ -431,9 +440,17 @@ CASES = [
      # the slate's first anchor was "bitkide tabla sayısı", which appears
      # NOWHERE in dp_1514564 (the paper writes "bitki başına tabla sayısı");
      # corrected to the source's own wording. This is a transcription fix to a
-     # context anchor, not a loosened assertion - "ham yağ oranı" alone already
-     # carried ctx=True before and after.
-     "context_any": ["bitki başına tabla sayısı", "ham yağ oranı"],
+     # context anchor, not a loosened assertion.
+     # ANCHOR TIGHTENED 2026-07-20 (final-review Minor): the second anchor was
+     # "ham yağ oranı", which occurs in FOUR sources (dp_1071763 x6, dp_1514564
+     # x2, dp_19433 x2, dp_21746 x1 - the last a canola cultivar-yield trial,
+     # semantically adjacent to this query). Since context_any is ANY-semantics,
+     # that anchor could carry a green ctx without dp_1514564 being retrieved at
+     # all. Replaced with "çalışmanın sonuçlarına dayanarak", from the paper's own
+     # conclusion sentence: verified UNIQUE to dp_1514564 corpus-wide and verified
+     # PRESENT in the live retrieved context for this query. It echoes neither the
+     # query wording nor the asserted value. Both anchors are now source-unique.
+     "context_any": ["bitki başına tabla sayısı", "çalışmanın sonuçlarına dayanarak"],
      # dp_1514564 (2025; Diyarbakır, üç yıllık aspir çeşit denemesi): the
      # study's own conclusion states "Sonuç olarak, üç yıllık bu çalışmanın
      # sonuçlarına dayanarak, Remzibey-05 çeşidi Diyarbakır ekolojik koşulları
