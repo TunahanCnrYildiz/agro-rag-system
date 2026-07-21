@@ -648,6 +648,59 @@ CASES = [
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["atlatma", "atlatma sık"]},
+    {"id": "technique_maize_sowing_opener", "category": "horticulture",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "İkinci ürün mısırın doğrudan ekiminde hangi gömücü ayak tipi daha iyi çıkış sağlar?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, and are unique to dp_19517 corpus-wide. They are NOT
+     # equally strong. "yürütüldüğü iklim ve toprak koşulları için" is 1 chunk
+     # and IS the page-8 verdict chunk; "yan tekerlek" is 10 chunks over pages
+     # 0, 2, 3, 4, 6, 7, 8 - source-unique but NOT verdict-confined, so on its
+     # own it proves only that dp_19517 was retrieved. context_any is
+     # ANY-semantics, so the honest claim is: ctx=True proves the source, and
+     # only the first anchor pins the conclusion.
+     "context_any": ["yan tekerlek",
+                     "yürütüldüğü iklim ve toprak koşulları için"],
+     # dp_19517 (2007; ikinci ürün mısır, doğrudan ekim, gömücü ayak x derinlik
+     # kontrol sistemi): the study's own conclusion states "Sonuç olarak, bu
+     # araştırmanın yürütüldüğü iklim ve toprak koşulları için, ikinci ürün
+     # mısırın doğrudan ekiminde, daha yüksek tarla filiz çıkış oranı ve çıkış
+     # oranı indeksi ve daha düşük ortalama çıkış süresi için çift diskli gömücü
+     # ayak ve yan tekerlek ... kullanılması önerilmektedir." (confirmed verbatim
+     # in docs/books/dp_19517.pdf, page 8) - naming the opener is exactly what a
+     # "hangi gömücü ayak tipi" answer states, not a results-table cell.
+     # Recorded risk, checked not assumed: double-disc openers are standard
+     # no-till practice, so a model-carried read was plausible. It did NOT
+     # materialise (ablated 0/4).
+     # RETRIEVAL COLLISION, checked not assumed: dp_19566 (Karayel & Özmerzi -
+     # the same authors, journal and research programme) also compares furrow
+     # openers including "çift diskli" and recommends a DIFFERENT one (balta),
+     # judging openers on furrow cross-section rather than emergence rate. Both
+     # answer_any terms hit it on 7 pages, so a green grounding off a dp_19566
+     # chunk would be right by accident. The retrieved context was therefore
+     # inspected directly: all FOUR chunks are dp_19517 (pages 0, 0, 8, 1),
+     # including the page-8 verdict chunk. dp_19566 does not enter context.
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive, so
+     # no repeat-8 escalation (that is only for an exact 2/4 read). The normal
+     # run also reads ret=True ctx=True, so the grounding is not a list-echo
+     # artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["çift disk", "çift diskli"]},
+    # UNMEASURED 2026-07-21 (round-4 stopping rule, not a finding): slate rows 9
+    # (dp_257759, Macar fiği/yem bezelyesi "%75 tarla kapasitesi" irrigation
+    # level) and 10 (dp_19426, asma aşısı "sürmüş çelik X sürmemiş kalem"
+    # graft-material state) were never run. Round 4's stopping rule fires at 4
+    # corpus-carried ships, and this case was the fourth. Both rows' context_any
+    # anchors WERE re-verified against the store first and all four are present,
+    # contiguous and source-unique (r9: 2 chunks + 1 chunk, both page 4,
+    # dp_257759-only; r10: 1 chunk each, both page 7, dp_19426-only), so round 5
+    # can pick them up as-is. Neither is dropped and neither is a map finding -
+    # they are simply unreached. Row 9 carries a recorded model-carried risk
+    # ("75 % of field capacity" is a generic irrigation figure) and row 10 a
+    # recorded sibling-collision risk (dp_19448/dp_19471, same group, same graft
+    # combination), so both still need the ablated direction run first.
     # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
     # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
     # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
