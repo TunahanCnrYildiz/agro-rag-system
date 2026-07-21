@@ -278,11 +278,52 @@ measured counts, so a future session does not re-chase them as data gaps.
 
 ## 4. Exit gates
 
-1. `python -m evals.run_eval --faithfulness --repeat 4` — whole panel, exit 0.
+1. `python -m evals.run_eval --faithfulness --repeat 4` — whole panel. **See the two-stage
+   protocol below: a flag is not automatically a failure.**
 2. `python -m evals.run_eval --no-context --only local` — exit 0.
 3. `python -m pytest -q` — **180**, unchanged.
 4. `git diff --stat main..HEAD` — only `evals/eval_set.py`, this spec, the plan, and the
    round-4 slate.
+
+### STANDING RULE — the drift gate is TWO-STAGE
+
+**Adopted 2026-07-21, after round 4's own gate run. This amends gate 1 above and binds every
+future round.**
+
+Run `--faithfulness --repeat 4` over the whole panel. **Every flagged case is then measured
+ONCE at `--repeat 8`, and that verdict is FINAL in both directions** — a repeat-8 red is a
+real regression and merge stops; a repeat-8 green clears the flag. There is no second
+escalation. **"Re-run until it goes green" is forbidden**: that is tuning-to-green at the
+gate level, the same defect as widening an assertion to rescue a red case.
+
+**Why the gate needed this.** Round 4's run exited 1, flagging `local_deveci_pear` (1/4) and
+`quant_rose_pot_fertilizer_dose` (1/4). Both then measured **6/8 with ablated 0/8** — no
+regression existed. The branch had changed no code and no corpus, only appended independent
+case dicts, so no existing case *could* regress because of it. A gate defined purely as
+"repeat 4 exits 0" therefore fails while nothing is wrong, and will do so more often as the
+panel grows and intermittent cases accumulate.
+
+**Why NOT simply raise the whole-panel gate to `--repeat 8`** — measured, and it is the
+expensive non-fix. `_classify`'s threshold is PROPORTIONAL (`normal ≥ n/2`), so extra samples
+sharpen the estimate without moving the bar: they help a high-`p` case and barely touch a
+borderline one.
+
+| case `p` | false alarm at repeat 4 | at repeat 8 |
+|---|---|---|
+| 0.875 | 1.2% | 0.1% |
+| 0.750 | 5.1% | 2.7% |
+| 0.625 | 15.2% | **13.7%** |
+
+Panel-wide that is **29.7% → 21.1% for double the runtime** (~80 min → ~160 min), and about
+two-thirds of the remaining 21% comes from a single borderline case. The two-stage protocol
+costs ~95 min and reached the identical conclusion.
+
+**Recorded observation, not yet acted on:** `quant_rose_pot_fertilizer_dose` grounds at
+`p ≈ 0.625` (pooled 10 of 16) against a clean ablated 0/8. Its corpus-dependence is real but
+its own noise swamps its signal, and it cannot be repaired — the source writes "3 ile
+6 g/saksı" in its verdict chunk, so the model sometimes reports the range, and widening
+`answer_any` to accept that is a different claim. It stays for now; drop it only if its
+pooled `p` keeps falling across future runs, never on a single bad read.
 
 **Execution constraint:** shared working tree, **strictly sequential** subagents (or
 inline), **exactly one eval process at a time**. Worktree isolation is impossible here —
