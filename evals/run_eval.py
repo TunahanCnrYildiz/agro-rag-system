@@ -117,7 +117,10 @@ def _corpus_ablated():
     ablate nothing and quietly "prove" the corpus load-bearing.
     """
     original = engine.retrieve_context
-    engine.retrieve_context = lambda query, k=None: ""
+    # Accept any signature the real retrieve_context grows (it gained a `history`
+    # kwarg): the stub must swallow whatever answer() passes, or ablation crashes
+    # instead of ablating.
+    engine.retrieve_context = lambda *a, **kw: ""
     try:
         yield
     finally:
