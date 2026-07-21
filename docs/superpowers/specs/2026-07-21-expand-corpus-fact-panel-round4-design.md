@@ -96,10 +96,9 @@ crop-free (a soil pathogen) and consumes no crop slot.
 | Claim shape | Now | New allowed |
 |---|---|---|
 | self-fertility verdict | 4 | **0** (already over; grandfathered) |
+| **named plant material** (was: `resistant-cultivar list` 2 + `region-adapted cultivar rec.` 2 — ONE family, see below) | **5** | **0** (already over; **grandfathered**) |
 | storage duration / condition | 2 | 1 |
-| nitrogen dose | 2 | 1 |
-| resistant-cultivar list | 2 | 1 |
-| region-adapted cultivar rec. | 2 | 1 |
+| **input application rate** (was: `nitrogen dose`) | 2 | 1 |
 | harvest timing | 1 | 2 |
 | drying pretreatment | 1 | 2 |
 | biocontrol-agent list | 1 | 2 |
@@ -125,6 +124,55 @@ This is the failure this spec predicted for the ROUND-3 rule and did not fully c
 pressure." Making the cap a cap rather than a ban was right; leaving the LABELLING free
 was the remaining gap.
 
+#### `named plant material` is ONE family, and it is ALREADY OVER CAP — adjudicated 2026-07-21
+
+**Added by the final whole-branch review, which found the amendment above still
+being evaded in the very table it amends.** The table previously carried
+`resistant-cultivar list` (2) and `region-adapted cultivar rec.` (2) as SEPARATE
+buckets. They are not separate. Both assert **a named plant material** — the exact
+structure the amendment lists as one of its four canonical shapes — and they differ
+only in the **application context** that motivates the naming (disease resistance vs
+regional adaptation). Splitting on application context is precisely the evasion the
+amendment bans; the amendment banned it for the dose family and then left it
+standing one row above.
+
+The split also does not survive contact with the cases. `local_oltu_raspberry`'s
+assertion is a **two-name LIST** ("hollanda boduru", "newburg") yet sat in the
+"region-adapted" bucket, while the fireblight and chickpea lists sat in
+"resistant-cultivar list". So the recorded split was never singular-vs-list either —
+it was disease-resistance vs regional adaptation, i.e. application context, full stop.
+
+**Ruling: `named plant material` is one family. It currently holds FIVE cases,
+against a cap of 3:**
+
+| # | case id | why it is named plant material |
+|---|---|---|
+| 1 | `disease_fireblight_resistant` | names resistant cultivars |
+| 2 | `local_chickpea_blight_cultivars` | names resistant cultivars |
+| 3 | `local_diyarbakir_safflower` | names a region-adapted cultivar |
+| 4 | `local_oltu_raspberry` | names region-adapted cultivars (a two-name list) |
+| 5 | `local_antalya_grapefruit_rootstock` | names a region-adapted rootstock — **shipped THIS round; this is the case that landed at the collapse point** |
+
+**Grandfathered, exactly as `self-fertility verdict` (4 against a cap of 3) already
+is. The five existing cases REMAIN VALID GUARDS and are not removed, retuned, or
+renamed. But NO NEW named-plant-material case may be added — ever, in any round.**
+A cap binds FORWARD; it does not delete guards that were measured and shipped
+honestly under a labelling that was wrong. Deleting them would trade a real
+retrieval guard for a bookkeeping tidy, which is the wrong direction.
+
+Note what this costs round 5, stated so it is not rediscovered as a surprise: the
+"local cultivar recommendation" vein — round 3's and round 4's most productive
+source of candidates — is now **CLOSED**. Round 5 must mine other shapes, and the
+only headroom left is in the four buckets round 4 opened (training-system choice,
+sowing-implement choice, irrigation level, graft-material state) and in genuinely
+new shapes.
+
+`local_antalya_grapefruit_rootstock` is recorded as the case that landed at the
+collapse point: it shipped as the last member of the merged family before the
+family was recognised as over cap. It is not a rule violation by the author — the
+family did not exist as one bucket when it was mined — and it is not being
+unshipped. It is the boundary marker.
+
 ### Do NOT re-mine these — already measured and dropped
 
 Re-trying them burns budget on known answers: Şebin walnut (`dp_1089365`),
@@ -143,6 +191,22 @@ of every shortlisted source**. Round 3 found 237 sources passing a naive filter,
 binding constraint was assertion QUALITY, not supply — most were results-table ranges
 that fail the answer-naturalness test. Never shortlist on a match count alone: `amasya`'s
 hits were a province in a beetle survey, `gemlik`'s were olive-oil authenticity.
+
+- **A mine-time REJECTION is a collision signal, not a deletion. Added 2026-07-21
+  after round 4's final review.** Rejecting a source removes it from the candidate
+  pool; it does NOT remove it from the vector store, so it remains fully
+  retrievable and can still take a shipped case's retrieval path. **Before ranking
+  the surviving rows, re-check each one against the rejection list for a source
+  sharing its CROP and its INPUT/intervention, and record the collision in the row
+  or de-rank it.** This is a read-only slate-time check, done in the same pass as
+  anchor uniqueness, and it costs no model time. Round 4 paid for skipping it: it
+  rejected `dp_19431` (sunflower + humic acid, Ankara) as multi-valued, then ranked
+  `dp_19600` (sunflower + humic acid, Ankara) **RANK 1 with no collision note**.
+  That row measured retrieval-broken with all four retrieved chunks from
+  `dp_19431`. A contributing cause was a one-word error in the rejection list —
+  `dp_19431` was recorded as "aspir" (safflower) rather than sunflower, which made
+  the two rows look unrelated. **Crop labels in a rejection list are load-bearing**,
+  because the next round's collision check reads them.
 
 ### STANDING RULE — verify every anchor against the STORED CHUNK TEXT, never against the PDF
 

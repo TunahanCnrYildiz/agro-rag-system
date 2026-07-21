@@ -540,6 +540,12 @@ CASES = [
      # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): under
+     # ANY-semantics "carrizo sitranj" and "carrizo citrange" are DEAD entries -
+     # both contain "carrizo", so anything they could match the bare form
+     # already matched (verified). Harmless, but they overstate the assertion's
+     # breadth to a reader: the case really asserts one token, "carrizo".
+     # answer_any is frozen post-validation, so this is documented, not edited.
      # The slate's recorded risk - that Carrizo citrange is an internationally
      # famous citrus rootstock the model might name unaided, the
      # local_avocado_antalya failure mode - did NOT materialise: 0/4 ablated.
@@ -644,6 +650,11 @@ CASES = [
      # table-conditioned figure vs an unconditioned conclusion), which SHIPPED -
      # not the guarbean either/or. The paper explicitly REJECTS seyrek dikim
      # ("seyrek dikim uygulaması kesinlikle önerilmezken").
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): "atlatma sık"
+     # is a DEAD entry under ANY-semantics - it contains "atlatma", so the bare
+     # form already matched everything it could (verified). The case really
+     # asserts one token, "atlatma". answer_any is frozen post-validation, so
+     # this is documented, not edited.
      # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
@@ -683,6 +694,11 @@ CASES = [
      # chunk would be right by accident. The retrieved context was therefore
      # inspected directly: all FOUR chunks are dp_19517 (pages 0, 0, 8, 1),
      # including the page-8 verdict chunk. dp_19566 does not enter context.
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): "çift diskli"
+     # is a DEAD entry under ANY-semantics - _matches' right guard is (?!\d)
+     # only, so the bare "çift disk" already matches "çift diskli" (verified).
+     # The case really asserts one token, "çift disk". answer_any is frozen
+     # post-validation, so this is documented, not edited.
      # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive, so
      # no repeat-8 escalation (that is only for an exact 2/4 read). The normal
      # run also reads ret=True ctx=True, so the grounding is not a list-echo
@@ -701,6 +717,28 @@ CASES = [
     # ("75 % of field capacity" is a generic irrigation figure) and row 10 a
     # recorded sibling-collision risk (dp_19448/dp_19471, same group, same graft
     # combination), so both still need the ablated direction run first.
+    #
+    # WHERE THE ROWS ACTUALLY ARE (added 2026-07-21 by the final review - the
+    # block above says "pick them up as-is" but recorded no path, no query and no
+    # anchor text, so a cold session could not act on it):
+    #   docs/superpowers/2026-07-21-round4-candidate-slate.md, section 1,
+    #   rows 9 and 10. Query, answer_any, answer_none, context_any and the full
+    #   anchor locators are frozen there. COPY them; do not re-derive them.
+    #
+    # WARNING - ROW 9's ANCHOR CONTAINS U+2019, NOT AN ASCII APOSTROPHE.
+    # The anchor is "kapasitesinin %25’ine düşmesine sebep olan kuraklıklar".
+    # COPY IT FROM THE SLATE; DO NOT RETYPE IT. Re-verified 2026-07-21 against
+    # the store with the exact _matches semantics, corpus-wide:
+    #   U+2019 form (’)  -> 2 chunks, dp_257759.pdf page 4   (correct)
+    #   ASCII form  (')  -> ZERO chunks                      (dead)
+    # This is the same defect class that killed 10 of 20 anchors earlier this
+    # round (spec section 3, "verify every anchor against the STORED CHUNK
+    # TEXT"), and it is the dangerous kind: a retyped anchor does not fail
+    # loudly, it produces ctx=False, which reads as a retrieval-broken FINDING
+    # about the corpus rather than as a typo. Row 9's own slate entry records
+    # that its previous ASCII-apostrophe anchor was dead for exactly this reason.
+    # Row 10's two anchors are plain ASCII and were also re-verified the same
+    # day: 1 chunk each, dp_19426.pdf page 7.
     # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
     # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
     # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
@@ -832,6 +870,31 @@ CASES = [
      # "6 g" form is listed. Recorded risk: the paper also reports that
      # 12 g/saksı DEPRESSED plant height - a supporting finding, not a competing
      # recommendation.
+     # RECORDED RISK, SECOND PART (added 2026-07-21 by the final review; the
+     # 12 g line above was only half the picture). "6 g/saksı" ALSO MATCHES A
+     # RANGE that includes 6, because _matches' left guard is (?<!\w) and that
+     # does not break on "-", on a space, or on "ve"/"ile". Verified:
+     #   _matches("6 g/saksı", "3-6 g/saksı")     = True
+     #   _matches("6 g/saksı", "4-6 g/saksı")     = True
+     #   _matches("6 g/saksı", "3 ve 6 g/saksı")  = True
+     #   _matches("6 g/saksı", "3 ile 6 g/saksı") = True
+     # This is not hypothetical: dp_21749 ITSELF writes the range form for
+     # individual traits in the same SONUÇ VE ÖNERİLER block as the verdict -
+     # "Yaprak kuru madde oranı açısından en iyi sonuç 3 ile 6 g/saksı
+     # dozlarından elde edilmektedir" (page 10, the verdict chunk) and "3 ve
+     # 6 g/saksı'lık dozlar ... en başarılı sonucu vermektedir" (pages 6, 7, 8,
+     # 10). So a corpus-grounded answer that reports the RANGE rather than the
+     # paper's single-dose verdict grounds GREEN on a DIFFERENT claim.
+     # Why this is recorded and NOT fixed: it does not make the case a false
+     # guard. Corpus dependence is untouched - the range forms are as
+     # corpus-dependent as the verdict, and the ablated read is 0/4 either way.
+     # answer_any is FROZEN post-validation and was NOT narrowed; narrowing a
+     # measured assertion after the fact would invalidate the measurement it was
+     # measured under. Recorded so a green read on this case is understood as
+     # "the model stated 6 g/saksı, possibly inside a 3-6 range", not as "the
+     # model stated the paper's single-dose verdict".
+     # (Note the guard is not useless: "6-12 g/saksı" does NOT match, since that
+     # string does not contain "6 g/saksı" at all.)
      # corpus-carried (live 2026-07-21): normal 3/4, ablated 0/4 - not an exact
      # 2/4 read, so no repeat-8 escalation. The normal run also reads ret=True
      # ctx=True (and prod=True), so the grounding is not a list-echo artifact

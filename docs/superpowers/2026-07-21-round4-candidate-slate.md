@@ -24,6 +24,38 @@ Rows 3, 4, 5 and 8 are the round-3 slate's **unmeasured** rows (7, 8, 9 and 10),
 carried forward where the assertion is unchanged. They cost nothing to re-mine
 and their round-3 rule checks still hold under round 4's rules.
 
+### STANDING RULE earned by round 4 — a mine-time rejection is a COLLISION SIGNAL
+
+**Added 2026-07-21 by the final whole-branch review. This binds every future
+round, and it is what §3's `dp_19431` mislabel hid.**
+
+**When a source is rejected at mining time, re-check the SURVIVING rows for
+same-crop / same-input collisions with it BEFORE ranking them.** §3 rejects
+sources; it does not thereby make them harmless. A rejected source stays in the
+vector store and stays fully retrievable, so it can still take a shipped case's
+retrieval path.
+
+How this cost round 4 its rank-1 row, in order:
+
+1. §3 rejected `dp_19431` — a **sunflower + humic-acid, Ankara-region** paper —
+   as multi-valued by application timing.
+2. Row 2 (`dp_19600`) is **also sunflower + humic acid, also Ankara**, and was
+   ranked **RANK 1 with no collision note at all.**
+3. Row 2 then died exactly there: retrieval-broken, `ctx=False`, with **all four
+   retrieved chunks from `dp_19431`**. `dp_19600` never entered context.
+
+The collision was foreseeable at slate time from the two rows sitting in the same
+document, for free, with no model time spent. **What made it invisible was the
+mislabel**: recorded as "aspir", `dp_19431` read as a safflower paper and looked
+unrelated to a sunflower row. One wrong crop word in a rejection list is what
+turned a predictable collision into a spent validation run.
+
+The check is mechanical and belongs beside the anchor-uniqueness check (spec §3,
+same slate-time slot, also read-only): for every shippable row, scan §3 for a
+rejected source sharing its crop AND its input/intervention, and record the
+collision in the row — or de-rank it. Row 8 got this treatment for `dp_19566`
+(I-B) and survived because the check was actually done; row 2 did not.
+
 ---
 
 ## 0. Repair pass — 2026-07-21 (pre-run, no value measured yet)
@@ -159,6 +191,14 @@ the verdict in CODED form only.
   `nitrogen dose` (panel 2, cap 3, **1 slot free**). Competes with rows 1, 4, 5.
 - **STATUS: RANK 1 of the four dose rows — this is the ONE Task 2 tries first.**
   Shipping it consumes the bucket's last slot and blocks rows 1, 4 and 5.
+- **POST-RUN, added 2026-07-21 by the final review (retrospective — the frozen
+  values above are untouched): this row DIED of an UNRECORDED COLLISION with
+  `dp_19431`**, the sunflower + humic-acid paper §3 rejected at mining time.
+  Measured retrieval-broken; all four retrieved chunks were `dp_19431` and
+  `dp_19600` never entered context. The collision was predictable from §3 alone —
+  same crop, same input, same region — and this row was ranked 1 with no
+  collision note because §3 mislabelled `dp_19431` "aspir". See the standing rule
+  in the header, and the drop-log in `evals/eval_set.py`.
 - **Rule check:** R1 pass · R2 pass (sunflower new to panel, 0 → 1) · R3 pass as
   the single row taking the input-application-rate bucket's remaining slot.
 - **proposed_query:** `Ayçiçeğinde ekim öncesi tohuma humik asit uygulaması hangi dozda yapılmalı?`
@@ -799,9 +839,17 @@ These were read and rejected BEFORE any candidate line was written.
 **Ambiguous / multi-valued assertion (the guar-bean class — greening it needs a
 DIFFERENT claim):**
 
-- `dp_19431` aspir + humik asit — genuinely multi-valued by timing: 18 g/da to the
-  soil at sowing, 12 g/da at the 4–5 leaf stage, 6 g/da later. No single value is
-  *the* answer.
+- `dp_19431` **ayçiçeği (sunflower)** + humik asit, Akdeniz Üniv. — genuinely
+  multi-valued by timing: 18 g/da to the soil at sowing, 12 g/da at the 4–5 leaf
+  stage, 6 g/da later. No single value is *the* answer.
+  **CROP CORRECTED 2026-07-21 (final review).** This entry previously read
+  "aspir + humik asit" (safflower). That was a MISLABEL, and it was not cosmetic —
+  see the post-round rule below. Verified against the store: dp_19431's title is
+  "Humik asit uygulama zamanı ve dozlarının **ayçiçeğinde** (*Helianthus annuus*)
+  verim, verim öğeleri ve yağ oranına etkisi"; across its 27 chunks the string
+  `ayçiçe` occurs **21 times** and `aspir` occurs **ZERO** times. The drop-log for
+  `quant_sunflower_humic_seed_dose` in `evals/eval_set.py` says sunflower and is
+  correct; this document was the one that was wrong.
 - `dp_19415` çilek tüplü vs frigo fide — an explicit either/or: tüplü wins on
   earliness, frigo on total yield per plant.
 - `dp_21717`/`dp_21736`/`dp_21737` fiğ+buğday "%70-30 karışım oranı" — the same
