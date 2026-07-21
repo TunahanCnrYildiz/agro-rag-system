@@ -521,6 +521,14 @@ _NOPRODUCT_MARKER = "[NOPRODUCT]"
 # stream_answer buffers until it can (dis)confirm a marker - size off the longest
 _LONGEST_MARKER = max(len(_OFFSCOPE_MARKER), len(_NOPRODUCT_MARKER))
 
+# Clean characters to accumulate before the stream starts flowing to the client.
+# Larger than any control marker (so the marker is fully visible and stripped
+# first) and larger than a reasoning-exhaustion truncation fragment (~20 chars),
+# so such a fragment never reaches the client and can be retried instead. The
+# only cost is that the first paint waits for this many characters - negligible
+# against generation latency.
+_STREAM_WARMUP = 80
+
 
 def _strip_markers(text: str) -> tuple[str, bool, bool]:
     """Return (clean_text, off_scope, no_product).
@@ -582,14 +590,23 @@ def stream_answer(
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
 
-    # Buffer the opening tokens so we can detect+strip a leading control marker
-    # before streaming it to the client, and drop products if one fired.
+    # Hold back the opening tokens until we have a WARMUP's worth of clean content
+    # (marker stripped). Two jobs at once: (1) strip a leading control marker
+    # before it reaches the client; (2) never emit a reasoning-exhaustion
+    # truncation. The model sometimes spends its whole token budget on
+    # reasoning_content and finishes with `length` after only a word or two (the
+    # streaming form of the item-20 blank-answer bug). While nothing has been
+    # emitted yet, that is recoverable: fall back to the non-streaming path, which
+    # completes reliably. Once we have warmed up (a real answer is flowing), a
+    # late truncation is no longer recoverable, but by then the user has a usable
+    # answer rather than a stray fragment like "Orkideler".
     off_scope = False
     no_product = False
     buffer = ""
-    checked = False
+    warmed = False
     emitted = False
     failed = False
+    finish = None
     has_advice = True   # cleared when we fall back instead of answering
     try:
         client = _get_llm()
@@ -600,36 +617,50 @@ def stream_answer(
             **_sampling_kwargs(),
         )
         for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if not chunk.choices:
+                continue
+            fr = getattr(chunk.choices[0], "finish_reason", None)
+            if fr:
+                finish = fr
+            delta = chunk.choices[0].delta.content
             if not delta:
                 continue
-            if checked:
+            if warmed:
                 yield _sse({"type": "token", "content": delta})
                 emitted = True
                 continue
             buffer += delta
-            # Decide once we have enough leading text to (dis)confirm the marker.
-            if len(buffer.lstrip()) >= _LONGEST_MARKER or len(buffer) > 40:
-                clean, off_scope, no_product = _strip_markers(buffer)
-                checked = True
-                if clean:
-                    yield _sse({"type": "token", "content": clean})
-                    emitted = True
+            clean, off_scope, no_product = _strip_markers(buffer)
+            if len(clean) >= _STREAM_WARMUP:
+                yield _sse({"type": "token", "content": clean})
+                emitted = True
+                warmed = True
                 buffer = ""
     except Exception as exc:  # noqa: BLE001
         failed = True
         has_advice = False
         yield _sse({"type": "token", "content": _llm_unavailable_message(exc)})
-    # Flush any leftover (very short answers that never hit the decision point).
-    if not checked and buffer:
+
+    if not warmed and not failed:
+        # The stream ended before a full warmup. Either a genuinely short answer
+        # (finish 'stop') - emit it as-is - or a length-truncation (the reasoning-
+        # exhaustion bug, zero-or-few tokens). Nothing has reached the client, so
+        # a truncation retries safely on the reliable non-streaming path.
         clean, off_scope, no_product = _strip_markers(buffer)
+        if finish == "length":
+            try:
+                text = _complete_text(messages)
+            except Exception as exc:  # noqa: BLE001
+                text = _llm_unavailable_message(exc)
+            has_advice = _has_advice(text)
+            clean, off_scope, no_product = _strip_markers(text)
         if clean:
             yield _sse({"type": "token", "content": clean})
             emitted = True
 
     if not emitted and not failed:
-        # The model streamed nothing at all - the same blank-output bug answer()
-        # guards against. Nothing reached the client yet, so retrying is safe.
+        # Backstop: the stream produced nothing usable and finish was not
+        # 'length' (e.g. an empty 'stop'). Same blank-output guard as answer().
         try:
             text = _complete_text(messages)
         except Exception as exc:  # noqa: BLE001
