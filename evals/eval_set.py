@@ -513,6 +513,39 @@ CASES = [
      # realignment above), so the grounding is not a list-echo artifact off a
      # methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["göktürk", "azkan"]},
+    {"id": "local_antalya_grapefruit_rootstock", "category": "local",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Antalya koşullarında Marsh Seedless altıntop için hangi anaç önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, and both are unique to dp_19511 corpus-wide (1 and 2
+     # chunks). Both are drawn from the page-10 VERDICT chunk, which is the
+     # property that matters here: dp_19511's literature review cites Carrizo
+     # repeatedly, and page 9 carries a near-identical same-direction claim in
+     # ANOTHER author's voice (Ecomides ve Gregoriou, 1993). Anchors confined to
+     # the verdict chunk cannot be satisfied by that page-9 citation. The second
+     # anchor's 2 chunks are page 0 (abstract) and page 10 (conclusion), both
+     # dp_19511's own voice.
+     "context_any": ["Sonuç olarak incelenen tüm faktörler",
+                     "açısından en iyi sonuçlar Carrizo sitranjı"],
+     # dp_19511 (2008; Antalya, Marsh Seedless altıntop x anaç denemesi): the
+     # study's own conclusion states "Sonuç olarak incelenen tüm faktörler göz
+     # önüne alındığında bölgemiz koşullarında yetiştirilen Marsh Seedless
+     # altıntopu için Carrizo sitranjı anacı, en iyi sonucu vermiştir." - a
+     # rootstock recommendation is stated by NAME in any natural answer, not
+     # read off a results table. The three answer_any forms are notations of the
+     # SAME rootstock name, not a broadening.
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     # The slate's recorded risk - that Carrizo citrange is an internationally
+     # famous citrus rootstock the model might name unaided, the
+     # local_avocado_antalya failure mode - did NOT materialise: 0/4 ablated.
+     # What the model loses without the corpus is the Antalya-specific verdict,
+     # not the name's existence.
+     "answer_any": ["carrizo", "carrizo sitranj", "carrizo citrange"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
@@ -579,6 +612,42 @@ CASES = [
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["20 mayıs"]},
+    {"id": "technique_tomato_training_system", "category": "horticulture",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Serada salkım domateste hangi terbiye sistemi önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, 1 chunk each and unique to dp_19468 corpus-wide. They
+     # prove DIFFERENT things and are held together on purpose: "karşı telin
+     # üzerinden atlatarak" is the page-2 METHODS chunk (Çizelge 1), so it
+     # proves the source but NOT the verdict; "uygulamasının üreticiye tavsiye
+     # edilebilecek" IS the page-4 verdict chunk. context_any is ANY-semantics,
+     # so ctx=True on its own guarantees only the source, not the conclusion.
+     "context_any": ["karşı telin üzerinden atlatarak",
+                     "uygulamasının üreticiye tavsiye edilebilecek"],
+     # dp_19468 (2009; Antalya serası, M19 salkım domates, terbiye sistemi x
+     # dikim sıklığı): the study's own 4. Sonuç states "Sonuç olarak salkım
+     # domates yetiştiriciliğinde atlatma sık dikim uygulamasının üreticiye
+     # tavsiye edilebilecek bir terbiye sistemi olduğu tespit edilmiştir." -
+     # "atlatma" is a Turkish-specific greenhouse training term a model has
+     # little reason to emit unaided, and naming the system is exactly what a
+     # "hangi terbiye sistemi" answer does. The query was NARROWED at slate time
+     # to the training system alone (it previously also asked dikim sıklığı):
+     # answer_any covered only the training half, so a correct answer leading
+     # with density would have scored red. That removes a false-negative path;
+     # answer_any was NOT widened.
+     # Recorded risk, checked not assumed: the results section names "kontrol
+     # sık dikim" as the highest-YIELD treatment while the conclusion recommends
+     # "atlatma sık". That is the technique_grape_bud_load structure (a
+     # table-conditioned figure vs an unconditioned conclusion), which SHIPPED -
+     # not the guarbean either/or. The paper explicitly REJECTS seyrek dikim
+     # ("seyrek dikim uygulaması kesinlikle önerilmezken").
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["atlatma", "atlatma sık"]},
     # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
     # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
     # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
@@ -664,4 +733,63 @@ CASES = [
      # azot" - same value, alternate notation, matching the wheat case's "16 kg
      # saf azot" precedent.
      "answer_any": ["10 kg/da", "10 kg/da azot", "10 kg n", "10 kg azot"]},
+    # DROPPED 2026-07-21: quant_sunflower_humic_acid_dose, "Ayçiçeğinde ekim
+    # öncesi tohuma humik asit uygulaması hangi dozda yapılmalı?" asserting
+    # dp_19600's own conclusion "100 kg tohuma 60 g humik asit dozunun ise
+    # ekimden önce ayçiçeği tohumlarına uygulanabileceği". retrieval-broken
+    # (normal 0/4, ablated 0/4) - decisive at repeat 4, so no repeat-8
+    # escalation (that is only for an exact 2/4 read). The normal run also reads
+    # ctx=False, and the reason is a RETRIEVAL COLLISION, not dead anchors: both
+    # context_any anchors were re-verified in the store the same day (present as
+    # contiguous runs, 1 chunk each, unique to dp_19600 corpus-wide, both in the
+    # page-4 verdict chunk). All FOUR retrieved chunks are dp_19431 - a
+    # different Ankara ayçiçeği + humik asit paper, which the round-4 slate had
+    # already rejected at mining time as multi-valued (18 g/da at sowing, 12 at
+    # the 4-5 leaf stage, 6 later). dp_19600 never enters context at all, so the
+    # model answers off the collider's doses and never states 60 g/100 kg. The
+    # only way to green this is to accept dp_19431's different claim, which is
+    # the guarbean rule. Not retuned. Do not re-mine dp_19600 and dp_19431
+    # against each other in round 5: they collide by construction (same crop,
+    # same input, same question wording).
+    {"id": "quant_rose_pot_fertilizer_dose", "category": "nutrition",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Saksıda gül fidanı yetiştirirken hümik asitli kompoze gübreden saksı başına ne kadar vermeliyim?",
+     "retrieval": "nonempty", "products": "some",
+     # anchor honesty (the local_oltu_raspberry model): both anchors are unique
+     # to dp_21749 corpus-wide, re-verified against the STORE 2026-07-21 as
+     # contiguous runs, case-insensitively. They are NOT equally strong.
+     # "18 kg harç için en olumlu sonucu" is a single chunk and sits in the
+     # page-10 VERDICT chunk, next to "6 g/saksı"; "yaprak kuru madde oranı" is
+     # 6 chunks spread over pages 0, 4, 7, 8, 10 - source-unique but NOT
+     # verdict-confined, so on its own it would only prove dp_21749 was
+     # retrieved, not that the conclusion was. context_any is ANY-semantics, so
+     # the honest claim is: ctx=True proves dp_21749 and nothing else was the
+     # source; only the first anchor pins the verdict chunk.
+     "context_any": ["yaprak kuru madde oranı",
+                     "18 kg harç için en olumlu sonucu"],
+     # dp_21749 (2009; saksıda gül fidanı, hümik asitli kompoze gübre dozları):
+     # the study's own conclusion states "6 g/bitki gübre dozunun sağlıklı gül
+     # yetiştirmek ve en fazla sayıda çiçek elde etmek açısından en uygun doz
+     # olacağı sonucuna varılmıştır" (and "özellikle 6 g/saksı'lık gübre
+     # dozunda en olumlu sonuç elde edilmiştir") - a per-pot rate is exactly
+     # what a "ne kadar vermeliyim" answer states, not a results-table cell.
+     # The paper states the SAME value both as g/saksı and g/bitki, so those
+     # answer_any forms are notations of one value, not a broadening; no bare
+     # "6 g" form is listed. Recorded risk: the paper also reports that
+     # 12 g/saksı DEPRESSED plant height - a supporting finding, not a competing
+     # recommendation.
+     # corpus-carried (live 2026-07-21): normal 3/4, ablated 0/4 - not an exact
+     # 2/4 read, so no repeat-8 escalation. The normal run also reads ret=True
+     # ctx=True (and prod=True), so the grounding is not a list-echo artifact
+     # off a methods chunk (the local_ege_durum_wheat trap). NOTE the 3/4: this
+     # case grounds intermittently, so a single full-eval sample can read
+     # ground=False (one was observed). That is the deveci-anchor situation the
+     # _classify docstring records - the label is majority-based on purpose -
+     # not a reason to widen answer_any.
+     # This case took the input-application-rate bucket's last slot only because
+     # slate rank 1 (dp_19600 sunflower) dropped retrieval-broken above; rows 1
+     # (dp_19434 Ranunculus) and 5 (dp_21704 marul) stay BLOCKED BY SHAPE CAP
+     # and are held for round 5.
+     "answer_any": ["6 g/saksı", "6 g saksı", "6 g/bitki", "saksı başına 6 g"]},
 ]
