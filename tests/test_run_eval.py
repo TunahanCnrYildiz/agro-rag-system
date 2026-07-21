@@ -195,6 +195,18 @@ def test_corpus_ablated_empties_the_path_answer_uses(monkeypatch):
     assert engine.retrieve_context("x") == "REAL"
 
 
+def test_corpus_ablated_accepts_the_call_answer_actually_makes():
+    """answer() calls retrieve_context(message, history=...). The ablation stub
+    must accept that exact call, or --faithfulness / --no-context crash with a
+    TypeError instead of ablating. The test above only called it positionally, so
+    when retrieve_context grew a `history` kwarg the drift slipped through and the
+    ablation path was silently broken. This exercises the real call shape."""
+    with run_eval._corpus_ablated():
+        assert engine.retrieve_context(
+            "x", history=[{"role": "user", "content": "q"}]) == ""
+        assert engine.retrieve_context("x", k=4, history=None) == ""
+
+
 LOCAL_CASE = [{
     "id": "local_probe", "category": "local", "query": "q",
     "retrieval": "nonempty", "products": "none",
