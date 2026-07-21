@@ -372,26 +372,33 @@ def test_retrieve_context_searches_every_expanded_query(monkeypatch):
 # --------------------------------------------------------------------------- #
 # stream_answer() — the production path (/api/chat with stream=true)
 # --------------------------------------------------------------------------- #
-def _fake_stream_llm(chunks):
-    """Minimal streaming client: yields chunks with .choices[0].delta.content."""
+def _fake_stream_llm(chunks, finish=None):
+    """Minimal streaming client: yields chunks with .choices[0].delta.content,
+    then (if `finish` is given) a final content-less chunk carrying that
+    finish_reason - exactly how the OpenAI stream signals 'length'/'stop'."""
     class _Delta:
         def __init__(self, c):
             self.content = c
 
     class _Choice:
-        def __init__(self, c):
+        def __init__(self, c, fr=None):
             self.delta = _Delta(c)
+            self.finish_reason = fr
 
     class _Chunk:
-        def __init__(self, c):
-            self.choices = [_Choice(c)]
+        def __init__(self, c, fr=None):
+            self.choices = [_Choice(c, fr)]
+
+    seq = [_Chunk(c) for c in chunks]
+    if finish is not None:
+        seq.append(_Chunk(None, finish))
 
     class _Client:
         class chat:
             class completions:
                 @staticmethod
                 def create(**kwargs):
-                    return iter([_Chunk(c) for c in chunks])
+                    return iter(seq)
 
     return _Client()
 
@@ -693,3 +700,43 @@ def test_stream_answer_passes_history_to_retrieval(monkeypatch):
     list(engine.stream_answer("Toprak nasıl olmalı?", history))
 
     assert seen["history"] == history
+
+
+def test_stream_answer_recovers_from_length_truncation_after_a_few_tokens(monkeypatch):
+    """The reasoning-exhaustion bug in STREAMING form: the model emits its marker
+    plus a couple of words, then finish_reason='length' with nothing more. The old
+    guard only caught a ZERO-token stream, so this truncated fragment ('Orkideler')
+    reached the user. stream_answer must instead fall back to the non-streaming
+    path, which completes reliably, and the fragment must NOT be streamed."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["[NOPRODUCT] Orkideler"], finish="length"))
+    monkeypatch.setattr(
+        engine, "_complete_text",
+        lambda msgs: "[NOPRODUCT] Orkideler icin bahce topragi uygun degildir; "
+                     "epifit olduklari icin agac kabugu ve perlit tercih edilir.")
+
+    out = "".join(engine.stream_answer("Topragi nasil olmali?"))
+    text = _sse_tokens(out)
+
+    assert "bahce topragi uygun degildir" in text     # the full fallback answer
+    assert text.strip() != "Orkideler"                # NOT the truncated fragment
+    assert "[NOPRODUCT]" not in text                  # marker still stripped
+
+
+def test_stream_answer_keeps_a_short_answer_that_finished_cleanly(monkeypatch):
+    """A genuinely short answer that finishes with 'stop' (not 'length') is a real
+    answer, not a truncation - it must be emitted, never retried away."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["Evet, bu mumkundur."], finish="stop"))
+    monkeypatch.setattr(
+        engine, "_complete_text",
+        lambda msgs: pytest.fail("must not retry a cleanly-finished short answer"))
+
+    out = "".join(engine.stream_answer("Bu mumkun mu?"))
+    assert _sse_tokens(out) == "Evet, bu mumkundur."
