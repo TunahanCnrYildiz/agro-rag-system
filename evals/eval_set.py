@@ -244,6 +244,15 @@ CASES = [
      # registered from the same breeding line - Potomac, Blake's Pride,
      # Shenandoah, Sunrise, Gem. A natural answer lists these resistant names.
      # corpus-carried (live 2026-07-18, repeat 4): normal 4/4, ablated 0/4.
+     # LIST-ECHO AUDIT 2026-07-20 - CLEAR. This case predates the normal-run ctx
+     # gate, and its cultivar-naming shape is the one structurally exposed to the
+     # local_ege_durum_wheat artifact (names can come from a trial ROSTER instead
+     # of the verdict). Audited directly: normal run reads ret=True ctx=True, and
+     # the retrieved dp_1399494 p.9 chunk IS the verdict chunk - it carries BOTH
+     # context_any anchors AND the Potomac/Blake's Pride/Shenandoah/Sunrise/Gem
+     # registration sentence in the same chunk, so ctx=True proves the finding was
+     # retrieved, not a roster. Both anchors also verified UNIQUE to dp_1399494
+     # corpus-wide (7 and 1 chunks respectively, no other source).
      "answer_any": ["potomac", "blake", "shenandoah", "sunrise"]},
     {"id": "disease_rhizoctonia_biocontrol", "category": "disease", "corpus_fact": True,
      # model-carried (live 2026-07-18, repeat 4): grounded 4/4 even ablated -
