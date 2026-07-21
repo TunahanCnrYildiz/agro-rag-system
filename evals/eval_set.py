@@ -513,6 +513,45 @@ CASES = [
      # realignment above), so the grounding is not a list-echo artifact off a
      # methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["göktürk", "azkan"]},
+    {"id": "local_antalya_grapefruit_rootstock", "category": "local",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Antalya koşullarında Marsh Seedless altıntop için hangi anaç önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, and both are unique to dp_19511 corpus-wide (1 and 2
+     # chunks). Both are drawn from the page-10 VERDICT chunk, which is the
+     # property that matters here: dp_19511's literature review cites Carrizo
+     # repeatedly, and page 9 carries a near-identical same-direction claim in
+     # ANOTHER author's voice (Ecomides ve Gregoriou, 1993). Anchors confined to
+     # the verdict chunk cannot be satisfied by that page-9 citation. The second
+     # anchor's 2 chunks are page 0 (abstract) and page 10 (conclusion), both
+     # dp_19511's own voice.
+     "context_any": ["Sonuç olarak incelenen tüm faktörler",
+                     "açısından en iyi sonuçlar Carrizo sitranjı"],
+     # dp_19511 (2008; Antalya, Marsh Seedless altıntop x anaç denemesi): the
+     # study's own conclusion states "Sonuç olarak incelenen tüm faktörler göz
+     # önüne alındığında bölgemiz koşullarında yetiştirilen Marsh Seedless
+     # altıntopu için Carrizo sitranjı anacı, en iyi sonucu vermiştir." - a
+     # rootstock recommendation is stated by NAME in any natural answer, not
+     # read off a results table. The three answer_any forms are notations of the
+     # SAME rootstock name, not a broadening.
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): under
+     # ANY-semantics "carrizo sitranj" and "carrizo citrange" are DEAD entries -
+     # both contain "carrizo", so anything they could match the bare form
+     # already matched (verified). Harmless, but they overstate the assertion's
+     # breadth to a reader: the case really asserts one token, "carrizo".
+     # answer_any is frozen post-validation, so this is documented, not edited.
+     # The slate's recorded risk - that Carrizo citrange is an internationally
+     # famous citrus rootstock the model might name unaided, the
+     # local_avocado_antalya failure mode - did NOT materialise: 0/4 ablated.
+     # What the model loses without the corpus is the Antalya-specific verdict,
+     # not the name's existence.
+     "answer_any": ["carrizo", "carrizo sitranj", "carrizo citrange"]},
 
     # --- horticulture technique corpus_fact cases (Zone-3 dependence map) ---
     {"id": "technique_carob_graft_diameter", "category": "horticulture", "corpus_fact": True,
@@ -579,6 +618,127 @@ CASES = [
      # normal run also reads ret=True ctx=True, so the grounding is not a
      # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["20 mayıs"]},
+    {"id": "technique_tomato_training_system", "category": "horticulture",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Serada salkım domateste hangi terbiye sistemi önerilir?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, 1 chunk each and unique to dp_19468 corpus-wide. They
+     # prove DIFFERENT things and are held together on purpose: "karşı telin
+     # üzerinden atlatarak" is the page-2 METHODS chunk (Çizelge 1), so it
+     # proves the source but NOT the verdict; "uygulamasının üreticiye tavsiye
+     # edilebilecek" IS the page-4 verdict chunk. context_any is ANY-semantics,
+     # so ctx=True on its own guarantees only the source, not the conclusion.
+     "context_any": ["karşı telin üzerinden atlatarak",
+                     "uygulamasının üreticiye tavsiye edilebilecek"],
+     # dp_19468 (2009; Antalya serası, M19 salkım domates, terbiye sistemi x
+     # dikim sıklığı): the study's own 4. Sonuç states "Sonuç olarak salkım
+     # domates yetiştiriciliğinde atlatma sık dikim uygulamasının üreticiye
+     # tavsiye edilebilecek bir terbiye sistemi olduğu tespit edilmiştir." -
+     # "atlatma" is a Turkish-specific greenhouse training term a model has
+     # little reason to emit unaided, and naming the system is exactly what a
+     # "hangi terbiye sistemi" answer does. The query was NARROWED at slate time
+     # to the training system alone (it previously also asked dikim sıklığı):
+     # answer_any covered only the training half, so a correct answer leading
+     # with density would have scored red. That removes a false-negative path;
+     # answer_any was NOT widened.
+     # Recorded risk, checked not assumed: the results section names "kontrol
+     # sık dikim" as the highest-YIELD treatment while the conclusion recommends
+     # "atlatma sık". That is the technique_grape_bud_load structure (a
+     # table-conditioned figure vs an unconditioned conclusion), which SHIPPED -
+     # not the guarbean either/or. The paper explicitly REJECTS seyrek dikim
+     # ("seyrek dikim uygulaması kesinlikle önerilmezken").
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): "atlatma sık"
+     # is a DEAD entry under ANY-semantics - it contains "atlatma", so the bare
+     # form already matched everything it could (verified). The case really
+     # asserts one token, "atlatma". answer_any is frozen post-validation, so
+     # this is documented, not edited.
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive. The
+     # normal run also reads ret=True ctx=True, so the grounding is not a
+     # list-echo artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["atlatma", "atlatma sık"]},
+    {"id": "technique_maize_sowing_opener", "category": "horticulture",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "İkinci ürün mısırın doğrudan ekiminde hangi gömücü ayak tipi daha iyi çıkış sağlar?",
+     "retrieval": "nonempty", "products": "none",
+     # anchor honesty (the local_oltu_raspberry model): both anchors were
+     # re-verified against the STORE 2026-07-21 as contiguous runs, matched
+     # case-insensitively, and are unique to dp_19517 corpus-wide. They are NOT
+     # equally strong. "yürütüldüğü iklim ve toprak koşulları için" is 1 chunk
+     # and IS the page-8 verdict chunk; "yan tekerlek" is 10 chunks over pages
+     # 0, 2, 3, 4, 6, 7, 8 - source-unique but NOT verdict-confined, so on its
+     # own it proves only that dp_19517 was retrieved. context_any is
+     # ANY-semantics, so the honest claim is: ctx=True proves the source, and
+     # only the first anchor pins the conclusion.
+     "context_any": ["yan tekerlek",
+                     "yürütüldüğü iklim ve toprak koşulları için"],
+     # dp_19517 (2007; ikinci ürün mısır, doğrudan ekim, gömücü ayak x derinlik
+     # kontrol sistemi): the study's own conclusion states "Sonuç olarak, bu
+     # araştırmanın yürütüldüğü iklim ve toprak koşulları için, ikinci ürün
+     # mısırın doğrudan ekiminde, daha yüksek tarla filiz çıkış oranı ve çıkış
+     # oranı indeksi ve daha düşük ortalama çıkış süresi için çift diskli gömücü
+     # ayak ve yan tekerlek ... kullanılması önerilmektedir." (confirmed verbatim
+     # in docs/books/dp_19517.pdf, page 8) - naming the opener is exactly what a
+     # "hangi gömücü ayak tipi" answer states, not a results-table cell.
+     # Recorded risk, checked not assumed: double-disc openers are standard
+     # no-till practice, so a model-carried read was plausible. It did NOT
+     # materialise (ablated 0/4).
+     # RETRIEVAL COLLISION, checked not assumed: dp_19566 (Karayel & Özmerzi -
+     # the same authors, journal and research programme) also compares furrow
+     # openers including "çift diskli" and recommends a DIFFERENT one (balta),
+     # judging openers on furrow cross-section rather than emergence rate. Both
+     # answer_any terms hit it on 7 pages, so a green grounding off a dp_19566
+     # chunk would be right by accident. The retrieved context was therefore
+     # inspected directly: all FOUR chunks are dp_19517 (pages 0, 0, 8, 1),
+     # including the page-8 verdict chunk. dp_19566 does not enter context.
+     # REDUNDANCY, recorded not changed (final review 2026-07-21): "çift diskli"
+     # is a DEAD entry under ANY-semantics - _matches' right guard is (?!\d)
+     # only, so the bare "çift disk" already matches "çift diskli" (verified).
+     # The case really asserts one token, "çift disk". answer_any is frozen
+     # post-validation, so this is documented, not edited.
+     # corpus-carried (live 2026-07-21): normal 4/4, ablated 0/4 - decisive, so
+     # no repeat-8 escalation (that is only for an exact 2/4 read). The normal
+     # run also reads ret=True ctx=True, so the grounding is not a list-echo
+     # artifact off a methods chunk (the local_ege_durum_wheat trap).
+     "answer_any": ["çift disk", "çift diskli"]},
+    # UNMEASURED 2026-07-21 (round-4 stopping rule, not a finding): slate rows 9
+    # (dp_257759, Macar fiği/yem bezelyesi "%75 tarla kapasitesi" irrigation
+    # level) and 10 (dp_19426, asma aşısı "sürmüş çelik X sürmemiş kalem"
+    # graft-material state) were never run. Round 4's stopping rule fires at 4
+    # corpus-carried ships, and this case was the fourth. Both rows' context_any
+    # anchors WERE re-verified against the store first and all four are present,
+    # contiguous and source-unique (r9: 2 chunks + 1 chunk, both page 4,
+    # dp_257759-only; r10: 1 chunk each, both page 7, dp_19426-only), so round 5
+    # can pick them up as-is. Neither is dropped and neither is a map finding -
+    # they are simply unreached. Row 9 carries a recorded model-carried risk
+    # ("75 % of field capacity" is a generic irrigation figure) and row 10 a
+    # recorded sibling-collision risk (dp_19448/dp_19471, same group, same graft
+    # combination), so both still need the ablated direction run first.
+    #
+    # WHERE THE ROWS ACTUALLY ARE (added 2026-07-21 by the final review - the
+    # block above says "pick them up as-is" but recorded no path, no query and no
+    # anchor text, so a cold session could not act on it):
+    #   docs/superpowers/2026-07-21-round4-candidate-slate.md, section 1,
+    #   rows 9 and 10. Query, answer_any, answer_none, context_any and the full
+    #   anchor locators are frozen there. COPY them; do not re-derive them.
+    #
+    # WARNING - ROW 9's ANCHOR CONTAINS U+2019, NOT AN ASCII APOSTROPHE.
+    # The anchor is "kapasitesinin %25’ine düşmesine sebep olan kuraklıklar".
+    # COPY IT FROM THE SLATE; DO NOT RETYPE IT. Re-verified 2026-07-21 against
+    # the store with the exact _matches semantics, corpus-wide:
+    #   U+2019 form (’)  -> 2 chunks, dp_257759.pdf page 4   (correct)
+    #   ASCII form  (')  -> ZERO chunks                      (dead)
+    # This is the same defect class that killed 10 of 20 anchors earlier this
+    # round (spec section 3, "verify every anchor against the STORED CHUNK
+    # TEXT"), and it is the dangerous kind: a retyped anchor does not fail
+    # loudly, it produces ctx=False, which reads as a retrieval-broken FINDING
+    # about the corpus rather than as a typo. Row 9's own slate entry records
+    # that its previous ASCII-apostrophe anchor was dead for exactly this reason.
+    # Row 10's two anchors are plain ASCII and were also re-verified the same
+    # day: 1 chunk each, dp_19426.pdf page 7.
     # DROPPED 2026-07-20: technique_pea_sowing_date, "Ot amaçlı bezelyede en
     # yüksek hasıl verimi için ekim ne zaman yapılmalı?" asserting dp_21712's
     # own conclusion "en yüksek hasıl ve kuru madde veriminin 22 Kasım'da
@@ -664,4 +824,88 @@ CASES = [
      # azot" - same value, alternate notation, matching the wheat case's "16 kg
      # saf azot" precedent.
      "answer_any": ["10 kg/da", "10 kg/da azot", "10 kg n", "10 kg azot"]},
+    # DROPPED 2026-07-21: quant_sunflower_humic_acid_dose, "Ayçiçeğinde ekim
+    # öncesi tohuma humik asit uygulaması hangi dozda yapılmalı?" asserting
+    # dp_19600's own conclusion "100 kg tohuma 60 g humik asit dozunun ise
+    # ekimden önce ayçiçeği tohumlarına uygulanabileceği". retrieval-broken
+    # (normal 0/4, ablated 0/4) - decisive at repeat 4, so no repeat-8
+    # escalation (that is only for an exact 2/4 read). The normal run also reads
+    # ctx=False, and the reason is a RETRIEVAL COLLISION, not dead anchors: both
+    # context_any anchors were re-verified in the store the same day (present as
+    # contiguous runs, 1 chunk each, unique to dp_19600 corpus-wide, both in the
+    # page-4 verdict chunk). All FOUR retrieved chunks are dp_19431 - a
+    # different Ankara ayçiçeği + humik asit paper, which the round-4 slate had
+    # already rejected at mining time as multi-valued (18 g/da at sowing, 12 at
+    # the 4-5 leaf stage, 6 later). dp_19600 never enters context at all, so the
+    # model answers off the collider's doses and never states 60 g/100 kg. The
+    # only way to green this is to accept dp_19431's different claim, which is
+    # the guarbean rule. Not retuned. Do not re-mine dp_19600 and dp_19431
+    # against each other in round 5: they collide by construction (same crop,
+    # same input, same question wording).
+    {"id": "quant_rose_pot_fertilizer_dose", "category": "nutrition",
+     "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Saksıda gül fidanı yetiştirirken hümik asitli kompoze gübreden saksı başına ne kadar vermeliyim?",
+     "retrieval": "nonempty", "products": "some",
+     # anchor honesty (the local_oltu_raspberry model): both anchors are unique
+     # to dp_21749 corpus-wide, re-verified against the STORE 2026-07-21 as
+     # contiguous runs, case-insensitively. They are NOT equally strong.
+     # "18 kg harç için en olumlu sonucu" is a single chunk and sits in the
+     # page-10 VERDICT chunk, next to "6 g/saksı"; "yaprak kuru madde oranı" is
+     # 6 chunks spread over pages 0, 4, 7, 8, 10 - source-unique but NOT
+     # verdict-confined, so on its own it would only prove dp_21749 was
+     # retrieved, not that the conclusion was. context_any is ANY-semantics, so
+     # the honest claim is: ctx=True proves dp_21749 and nothing else was the
+     # source; only the first anchor pins the verdict chunk.
+     "context_any": ["yaprak kuru madde oranı",
+                     "18 kg harç için en olumlu sonucu"],
+     # dp_21749 (2009; saksıda gül fidanı, hümik asitli kompoze gübre dozları):
+     # the study's own conclusion states "6 g/bitki gübre dozunun sağlıklı gül
+     # yetiştirmek ve en fazla sayıda çiçek elde etmek açısından en uygun doz
+     # olacağı sonucuna varılmıştır" (and "özellikle 6 g/saksı'lık gübre
+     # dozunda en olumlu sonuç elde edilmiştir") - a per-pot rate is exactly
+     # what a "ne kadar vermeliyim" answer states, not a results-table cell.
+     # The paper states the SAME value both as g/saksı and g/bitki, so those
+     # answer_any forms are notations of one value, not a broadening; no bare
+     # "6 g" form is listed. Recorded risk: the paper also reports that
+     # 12 g/saksı DEPRESSED plant height - a supporting finding, not a competing
+     # recommendation.
+     # RECORDED RISK, SECOND PART (added 2026-07-21 by the final review; the
+     # 12 g line above was only half the picture). "6 g/saksı" ALSO MATCHES A
+     # RANGE that includes 6, because _matches' left guard is (?<!\w) and that
+     # does not break on "-", on a space, or on "ve"/"ile". Verified:
+     #   _matches("6 g/saksı", "3-6 g/saksı")     = True
+     #   _matches("6 g/saksı", "4-6 g/saksı")     = True
+     #   _matches("6 g/saksı", "3 ve 6 g/saksı")  = True
+     #   _matches("6 g/saksı", "3 ile 6 g/saksı") = True
+     # This is not hypothetical: dp_21749 ITSELF writes the range form for
+     # individual traits in the same SONUÇ VE ÖNERİLER block as the verdict -
+     # "Yaprak kuru madde oranı açısından en iyi sonuç 3 ile 6 g/saksı
+     # dozlarından elde edilmektedir" (page 10, the verdict chunk) and "3 ve
+     # 6 g/saksı'lık dozlar ... en başarılı sonucu vermektedir" (pages 6, 7, 8,
+     # 10). So a corpus-grounded answer that reports the RANGE rather than the
+     # paper's single-dose verdict grounds GREEN on a DIFFERENT claim.
+     # Why this is recorded and NOT fixed: it does not make the case a false
+     # guard. Corpus dependence is untouched - the range forms are as
+     # corpus-dependent as the verdict, and the ablated read is 0/4 either way.
+     # answer_any is FROZEN post-validation and was NOT narrowed; narrowing a
+     # measured assertion after the fact would invalidate the measurement it was
+     # measured under. Recorded so a green read on this case is understood as
+     # "the model stated 6 g/saksı, possibly inside a 3-6 range", not as "the
+     # model stated the paper's single-dose verdict".
+     # (Note the guard is not useless: "6-12 g/saksı" does NOT match, since that
+     # string does not contain "6 g/saksı" at all.)
+     # corpus-carried (live 2026-07-21): normal 3/4, ablated 0/4 - not an exact
+     # 2/4 read, so no repeat-8 escalation. The normal run also reads ret=True
+     # ctx=True (and prod=True), so the grounding is not a list-echo artifact
+     # off a methods chunk (the local_ege_durum_wheat trap). NOTE the 3/4: this
+     # case grounds intermittently, so a single full-eval sample can read
+     # ground=False (one was observed). That is the deveci-anchor situation the
+     # _classify docstring records - the label is majority-based on purpose -
+     # not a reason to widen answer_any.
+     # This case took the input-application-rate bucket's last slot only because
+     # slate rank 1 (dp_19600 sunflower) dropped retrieval-broken above; rows 1
+     # (dp_19434 Ranunculus) and 5 (dp_21704 marul) stay BLOCKED BY SHAPE CAP
+     # and are held for round 5.
+     "answer_any": ["6 g/saksı", "6 g saksı", "6 g/bitki", "saksı başına 6 g"]},
 ]
