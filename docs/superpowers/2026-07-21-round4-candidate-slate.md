@@ -21,8 +21,53 @@ Legend: R1 = source not banned and not previously dropped · R2 = crop under the
 absolute panel-wide cap of 2 · R3 = claim shape under its cap.
 
 Rows 3, 4, 5 and 8 are the round-3 slate's **unmeasured** rows (7, 8, 9 and 10),
-carried forward verbatim where the assertion is unchanged. They cost nothing to
-re-mine and their round-3 rule checks still hold under round 4's rules.
+carried forward where the assertion is unchanged. They cost nothing to re-mine
+and their round-3 rule checks still hold under round 4's rules.
+
+---
+
+## 0. Repair pass — 2026-07-21 (pre-run, no value measured yet)
+
+This slate FAILED its review before any run. Nothing here had been validated, so
+the frozen values were repaired in place; the freeze binds from the first run,
+which has not happened. Repairs applied:
+
+- **C-1 — ten of twenty anchors could not match.** `_matches` does no whitespace
+  normalization, so any anchor spanning a line break in the STORED chunk text is
+  dead. Rows 1, 2, 6 and 9 had ZERO working anchors; rows 3, 4 and 7 had one
+  each. Every anchor on every row was re-verified against the store with the
+  exact `_matches` semantics, corpus-wide and case-insensitively. All twenty
+  anchors below are now **verified present, contiguous, and unique to their
+  source**, with the locator recorded per row (§M-2).
+- **C-2 — rows 1 and 2 admitted different values.** Row 1's bare `"8 ton"` also
+  matched `8 ton/ha` and `8 tonluk`; row 2's bare `"60 g"` also matched `60 gün`
+  and `60 g/ha` (the trailing guard is `(?!\d)` only, so a trailing letter or `/`
+  passes). Both unit-less forms are REMOVED. Only fully denominated notations of
+  the same value remain.
+- **I-1 — shape re-labelling.** A claim shape is defined by the STRUCTURE of the
+  assertion (a recommended value plus its unit), NOT by the application context
+  or the unit's denominator. Rows 1, 2, 4 and 5 are therefore ONE shape —
+  **input application rate** — the same bucket as the panel's existing
+  `nitrogen dose`, which holds 2 against a cap of 3. **At most ONE of rows 1, 2,
+  4, 5 may ship.** Row 6 is the same shape as `local_diyarbakir_safflower` (a
+  region-adapted plant-material recommendation) and consumes that bucket's single
+  remaining slot. The non-shipping dose rows are kept, marked
+  **BLOCKED BY SHAPE CAP**, so round 5 can reconsider them.
+- **I-5** — row 10 now asserts the COMBINATION, not its halves.
+- **I-7** — row 1's framing corrected: it is NOT a clean unconditioned
+  recommendation. See the row.
+- **I-8** — row 7's query narrowed to the training system alone. The finding's
+  factual premise was wrong; see the row's note.
+- **M-1** — row 2's misleading `"60 g ha"` removed.
+- **M-3** — row 3's low-discrimination `"oda sıcaklığ"` removed in favour of the
+  25 °C notations.
+
+**Rank order for the four shape-capped dose rows (Task 2 tries ONE):**
+**2 → 4 → 1 → 5.** Row 2 is strongest (the LOWEST tested dose won, so a
+"more is better" prior gives the wrong answer). Row 4 is a clean own-voice
+verdict with a supporting-not-competing risk. Row 1 drops below row 4 because
+of I-7 (a competing in-document conclusion). Row 5 is last because its ÖZ states
+the verdict in CODED form only.
 
 ---
 
@@ -30,33 +75,74 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 
 ### 1. dp_19434 (2011) — düğün çiçeği (*Ranunculus asiaticus* 'Orange'), Antalya plastik sera
 
-- **claim_shape:** organic-amendment (compost) dose — **NEW shape** (0 → 1; cap 3)
+- **claim_shape:** **input application rate** (I-1) — SAME bucket as the panel's
+  `nitrogen dose` (panel 2, cap 3, **1 slot free**). Competes with rows 2, 4, 5.
+- **STATUS: BLOCKED BY SHAPE CAP.** Rank 3 of the four dose rows. Do not ship
+  unless row 2 and row 4 are both unusable. Kept for round 5.
 - **Rule check:** R1 pass · R2 pass (Ranunculus new to panel, 0 → 1; no slate-mate
-  on this crop) · R3 pass (new shape, only row on the slate in this bucket)
+  on this crop) · **R3 FAIL as a slate-mate** — only one of rows 1/2/4/5 may ship.
 - **proposed_query:** `Serada düğün çiçeği yetiştiriciliğinde dekara ne kadar kompost uygulamalıyım?`
-- **frozen_answer_any:** `["8 ton/da", "8 ton da", "dekara 8 ton", "8 ton"]`
-  (all four are notations of the SAME value — the paper writes it `8 ton da-1`)
-- **frozen_context_any:** `["toprağa zarar vermeden örtüaltı düğün çiçeği",
-  "kentsel katı atık kompostunun zengin mineral bileşimi"]`
-- **source_quote:** "Sonuç Araştırma sonuçlarına göre, söz konusu kompostun farklı
-  dozlarının verim ve kalite özellikleri üzerinde kontrole göre artış gösterdiği
-  ve **8 ton da-1** uygulama dozunun toprağa zarar vermeden örtüaltı düğün çiçeği
-  yetiştiriciliğinde başarıyla kullanılabileceği saptanmıştır."
+- **frozen_answer_any:** `["8 ton da-1", "8 ton da", "8 ton/da", "dekara 8 ton"]`
+  (C-2: the bare `"8 ton"` is REMOVED — it also matched `8 ton/ha` and `8 tonluk`,
+  which are different values. All four remaining forms are fully denominated
+  notations of the same per-dekar rate; the paper writes it `8 ton da-1`.)
+- **frozen_context_any:** `["uygulama dozunun toprağa zarar",
+  "Artan kompost seviyeleri, kontrol"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `uygulama dozunun toprağa zarar` — dp_19434.pdf, **1 chunk, page 4**, unique
+    corpus-wide. Sits in the SAME chunk as `8 ton da-1`.
+  - `Artan kompost seviyeleri, kontrol` — dp_19434.pdf, **1 chunk, page 4**,
+    unique corpus-wide. Same chunk as the value.
+  - REPLACED: `toprağa zarar vermeden örtüaltı düğün çiçeği` (0 chunks — the
+    store holds `toprağa zarar \nvermeden`) and `kentsel katı atık kompostunun
+    zengin mineral bileşimi` (0 chunks — the store holds `kentsel \nkatı atık`).
+- **source_quote:** "4. Sonuç Araştırma sonuçlarına göre, söz konusu kompostun
+  farklı dozlarının verim ve kalite özellikleri üzerinde kontrole göre artış
+  gösterdiği ve **8 ton da-1** uygulama dozunun toprağa zarar vermeden örtüaltı
+  düğün çiçeği yetiştiriciliğinde başarıyla kullanılabileceği saptanmıştır."
 - **Answer-naturalness:** a grower asking how much compost to spread is answered
-  with a per-dekar rate. It is the paper's own unconditioned recommendation
-  sentence, not a results-table cell.
+  with a per-dekar rate, not a results-table cell.
+- **FRAMING CORRECTION (I-7) — this is NOT a clean unconditioned recommendation.**
+  The 8 t/da sentence sits in an `Araştırma sonuçlarına göre` paragraph. The
+  paper's actual `Sonuç olarak` paragraph, two paragraphs later, **names no dose
+  at all** and carries a caution: "…aynı kompostun yüksek tuz düzeyi içermesi
+  nedeniyle tarımda artan dozlarda kullanımı öncesi mutlaka analiz edilmesi
+  gerekmektedir." The results section likewise reports soil salt, Mn, Zn and Fe
+  RISING with dose (355 → 421 → 478 → 560 micromhos). So the document contains a
+  competing conclusion that argues AGAINST simply raising the dose. Task 2 must
+  weigh this as a risk flag: retrieval landing on the `Sonuç olarak` chunk yields
+  a caution, not a number.
 - **Recorded risk:** 8 ton da-1 was also the HIGHEST dose tested, so the
   *direction* ("more is better") is guessable; the number itself is not.
 
 ### 2. dp_19600 (2005) — ayçiçeği (*Helianthus annuus*), Ankara
 
-- **claim_shape:** seed pre-treatment dose — **NEW shape** (0 → 1; cap 3)
-- **Rule check:** R1 pass · R2 pass (sunflower new to panel, 0 → 1) · R3 pass
+- **claim_shape:** **input application rate** (I-1) — SAME bucket as the panel's
+  `nitrogen dose` (panel 2, cap 3, **1 slot free**). Competes with rows 1, 4, 5.
+- **STATUS: RANK 1 of the four dose rows — this is the ONE Task 2 tries first.**
+  Shipping it consumes the bucket's last slot and blocks rows 1, 4 and 5.
+- **Rule check:** R1 pass · R2 pass (sunflower new to panel, 0 → 1) · R3 pass as
+  the single row taking the input-application-rate bucket's remaining slot.
 - **proposed_query:** `Ayçiçeğinde ekim öncesi tohuma humik asit uygulaması hangi dozda yapılmalı?`
-- **frozen_answer_any:** `["60 g", "60 gram", "60 g/100 kg", "60 g ha"]`
-  (notations of the same dose; `_matches`'s digit-guard keeps "60 g" out of "160 g")
-- **frozen_context_any:** `["ekimden önce ayçiçeği tohumlarına uygulanabileceği",
-  "60 g HA/100 kg tohum ile muamele edilmesinin"]`
+- **frozen_answer_any:** `["60 g/100 kg", "100 kg tohuma 60 g", "60 g HA/100 kg"]`
+  (C-2: bare `"60 g"` and `"60 gram"` REMOVED — `"60 g"` also matched `60 gün` and
+  `60 g/ha`, which are different values. M-1: `"60 g ha"` REMOVED — it reads as a
+  per-hectare rate but actually meant `60 g HA` (humik asit), which is exactly the
+  ambiguity the rule forbids. All three remaining forms carry the `/100 kg tohum`
+  denominator explicitly.)
+- **frozen_context_any:** `["Sanbro çeşidinin fide özellikleri",
+  "yüksek verimin ön koşuludur"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `Sanbro çeşidinin fide özellikleri` — dp_19600.pdf, **1 chunk, page 4**,
+    unique corpus-wide. Same chunk as the verdict.
+  - `yüksek verimin ön koşuludur` — dp_19600.pdf, **1 chunk, page 4**, unique
+    corpus-wide. Same chunk as the verdict.
+  - Both were chosen over the value-bearing run because they carry no query echo.
+    For reference, the value's own contiguous run `100 kg tohuma 60 g` is also
+    dp_19600-unique (1 chunk, page 4) and is used in `answer_any`.
+  - REPLACED: `ekimden önce ayçiçeği tohumlarına uygulanabileceği` (0 chunks — the
+    store holds `ekimden önce \nayçiçeği`) and `60 g HA/100 kg tohum ile muamele
+    edilmesinin` (0 chunks — the store holds `60 g HA/100 kg tohum ile \nmuamele`).
 - **source_quote:** "Ayrıca, HA uygulamalarının hem kök hem de fide gelişimini
   olumlu yönde etkilediği ve **100 kg tohuma 60 g humik asit** dozunun ise ekimden
   önce ayçiçeği tohumlarına uygulanabileceği sonucuna varılmıştır."
@@ -73,9 +159,22 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 - **Rule check:** R1 pass · R2 pass (tulip new, 0 → 1) · R3 pass at the cap; this
   is the ONE storage row rule 3 allows, so no other storage candidate may ship.
 - **proposed_query:** `Muş lalesi soğanlarını söküm sonrası yaz boyunca nasıl saklamalıyım?`
-- **frozen_answer_any:** `["oda sıcaklığ", "25 °c", "25 0c", "25°c"]`
-  (the paper writes "oda sıcaklığında (yaklaşık 25 0C'de)" — one claim, two notations)
-- **frozen_context_any:** `["kar örtüsü altında", "çıkış oranı kontrol uygulamasında"]`
+- **frozen_answer_any:** `["25 °c", "25°c", "25 0c"]`
+  (M-3: `"oda sıcaklığ"` REMOVED — the paper's own Methods call the control
+  "room temperature", so the phrase is low-discrimination and a model can emit it
+  without the corpus. The discriminating content is the 25 °C notation. The paper
+  writes it `oda sıcaklığında (yaklaşık 25 0C'de)`; all three forms are notations
+  of the same value.)
+- **frozen_context_any:** `["çıkış oranı kontrol uygulamasında",
+  "soğanlarının kışın kar örtüsü"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `çıkış oranı kontrol uygulamasında` — dp_1338811.pdf, **1 chunk, page 4**,
+    unique corpus-wide. Same chunk as the `25 0C` verdict. (Carried unchanged —
+    verified working.)
+  - `soğanlarının kışın kar örtüsü` — dp_1338811.pdf, **1 chunk, page 4**, unique
+    corpus-wide. Same chunk as the verdict.
+  - REPLACED: `kar örtüsü altında` (0 chunks — the store holds
+    `kışın kar örtüsü \naltında`).
 - **source_quote:** "Muş lalesi'nin soğan gelişimleri ve bazı bitkisel
   özelliklerinin incelendiği çalışmada incelenen bütün özelikler bakımından en iyi
   sonuçlar soğanların yaz döneminde **oda sıcaklığında (yaklaşık 25 0C'de)**
@@ -89,14 +188,32 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 
 *(round-3 slate row 8, unmeasured — carried forward verbatim)*
 
-- **claim_shape:** pot fertilizer dose (non-nitrogen) — **NEW shape** (0 → 1; cap 3)
-- **Rule check:** R1 pass · R2 pass (rose new, 0 → 1) · R3 pass. Not a "nitrogen
-  dose" row: the assertion is a per-pot rate of a humic compound fertilizer, so it
-  does not consume that shape's single remaining slot.
+- **claim_shape:** **input application rate** (I-1) — SAME bucket as the panel's
+  `nitrogen dose` (panel 2, cap 3, **1 slot free**). Competes with rows 1, 2, 5.
+- **STATUS: BLOCKED BY SHAPE CAP.** Rank 2 of the four dose rows — Task 2's
+  fallback if row 2 is unusable. Kept for round 5.
+- **Rule check:** R1 pass · R2 pass (rose new, 0 → 1) · **R3 FAIL as a slate-mate**
+  — only one of rows 1/2/4/5 may ship. The round-3 argument that a per-pot rate of
+  a humic compound fertilizer is a DIFFERENT shape from a nitrogen dose is
+  **overruled by I-1**: shape is the structure of the assertion (value + unit),
+  not the application context or the unit's denominator.
 - **proposed_query:** `Saksıda gül fidanı yetiştirirken hümik asitli kompoze gübreden saksı başına ne kadar vermeliyim?`
 - **frozen_answer_any:** `["6 g/saksı", "6 g saksı", "6 g/bitki", "saksı başına 6 g"]`
-  (the paper itself states the dose both as g/saksı and g/bitki — same value)
-- **frozen_context_any:** `["gonca-çiçek sayısı", "yaprak kuru madde oranı"]`
+  (the paper itself states the dose both as g/saksı and g/bitki — same value. No
+  bare `"6 g"` form is present, so C-2 does not bite here.)
+- **frozen_context_any:** `["yaprak kuru madde oranı",
+  "18 kg harç için en olumlu sonucu"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `yaprak kuru madde oranı` — dp_21749.pdf, **6 chunks, pages 0, 4, 7, 8, 10**,
+    unique corpus-wide (no other source). One of those chunks is the page-10
+    verdict chunk. (Carried unchanged — verified working.)
+  - `18 kg harç için en olumlu sonucu` — dp_21749.pdf, **1 chunk, page 10**,
+    unique corpus-wide. Sits in the SAME chunk as `6 g/saksı` and `6 g/bitki`.
+  - REPLACED (I-3): `gonca-çiçek sayısı` (0 chunks — the store holds
+    `gonca�çiçek sayısı`, with U+FFFD where the hyphen should be; same defect
+    class as round 3's dead `bitkide tabla sayısı` anchor). The page-10 verdict
+    chunk writes the character correctly as `gonca (çiçek) sayısına`, which IS
+    matchable (dp_21749, 2 chunks, page 10) and is held in reserve.
 - **source_quote:** "…özellikle **6 g/saksı**'lık gübre dozunda en olumlu sonuç elde
   edilmiştir." and "**6 g/bitki** gübre dozunun sağlıklı gül yetiştirmek ve en fazla
   sayıda çiçek elde etmek açısından en uygun doz olacağı sonucuna varılmıştır."
@@ -107,11 +224,29 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 
 *(round-3 slate row 9, unmeasured — carried forward verbatim, including its risk)*
 
-- **claim_shape:** micronutrient dose — **NEW shape** (0 → 1; cap 3)
-- **Rule check:** R1 pass · R2 pass (lettuce new, 0 → 1) · R3 pass
+- **claim_shape:** **input application rate** (I-1) — SAME bucket as the panel's
+  `nitrogen dose` (panel 2, cap 3, **1 slot free**). Competes with rows 1, 2, 4.
+- **STATUS: BLOCKED BY SHAPE CAP.** Rank 4 (last) of the four dose rows — its
+  coded-abstract risk below keeps it bottom. Kept for round 5.
+- **Rule check:** R1 pass · R2 pass (lettuce new, 0 → 1) · **R3 FAIL as a
+  slate-mate** — only one of rows 1/2/4/5 may ship.
 - **proposed_query:** `Marulda çinko eksikliği için topraktan kaç ppm çinko uygulanmalı?`
 - **frozen_answer_any:** `["20 ppm"]`
-- **frozen_context_any:** `["çinko sülfat", "baş boyu"]`
+- **frozen_context_any:** `["çinko sülfat (ZnSO4.7H2O)",
+  "denemeleriyle de kalibre edilerek uygulanması"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `çinko sülfat (ZnSO4.7H2O)` — dp_21704.pdf, **3 chunks, pages 0, 2, 6**,
+    unique corpus-wide. The page-6 chunk is the verdict chunk holding `20 ppm`.
+  - `denemeleriyle de kalibre edilerek uygulanması` — dp_21704.pdf, **1 chunk,
+    page 6**, unique corpus-wide. Same chunk as `20 ppm`.
+  - REPLACED (I-4): `çinko sülfat` — matchable but **NOT source-specific**:
+    10 chunks across 3 sources (dp_21704 ×8, dp_1082347 ×1 page 12,
+    dp_1225168 ×1 page 11). Under ANY-semantics it could carry ctx=True without
+    dp_21704 being retrieved at all. The parenthesised formula makes it unique.
+  - Also DROPPED: `baş boyu` — it verifies clean (dp_21704, 6 chunks,
+    pages 0, 2, 4, 5, unique corpus-wide) but never co-occurs with the `20 ppm`
+    verdict chunk, so a green ctx on it would prove only that an adjacent chunk
+    was retrieved. Held in reserve if a third anchor is ever wanted.
 - **source_quote:** "Her iki uygulamada da marul bitkisinin gelişimi ve beslenmesi
   topraktan **20 ppm** (ZnT2) ve yapraktan % 0.20 (ZnY2) dozlarının önerilebileceği
   sonucuna varılmıştır." Corroborated by the paper's own results section:
@@ -124,13 +259,46 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 
 ### 6. dp_19511 (2008) — Marsh Seedless altıntop (grapefruit), Antalya
 
-- **claim_shape:** rootstock recommendation — **NEW shape** (0 → 1; cap 3)
-- **Rule check:** R1 pass · R2 pass (grapefruit/citrus new to panel, 0 → 1) · R3 pass
+- **claim_shape:** **region-adapted plant-material recommendation** (I-1) — the
+  SAME bucket as the panel's `local_diyarbakir_safflower` (panel 2, cap 3,
+  **1 slot free**). This row CONSUMES that last slot: 2 → 3, bucket then AT CAP.
+  It is not a brand-new "rootstock recommendation" shape; the assertion structure
+  is "for region X, plant material Y is recommended", which is the safflower case.
+- **Rule check:** R1 pass · R2 pass (grapefruit/citrus new to panel, 0 → 1) ·
+  R3 pass, **at the cap**, and no other slate row competes for this bucket.
 - **proposed_query:** `Antalya koşullarında Marsh Seedless altıntop için hangi anaç önerilir?`
 - **frozen_answer_any:** `["carrizo", "carrizo sitranj", "carrizo citrange"]`
   (three notations of the SAME rootstock name — not a broadening)
-- **frozen_context_any:** `["Marsh Seedless altıntopu için Carrizo sitranjı anacı",
-  "en iyi ağaç gelişimi ise turunç anacı"]`
+- **frozen_context_any:** `["Sonuç olarak incelenen tüm faktörler",
+  "açısından en iyi sonuçlar Carrizo sitranjı"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `Sonuç olarak incelenen tüm faktörler` — dp_19511.pdf, **1 chunk, page 10**,
+    unique corpus-wide. The verdict chunk; own voice; no query echo.
+  - `açısından en iyi sonuçlar Carrizo sitranjı` — dp_19511.pdf, **2 chunks,
+    pages 0 and 10**, unique corpus-wide. Page 10 is the verdict chunk. Own voice:
+    "Araştırma sonucunda, verim ve kalite açısından en iyi sonuçlar Carrizo
+    sitranjı anacı üzerindeki ağaçlarda … saptanmıştır."
+  - REPLACED: `Marsh Seedless altıntopu için Carrizo sitranjı anacı` (0 chunks —
+    the store holds `Marsh Seedless \naltıntopu`) and `en iyi ağaç gelişimi ise
+    turunç anacı` (0 chunks — the store holds `en iyi ağaç \ngelişimi`).
+- **Correction to the round-4 anchor note (I-2, partially amended).** The finding
+  states the second anchor was cited literature rather than the paper's own voice.
+  **The evidence does not fully support that.** The exact string
+  `en iyi ağaç gelişimi ise turunç anacı` occurs ONLY in the paper's own
+  conclusion (page 10, chunk 51: "…en iyi ağaç gelişimi ise turunç anacı
+  üzerindeki ağaçlarda saptanmıştır"), so the slate's own-voice claim for THAT
+  anchor was correct; the anchor was dead for the line-break reason (C-1), not
+  for provenance. The sentence the finding quotes —
+  "…altıntopunda en iyi ağaç gelişiminin turunç anacı üzerinde olduğunu saptayarak
+  sonuçlarımızı desteklemiştir" — is a DIFFERENT sentence, on page 9, attributed
+  to **Ecomides ve Gregoriou (1993)**. It is genuinely cited literature, and it is
+  a real hazard: a near-identical claim in another author's voice sits one page
+  from the verdict. Both replacement anchors above are drawn from the page-10
+  verdict chunk, so neither can be satisfied by the page-9 citation.
+- **Anchor note for Task 2 (corrected):** the paper's literature review cites
+  Carrizo repeatedly, including a same-direction finding by another author on
+  page 9. Anchor uniqueness has now been verified corpus-wide and
+  case-insensitively; both anchors are confined to the verdict chunk.
 - **source_quote:** "Sonuç olarak incelenen tüm faktörler göz önüne alındığında
   bölgemiz koşullarında yetiştirilen Marsh Seedless altıntopu için **Carrizo
   sitranjı** anacı, en iyi sonucu vermiştir."
@@ -138,9 +306,6 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
   citrus rootstock a model may name with an EMPTY corpus — the
   `local_avocado_antalya` failure mode. Ranked below the dose rows for exactly
   this reason. Do NOT retune it green if it reads model-carried; record and drop.
-- **Anchor note for Task 2:** the paper's literature review cites Carrizo
-  repeatedly, so both anchors above were chosen from the paper's OWN verdict and
-  results sentences. Verify uniqueness case-insensitively before running.
 
 ### 7. dp_19468 (2009) — M19 salkım domates (tomato), Antalya sera
 
@@ -148,15 +313,47 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 - **Rule check:** R1 pass · R2 pass (tomato at 0 corpus_fact cases → 1; the
   existing `tomato_disease_organic` is NOT a corpus_fact case and consumes no
   slot) · R3 pass
-- **proposed_query:** `Serada salkım domateste hangi terbiye sistemi ve dikim sıklığı önerilir?`
+- **proposed_query (NARROWED per I-8):** `Serada salkım domateste hangi terbiye sistemi önerilir?`
+  (was: `…hangi terbiye sistemi ve dikim sıklığı önerilir?`)
 - **frozen_answer_any:** `["atlatma", "atlatma sık"]`
-- **frozen_context_any:** `["atlatma sık dikim uygulamasının üreticiye tavsiye",
-  "karşı telin üzerinden atlatarak"]`
+- **frozen_context_any:** `["karşı telin üzerinden atlatarak",
+  "uygulamasının üreticiye tavsiye edilebilecek"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `karşı telin üzerinden atlatarak` — dp_19468.pdf, **1 chunk, page 2**, unique
+    corpus-wide. (Carried unchanged — verified working.) NOTE: this is the Methods
+    chunk (Çizelge 1), not the verdict chunk, so it proves the source but not the
+    verdict chunk.
+  - `uygulamasının üreticiye tavsiye edilebilecek` — dp_19468.pdf, **1 chunk,
+    page 4**, unique corpus-wide. This IS the verdict chunk. Held alongside the
+    Methods anchor deliberately: a green on both means the retrieval covered the
+    verdict.
+  - REPLACED: `atlatma sık dikim uygulamasının üreticiye tavsiye` (0 chunks — the
+    store holds `atlatma sık dikim \nuygulamasının`). The alternative
+    `yetiştiriciliğinde atlatma sık dikim` also verifies (dp_19468, 1 chunk,
+    page 4) and is held in reserve; it was not chosen because it carries answer
+    echo without adding retrieval evidence beyond the anchor already selected.
 - **source_quote:** "Sonuç olarak salkım domates yetiştiriciliğinde **atlatma sık
   dikim** uygulamasının üreticiye tavsiye edilebilecek bir terbiye sistemi olduğu
   tespit edilmiştir."
 - **Answer-naturalness:** "atlatma" is a Turkish-specific greenhouse training term
   a model has little reason to emit unaided — good discrimination.
+- **I-8, applied with a correction to its premise.** The finding says the query
+  asks two things while the assertion covers one, and that "the paper's yield
+  winner is `seyrek dikim` (density)". **The second half is wrong on the
+  evidence.** The paper explicitly REJECTS seyrek dikim — its own ÖZ and its
+  `4. Sonuç` both open with "seyrek dikim uygulaması kesinlikle önerilmezken sık
+  dikim ve uç almadan yapılan yetiştiriciliğin ciddi verim artışı sağladığı…" —
+  and its per-m² yield winner is `kontrol sık dikim` (32,5 kg/m²). `Seyrek dikim`
+  wins only on per-truss yield (894,34 g/salkım), which the paper immediately
+  discounts because plants per dekar fall. So the paper's recommendation,
+  `atlatma sık dikim`, answers BOTH halves of the original query, and no wrong
+  answer could have grounded green on the original assertion.
+  **The narrowing is applied anyway**, because the residual defect the finding
+  points at is real: the query invited a two-part answer while `answer_any`
+  required only the training-system half, so a correct answer that led with
+  density and never said "atlatma" would have been scored red. Narrowing removes
+  that false-negative path. `answer_any` was NOT widened — that would be a
+  different claim.
 - **Recorded risk:** the results section names "kontrol sık dikim" as the
   highest-YIELD treatment while the conclusion recommends "atlatma sık". This is
   the `technique_grape_bud_load` structure (a table-conditioned figure vs an
@@ -172,7 +369,18 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
   maize case may ever be added) · R3 pass
 - **proposed_query:** `İkinci ürün mısırın doğrudan ekiminde hangi gömücü ayak tipi daha iyi çıkış sağlar?`
 - **frozen_answer_any:** `["çift disk", "çift diskli"]`
-- **frozen_context_any:** `["çıkış oranı indeksi", "yan tekerlek"]`
+- **frozen_context_any:** `["yan tekerlek",
+  "yürütüldüğü iklim ve toprak koşulları için"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `yan tekerlek` — dp_19517.pdf, **10 chunks, pages 0, 2, 3, 4, 6, 7, 8**,
+    unique corpus-wide. The page-8 chunk is the verdict chunk. (Carried unchanged
+    — verified working.)
+  - `yürütüldüğü iklim ve toprak koşulları için` — dp_19517.pdf, **1 chunk,
+    page 8**, unique corpus-wide. The verdict chunk; own voice.
+  - REPLACED: `çıkış oranı indeksi` — it verifies clean (dp_19517, 5 chunks,
+    pages 0, 5, 6, 7, unique corpus-wide) but is **dead inside the verdict chunk
+    itself**, where the store holds `çıkış oranı\nindeksi`. A green on it would
+    prove only that an adjacent chunk was retrieved. Held in reserve.
 - **source_quote:** "Sonuç olarak, bu araştırmanın yürütüldüğü iklim ve toprak
   koşulları için, ikinci ürün mısırın doğrudan ekiminde, daha yüksek tarla filiz
   çıkış oranı ve çıkış oranı indeksi ve daha düşük ortalama çıkış süresi için
@@ -190,8 +398,21 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 - **proposed_query:** `Macar fiği ve yem bezelyesinde kurak dönemde hangi toprak nem seviyesinde sulama yapmalıyım?`
 - **frozen_answer_any:** `["%75 tarla kapasitesi", "% 75 tarla kapasitesi",
   "tarla kapasitesinin %75"]`
-- **frozen_context_any:** `["en yüksek ot verimleri için",
-  "tarla kapasitesinin %25'ine düşmesine sebep olan kuraklıklar"]`
+- **frozen_context_any:** `["kapasitesinin %25’ine düşmesine sebep olan kuraklıklar",
+  "her iki yem bitkisine ne ciddi zarar vererek"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `kapasitesinin %25’ine düşmesine sebep olan kuraklıklar` — dp_257759.pdf,
+    **2 chunks, page 4**, unique corpus-wide. The verdict chunk holding
+    `%75 tarla kapasitesi`. **Note the apostrophe: the store uses U+2019 (’), not
+    ASCII `'`.** The old anchor's ASCII apostrophe was one of its two defects.
+  - `her iki yem bitkisine ne ciddi zarar vererek` — dp_257759.pdf, **1 chunk,
+    page 4**, unique corpus-wide. Same chunk as the value. (The "bitkisine ne"
+    spacing is a typo in the source; it is reproduced verbatim on purpose.)
+  - REPLACED: `en yüksek ot verimleri için` (0 chunks — the store holds
+    `en yüksek ot verimleri \niçin`; the truncated `en yüksek ot verimleri` does
+    verify, dp_257759 1 chunk page 4, and is held in reserve) and
+    `tarla kapasitesinin %25'ine düşmesine sebep olan kuraklıklar` (0 chunks —
+    ASCII apostrophe, plus the store holds `tarla \nkapasitesinin`).
 - **source_quote:** "Kurak dönemlerde sulama gerektiğinde ise en yüksek ot
   verimleri için **%75 tarla kapasitesi** seviyesinde sulama yapıldığında elde
   edildiği sonucuna varılmıştır."
@@ -203,9 +424,31 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 - **claim_shape:** graft-material state — **NEW shape** (0 → 1; cap 3)
 - **Rule check:** R1 pass · R2 pass (grape 1 → 2, AT the absolute cap) · R3 pass
 - **proposed_query:** `Asma aşısında anaç çeliği ve kalem hangi sürme durumunda olmalı?`
-- **frozen_answer_any:** `["sürmüş çelik", "sürmemiş kalem"]`
-- **frozen_context_any:** `["sürmüş çelik X sürmemiş kalem",
-  "aşı kaynaşma özellikleri üzerine"]`
+- **frozen_answer_any (I-5 — the COMBINATION, not its halves):**
+  `["sürmüş çelik x sürmemiş kalem", "sürmüş çelik × sürmemiş kalem",
+  "sürmüş çelik + sürmemiş kalem", "sürmüş çelik ile sürmemiş kalem"]`
+  (As previously frozen, `["sürmüş çelik", "sürmemiş kalem"]` split a compound
+  claim: under ANY-semantics an answer saying `sürmemiş çelik × sürmemiş kalem` —
+  **wrong on the rootstock cutting** — would still have grounded green on the
+  `"sürmemiş kalem"` half. The paper's verdict is the pairing. All four forms
+  above are notations of the SAME pairing; `_matches` is case-insensitive, so the
+  paper's capital `X` and a model's lowercase `x` both hit.)
+- **frozen_context_any:** `["sürmüş çelik X sürmemiş kalem durumunun aşıda kullanılması",
+  "Filizi kesilmemiş kalem durumunun en düşük değerleri"]`
+- **Anchor locators (verified 2026-07-21):**
+  - `sürmüş çelik X sürmemiş kalem durumunun aşıda kullanılması` — dp_19426.pdf,
+    **1 chunk, page 7**, unique corpus-wide. The verdict chunk. The shorter
+    `sürmüş çelik X sürmemiş kalem` also verifies unique to dp_19426 (4 chunks,
+    pages 0 and 7) but spans the abstract too; the longer run pins the verdict
+    chunk specifically, which is what defeats the dp_19448 / dp_19471 hazard.
+  - `Filizi kesilmemiş kalem durumunun en düşük değerleri` — dp_19426.pdf,
+    **1 chunk, page 7**, unique corpus-wide. Same verdict chunk.
+  - DROPPED: `aşı kaynaşma özellikleri üzerine` — it verifies clean (dp_19426,
+    1 chunk, page 0, unique corpus-wide) but sits in the ABSTRACT, one of the two
+    places the sibling papers are most likely to collide topically. Replaced by a
+    verdict-chunk anchor for the reason recorded in the row's risk note.
+  - Sibling check: dp_19448 writes the combination with `+` rather than `X`, so
+    neither anchor above can be satisfied by a sibling chunk.
 - **source_quote:** "Sonuç olarak **sürmüş çelik X sürmemiş kalem** durumunun aşıda
   kullanılması önerilebilir."
 - **RISK, recorded before running:** dp_19448 and dp_19471 are the same research
@@ -249,20 +492,43 @@ re-mine and their round-3 rule checks still hold under round 4's rules.
 | resistant-cultivar list | 2 | 1 | **0** | ✔ |
 | region-adapted cultivar rec. | 2 | 1 | **0** | ✔ |
 | harvest timing / drying pretreatment / biocontrol list / min-diameter / bud load / sowing date | 1 each | 2 each | **0** | ✔ |
-| organic-amendment (compost) dose | 0 | 3 | 1 (row 1) | ✔ |
-| seed pre-treatment dose | 0 | 3 | 1 (row 2) | ✔ |
-| pot fertilizer dose | 0 | 3 | 1 (row 4) | ✔ |
-| micronutrient dose | 0 | 3 | 1 (row 5) | ✔ |
-| rootstock recommendation | 0 | 3 | 1 (row 6) | ✔ |
+| **input application rate** (was: nitrogen dose) | **2** | **1** | **4** (rows 1, 2, 4, 5) | ✘ **OVER CAP — only ONE may ship** |
+| **region-adapted plant-material rec.** (`local_diyarbakir_safflower`) | **2** | **1** | **1** (row 6) | ✔ at cap, slot consumed |
 | training-system choice | 0 | 3 | 1 (row 7) | ✔ |
 | sowing-implement choice | 0 | 3 | 1 (row 8) | ✔ |
 | irrigation level | 0 | 3 | 1 (row 9) | ✔ |
 | graft-material state | 0 | 3 | 1 (row 10) | ✔ |
 
-Nine of ten rows open a brand-new shape bucket. That is a direct consequence of
-rule 3: every shape the panel already uses is at or near its cap, so the only
-headroom left is in new shapes. Worth naming, because it means round 5 will have
-these nine buckets partly filled and even less headroom.
+**Table rewritten by the I-1 repair pass.** As originally counted, rows 1, 2, 4
+and 5 each opened a brand-new bucket ("organic-amendment dose", "seed
+pre-treatment dose", "pot fertilizer dose", "micronutrient dose") and row 6
+opened a "rootstock recommendation" bucket. Under the spec's rule that a claim
+shape is the STRUCTURE of the assertion (a recommended value plus its unit), not
+the application context or the unit's denominator, those four dose rows are ONE
+shape and row 6 is not new at all.
+
+**Per-row bucket accounting after the repair:**
+
+| Row | Bucket it consumes | Slots free before | After if it ships | Status |
+|---|---|---|---|---|
+| 1 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 3) |
+| 2 | input application rate | 1 | 0 | **ELIGIBLE — try first** (rank 1) |
+| 3 | storage duration / condition | 1 | 0 | ELIGIBLE, at cap |
+| 4 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 2) |
+| 5 | input application rate | 1 | 0 | **BLOCKED BY SHAPE CAP** (rank 4) |
+| 6 | region-adapted plant-material rec. | 1 | 0 | ELIGIBLE, consumes last slot |
+| 7 | training-system choice (new) | 3 | 2 | ELIGIBLE |
+| 8 | sowing-implement choice (new) | 3 | 2 | ELIGIBLE |
+| 9 | irrigation level (new) | 3 | 2 | ELIGIBLE |
+| 10 | graft-material state (new) | 3 | 2 | ELIGIBLE |
+
+**Maximum shippable this round is therefore 7, not 10** (one of rows 1/2/4/5,
+plus rows 3, 6, 7, 8, 9, 10). Rows 1, 4 and 5 are kept, not deleted, so round 5
+can reconsider them once the input-application-rate bucket's cap is revisited.
+
+Four of ten rows open a brand-new shape bucket (was: nine). Every shape the panel
+already uses is at or near its cap, so the headroom left is in those four new
+buckets and nowhere else. Round 5 will be tighter still.
 
 **Source check:** none of the ten sources appears in the 16 banned panel sources,
 the 9 measured-and-dropped sources, or round 3's mine-time rejection list. ✔
