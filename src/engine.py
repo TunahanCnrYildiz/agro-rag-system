@@ -343,7 +343,17 @@ def _search(store, query: str, k: int):
         return []
 
 
-def retrieve_context(query: str, k: int | None = None) -> str:
+def _last_user_turn(history: list[dict] | None) -> str:
+    """The most recent user message in the conversation, or ""."""
+    for turn in reversed(history or []):
+        if turn.get("role") == "user" and turn.get("content"):
+            return str(turn["content"])
+    return ""
+
+
+def retrieve_context(
+    query: str, k: int | None = None, history: list[dict] | None = None
+) -> str:
     """Return concatenated botany chunks relevant to the query, or "" if nothing
     clears the floor.
 
@@ -359,7 +369,17 @@ def retrieve_context(query: str, k: int | None = None) -> str:
     if store is None:
         return ""
 
-    result_lists = [_search(store, q, k) for q in _expand_query(query)]
+    queries = _expand_query(query)
+    # A follow-up ("Toprak nasıl olmalı?") carries none of the conversation's
+    # subject, so on its own it reaches generic chunks while the LLM - which DOES
+    # get the history - talks about something the context never mentions. Search
+    # the prior turn joined to this one as an EXTRA list; _fuse ranks by RRF, so
+    # a self-contained question keeps its own top hits either way.
+    prior = _last_user_turn(history)
+    if prior:
+        queries = [*queries, f"{prior} {query}"]
+
+    result_lists = [_search(store, q, k) for q in queries]
 
     parts: list[str] = []
     for d in _fuse(result_lists, MIN_RETRIEVAL_RELEVANCE, k):
@@ -529,7 +549,7 @@ def _strip_markers(text: str) -> tuple[str, bool, bool]:
 
 def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
-    context = retrieve_context(message)
+    context = retrieve_context(message, history=history)
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
 
@@ -558,7 +578,7 @@ def stream_answer(
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
     a final 'done' event closes the stream."""
-    context = retrieve_context(message)
+    context = retrieve_context(message, history=history)
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
 

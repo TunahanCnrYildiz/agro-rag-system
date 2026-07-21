@@ -165,7 +165,7 @@ def _fake_llm(content):
 
 
 def test_answer_suppresses_products_on_offscope(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     monkeypatch.setattr(engine, "_get_llm",
@@ -178,7 +178,7 @@ def test_answer_suppresses_products_on_offscope(monkeypatch):
 
 def test_answer_keeps_products_in_scope(monkeypatch):
     p = engine.RecommendedProduct("P", "url")
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda m, c: [p])
     monkeypatch.setattr(engine, "_get_llm",
                         lambda: _fake_llm("Azot eksikligi olabilir."))
@@ -188,7 +188,7 @@ def test_answer_keeps_products_in_scope(monkeypatch):
 
 
 def test_answer_suppresses_products_on_noproduct(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     monkeypatch.setattr(engine, "_get_llm",
@@ -408,7 +408,7 @@ def _sse_tokens(out):
 
 
 def test_stream_answer_suppresses_products_on_noproduct(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     # marker deliberately SPLIT across chunks - exercises the leading buffer
@@ -424,7 +424,7 @@ def test_stream_answer_suppresses_products_on_noproduct(monkeypatch):
 
 
 def test_stream_answer_emits_products_without_marker(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     monkeypatch.setattr(engine, "_get_llm",
@@ -512,7 +512,7 @@ def test_complete_text_propagates_transport_errors(monkeypatch):
 
 
 def test_answer_never_returns_empty(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     client, _ = _fake_llm_seq(["", ""])
@@ -525,7 +525,7 @@ def test_answer_never_returns_empty(monkeypatch):
 
 
 def test_answer_uses_the_retry(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda m, c: [])
     client, calls = _fake_llm_seq(["", "Azot eksikligi olabilir."])
     monkeypatch.setattr(engine, "_get_llm", lambda: client)
@@ -537,7 +537,7 @@ def test_answer_uses_the_retry(monkeypatch):
 
 
 def test_stream_answer_never_streams_nothing(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda m, c: [])
     # the model streams no tokens at all, then the non-streaming retry is blank
     monkeypatch.setattr(engine, "_get_llm", lambda: _fake_stream_llm([]))
@@ -552,7 +552,7 @@ def test_stream_answer_never_streams_nothing(monkeypatch):
 def test_answer_hides_products_under_the_empty_fallback(monkeypatch):
     """"I could not produce an answer" + 3 fertilizer ads is incoherent: there is
     no advice for the products to sit under. Same rule as [NOPRODUCT]."""
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     client, _ = _fake_llm_seq(["", ""])          # blank twice -> fallback
@@ -565,7 +565,7 @@ def test_answer_hides_products_under_the_empty_fallback(monkeypatch):
 
 
 def test_stream_answer_hides_products_under_the_empty_fallback(monkeypatch):
-    monkeypatch.setattr(engine, "retrieve_context", lambda m: "ctx")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
     monkeypatch.setattr(engine, "match_products",
                         lambda m, c: [engine.RecommendedProduct("P", "url")])
     monkeypatch.setattr(engine, "_get_llm", lambda: _fake_stream_llm([]))
@@ -603,3 +603,93 @@ def test_get_retriever_store_none_on_generic_error(monkeypatch):
     monkeypatch.setattr(_ing, "get_vector_store", boom)
     assert engine._get_retriever_store() is None
     engine._get_retriever_store.cache_clear()
+
+
+class _TopicStore:
+    """Returns the orchid chunk ONLY when the query carries the orchid topic."""
+
+    def __init__(self):
+        self.queries = []
+
+    def similarity_search_with_relevance_scores(self, query, k):
+        self.queries.append(query)
+        if "orkide" in query.lower():
+            return [(_Doc("orkide saksı harcı", "dp_19441.pdf", 2), 0.55)]
+        return [(_Doc("genel toprak bilgisi", "dp_30459.pdf", 1), 0.50)]
+
+
+def test_retrieve_context_uses_prior_user_turn_for_followups(monkeypatch):
+    """A follow-up like "Toprak nasıl olmalı?" must still reach the topic the
+    conversation is about. Retrieval used to see only the latest message, so the
+    prior subject was invisible to the corpus even though the LLM got it in
+    history - the answer came back generic."""
+    store = _TopicStore()
+    monkeypatch.setattr(engine, "_get_retriever_store", lambda: store)
+    monkeypatch.setattr(engine, "_expand_query", lambda q: [q])  # hermetic
+
+    history = [
+        {"role": "user", "content": "Orkide nasıl yetiştirilir?"},
+        {"role": "assistant", "content": "Orkideler için ..."},
+    ]
+    ctx = engine.retrieve_context("Toprak nasıl olmalı?", history=history)
+
+    assert any("orkide" in q.lower() for q in store.queries), (
+        f"retrieval never saw the prior topic; queries were {store.queries}"
+    )
+    assert "orkide saksı harcı" in ctx
+
+
+def test_retrieve_context_without_history_searches_only_the_message(monkeypatch):
+    """No history -> behaviour is unchanged (the eval's 53 cases are all
+    single-turn, so this is what keeps them inert)."""
+    store = _TopicStore()
+    monkeypatch.setattr(engine, "_get_retriever_store", lambda: store)
+    monkeypatch.setattr(engine, "_expand_query", lambda q: [q])
+
+    engine.retrieve_context("Toprak nasıl olmalı?")
+
+    assert store.queries == ["Toprak nasıl olmalı?"]
+
+
+def test_answer_passes_history_to_retrieval(monkeypatch):
+    """The production path must hand the conversation to retrieval, not just to
+    the LLM - otherwise a follow-up is answered from off-topic chunks."""
+    seen = {}
+
+    def fake_retrieve(query, k=None, history=None):
+        seen["query"] = query
+        seen["history"] = history
+        return "ctx"
+
+    monkeypatch.setattr(engine, "retrieve_context", fake_retrieve)
+    monkeypatch.setattr(engine, "match_products", lambda *a, **kw: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda msgs: "cevap")
+
+    history = [{"role": "user", "content": "Orkide nasıl yetiştirilir?"}]
+    engine.answer("Toprak nasıl olmalı?", history)
+
+    assert seen["history"] == history
+
+
+def test_stream_answer_passes_history_to_retrieval(monkeypatch):
+    """stream_answer is the PRODUCTION path (/api/chat?stream=true); answer()
+    alone being fixed would leave the real app broken."""
+    seen = {}
+
+    def fake_retrieve(query, k=None, history=None):
+        seen["history"] = history
+        return "ctx"
+
+    def boom():
+        raise RuntimeError("no llm in this test")
+
+    monkeypatch.setattr(engine, "retrieve_context", fake_retrieve)
+    monkeypatch.setattr(engine, "match_products", lambda *a, **kw: [])
+    # Retrieval happens before the model is touched, so a dead client is enough
+    # to exercise the wiring without a live LLM.
+    monkeypatch.setattr(engine, "_get_llm", boom)
+
+    history = [{"role": "user", "content": "Orkide nasıl yetiştirilir?"}]
+    list(engine.stream_answer("Toprak nasıl olmalı?", history))
+
+    assert seen["history"] == history
