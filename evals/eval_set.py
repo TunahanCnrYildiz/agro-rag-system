@@ -704,6 +704,47 @@ CASES = [
      # run also reads ret=True ctx=True, so the grounding is not a list-echo
      # artifact off a methods chunk (the local_ege_durum_wheat trap).
      "answer_any": ["çift disk", "çift diskli"]},
+    # --- Round 5 candidates UNDER MEASUREMENT (added 2026-07-22): slate rows 9 & 10,
+    # frozen values COPIED VERBATIM from the round-4 slate. See the provenance +
+    # U+2019 warning block just below (retained). NO corpus_class is set until both
+    # directions are measured; a red read is DROPPED, never tuned to green.
+    {"id": "quant_forage_irrigation_level", "category": "horticulture", "corpus_fact": True,
+     "corpus_class": "corpus-carried",
+     "query": "Macar fiği ve yem bezelyesinde kurak dönemde hangi toprak nem seviyesinde sulama yapmalıyım?",
+     "retrieval": "nonempty", "products": "none",
+     # dp_257759 (Macar fiği + yem bezelyesi, forage legumes; slate row 9): the
+     # study's own conclusion states "...en yüksek ot verimleri için %75 tarla
+     # kapasitesi seviyesinde sulama yapıldığında elde edildiği". The first
+     # context anchor uses U+2019 (’), NOT an ASCII apostrophe (ASCII form = ZERO
+     # chunks). Copied verbatim from the slate; do not retype it.
+     "context_any": ["kapasitesinin %25’ine düşmesine sebep olan kuraklıklar",
+                     "her iki yem bitkisine ne ciddi zarar vererek"],
+     # RISK checked, not assumed: "75% of field capacity" is a fairly generic
+     # irrigation figure, so a model-carried read was plausible. It did NOT
+     # materialise.
+     # corpus-carried (live 2026-07-22, round 5): repeat 4 read normal 4/4,
+     # ablated 0/4 - decisive, no repeat-8 escalation. The normal run also reads
+     # ret=True ctx=True, so the grounding is not a list-echo off a methods chunk
+     # (the local_ege_durum_wheat trap): the U+2019 verdict-chunk anchor is in the
+     # retrieved context.
+     "answer_any": ["%75 tarla kapasitesi", "% 75 tarla kapasitesi",
+                    "tarla kapasitesinin %75"]},
+    # DROPPED 2026-07-22 (round 5): technique_grape_graft_material, "Asma aşısında
+    # anaç çeliği ve kalem hangi sürme durumunda olmalı?" asserting dp_19426's own
+    # conclusion "sürmüş çelik X sürmemiş kalem durumunun aşıda kullanılması
+    # önerilebilir" (slate row 10). retrieval-broken (normal ret=True ctx=False
+    # ground=False). NOT dead anchors: both context_any anchors were re-verified in
+    # the store (1 chunk each, dp_19426 page 7, source-unique). The RECORDED
+    # sibling collision materialised - retrieve_context landed on dp_19448 (the
+    # same Tekirdağ group, same graft combination with UV-C) as the #1 source; the
+    # only dp_19426 chunk that surfaced was NOT the page-7 verdict chunk, so
+    # neither anchor entered context and the model never stated the pairing. Same
+    # class as the dropped quant_sunflower_humic_acid_dose (killed by dp_19431).
+    # Retrieval is deterministic, so ctx=False is stable, not a flake - no repeat
+    # escalation. The only way to green this is to change the query or the claim,
+    # which is tuning-to-green; not done. Do NOT re-mine dp_19426 / dp_19448 /
+    # dp_19471 against each other in a future round: they collide by construction.
+    # HISTORICAL provenance block (row 9 is now a case ABOVE; row 10 dropped).
     # UNMEASURED 2026-07-21 (round-4 stopping rule, not a finding): slate rows 9
     # (dp_257759, Macar fiği/yem bezelyesi "%75 tarla kapasitesi" irrigation
     # level) and 10 (dp_19426, asma aşısı "sürmüş çelik X sürmemiş kalem"
