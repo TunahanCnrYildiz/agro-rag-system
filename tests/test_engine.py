@@ -820,3 +820,66 @@ def test_get_llm_uses_the_profile_base_url(monkeypatch):
 
     assert str(client.base_url).startswith(engine.settings.openrouter_base_url)
     engine._get_llm.cache_clear()   # never leak a test-configured client
+
+
+def _capturing_stream_llm(seen: dict, chunks, finish=None):
+    """Streaming counterpart of _capturing_llm: same shape as _fake_stream_llm,
+    but also records the kwargs passed to chat.completions.create so the
+    streaming call site's wiring can be checked the same way
+    test_complete_text_sends_the_profile_model_and_sampling checks the unified
+    path. _fake_stream_llm itself is left untouched - several tests depend on
+    it discarding kwargs."""
+    class _Delta:
+        def __init__(self, c):
+            self.content = c
+
+    class _Choice:
+        def __init__(self, c, fr=None):
+            self.delta = _Delta(c)
+            self.finish_reason = fr
+
+    class _Chunk:
+        def __init__(self, c, fr=None):
+            self.choices = [_Choice(c, fr)]
+
+    seq = [_Chunk(c) for c in chunks]
+    if finish is not None:
+        seq.append(_Chunk(None, finish))
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    seen.update(kwargs)
+                    return iter(seq)
+
+    return _Client()
+
+
+def test_stream_answer_sends_the_profile_model_and_sampling(monkeypatch):
+    """Streaming counterpart of test_complete_text_sends_the_profile_model_and_
+    sampling. _fake_stream_llm discards the kwargs passed to create(), so
+    nothing previously proved stream_answer's chat.completions.create() call
+    carries the active profile's model/sampling rather than
+    settings.chat_model / a global sampling dict."""
+    seen: dict = {}
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    # Well over _STREAM_WARMUP (80) clean chars in a single chunk, finished
+    # cleanly ("stop") - so the streaming path itself runs to completion
+    # instead of falling back to _complete_text on a "length" truncation.
+    answer_text = ("Bu oldukca uzun bir cevap metni, isinma tamponunu asmak "
+                   "icin yeterince karakter iceriyor ve akis boyunca boyle "
+                   "devam ediyor.")
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _capturing_stream_llm(seen, [answer_text], finish="stop"))
+
+    out = "".join(engine.stream_answer("Soru?"))
+
+    assert seen["model"] == "vendor/model-x"
+    assert "extra_body" not in seen
+    assert _sse_tokens(out) == answer_text
