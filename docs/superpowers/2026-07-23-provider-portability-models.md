@@ -81,3 +81,51 @@ Note on a boundary case that was *not* disqualified: a few small models report `
 2. **Whether the phase-1 per-call token estimate (2,500 prompt / 400 completion) also applies to the phase-2 calls.** The brief only states this estimate for phase 1. Since phase 2 reuses the same retrieval setup (four ~1,000-character chunks + system prompt) just repeated across normal/ablated conditions and repeats, the same per-call estimate was reused for phase 2's 184 billed calls. This likely slightly overstates the ablated-condition cost (which may carry less context), so the phase-2 figures above should be read as a conservative (upper-bound) estimate, appropriate for a pre-approval cost ceiling.
 3. **Free-tier (`:free`) model variants.** Several candidates (e.g. Gemma, DeepSeek, Qwen, gpt-oss) have zero-cost `:free` siblings in the catalogue. These were deliberately not chosen: free-tier endpoints on OpenRouter carry tighter rate limits and lower availability guarantees, which is a bad fit for a scheduled, unattended measurement run of this call volume. Paid ids were used throughout.
 4. **"Strong" interpreted as frontier-but-not-most-expensive.** The brief's class label is "a frontier-class model," not "the most expensive model." Among genuinely frontier-tier candidates, `openai/gpt-5.1` was preferred over pricier peers (`claude-opus-4.8`, `gpt-5.2`, `gemini-3.1-pro-preview`) on the grounds that all are comparably frontier-class, so the cheaper one under a fixed call budget is the better pick.
+
+---
+
+## REVISION 2026-07-23 — free-tier slate adopted
+
+The models above were pinned on cost-efficiency grounds and remain the correct
+choice *if credits are available*. Two facts emerged afterwards and changed the
+slate. The original reasoning is left intact above as the record.
+
+**Fact 1 — the account has no OpenRouter credits.** OpenRouter is prepaid, so a
+paid model simply returns `402 insufficient credits`; there is no billing risk,
+but there is also no measurement. Rather than gate this work on a top-up, the
+slate moves to `:free` models, which cost nothing.
+
+**Fact 2 — the local baseline is `google/gemma-4-12b-qat`, not a generic
+"Gemma-class ~12B".** The exact id was read from the live LM Studio `/v1/models`
+endpoint after the original selection was made. There is no `gemma-4-12b` on
+OpenRouter, so no exact twin exists and the near-peer choice becomes a real
+trade-off: same *size* (`gemma-3-12b-it`, one generation older) versus same
+*generation* (`gemma-4-26b-a4b-it`, larger but mixture-of-experts with roughly 4B
+active parameters, so its working capacity may sit closer to a 12B dense model
+than its nominal size suggests). **User ruling: same generation.**
+
+### The slate actually being measured
+
+| class | id | price |
+|---|---|---|
+| strong | `nvidia/nemotron-3-ultra-550b-a55b:free` | free |
+| mid | `openai/gpt-oss-20b:free` | free |
+| near-peer | `google/gemma-4-26b-a4b-it:free` | free |
+
+All three clear the 8,192-token context rule by a wide margin
+(1,000,000 / 131,072 / 262,144).
+
+**Total measurement cost: $0.00.**
+
+### The new unknown this introduces
+
+Free-tier accounts carry a daily request cap, and it is lower for accounts that
+have never purchased credits. Phase 1 needs 162 calls (54 cases x 3 models). If
+the cap is below that, the measurement cannot complete in one day.
+
+**This is not estimated here.** The cap will be read from
+`https://openrouter.ai/api/v1/auth/key` with the real key before phase 1 starts,
+and the actual limit recorded. If it proves too low, the fallback is to run the
+guardrail subset first — the guardrail is the only *blocking* criterion in the
+pre-registered rule, so a partial run still answers the question that matters
+most.
