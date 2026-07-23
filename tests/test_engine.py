@@ -740,3 +740,83 @@ def test_stream_answer_keeps_a_short_answer_that_finished_cleanly(monkeypatch):
 
     out = "".join(engine.stream_answer("Bu mumkun mu?"))
     assert _sse_tokens(out) == "Evet, bu mumkundur."
+
+
+# --------------------------------------------------------------------------- #
+# ChatProfile: everything provider-dependent lives in one place
+# --------------------------------------------------------------------------- #
+def test_local_profile_carries_the_lm_studio_sampling_extensions(monkeypatch):
+    monkeypatch.setattr(engine.settings, "chat_provider", "local")
+
+    p = engine._chat_profile()
+
+    assert p.model == engine.settings.chat_model
+    assert p.base_url == engine.settings.lm_studio_base_url
+    assert p.sampling["extra_body"] == {
+        "min_p": engine.settings.min_p,
+        "repeat_penalty": engine.settings.repeat_penalty,
+    }
+
+
+def test_openrouter_profile_omits_the_lm_studio_sampling_extensions(monkeypatch):
+    """min_p / repeat_penalty are LM Studio extensions; hosted providers reject
+    unknown body fields with a 400. This test's real job is FUTURE protection: if
+    sampling is ever re-collapsed into one global dict, the failure would appear
+    only on the hosted path, in production."""
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+
+    p = engine._chat_profile()
+
+    assert p.model == "vendor/model-x"
+    assert p.base_url == engine.settings.openrouter_base_url
+    assert "extra_body" not in p.sampling
+    assert p.sampling["temperature"] == engine.settings.temperature
+
+
+def _capturing_llm(seen: dict, reply: str = "Cevap."):
+    """A fake client that records the kwargs passed to chat.completions.create."""
+    class _Msg:
+        content = reply
+
+    class _Choice:
+        message = _Msg()
+
+    class _Resp:
+        choices = [_Choice()]
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    seen.update(kwargs)
+                    return _Resp()
+
+    return _Client()
+
+
+def test_complete_text_sends_the_profile_model_and_sampling(monkeypatch):
+    """The wiring test: the provider switch is worthless if the request still
+    carries settings.chat_model or the local-only extra_body."""
+    seen: dict = {}
+    monkeypatch.setattr(engine, "_get_llm", lambda: _capturing_llm(seen))
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+
+    assert engine._complete_text([]) == "Cevap."
+
+    assert seen["model"] == "vendor/model-x"
+    assert "extra_body" not in seen
+
+
+def test_get_llm_uses_the_profile_base_url(monkeypatch):
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    monkeypatch.setattr(engine.settings, "openrouter_api_key", "test-key")
+    engine._get_llm.cache_clear()
+
+    client = engine._get_llm()
+
+    assert str(client.base_url).startswith(engine.settings.openrouter_base_url)
+    engine._get_llm.cache_clear()   # never leak a test-configured client

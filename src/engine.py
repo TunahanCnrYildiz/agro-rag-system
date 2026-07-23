@@ -392,11 +392,68 @@ def retrieve_context(
 # --------------------------------------------------------------------------- #
 # LLM client
 # --------------------------------------------------------------------------- #
-@lru_cache(maxsize=1)
-def _get_llm() -> OpenAI:
-    return OpenAI(
+@dataclass(frozen=True)
+class ChatProfile:
+    """Everything that depends on WHICH chat backend is in use.
+
+    Sampling lives here rather than in one global dict on purpose: min_p and
+    repeat_penalty are LM Studio extensions, and a hosted provider rejects
+    unknown body fields with a 400. Keeping them beside the endpoint they belong
+    to makes a third provider one more branch instead of a scattered `if`.
+    """
+    base_url: str
+    api_key: str
+    model: str
+    sampling: dict
+    unavailable_hint: str
+
+
+def _chat_profile() -> ChatProfile:
+    """Build the active profile. Deliberately NOT cached: the eval repoints
+    settings mid-process (see evals/run_eval.py --provider) and must see the
+    change. It is only a few dict literals."""
+    if settings.chat_provider == "openrouter":
+        return ChatProfile(
+            base_url=settings.openrouter_base_url,
+            api_key=settings.openrouter_api_key,
+            model=settings.openrouter_model,
+            sampling={
+                "temperature": settings.temperature,
+                "top_p": settings.top_p,
+                "max_tokens": settings.max_tokens,
+            },
+            unavailable_hint=(
+                "Lutfen internet baglantinizi ve OpenRouter kredinizi kontrol edin."
+            ),
+        )
+    return ChatProfile(
         base_url=settings.lm_studio_base_url,
         api_key=settings.lm_studio_api_key,
+        model=settings.chat_model,
+        sampling={
+            "temperature": settings.temperature,
+            "top_p": settings.top_p,
+            "max_tokens": settings.max_tokens,
+            # LM Studio extensions - see ChatProfile's docstring.
+            "extra_body": {
+                "min_p": settings.min_p,
+                "repeat_penalty": settings.repeat_penalty,
+            },
+        },
+        unavailable_hint=(
+            "Lutfen yerel sunucunun (LM Studio) calistigindan emin olun."
+        ),
+    )
+
+
+# Cached because constructing the client is the expensive part. Callers that
+# change the provider mid-process MUST call _get_llm.cache_clear().
+@lru_cache(maxsize=1)
+def _get_llm() -> OpenAI:
+    profile = _chat_profile()
+    return OpenAI(
+        base_url=profile.base_url,
+        api_key=profile.api_key,
         timeout=settings.request_timeout,
     )
 
@@ -453,12 +510,13 @@ def _complete_text(messages: list[dict]) -> str:
     is a different failure and must stay distinguishable.
     """
     client = _get_llm()
+    profile = _chat_profile()
     for _ in range(2):  # first attempt + one retry
         completion = client.chat.completions.create(
-            model=settings.chat_model,
+            model=profile.model,
             messages=messages,
             stream=False,
-            **_sampling_kwargs(),
+            **profile.sampling,
         )
         text = completion.choices[0].message.content or ""
         if text.strip():
@@ -499,20 +557,6 @@ def _build_messages(
 # --------------------------------------------------------------------------- #
 # Public API: full (unified) and streaming answers
 # --------------------------------------------------------------------------- #
-def _sampling_kwargs() -> dict:
-    """Shared generation params. top_p is a standard OpenAI field; min_p and
-    repeat_penalty are LM Studio extensions passed via extra_body."""
-    return {
-        "temperature": settings.temperature,
-        "top_p": settings.top_p,
-        "max_tokens": settings.max_tokens,
-        "extra_body": {
-            "min_p": settings.min_p,
-            "repeat_penalty": settings.repeat_penalty,
-        },
-    }
-
-
 # The model prefixes off-scope refusals with this marker (see SYSTEM_PROMPT) so
 # we can strip it and drop product suggestions - recommending catalog products
 # under a "that's outside my scope" reply would be incoherent.
@@ -610,11 +654,12 @@ def stream_answer(
     has_advice = True   # cleared when we fall back instead of answering
     try:
         client = _get_llm()
+        profile = _chat_profile()
         stream = client.chat.completions.create(
-            model=settings.chat_model,
+            model=profile.model,
             messages=messages,
             stream=True,
-            **_sampling_kwargs(),
+            **profile.sampling,
         )
         for chunk in stream:
             if not chunk.choices:
