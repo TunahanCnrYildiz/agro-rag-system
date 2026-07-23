@@ -190,6 +190,23 @@ def _faithfulness_verdict(
     return (1 if regressed else 0), regressed
 
 
+def _no_answer_reason(text: str) -> str | None:
+    """Why this text is not a real answer, or None if it is one.
+
+    The eval scores `answer_none` (the guardrail) by checking that banned
+    phrases are ABSENT. Our own fallback messages contain none, so a case the
+    model never answered would score guardrail=True - a pass that asserts
+    nothing. Measured live 2026-07-23: two rate-limited models returned almost
+    nothing but 429 fallbacks and both read `guardrail: 54/54`.
+    """
+    stripped = (text or "").strip()
+    if stripped.startswith(engine._LLM_UNAVAILABLE_PREFIX):
+        return "unavailable"
+    if stripped == engine._empty_answer_message():
+        return "empty"
+    return None
+
+
 def run(fast: bool, repeat: int = 1, only: str | None = None,
         no_context: bool = False) -> int:
     if fast and repeat > 1:
@@ -224,28 +241,42 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
             row["ok"] = all(row[d] for d in ("retrieval", "context"))
         else:
             samples = []
+            no_answer = None
             for _ in range(repeat):
                 r = engine.answer(c["query"])
+                reason = _no_answer_reason(r.answer)
+                if reason and no_answer is None:
+                    no_answer = reason
                 g, gr = _answer_ok(c, r.answer)
                 samples.append({
                     "products": _products_ok(c, len(r.recommended_products)),
                     "grounding": g,
                     "guardrail": gr,
                 })
-            for dim in ("products", "grounding", "guardrail"):
-                vals = [s[dim] for s in samples]
-                # every sample must pass: "leaks 1 time in 8" is a failure
-                row[dim] = all(vals)
-                row[dim + "_hits"] = (sum(vals), len(vals))
-            dims = ["products", "grounding", "guardrail"]
-            if not no_context:
-                dims += ["retrieval", "context"]
-            row["ok"] = all(row[d] for d in dims)
+            if no_answer:
+                # Record NO dimension keys: rate()/sample_rate() skip absent
+                # keys, so this case is EXCLUDED from the scores rather than
+                # counted as a vacuous pass. One bad sample voids the case - a
+                # partially-answered case cannot demonstrate a guardrail.
+                row["no_answer"] = no_answer
+                row["ok"] = False
+            else:
+                for dim in ("products", "grounding", "guardrail"):
+                    vals = [s[dim] for s in samples]
+                    # every sample must pass: "leaks 1 time in 8" is a failure
+                    row[dim] = all(vals)
+                    row[dim + "_hits"] = (sum(vals), len(vals))
+                dims = ["products", "grounding", "guardrail"]
+                if not no_context:
+                    dims += ["retrieval", "context"]
+                row["ok"] = all(row[d] for d in dims)
         row["secs"] = time.time() - t
         rows.append(row)
-        mark = "PASS" if row["ok"] else "FAIL"
+        mark = "ERROR" if row.get("no_answer") else ("PASS" if row["ok"] else "FAIL")
         if fast:
             detail = f"rawprod={row.get('raw_products')}"
+        elif row.get("no_answer"):
+            detail = f"NO ANSWER ({row['no_answer']}) - not scored"
         elif repeat > 1:
             detail = " ".join(
                 f"{name}={row[dim + '_hits'][0]}/{row[dim + '_hits'][1]}"
@@ -261,6 +292,17 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
 
     passed = sum(1 for r in rows if r["ok"])
     print(f"\n=== {passed}/{len(rows)} cases passed ===")
+
+    errored = [r for r in rows if r.get("no_answer")]
+    if errored:
+        kinds: dict[str, int] = {}
+        for r in errored:
+            kinds[r["no_answer"]] = kinds.get(r["no_answer"], 0) + 1
+        breakdown = ", ".join(f"{k}: {v}" for k, v in sorted(kinds.items()))
+        print(f"!! {len(errored)}/{len(rows)} cases produced NO ANSWER "
+              f"({breakdown}).")
+        print("   They are EXCLUDED from the rates below: a case the model "
+              "never answered cannot show that the guardrail held.")
 
     def rate(key):
         vals = [r[key] for r in rows if key in r]
@@ -325,8 +367,21 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
     settings.request_timeout = 400.0
 
     def grounded_hits(case: dict) -> int:
-        return sum(_answer_ok(case, engine.answer(case["query"]).answer)[0]
-                   for _ in range(repeat))
+        hits = 0
+        for _ in range(repeat):
+            answer = engine.answer(case["query"]).answer
+            reason = _no_answer_reason(answer)
+            if reason:
+                # An unanswered sample reads as "ungrounded", which would
+                # silently mislabel this case as model-carried or
+                # retrieval-broken - worse than a wrong score, since the label
+                # is recorded as a finding and quoted later. Abort the whole
+                # map rather than presenting a partial one as complete.
+                sys.exit(f"[faithfulness] {case['id']} produced NO ANSWER "
+                          f"({reason}) - aborting rather than misclassifying "
+                          f"it as ungrounded.")
+            hits += _answer_ok(case, answer)[0]
+        return hits
 
     suffix = f", {repeat}x each" if repeat > 1 else ""
     print(f"=== faithfulness (corpus contribution), "

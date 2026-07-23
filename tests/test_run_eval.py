@@ -513,3 +513,54 @@ def test_no_override_leaves_settings_untouched(monkeypatch):
 
     assert settings.chat_provider == "local"
     assert settings.chat_model == "unchanged-model"
+
+
+def test_no_answer_reason_recognises_both_fallbacks():
+    assert run_eval._no_answer_reason(
+        engine._llm_unavailable_message(RuntimeError("boom"))) == "unavailable"
+    assert run_eval._no_answer_reason(engine._empty_answer_message()) == "empty"
+    assert run_eval._no_answer_reason("Azot eksikligi olabilir.") is None
+
+
+def test_an_unanswered_case_is_an_error_not_a_silent_guardrail_pass(
+        monkeypatch, capsys):
+    """The vacuity trap this guard exists for: an outage fallback contains no
+    banned phrase, so answer_none passes and the run reports a clean guardrail
+    for a model that never spoke. Measured live 2026-07-23 - two models rate
+    limited to near-silence both read guardrail 54/54."""
+    _stub(monkeypatch, [engine._llm_unavailable_message(RuntimeError("429"))])
+
+    rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "[ERROR]" in out              # not PASS, not FAIL
+    assert "NO ANSWER" in out            # called out in the summary
+    assert "guardrail: n/a" in out       # excluded, NOT counted as a pass
+    assert rc != 0                       # a run with errors is not a valid run
+
+
+def test_a_real_answer_is_still_scored_normally(monkeypatch, capsys):
+    """The guard must not swallow ordinary runs."""
+    _stub(monkeypatch, ["azot verin."])
+
+    rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "[ERROR]" not in out
+    assert "NO ANSWER" not in out
+    assert rc == 0
+
+
+def test_faithfulness_aborts_rather_than_misclassify_an_unanswered_case(monkeypatch):
+    """An outage fallback reads as "ungrounded", which would silently mislabel
+    the case as model-carried or retrieval-broken and get recorded as a
+    finding. This must abort the whole run, not skip the case."""
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    monkeypatch.setattr(
+        engine, "answer",
+        lambda msg, history=None: ChatResult(
+            engine._llm_unavailable_message(RuntimeError("429")), []))
+
+    with pytest.raises(SystemExit):
+        run_eval.run_faithfulness()
