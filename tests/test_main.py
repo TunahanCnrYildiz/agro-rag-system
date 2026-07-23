@@ -42,3 +42,15 @@ def test_products_503_when_catalog_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "PRODUCTS_JSON", tmp_path / "nope.json")
     r = client.get("/api/products")
     assert r.status_code == 503
+
+
+def test_health_reports_the_active_provider_but_never_the_key():
+    r = client.get("/health")
+    body = r.json()
+
+    assert r.status_code == 200
+    assert body["status"] == "ok"
+    assert body["provider"] in ("local", "openrouter")
+    assert body["model"]
+    # The key must never leave the server, in any field.
+    assert "key" not in " ".join(body.keys()).lower()

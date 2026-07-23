@@ -96,7 +96,13 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "model": settings.chat_model}
+    # The model comes from the active profile, not settings.chat_model, so this
+    # tells the truth in hosted mode too. The API key is never included.
+    return {
+        "status": "ok",
+        "provider": settings.chat_provider,
+        "model": engine._chat_profile().model,
+    }
 
 
 @app.get("/api/products", response_model=list[CatalogProduct])
