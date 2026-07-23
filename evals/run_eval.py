@@ -201,7 +201,8 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
         settings.request_timeout = 400.0
     suffix = f", {repeat}x each" if repeat > 1 else ""
     print(f"Running eval on {len(cases)} cases "
-          f"({'FAST' if fast else 'FULL'}{suffix})\n")
+          f"({'FAST' if fast else 'FULL'}{suffix}) "
+          f"[{_provider_stamp()}]\n")
     rows = []
     # The ablation must be in force around answer(), not just around run()'s own
     # retrieve_context call - blanking only the local `ctx` would ablate nothing.
@@ -329,7 +330,7 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
 
     suffix = f", {repeat}x each" if repeat > 1 else ""
     print(f"=== faithfulness (corpus contribution), "
-          f"{len(cases)} corpus_fact case(s){suffix} ===\n")
+          f"{len(cases)} corpus_fact case(s){suffix} === [{_provider_stamp()}]\n")
     counts = {"corpus-carried": 0, "model-carried": 0,
               "retrieval-broken": 0, "corpus-harmful": 0}
     live_labels: dict[str, str] = {}
@@ -354,6 +355,38 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
         print(f"\n  [drift] corpus-carried cases that REGRESSED: "
               f"{', '.join(regressed)}")
     return code
+
+
+def _apply_provider_override(provider: str | None, model: str | None) -> None:
+    """Repoint this eval process at a different chat backend.
+
+    Mutates the live `settings` object and drops the cached client, so the
+    override acts on the PRODUCTION path - run() still calls engine.answer().
+    A measurement-only client would be a different code path from the one that
+    ships, which is exactly the harness trap this project has already been
+    bitten by.
+
+    `settings` has no validate_assignment, so assigning chat_provider does NOT
+    re-run the config validator; the key is therefore checked here explicitly.
+    """
+    if not provider and not model:
+        return
+    if provider:
+        settings.chat_provider = provider
+    if model:
+        if settings.chat_provider == "openrouter":
+            settings.openrouter_model = model
+        else:
+            settings.chat_model = model
+    if settings.chat_provider == "openrouter" and not settings.openrouter_api_key.strip():
+        sys.exit("--provider openrouter needs OPENROUTER_API_KEY in .env")
+    engine._get_llm.cache_clear()
+
+
+def _provider_stamp() -> str:
+    """Provider + model, for the run header. Every recorded result must carry
+    this - an unstamped number cannot be attributed to a model later."""
+    return f"{settings.chat_provider}:{engine._chat_profile().model}"
 
 
 def main() -> None:
@@ -383,7 +416,15 @@ def main() -> None:
                         "recorded corpus-carried regresses; model-carried cases are "
                         "data, not failures. Pair with --repeat 4+ (labels are "
                         "majority-based, so the signal needs samples).")
+    p.add_argument("--provider", choices=["local", "openrouter"],
+                   help="Override the chat backend for this run. Default comes "
+                        "from CHAT_PROVIDER in .env. The embedding model always "
+                        "stays local.")
+    p.add_argument("--model", metavar="ID",
+                   help="Override the chat model id for this run. Applies to "
+                        "whichever provider is active after --provider.")
     args = p.parse_args()
+    _apply_provider_override(args.provider, args.model)
     if args.faithfulness:
         sys.exit(run_faithfulness(repeat=args.repeat, only=args.only,
                                   fast=args.fast))

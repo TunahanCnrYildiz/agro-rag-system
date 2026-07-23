@@ -445,3 +445,71 @@ def test_faithfulness_normal_minority_green_is_a_regression(monkeypatch):
     # repeat=4: normal 1/4 green (a minority) -> retrieval-broken -> a recorded
     # corpus-carried case that collapsed -> drift, exit 1.
     assert run_eval.run_faithfulness(repeat=4) == 1
+
+
+def test_provider_override_repoints_settings_and_clears_the_client_cache(monkeypatch):
+    """The override must act on the PRODUCTION path: same settings object that
+    answer() reads, and the cached client dropped so the next call rebuilds it
+    against the new endpoint."""
+    from evals import run_eval
+    from src import engine
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "chat_provider", "local")
+    monkeypatch.setattr(settings, "openrouter_model", "")
+    monkeypatch.setattr(settings, "openrouter_api_key", "test-key")
+
+    engine._get_llm.cache_clear()
+    engine._get_llm()                                    # populate the cache
+    assert engine._get_llm.cache_info().currsize == 1
+
+    run_eval._apply_provider_override("openrouter", "vendor/model-x")
+
+    assert settings.chat_provider == "openrouter"
+    assert settings.openrouter_model == "vendor/model-x"
+    assert engine._get_llm.cache_info().currsize == 0
+
+    engine._get_llm.cache_clear()        # never leak a test-configured client
+
+
+def test_model_override_alone_targets_the_active_provider(monkeypatch):
+    from evals import run_eval
+    from src import engine
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "chat_provider", "local")
+    monkeypatch.setattr(settings, "chat_model", "old-local-model")
+
+    run_eval._apply_provider_override(None, "new-local-model")
+
+    assert settings.chat_model == "new-local-model"
+    engine._get_llm.cache_clear()
+
+
+def test_openrouter_override_without_a_key_exits(monkeypatch):
+    """settings has no validate_assignment, so mutating chat_provider does NOT
+    re-run the model validator. Without this check the run would start and fail
+    with 401s partway through a paid measurement."""
+    import pytest
+    from evals import run_eval
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "chat_provider", "local")
+    monkeypatch.setattr(settings, "openrouter_api_key", "")
+    monkeypatch.setattr(settings, "openrouter_model", "")
+
+    with pytest.raises(SystemExit):
+        run_eval._apply_provider_override("openrouter", "vendor/model-x")
+
+
+def test_no_override_leaves_settings_untouched(monkeypatch):
+    from evals import run_eval
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "chat_provider", "local")
+    monkeypatch.setattr(settings, "chat_model", "unchanged-model")
+
+    run_eval._apply_provider_override(None, None)
+
+    assert settings.chat_provider == "local"
+    assert settings.chat_model == "unchanged-model"
