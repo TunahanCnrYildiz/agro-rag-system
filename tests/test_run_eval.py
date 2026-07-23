@@ -502,6 +502,23 @@ def test_openrouter_override_without_a_key_exits(monkeypatch):
         run_eval._apply_provider_override("openrouter", "vendor/model-x")
 
 
+def test_openrouter_override_without_a_model_exits(monkeypatch):
+    """Same trap as the missing-key case, but for OPENROUTER_MODEL: a `local`
+    .env with a key but no model set, run with --provider openrouter and no
+    --model, must fail loudly instead of stamping `[openrouter:]` and sending
+    every request with an empty model id (measured: a 400 per case)."""
+    import pytest
+    from evals import run_eval
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "chat_provider", "local")
+    monkeypatch.setattr(settings, "openrouter_api_key", "test-key")
+    monkeypatch.setattr(settings, "openrouter_model", "")
+
+    with pytest.raises(SystemExit):
+        run_eval._apply_provider_override("openrouter", None)
+
+
 def test_no_override_leaves_settings_untouched(monkeypatch):
     from evals import run_eval
     from src.config import settings

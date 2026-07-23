@@ -435,6 +435,8 @@ def _apply_provider_override(provider: str | None, model: str | None) -> None:
             settings.chat_model = model
     if settings.chat_provider == "openrouter" and not settings.openrouter_api_key.strip():
         sys.exit("--provider openrouter needs OPENROUTER_API_KEY in .env")
+    if settings.chat_provider == "openrouter" and not settings.openrouter_model.strip():
+        sys.exit("--provider openrouter needs OPENROUTER_MODEL in .env, or pass --model")
     engine._get_llm.cache_clear()
 
 

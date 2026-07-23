@@ -451,10 +451,18 @@ def _chat_profile() -> ChatProfile:
 @lru_cache(maxsize=1)
 def _get_llm() -> OpenAI:
     profile = _chat_profile()
+    # max_retries=0: the openai SDK defaults to DEFAULT_MAX_RETRIES=2 and retries
+    # 429s (and 5xx) itself, with backoff, entirely invisibly to our code. That
+    # violates a binding project constraint - a rate limit must stay visible,
+    # never silently absorbed - because an eval run measures timing and request
+    # budget, and a hidden retry-with-backoff corrupts both. This also disables
+    # retry-on-5xx; that is accepted as the same tradeoff, a visible failure
+    # beats a silent wait.
     return OpenAI(
         base_url=profile.base_url,
         api_key=profile.api_key,
         timeout=settings.request_timeout,
+        max_retries=0,
     )
 
 

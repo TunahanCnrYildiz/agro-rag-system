@@ -822,6 +822,21 @@ def test_get_llm_uses_the_profile_base_url(monkeypatch):
     engine._get_llm.cache_clear()   # never leak a test-configured client
 
 
+def test_get_llm_disables_sdk_retries(monkeypatch):
+    """The project constraint is no backoff/retry on 429 - a rate limit must
+    stay visible. The openai SDK's own default (DEFAULT_MAX_RETRIES=2) retries
+    429s (and 5xx) silently, with backoff, so _get_llm must override it."""
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    monkeypatch.setattr(engine.settings, "openrouter_api_key", "test-key")
+    engine._get_llm.cache_clear()
+
+    client = engine._get_llm()
+
+    assert client.max_retries == 0
+    engine._get_llm.cache_clear()   # never leak a test-configured client
+
+
 def _capturing_stream_llm(seen: dict, chunks, finish=None):
     """Streaming counterpart of _capturing_llm: same shape as _fake_stream_llm,
     but also records the kwargs passed to chat.completions.create so the
