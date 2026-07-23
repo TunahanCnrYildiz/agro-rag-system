@@ -44,7 +44,10 @@ def test_products_503_when_catalog_missing(monkeypatch, tmp_path):
     assert r.status_code == 503
 
 
-def test_health_reports_the_active_provider_but_never_the_key():
+def test_health_reports_the_active_provider_but_never_the_key(monkeypatch):
+    sentinel = "sk-or-SENTINEL-DO-NOT-LEAK"
+    monkeypatch.setattr(main.settings, "openrouter_api_key", sentinel)
+
     r = client.get("/health")
     body = r.json()
 
@@ -52,5 +55,8 @@ def test_health_reports_the_active_provider_but_never_the_key():
     assert body["status"] == "ok"
     assert body["provider"] in ("local", "openrouter")
     assert body["model"]
-    # The key must never leave the server, in any field.
+    # No field is literally named "key" ...
     assert "key" not in " ".join(body.keys()).lower()
+    # ... and the actual key value never appears anywhere in the raw
+    # response body, no matter which field it might hide behind.
+    assert sentinel not in r.text
