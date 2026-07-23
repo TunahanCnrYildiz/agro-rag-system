@@ -458,17 +458,24 @@ def _get_llm() -> OpenAI:
     )
 
 
-# Stable opening of the unavailable message; the tail carries the exception text,
-# so `_has_advice` matches on this prefix rather than the whole string.
-_LLM_UNAVAILABLE_PREFIX = "Uzgunum, su anda dil modeline (LM Studio) ulasamiyorum."
+# Stable opening of the unavailable message; the tail carries the provider hint
+# and the exception text, so `_has_advice` matches on this prefix rather than the
+# whole string.
+#
+# DELIBERATELY provider-neutral and a SINGLE constant. `_has_advice` uses it to
+# tell our own fallback from a real answer, and suppresses product suggestions
+# under it. A per-provider prefix would make a hosted outage message read as real
+# advice - and fertilizer products would be recommended under an error message.
+_LLM_UNAVAILABLE_PREFIX = "Uzgunum, su anda dil modeline ulasamiyorum."
 
 
 def _llm_unavailable_message(exc: Exception) -> str:
-    """User-facing fallback shown when the LM Studio chat model can't be
-    reached, so both the unified and streaming paths return the same wording."""
+    """User-facing fallback shown when the chat model can't be reached, so both
+    the unified and streaming paths return the same wording. The provider-specific
+    remedy comes from the active ChatProfile."""
     return (
         f"{_LLM_UNAVAILABLE_PREFIX} "
-        "Lutfen yerel sunucunun calistigindan emin oldugunuzu kontrol edin. "
+        f"{_chat_profile().unavailable_hint} "
         f"(teknik detay: {exc})"
     )
 

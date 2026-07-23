@@ -507,7 +507,7 @@ def test_complete_text_does_not_retry_a_short_answer(monkeypatch):
 
 
 def test_complete_text_propagates_transport_errors(monkeypatch):
-    """'LM Studio unreachable' must stay distinguishable from 'model said
+    """'Chat model unreachable' must stay distinguishable from 'model said
     nothing' - callers map the exception to _llm_unavailable_message."""
     import pytest  # this module has no module-level pytest import; keep it local
 
@@ -883,3 +883,26 @@ def test_stream_answer_sends_the_profile_model_and_sampling(monkeypatch):
     assert seen["model"] == "vendor/model-x"
     assert "extra_body" not in seen
     assert _sse_tokens(out) == answer_text
+
+
+def test_unavailable_message_is_never_advice_whichever_provider(monkeypatch):
+    """_has_advice recognises our own fallback by a single, provider-NEUTRAL
+    prefix. If the prefix ever became provider-dependent, a hosted outage message
+    would read as real advice and products would be recommended under an error."""
+    messages = {}
+    for provider in ("local", "openrouter"):
+        monkeypatch.setattr(engine.settings, "chat_provider", provider)
+        monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+        msg = engine._llm_unavailable_message(RuntimeError("connection refused"))
+        messages[provider] = msg
+        assert not engine._has_advice(msg)
+        assert msg.startswith(engine._LLM_UNAVAILABLE_PREFIX)
+        assert "connection refused" in msg      # technical detail still reaches the tail
+
+    # The hint must actually differ, or the user is pointed at the wrong place.
+    assert messages["local"] != messages["openrouter"]
+    assert "LM Studio" in messages["local"]
+    assert "OpenRouter" in messages["openrouter"]
+    # ...and the provider name must NOT be in the shared prefix.
+    assert "LM Studio" not in engine._LLM_UNAVAILABLE_PREFIX
+    assert "OpenRouter" not in engine._LLM_UNAVAILABLE_PREFIX
