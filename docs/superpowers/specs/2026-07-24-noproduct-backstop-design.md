@@ -82,23 +82,31 @@ activity **and** carries no nutrition term. Consequences:
 
 ### The matcher
 
-`_contains_any(text: str, stems: tuple[str, ...]) -> bool` reuses the exact
-Turkish-inflection-aware pattern already used by `_expand_query`
-(`engine.py:293`): `(?<!\w){stem}(?:{_TR_SUFFIXES})?(?!\w)` over `_normalize_tr(text)`.
-This sees a stem through Turkish case/plural/possessive endings ("budamada",
-"depolamada", "sulamada") without firing on an unrelated morpheme. It is small and
-testable in isolation.
+`_contains_any(text: str, stems: tuple[str, ...]) -> bool` matches each stem with a
+**LEFT word-boundary only**: `(?<!\w){stem}` over `_normalize_tr(text)`, with the stem
+also folded.
+
+**Why NOT the `_expand_query` pattern.** `_expand_query` uses `(?<!\w){stem}(?:{_TR_SUFFIXES})?(?!\w)`
+— both boundaries plus a case-ending suffix group. That was measured (2026-07-24) to be
+WRONG here: `_TR_SUFFIXES` carries only noun case/possessive/plural endings, not
+derivational or verbal suffixes, and the right boundary then blocks exactly the forms
+the backstop must catch. Measured examples: with the full pattern, stem `gubre` does NOT
+match "gübreleyin" (the right `(?!\w)` fails at the derivational `-le`), and `besle`
+matches nothing. A nutrition answer saying "bitkiyi gübreleyin" would slip the nutrition
+guard and risk wrongful suppression. Left-boundary-only fixes this: `gubre` → "gübreleyin",
+"gübreleme"; `budam` → "budama", "budamada"; `sula` → "sulama", "sulayın".
+
+**The left boundary is load-bearing** and the right one is deliberately absent: the left
+boundary blocks a stem from matching inside a larger word from the left (`stor` does NOT
+match "restore" or "history"; `sula` does NOT match "pusula"), while dropping the right
+boundary lets a stem reach its own derivational tail.
 
 **CRITICAL — both sides must be folded.** `_normalize_tr` lowercases *and folds Turkish
-letters to ASCII* (`ş→s`, `ü→u`, `ç→c`, `ğ→g`, `ı→i`, `ö→o`), the same as
-`_LEXICON_BY_LENGTH` does to the crop lexicon (`engine.py:268`). So "Aşılama" becomes
-"asilama". Each stem must therefore be matched in **folded** form — `_contains_any`
-applies `_normalize_tr` to every stem before building its pattern (mirroring how the
-lexicon keys are pre-folded). If the stems were compared raw (with diacritics) against
-folded text, "aşı" would never match "asilama" and the gate would be **silently dead** —
-the "a dead anchor does not fail loudly" trap this project has hit before. A unit test
-MUST cover a diacritic stem end to end (a stem like `aşı`/`gübre` matching "aşılama"/
-"gübreleyin" in real input), so a folding regression fails loudly.
+letters to ASCII* (`ş→s`, `ü→u`, `ç→c`, `ğ→g`, `ı→i`, `ö→o`). So "Aşılama" becomes
+"asilama". `_contains_any` applies `_normalize_tr` to every stem before matching, so a
+folded stem meets folded text. A raw (diacritic) stem against folded text would never
+match — the "a dead anchor does not fail loudly" trap. A unit test MUST cover a diacritic
+stem end to end (`gübre` matching "gübreleyin", `aşıla` matching "aşılayın").
 
 ### The two term sets
 
@@ -107,33 +115,49 @@ categories `SYSTEM_PROMPT` already enumerates (`config.py:247-249`), no speculat
 terms. Expanded only if measurement shows a gap, and such a gap is a *finding*, not a
 cue to tune.
 
+The exact stems were chosen by empirical probing (2026-07-24) against realistic answer
+sentences in both directions, not by intuition — several intuitive stems had real false
+positives (below).
+
 `_NON_PRODUCT_ACTIVITY` (Turkish stems + English stems):
 
 | category | Turkish | English |
 |---|---|---|
-| pruning | budam | prun |
-| grafting | aşı, aşıla | graft |
+| pruning | budam | prune, pruning |
+| grafting | aşıla | graft |
 | ventilation | havaland | ventilat |
-| pollination | tozla | pollinat |
-| irrigation practice | sulam | irrigat |
+| pollination | tozlaş | pollinat |
+| irrigation practice | sula | irrigat |
 | propagation | çoğalt | propagat |
-| harvest/storage | hasat, depola, muhafaza | harvest, storag, stor |
-| pest/weed control | zararlı, yabancı ot, ilaçla | pest, weed, pesticid |
+| harvest/storage | hasat, depola, muhafaza | harvest, storag |
+| pest/weed control | zararlı, yabancı ot, ilaçla | pesticid, weed |
 
 `_NUTRITION_TERMS` (if any of these appears, never suppress):
 
-`gübre, besin, besle, azot, fosfor, potasyum, npk, doz, kompost, verimlil`
+`gübre, besin, besle, azot, fosfor, potasyum, npk, doz, kompost, verimli`
 / `fertiliz, nutrient, nitrogen, phosph, potass, compost, feeding`
 
-**Deliberate exclusions, each avoiding a known trap:**
-- **`tozla` for pollination, not `döllen`.** "Döllenme" spans pollination *and*
-  reproduction and reads close to "gübreleme"; `tozla` is unambiguous.
+**Deliberate stem choices, each avoiding a MEASURED trap:**
+- **`aşıla`, not bare `aşı`.** With left-boundary matching, `aşı` matches "aşırı"
+  (*excessive* — extremely common in plant advice: "aşırı sulama", "aşırı gübreleme"), a
+  frequent false positive. `aşıla` (the grafting gerund) does not. Cost: "aşı yapın"
+  phrasing slips — accepted partial coverage.
+- **`prune`/`pruning`, not `prun`.** `prun` matches "Prunus" (the cherry/plum genus), a
+  false positive on any answer naming that genus. The two explicit English words avoid it.
+- **`budam`, not `buda`.** `buda` matches "budala" (*fool*); `budam` matches the pruning
+  noun "budama"/"budamada" without that collision. Cost: pure verb "budayın" slips —
+  accepted.
+- **`tozlaş` for pollination, not `döllen`.** "Döllenme" spans pollination *and*
+  reproduction and reads close to "gübreleme"; `tozlaş` is unambiguous.
 - **`hastalık` (disease) is NOT an activity stem.** A nutrient-deficiency answer can be
-  framed as a "disease"; it must not be suppressed. It is protected twice: it carries a
-  nutrition term (`azot`…) anyway, and `hastalık` is simply absent from the list.
-- **`sulam` (irrigation) is included despite fertigation overlap** — a fertigation answer
-  ("sıvı gübre ile sulama") contains `gübre`, so the nutrition half keeps it. The overlap
-  falls to the safe side by construction.
+  framed as a "disease"; it must not be suppressed. Protected twice: it carries a
+  nutrition term (`azot`…), and `hastalık` is simply absent.
+- **`stor` dropped from English storage** (kept `storag`, `harvest`): `stor` risks
+  "restore"/"history"-class hits; `storag` is specific.
+- **`sula` (irrigation) is included despite fertigation overlap** — a fertigation answer
+  ("sıvı gübre ile sulama") contains `gübre`, so the nutrition half keeps it. A pure
+  watering-practice answer ("aşırı sulama kökü çürütür") correctly suppresses, since the
+  fertilizer catalog cannot answer a watering question either.
 
 ### Wiring — two call sites, mirroring the existing marker check
 
