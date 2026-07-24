@@ -738,6 +738,7 @@ def stream_answer(
     failed = False
     finish = None
     has_advice = True   # cleared when we fall back instead of answering
+    full_answer = ""    # the complete streamed answer, for the backstop
     try:
         client = _get_llm()
         profile = _chat_profile()
@@ -757,12 +758,14 @@ def stream_answer(
             if not delta:
                 continue
             if warmed:
+                full_answer += delta
                 yield _sse({"type": "token", "content": delta})
                 emitted = True
                 continue
             buffer += delta
             clean, off_scope, no_product = _strip_markers(buffer)
             if len(clean) >= _STREAM_WARMUP:
+                full_answer += clean
                 yield _sse({"type": "token", "content": clean})
                 emitted = True
                 warmed = True
@@ -786,6 +789,7 @@ def stream_answer(
             has_advice = _has_advice(text)
             clean, off_scope, no_product = _strip_markers(text)
         if clean:
+            full_answer += clean
             yield _sse({"type": "token", "content": clean})
             emitted = True
 
@@ -799,13 +803,15 @@ def stream_answer(
         has_advice = _has_advice(text)
         clean, off_scope, no_product = _strip_markers(text)
         if clean:
+            full_answer += clean
             yield _sse({"type": "token", "content": clean})
 
     # Emit product recommendations only after the full answer has streamed (and
     # only for in-scope answers), so clients render them beneath the reply.
     # `has_advice` covers the fallbacks: there is no advice for products to sit
     # under when we could not answer at all.
-    if not (off_scope or no_product) and has_advice:
+    if (not (off_scope or no_product) and has_advice
+            and not _looks_non_product(full_answer)):
         yield _sse(
             {"type": "products",
              "recommended_products": [p.as_api() for p in products]}

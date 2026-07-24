@@ -1011,3 +1011,47 @@ def test_looks_non_product_keeps_a_neutral_answer():
     """Neither signal -> when in doubt, show."""
     assert not engine._looks_non_product(
         "Bu bitki genellikle ilkbaharda cicek acar ve yari golge sever.")
+
+
+def test_stream_answer_suppresses_products_when_non_product_without_a_marker(
+        monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["Asmalarda budama kis sonunda yapilir."]))
+    out = "".join(engine.stream_answer("Asmada budama ne zaman?"))
+    assert '"type": "products"' not in out           # backstop suppressed the event
+    assert "budama" in _sse_tokens(out)              # the answer still streamed
+
+
+def test_stream_answer_keeps_products_on_a_nutrition_answer_without_a_marker(
+        monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["Azot eksikligi olabilir, gubre verin."]))
+    out = "".join(engine.stream_answer("Yapraklar sariyor"))
+    assert '"type": "products"' in out               # NOT suppressed
+
+
+def test_stream_answer_backstop_sees_the_whole_answer_not_just_the_warmup(
+        monkeypatch):
+    """The activity term arrives AFTER warmup. If the backstop only inspected the
+    warmup buffer it would miss it; it must inspect the accumulated full answer."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    # First chunk is >80 chars (clears _STREAM_WARMUP=80) with NO activity/nutrition
+    # term; the pruning term lands only in the second chunk, post-warmup.
+    head = ("Bu konuda size yardimci olabilirim ve asagida konuyu adim adim "
+            "ayrintili bicimde acikliyorum simdi. ")
+    assert len(head) > engine._STREAM_WARMUP
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm([head, "Once kuru dallari budamak gerekir."]))
+    out = "".join(engine.stream_answer("Nasil yapilir?"))
+    assert '"type": "products"' not in out           # suppressed on the late term
