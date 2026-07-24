@@ -8,8 +8,9 @@ which keeps secrets and per-machine paths out of the source tree.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -62,6 +63,25 @@ class Settings(BaseSettings):
     # Embedding model served by LM Studio (must be an embedding-capable model).
     embedding_model: str = Field(default="text-embedding-nomic-embed-text-v1.5")
 
+    # --- Chat provider selection --- #
+    # "local"      -> the LM Studio server configured above (unchanged behaviour)
+    # "openrouter" -> a hosted OpenAI-compatible endpoint
+    #
+    # Defaults to "local" on purpose: an existing install, a fresh clone with no
+    # .env, and CI must all keep behaving exactly as before. Hosted mode is
+    # entered explicitly, never by accident.
+    #
+    # NOTE the embedding settings above deliberately keep their lm_studio_* names
+    # and are NOT part of this switch. ingest.py builds the embeddings client from
+    # lm_studio_base_url, and the vector store is stamped bge-m3 - if embeddings
+    # followed the chat provider, switching model would invalidate the store.
+    chat_provider: Literal["local", "openrouter"] = Field(default="local")
+    openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    openrouter_api_key: str = Field(
+        default="", description="From .env; never commit it.")
+    openrouter_model: str = Field(
+        default="", description="OpenRouter model id, e.g. 'vendor/model-name'.")
+
     # --- Generation params --- #
     # Low temperature keeps answers grounded/consistent for a factual RAG.
     # 0.4 matches the value actually in use (.env is gitignored, so a stale
@@ -107,6 +127,20 @@ class Settings(BaseSettings):
         if raw == "*":
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
+
+    @model_validator(mode="after")
+    def _require_openrouter_credentials(self) -> "Settings":
+        """Fail loudly at startup rather than with a 401 per request."""
+        if self.chat_provider != "openrouter":
+            return self
+        missing = [name for name, value in (
+            ("OPENROUTER_API_KEY", self.openrouter_api_key),
+            ("OPENROUTER_MODEL", self.openrouter_model),
+        ) if not value.strip()]
+        if missing:
+            raise ValueError(
+                "CHAT_PROVIDER=openrouter requires " + " and ".join(missing))
+        return self
 
 
 settings = Settings()

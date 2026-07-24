@@ -507,7 +507,7 @@ def test_complete_text_does_not_retry_a_short_answer(monkeypatch):
 
 
 def test_complete_text_propagates_transport_errors(monkeypatch):
-    """'LM Studio unreachable' must stay distinguishable from 'model said
+    """'Chat model unreachable' must stay distinguishable from 'model said
     nothing' - callers map the exception to _llm_unavailable_message."""
     import pytest  # this module has no module-level pytest import; keep it local
 
@@ -740,3 +740,184 @@ def test_stream_answer_keeps_a_short_answer_that_finished_cleanly(monkeypatch):
 
     out = "".join(engine.stream_answer("Bu mumkun mu?"))
     assert _sse_tokens(out) == "Evet, bu mumkundur."
+
+
+# --------------------------------------------------------------------------- #
+# ChatProfile: everything provider-dependent lives in one place
+# --------------------------------------------------------------------------- #
+def test_local_profile_carries_the_lm_studio_sampling_extensions(monkeypatch):
+    monkeypatch.setattr(engine.settings, "chat_provider", "local")
+
+    p = engine._chat_profile()
+
+    assert p.model == engine.settings.chat_model
+    assert p.base_url == engine.settings.lm_studio_base_url
+    assert p.sampling["extra_body"] == {
+        "min_p": engine.settings.min_p,
+        "repeat_penalty": engine.settings.repeat_penalty,
+    }
+
+
+def test_openrouter_profile_omits_the_lm_studio_sampling_extensions(monkeypatch):
+    """min_p / repeat_penalty are LM Studio extensions; hosted providers reject
+    unknown body fields with a 400. This test's real job is FUTURE protection: if
+    sampling is ever re-collapsed into one global dict, the failure would appear
+    only on the hosted path, in production."""
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+
+    p = engine._chat_profile()
+
+    assert p.model == "vendor/model-x"
+    assert p.base_url == engine.settings.openrouter_base_url
+    assert "extra_body" not in p.sampling
+    assert p.sampling["temperature"] == engine.settings.temperature
+
+
+def _capturing_llm(seen: dict, reply: str = "Cevap."):
+    """A fake client that records the kwargs passed to chat.completions.create."""
+    class _Msg:
+        content = reply
+
+    class _Choice:
+        message = _Msg()
+
+    class _Resp:
+        choices = [_Choice()]
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    seen.update(kwargs)
+                    return _Resp()
+
+    return _Client()
+
+
+def test_complete_text_sends_the_profile_model_and_sampling(monkeypatch):
+    """The wiring test: the provider switch is worthless if the request still
+    carries settings.chat_model or the local-only extra_body."""
+    seen: dict = {}
+    monkeypatch.setattr(engine, "_get_llm", lambda: _capturing_llm(seen))
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+
+    assert engine._complete_text([]) == "Cevap."
+
+    assert seen["model"] == "vendor/model-x"
+    assert "extra_body" not in seen
+
+
+def test_get_llm_uses_the_profile_base_url(monkeypatch):
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    monkeypatch.setattr(engine.settings, "openrouter_api_key", "test-key")
+    engine._get_llm.cache_clear()
+
+    client = engine._get_llm()
+
+    assert str(client.base_url).startswith(engine.settings.openrouter_base_url)
+    engine._get_llm.cache_clear()   # never leak a test-configured client
+
+
+def test_get_llm_disables_sdk_retries(monkeypatch):
+    """The project constraint is no backoff/retry on 429 - a rate limit must
+    stay visible. The openai SDK's own default (DEFAULT_MAX_RETRIES=2) retries
+    429s (and 5xx) silently, with backoff, so _get_llm must override it."""
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    monkeypatch.setattr(engine.settings, "openrouter_api_key", "test-key")
+    engine._get_llm.cache_clear()
+
+    client = engine._get_llm()
+
+    assert client.max_retries == 0
+    engine._get_llm.cache_clear()   # never leak a test-configured client
+
+
+def _capturing_stream_llm(seen: dict, chunks, finish=None):
+    """Streaming counterpart of _capturing_llm: same shape as _fake_stream_llm,
+    but also records the kwargs passed to chat.completions.create so the
+    streaming call site's wiring can be checked the same way
+    test_complete_text_sends_the_profile_model_and_sampling checks the unified
+    path. _fake_stream_llm itself is left untouched - several tests depend on
+    it discarding kwargs."""
+    class _Delta:
+        def __init__(self, c):
+            self.content = c
+
+    class _Choice:
+        def __init__(self, c, fr=None):
+            self.delta = _Delta(c)
+            self.finish_reason = fr
+
+    class _Chunk:
+        def __init__(self, c, fr=None):
+            self.choices = [_Choice(c, fr)]
+
+    seq = [_Chunk(c) for c in chunks]
+    if finish is not None:
+        seq.append(_Chunk(None, finish))
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    seen.update(kwargs)
+                    return iter(seq)
+
+    return _Client()
+
+
+def test_stream_answer_sends_the_profile_model_and_sampling(monkeypatch):
+    """Streaming counterpart of test_complete_text_sends_the_profile_model_and_
+    sampling. _fake_stream_llm discards the kwargs passed to create(), so
+    nothing previously proved stream_answer's chat.completions.create() call
+    carries the active profile's model/sampling rather than
+    settings.chat_model / a global sampling dict."""
+    seen: dict = {}
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+    # Well over _STREAM_WARMUP (80) clean chars in a single chunk, finished
+    # cleanly ("stop") - so the streaming path itself runs to completion
+    # instead of falling back to _complete_text on a "length" truncation.
+    answer_text = ("Bu oldukca uzun bir cevap metni, isinma tamponunu asmak "
+                   "icin yeterince karakter iceriyor ve akis boyunca boyle "
+                   "devam ediyor.")
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _capturing_stream_llm(seen, [answer_text], finish="stop"))
+
+    out = "".join(engine.stream_answer("Soru?"))
+
+    assert seen["model"] == "vendor/model-x"
+    assert "extra_body" not in seen
+    assert _sse_tokens(out) == answer_text
+
+
+def test_unavailable_message_is_never_advice_whichever_provider(monkeypatch):
+    """_has_advice recognises our own fallback by a single, provider-NEUTRAL
+    prefix. If the prefix ever became provider-dependent, a hosted outage message
+    would read as real advice and products would be recommended under an error."""
+    messages = {}
+    for provider in ("local", "openrouter"):
+        monkeypatch.setattr(engine.settings, "chat_provider", provider)
+        monkeypatch.setattr(engine.settings, "openrouter_model", "vendor/model-x")
+        msg = engine._llm_unavailable_message(RuntimeError("connection refused"))
+        messages[provider] = msg
+        assert not engine._has_advice(msg)
+        assert msg.startswith(engine._LLM_UNAVAILABLE_PREFIX)
+        assert "connection refused" in msg      # technical detail still reaches the tail
+
+    # The hint must actually differ, or the user is pointed at the wrong place.
+    assert messages["local"] != messages["openrouter"]
+    assert "LM Studio" in messages["local"]
+    assert "OpenRouter" in messages["openrouter"]
+    # ...and the provider name must NOT be in the shared prefix.
+    assert "LM Studio" not in engine._LLM_UNAVAILABLE_PREFIX
+    assert "OpenRouter" not in engine._LLM_UNAVAILABLE_PREFIX

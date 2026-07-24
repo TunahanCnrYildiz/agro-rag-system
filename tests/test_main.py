@@ -42,3 +42,44 @@ def test_products_503_when_catalog_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "PRODUCTS_JSON", tmp_path / "nope.json")
     r = client.get("/api/products")
     assert r.status_code == 503
+
+
+def test_health_reports_the_active_provider_but_never_the_key(monkeypatch):
+    """local branch: the key never enters the profile here at all, so this only
+    proves /health doesn't dump unrelated settings wholesale."""
+    sentinel = "sk-or-SENTINEL-DO-NOT-LEAK"
+    monkeypatch.setattr(main.settings, "chat_provider", "local")
+    monkeypatch.setattr(main.settings, "openrouter_api_key", sentinel)
+
+    r = client.get("/health")
+    body = r.json()
+
+    assert r.status_code == 200
+    assert body["status"] == "ok"
+    assert body["provider"] == "local"
+    assert body["model"]
+    # No field is literally named "key" ...
+    assert "key" not in " ".join(body.keys()).lower()
+    # ... and the actual key value never appears anywhere in the raw
+    # response body, no matter which field it might hide behind.
+    assert sentinel not in r.text
+
+
+def test_health_on_openrouter_never_leaks_the_active_key(monkeypatch):
+    """The branch the local-only test above cannot exercise: with
+    chat_provider=openrouter the sentinel key genuinely IS the active
+    credential used to build the profile, not an inert unrelated setting."""
+    sentinel = "sk-or-SENTINEL-DO-NOT-LEAK"
+    monkeypatch.setattr(main.settings, "chat_provider", "openrouter")
+    monkeypatch.setattr(main.settings, "openrouter_model", "vendor/model-x")
+    monkeypatch.setattr(main.settings, "openrouter_api_key", sentinel)
+
+    r = client.get("/health")
+    body = r.json()
+
+    assert r.status_code == 200
+    assert body["status"] == "ok"
+    assert body["provider"] == "openrouter"
+    assert body["model"] == "vendor/model-x"
+    assert "key" not in " ".join(body.keys()).lower()
+    assert sentinel not in r.text

@@ -35,3 +35,46 @@ def test_env_file_is_anchored_to_the_project_root():
 
     assert env_file.is_absolute()
     assert env_file == PROJECT_ROOT / ".env"
+
+
+def test_chat_provider_defaults_to_local():
+    """Asserted on the FIELD DEFAULT, not on an instance: the maintainer's real
+    .env may well select openrouter, and a test that read it would pass in CI and
+    fail locally (or the reverse). Same reasoning as the decoy test above."""
+    assert Settings.model_fields["chat_provider"].default == "local"
+
+
+def test_openrouter_without_a_key_is_rejected():
+    """Fail loud on incomplete config - same rule as the embedding-model guard: a
+    misconfiguration must never silently serve garbage (here: 401s at request time
+    instead of one clear error at startup)."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Settings(chat_provider="openrouter",
+                 openrouter_api_key="",
+                 openrouter_model="vendor/model-x")
+
+
+def test_openrouter_without_a_model_is_rejected():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        Settings(chat_provider="openrouter",
+                 openrouter_api_key="key",
+                 openrouter_model="")
+
+
+def test_openrouter_with_key_and_model_is_accepted():
+    s = Settings(chat_provider="openrouter",
+                 openrouter_api_key="key",
+                 openrouter_model="vendor/model-x")
+    assert s.openrouter_model == "vendor/model-x"
+
+
+def test_local_provider_does_not_require_openrouter_fields():
+    """The default path must not be collateral damage of the new validation."""
+    s = Settings(chat_provider="local", openrouter_api_key="", openrouter_model="")
+    assert s.chat_provider == "local"

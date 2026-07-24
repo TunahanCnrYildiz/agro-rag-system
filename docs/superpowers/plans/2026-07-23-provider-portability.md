@@ -951,3 +951,203 @@ git commit -m "Record provider portability findings across three hosted models"
 - [ ] `grep -rn "OPENROUTER_API_KEY" .env.example` shows the empty placeholder and no key value.
 - [ ] `git log -p | grep -i "sk-or-"` finds nothing — no key was ever committed.
 - [ ] With `CHAT_PROVIDER` unset, `python -m evals.run_eval --fast --only offscope_livestock` behaves exactly as before the change.
+
+---
+
+### Task 8: A run that never got an answer must not report a clean guardrail
+
+**Added 2026-07-23, after phase 1 measured this defect in the live harness.** Not part of the original plan.
+
+**Files:**
+- Modify: `evals/run_eval.py` (`run()`'s sampling loop and summary; `run_faithfulness()`)
+- Test: `tests/test_run_eval.py`
+
+**Interfaces:**
+- Consumes: `engine._LLM_UNAVAILABLE_PREFIX`, `engine._empty_answer_message()`.
+- Produces: `run_eval._no_answer_reason(text: str) -> str | None`, returning `"unavailable"`, `"empty"`, or `None`.
+
+**Why this exists.** Phase 1 of the measurement ran into OpenRouter's free-tier cap of 50 requests/day. Two of the three models therefore returned almost nothing but `429` fallback messages — and the eval reported **`guardrail: 54/54` for all three**. An error message contains no banned phrase, so `answer_none` passes vacuously. This is the documented vacuity class recurring inside the harness: *what would fail if this claim were false?* — nothing. It was caught only because grounding collapsed to 1/54 at the same time; during a partial outage the scores would look plausible and the guardrail would read falsely green.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/test_run_eval.py`:
+
+```python
+def test_no_answer_reason_recognises_both_fallbacks():
+    assert run_eval._no_answer_reason(
+        engine._llm_unavailable_message(RuntimeError("boom"))) == "unavailable"
+    assert run_eval._no_answer_reason(engine._empty_answer_message()) == "empty"
+    assert run_eval._no_answer_reason("Azot eksikligi olabilir.") is None
+
+
+def test_an_unanswered_case_is_an_error_not_a_silent_guardrail_pass(
+        monkeypatch, capsys):
+    """The vacuity trap this guard exists for: an outage fallback contains no
+    banned phrase, so answer_none passes and the run reports a clean guardrail
+    for a model that never spoke. Measured live 2026-07-23 - two models rate
+    limited to near-silence both read guardrail 54/54."""
+    _stub(monkeypatch, [engine._llm_unavailable_message(RuntimeError("429"))])
+
+    rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "[ERROR]" in out              # not PASS, not FAIL
+    assert "NO ANSWER" in out            # called out in the summary
+    assert "guardrail: n/a" in out       # excluded, NOT counted as a pass
+    assert rc != 0                       # a run with errors is not a valid run
+
+
+def test_a_real_answer_is_still_scored_normally(monkeypatch, capsys):
+    """The guard must not swallow ordinary runs."""
+    _stub(monkeypatch, ["azot verin."])
+
+    rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert "[ERROR]" not in out
+    assert "NO ANSWER" not in out
+    assert rc == 0
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `python -m pytest tests/test_run_eval.py -k "no_answer or unanswered or scored_normally" -v`
+Expected: FAIL — `run_eval` has no attribute `_no_answer_reason`, and the unanswered case currently reports `[FAIL]` with a counted `guardrail` rate rather than `[ERROR]`.
+
+- [ ] **Step 3: Add the detector**
+
+In `evals/run_eval.py`, add above `run()`:
+
+```python
+def _no_answer_reason(text: str) -> str | None:
+    """Why this text is not a real answer, or None if it is one.
+
+    The eval scores `answer_none` (the guardrail) by checking that banned
+    phrases are ABSENT. Our own fallback messages contain none, so a case the
+    model never answered would score guardrail=True - a pass that asserts
+    nothing. Measured live 2026-07-23: two rate-limited models returned almost
+    nothing but 429 fallbacks and both read `guardrail: 54/54`.
+    """
+    stripped = (text or "").strip()
+    if stripped.startswith(engine._LLM_UNAVAILABLE_PREFIX):
+        return "unavailable"
+    if stripped == engine._empty_answer_message():
+        return "empty"
+    return None
+```
+
+- [ ] **Step 4: Mark errored cases and exclude them from the rates**
+
+In `run()`, the non-fast branch currently reads:
+
+```python
+            samples = []
+            for _ in range(repeat):
+                r = engine.answer(c["query"])
+                g, gr = _answer_ok(c, r.answer)
+                samples.append({
+                    "products": _products_ok(c, len(r.recommended_products)),
+                    "grounding": g,
+                    "guardrail": gr,
+                })
+            for dim in ("products", "grounding", "guardrail"):
+                ...
+```
+
+Change the sampling loop to record why an answer was not real, and skip the whole aggregation block when one was not:
+
+```python
+            samples = []
+            no_answer = None
+            for _ in range(repeat):
+                r = engine.answer(c["query"])
+                reason = _no_answer_reason(r.answer)
+                if reason and no_answer is None:
+                    no_answer = reason
+                g, gr = _answer_ok(c, r.answer)
+                samples.append({
+                    "products": _products_ok(c, len(r.recommended_products)),
+                    "grounding": g,
+                    "guardrail": gr,
+                })
+            if no_answer:
+                # Record NO dimension keys: rate()/sample_rate() skip absent
+                # keys, so this case is EXCLUDED from the scores rather than
+                # counted as a vacuous pass. One bad sample voids the case - a
+                # partially-answered case cannot demonstrate a guardrail.
+                row["no_answer"] = no_answer
+                row["ok"] = False
+            else:
+                <the existing `for dim in (...)` aggregation, the `dims = [...]`
+                 lines and `row["ok"] = all(row[d] for d in dims)`, all moved
+                 one level deeper under this else>
+```
+
+Do not otherwise change that aggregation code — only its indentation.
+
+- [ ] **Step 5: Print ERROR instead of PASS/FAIL, and summarise**
+
+In `run()`, replace:
+
+```python
+        mark = "PASS" if row["ok"] else "FAIL"
+```
+
+with:
+
+```python
+        mark = "ERROR" if row.get("no_answer") else ("PASS" if row["ok"] else "FAIL")
+```
+
+The chain that builds `detail` currently branches `if fast: ... elif repeat > 1: ... else: ...`. The `repeat > 1` branch reads `row[dim + "_hits"]`, which an errored row no longer has, so the new branch must come BEFORE it. The chain becomes:
+
+```python
+        if fast:
+            detail = f"rawprod={row.get('raw_products')}"
+        elif row.get("no_answer"):
+            detail = f"NO ANSWER ({row['no_answer']}) - not scored"
+        elif repeat > 1:
+            ...unchanged...
+        else:
+            ...unchanged...
+```
+
+Then, immediately after the `=== N/M cases passed ===` print, add:
+
+```python
+    errored = [r for r in rows if r.get("no_answer")]
+    if errored:
+        kinds: dict[str, int] = {}
+        for r in errored:
+            kinds[r["no_answer"]] = kinds.get(r["no_answer"], 0) + 1
+        breakdown = ", ".join(f"{k}: {v}" for k, v in sorted(kinds.items()))
+        print(f"!! {len(errored)}/{len(rows)} cases produced NO ANSWER "
+              f"({breakdown}).")
+        print("   They are EXCLUDED from the rates below: a case the model "
+              "never answered cannot show that the guardrail held.")
+```
+
+`run()` already returns `1` unless every row is `ok`, and errored rows are `ok=False`, so a run with errors exits non-zero without further change.
+
+- [ ] **Step 6: Abort the faithfulness path on an unanswered sample**
+
+Read `run_faithfulness()`. It labels each `corpus_fact` case by comparing normal and ablated grounding. An unanswered sample reads as "ungrounded", which would silently misclassify a case as model-carried or retrieval-broken — worse than a wrong score, because that label gets recorded as a finding and quoted later.
+
+Where it collects each answer, check `_no_answer_reason(...)`; if it is not None, abort the whole run immediately via `sys.exit(...)` with a message naming the case id and the reason. Do not attempt to classify around it, and do not merely skip the case — a partial faithfulness map presented as complete is the failure mode being prevented.
+
+Write a test for it in `tests/test_run_eval.py`, following the patterns the existing faithfulness tests use to build a `corpus_fact`-shaped case (see the `_optin_case` helper and the `_select` monkeypatching around it). Stub the answer as `engine._llm_unavailable_message(RuntimeError("429"))` and assert `pytest.raises(SystemExit)`.
+
+- [ ] **Step 7: Run the tests to verify they pass**
+
+Run: `python -m pytest tests/test_run_eval.py -v`
+Expected: PASS, including every pre-existing test in the file.
+
+Run: `python -m pytest -q`
+Expected: all green; the total is the previous 203 plus the tests added here.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add evals/run_eval.py tests/test_run_eval.py
+git commit -m "Report unanswered eval cases as errors instead of silent guardrail passes"
+```
