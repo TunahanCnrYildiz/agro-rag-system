@@ -307,6 +307,77 @@ def _expand_query(query: str) -> list[str]:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Product-suppression backstop
+# --------------------------------------------------------------------------- #
+# The catalog is fertilizer/nutrition ONLY. Products belong only on a nutrition
+# answer. The model is asked to prefix [NOPRODUCT] on a non-nutrition answer, but
+# not every model emits that marker reliably (measured: gemma-4-26b on OpenRouter
+# showed products on 22 non-product cases). This backstop reads the ANSWER and
+# suppresses products when it is CLEARLY about a non-product activity - and only
+# then, so a nutrition answer is never hidden. Deterministic, no cosine (measured
+# dead: product cosine cannot separate "is this an answer"), no extra LLM call.
+#
+# Stems are matched LEFT-boundary only and folded (see _contains_any). They were
+# chosen by empirical probing (2026-07-24), NOT intuition - several intuitive
+# stems had measured false positives (see the exclusions below). Bounded by the
+# categories SYSTEM_PROMPT enumerates; extend only on measured evidence.
+_NON_PRODUCT_ACTIVITY = (
+    "budam",                               # pruning (NOT "buda": hits "budala")
+    "prune", "pruning",                    # (NOT "prun": hits "Prunus" the genus)
+    "aşıla", "graft",                      # grafting (NOT "aşı": hits "aşırı")
+    "havaland", "ventilat",                # ventilation
+    "tozlaş", "pollinat",                  # pollination (NOT "döllen": ambiguous)
+    "sula", "irrigat",                     # irrigation practice
+    "çoğalt", "propagat",                  # propagation
+    "hasat", "depola", "muhafaza",         # harvest / storage
+    "harvest", "storag",                   # (NOT "stor": hits "restore")
+    "zararlı", "yabancı ot", "ilaçla",     # pest / weed control
+    "pesticid", "weed",
+)
+# If ANY of these appears, never suppress - the answer is about nutrition. This is
+# the guarantee that a working nutrition case is never regressed.
+_NUTRITION_TERMS = (
+    "gübre", "besin", "besle", "azot", "fosfor", "potasyum", "npk", "doz",
+    "kompost", "verimli",
+    "fertiliz", "nutrient", "nitrogen", "phosph", "potass", "compost", "feeding",
+)
+
+
+def _contains_any(text: str, stems: tuple[str, ...]) -> bool:
+    """True if any stem occurs in `text` with a LEFT word boundary.
+
+    Left-boundary only (no right boundary, no _TR_SUFFIXES): the stem may run into
+    its own derivational/verbal tail ("gubre" -> "gubreleyin", "budam" -> "budama",
+    "sula" -> "sulayin"), which the crop-lexicon pattern's right boundary blocks.
+    The left boundary still prevents matching inside a larger word from the left
+    ("stor" not in "restore", "sula" not in "pusula").
+
+    BOTH sides are folded by _normalize_tr (it folds Turkish letters to ASCII), so
+    a diacritic stem ("gübre") meets folded input ("gubreleyin"). Comparing a raw
+    stem against folded text would never match - a silently dead gate.
+    """
+    folded = _normalize_tr(text)
+    for stem in stems:
+        fs = _normalize_tr(stem)
+        if re.search(rf"(?<!\w){re.escape(fs)}", folded):
+            return True
+    return False
+
+
+def _looks_non_product(answer_text: str) -> bool:
+    """True when products should be suppressed on evidence from the answer alone.
+
+    Suppress ONLY when the answer names a non-product activity AND carries no
+    nutrition term. Both halves are required, so a nutrition answer (or a mixed
+    one) is never suppressed - the safe direction. This backstops the [NOPRODUCT]
+    marker for models that do not emit it reliably; it never overrides a nutrition
+    answer.
+    """
+    return (_contains_any(answer_text, _NON_PRODUCT_ACTIVITY)
+            and not _contains_any(answer_text, _NUTRITION_TERMS))
+
+
 # Reciprocal-rank-fusion constant; 60 is the standard damping value.
 _RRF_K = 60
 

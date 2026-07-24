@@ -921,3 +921,54 @@ def test_unavailable_message_is_never_advice_whichever_provider(monkeypatch):
     # ...and the provider name must NOT be in the shared prefix.
     assert "LM Studio" not in engine._LLM_UNAVAILABLE_PREFIX
     assert "OpenRouter" not in engine._LLM_UNAVAILABLE_PREFIX
+
+
+# --------------------------------------------------------------------------- #
+# Product-suppression backstop (marker-independent)
+# --------------------------------------------------------------------------- #
+def test_contains_any_matches_turkish_noun_and_verb_forms():
+    """Left-boundary matching reaches derivational/verb tails the crop-lexicon
+    pattern (right boundary + case suffixes) cannot. All verified empirically."""
+    assert engine._contains_any("Asmalarda budama yapin", ("budam",))
+    assert engine._contains_any("Serin yerde depolayin", ("depola",))
+    assert engine._contains_any("Haftada iki kez sulayin", ("sula",))         # verb form
+    assert engine._contains_any("Bitkiyi duzenli gubreleyin", ("gubre",))     # derivational
+
+
+def test_contains_any_matches_a_diacritic_stem_end_to_end():
+    """Folding guard: the stem carries diacritics, _normalize_tr folds the text
+    (ş->s, ü->u). _contains_any must fold the stem too, or it silently never
+    matches (a dead gate that looks green)."""
+    assert engine._contains_any("Once agaci asilayin", ("aşıla",))
+    assert engine._contains_any("Bitkiyi gubreleyin", ("gübre",))
+
+
+def test_contains_any_avoids_the_measured_false_positives():
+    """The three traps that killed the intuitive stems. Each MUST stay clear."""
+    assert not engine._contains_any("Asiri sulama koku curutur", ("asila",))   # not "aşırı"
+    assert not engine._contains_any("Prunus turleri kirazgillerdendir",
+                                    ("prune", "pruning"))                       # not "Prunus"
+    assert not engine._contains_any("Budala olma dediler", ("budam",))         # not "budala"
+    assert not engine._contains_any("Gecmisi restore etti", ("storag",))       # not "restore"
+
+
+def test_looks_non_product_suppresses_a_pure_pruning_answer():
+    assert engine._looks_non_product(
+        "Asmalarda budama kis sonunda, uyku doneminde yapilir.")
+
+
+def test_looks_non_product_keeps_a_pure_nutrition_answer():
+    assert not engine._looks_non_product(
+        "Domates yapraklari sarariyorsa azot eksikligi olabilir, gubre verin.")
+
+
+def test_looks_non_product_keeps_a_mixed_answer():
+    """Nutrition term present -> never suppressed, even with an activity term."""
+    assert not engine._looks_non_product(
+        "Once bitkiyi gubreleyin, ardindan kuru dallari budayin.")
+
+
+def test_looks_non_product_keeps_a_neutral_answer():
+    """Neither signal -> when in doubt, show."""
+    assert not engine._looks_non_product(
+        "Bu bitki genellikle ilkbaharda cicek acar ve yari golge sever.")
