@@ -199,6 +199,34 @@ def test_answer_suppresses_products_on_noproduct(monkeypatch):
     assert r.answer == "Budama kis sonunda yapilir."
 
 
+def test_answer_suppresses_products_when_answer_is_non_product_without_a_marker(
+        monkeypatch):
+    """The backstop's job: a model that forgets [NOPRODUCT] on a pruning answer
+    must still not get products shown under it. This is the gemma-4-26b failure
+    mode measured on OpenRouter."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_llm("Asmalarda budama kis sonunda yapilir."))
+    r = engine.answer("Asmada budama ne zaman yapilir?")
+    assert r.recommended_products == []          # backstop suppressed
+    assert r.answer == "Asmalarda budama kis sonunda yapilir."
+
+
+def test_answer_keeps_products_on_a_nutrition_answer_without_a_marker(monkeypatch):
+    """The regression guard - this is the one new risk. A nutrition answer with no
+    marker must keep its products; the backstop must not fire on it."""
+    p = engine.RecommendedProduct("P", "url")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [p])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_llm("Azot eksikligi olabilir, dengeli bir gubre verin."))
+    r = engine.answer("Domates yapraklarim sarariyor")
+    assert r.recommended_products == [p]         # NOT suppressed
+
+
 # --------------------------------------------------------------------------- #
 # _build_messages structure
 # --------------------------------------------------------------------------- #
@@ -921,3 +949,109 @@ def test_unavailable_message_is_never_advice_whichever_provider(monkeypatch):
     # ...and the provider name must NOT be in the shared prefix.
     assert "LM Studio" not in engine._LLM_UNAVAILABLE_PREFIX
     assert "OpenRouter" not in engine._LLM_UNAVAILABLE_PREFIX
+
+
+# --------------------------------------------------------------------------- #
+# Product-suppression backstop (marker-independent)
+# --------------------------------------------------------------------------- #
+def test_contains_any_matches_turkish_noun_and_verb_forms():
+    """Left-boundary matching reaches derivational/verb tails the crop-lexicon
+    pattern (right boundary + case suffixes) cannot. All verified empirically."""
+    assert engine._contains_any("Asmalarda budama yapin", ("budam",))
+    assert engine._contains_any("Serin yerde depolayin", ("depola",))
+    assert engine._contains_any("Haftada iki kez sulayin", ("sula",))         # verb form
+    assert engine._contains_any("Bitkiyi duzenli gubreleyin", ("gubre",))     # derivational
+
+
+def test_contains_any_matches_a_diacritic_stem_end_to_end():
+    """Folding guard: the stem carries diacritics, _normalize_tr folds the text
+    (ş->s, ü->u). _contains_any must fold the stem too, or it silently never
+    matches (a dead gate that looks green)."""
+    assert engine._contains_any("Once agaci asilayin", ("aşıla",))
+    assert engine._contains_any("Bitkiyi gubreleyin", ("gübre",))
+
+
+def test_contains_any_avoids_the_measured_false_positives():
+    """The three traps that killed the intuitive stems. Each MUST stay clear."""
+    assert not engine._contains_any("Asiri sulama koku curutur", ("asila",))   # not "aşırı"
+    assert not engine._contains_any("Prunus turleri kirazgillerdendir",
+                                    ("prune", "pruning"))                       # not "Prunus"
+    assert not engine._contains_any("Budala olma dediler", ("budam",))         # not "budala"
+    assert not engine._contains_any("Gecmisi restore etti", ("storag",))       # not "restore"
+
+
+def test_production_activity_tuple_is_locked_against_the_wrong_stems():
+    """Locks the shipped _NON_PRODUCT_ACTIVITY tuple, not a local literal: each
+    trap word would match only if a stem were reverted to its intuitive-but-wrong
+    form (buda/aşı/prun/stor). If that regression ever lands, this fails."""
+    act = engine._NON_PRODUCT_ACTIVITY
+    assert not engine._contains_any("asiri miktarda su verildi", act)   # not aşı
+    assert not engine._contains_any("Prunus avium bir kiraz turudur", act)  # not prun
+    assert not engine._contains_any("budala olma dediler", act)         # not buda
+    assert not engine._contains_any("dosyayi restore etti", act)        # not stor
+
+
+def test_looks_non_product_suppresses_a_pure_pruning_answer():
+    assert engine._looks_non_product(
+        "Asmalarda budama kis sonunda, uyku doneminde yapilir.")
+
+
+def test_looks_non_product_keeps_a_pure_nutrition_answer():
+    assert not engine._looks_non_product(
+        "Domates yapraklari sarariyorsa azot eksikligi olabilir, gubre verin.")
+
+
+def test_looks_non_product_keeps_a_mixed_answer():
+    """Nutrition term present -> never suppressed, even with an activity term."""
+    assert not engine._looks_non_product(
+        "Once bitkiyi gubreleyin, ardindan kuru dallari budayin.")
+
+
+def test_looks_non_product_keeps_a_neutral_answer():
+    """Neither signal -> when in doubt, show."""
+    assert not engine._looks_non_product(
+        "Bu bitki genellikle ilkbaharda cicek acar ve yari golge sever.")
+
+
+def test_stream_answer_suppresses_products_when_non_product_without_a_marker(
+        monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["Asmalarda budama kis sonunda yapilir."]))
+    out = "".join(engine.stream_answer("Asmada budama ne zaman?"))
+    assert '"type": "products"' not in out           # backstop suppressed the event
+    assert "budama" in _sse_tokens(out)              # the answer still streamed
+
+
+def test_stream_answer_keeps_products_on_a_nutrition_answer_without_a_marker(
+        monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm(["Azot eksikligi olabilir, gubre verin."]))
+    out = "".join(engine.stream_answer("Yapraklar sariyor"))
+    assert '"type": "products"' in out               # NOT suppressed
+
+
+def test_stream_answer_backstop_sees_the_whole_answer_not_just_the_warmup(
+        monkeypatch):
+    """The activity term arrives AFTER warmup. If the backstop only inspected the
+    warmup buffer it would miss it; it must inspect the accumulated full answer."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    # First chunk is >80 chars (clears _STREAM_WARMUP=80) with NO activity/nutrition
+    # term; the pruning term lands only in the second chunk, post-warmup.
+    head = ("Bu konuda size yardimci olabilirim ve asagida konuyu adim adim "
+            "ayrintili bicimde acikliyorum simdi. ")
+    assert len(head) > engine._STREAM_WARMUP
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_stream_llm([head, "Once kuru dallari budamak gerekir."]))
+    out = "".join(engine.stream_answer("Nasil yapilir?"))
+    assert '"type": "products"' not in out           # suppressed on the late term

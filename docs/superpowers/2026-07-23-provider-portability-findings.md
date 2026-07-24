@@ -147,3 +147,30 @@ hardening — a code-side gate, not just a prompt instruction.
 
 Hosted answers landed in 3-53s (median well under the local ~20-30s). An eval round
 drops from ~25 min to a few minutes, and a demo stops needing LM Studio on the machine.
+
+---
+
+## NOPRODUCT backstop — local no-regression check (2026-07-24)
+
+A code-side product-suppression backstop was added (spec/plan
+`2026-07-24-noproduct-backstop*`), so products are suppressed on clearly-non-product
+answers even when the model does not emit the `[NOPRODUCT]` marker. This is the local
+**safety** check — it proves the backstop does no harm, not that it works (efficacy is
+the hosted re-measurement below, still pending).
+
+Full local eval on `gemma-4-12b-qat`:
+
+```
+54/54 cases passed
+retrieval: 54/54 | context: 54/54 | product-gating: 54/54 | grounding: 54/54 | guardrail: 54/54
+```
+
+**No regression.** Product-gating stayed **54/54** — the backstop suppressed no nutrition
+case wrongly, the one new risk. Locally the marker fires, so the backstop is mostly inert;
+this run confirms it does not interfere. (The panel read 54/54 vs the baseline's 53/54; the
+one previously-red case was `quant_wheat_nitrogen_dose`, a known single-run grounding flake
+unrelated to the backstop — not an improvement to claim.)
+
+**Efficacy (does it fix the hosted 22 failures?) is unmeasured** — it needs a hosted
+re-run of `gemma-4-26b-a4b:free`, gated on the OpenRouter free-tier daily quota. If it does
+not improve the 22 cases, that is a finding, not a cue to inflate the term lists.

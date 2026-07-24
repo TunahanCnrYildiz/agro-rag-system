@@ -307,6 +307,77 @@ def _expand_query(query: str) -> list[str]:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Product-suppression backstop
+# --------------------------------------------------------------------------- #
+# The catalog is fertilizer/nutrition ONLY. Products belong only on a nutrition
+# answer. The model is asked to prefix [NOPRODUCT] on a non-nutrition answer, but
+# not every model emits that marker reliably (measured: gemma-4-26b on OpenRouter
+# showed products on 22 non-product cases). This backstop reads the ANSWER and
+# suppresses products when it is CLEARLY about a non-product activity - and only
+# then, so a nutrition answer is never hidden. Deterministic, no cosine (measured
+# dead: product cosine cannot separate "is this an answer"), no extra LLM call.
+#
+# Stems are matched LEFT-boundary only and folded (see _contains_any). They were
+# chosen by empirical probing (2026-07-24), NOT intuition - several intuitive
+# stems had measured false positives (see the exclusions below). Bounded by the
+# categories SYSTEM_PROMPT enumerates; extend only on measured evidence.
+_NON_PRODUCT_ACTIVITY = (
+    "budam",                               # pruning (NOT "buda": hits "budala")
+    "prune", "pruning",                    # (NOT "prun": hits "Prunus" the genus)
+    "aşıla", "graft",                      # grafting (NOT "aşı": hits "aşırı")
+    "havaland", "ventilat",                # ventilation
+    "tozlaş", "pollinat",                  # pollination (NOT "döllen": ambiguous)
+    "sula", "irrigat",                     # irrigation practice
+    "çoğalt", "propagat",                  # propagation
+    "hasat", "depola", "muhafaza",         # harvest / storage
+    "harvest", "storag",                   # (NOT "stor": hits "restore")
+    "zararlı", "yabancı ot", "ilaçla",     # pest / weed control
+    "pesticid", "weed",
+)
+# If ANY of these appears, never suppress - the answer is about nutrition. This is
+# the guarantee that a working nutrition case is never regressed.
+_NUTRITION_TERMS = (
+    "gübre", "besin", "besle", "azot", "fosfor", "potasyum", "npk", "doz",
+    "kompost", "verimli",
+    "fertiliz", "nutrient", "nitrogen", "phosph", "potass", "compost", "feeding",
+)
+
+
+def _contains_any(text: str, stems: tuple[str, ...]) -> bool:
+    """True if any stem occurs in `text` with a LEFT word boundary.
+
+    Left-boundary only (no right boundary, no _TR_SUFFIXES): the stem may run into
+    its own derivational/verbal tail ("gubre" -> "gubreleyin", "budam" -> "budama",
+    "sula" -> "sulayin"), which the crop-lexicon pattern's right boundary blocks.
+    The left boundary still prevents matching inside a larger word from the left
+    ("stor" not in "restore", "sula" not in "pusula").
+
+    BOTH sides are folded by _normalize_tr (it folds Turkish letters to ASCII), so
+    a diacritic stem ("gübre") meets folded input ("gubreleyin"). Comparing a raw
+    stem against folded text would never match - a silently dead gate.
+    """
+    folded = _normalize_tr(text)
+    for stem in stems:
+        fs = _normalize_tr(stem)
+        if re.search(rf"(?<!\w){re.escape(fs)}", folded):
+            return True
+    return False
+
+
+def _looks_non_product(answer_text: str) -> bool:
+    """True when products should be suppressed on evidence from the answer alone.
+
+    Suppress ONLY when the answer names a non-product activity AND carries no
+    nutrition term. Both halves are required, so a nutrition answer (or a mixed
+    one) is never suppressed - the safe direction. This backstops the [NOPRODUCT]
+    marker for models that do not emit it reliably; it never overrides a nutrition
+    answer.
+    """
+    return (_contains_any(answer_text, _NON_PRODUCT_ACTIVITY)
+            and not _contains_any(answer_text, _NUTRITION_TERMS))
+
+
 # Reciprocal-rank-fusion constant; 60 is the standard damping value.
 _RRF_K = 60
 
@@ -631,10 +702,10 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         products = []
 
     answer_text, off_scope, no_product = _strip_markers(answer_text)
-    if off_scope or no_product:
-        # off-scope refusal, or an in-scope question the fertilizer catalog
-        # cannot answer (pruning, pests, storage...) - see the product intent
-        # gate spec.
+    if off_scope or no_product or _looks_non_product(answer_text):
+        # off-scope refusal; or an in-scope non-nutrition question (pruning,
+        # pests, storage...). The marker is the primary signal; _looks_non_product
+        # backstops a model that did not emit it - see the backstop spec.
         products = []
     return ChatResult(answer=answer_text.strip(), recommended_products=products)
 
@@ -667,6 +738,7 @@ def stream_answer(
     failed = False
     finish = None
     has_advice = True   # cleared when we fall back instead of answering
+    full_answer = ""    # the complete streamed answer, for the backstop
     try:
         client = _get_llm()
         profile = _chat_profile()
@@ -686,12 +758,14 @@ def stream_answer(
             if not delta:
                 continue
             if warmed:
+                full_answer += delta
                 yield _sse({"type": "token", "content": delta})
                 emitted = True
                 continue
             buffer += delta
             clean, off_scope, no_product = _strip_markers(buffer)
             if len(clean) >= _STREAM_WARMUP:
+                full_answer += clean
                 yield _sse({"type": "token", "content": clean})
                 emitted = True
                 warmed = True
@@ -715,6 +789,7 @@ def stream_answer(
             has_advice = _has_advice(text)
             clean, off_scope, no_product = _strip_markers(text)
         if clean:
+            full_answer += clean
             yield _sse({"type": "token", "content": clean})
             emitted = True
 
@@ -728,13 +803,15 @@ def stream_answer(
         has_advice = _has_advice(text)
         clean, off_scope, no_product = _strip_markers(text)
         if clean:
+            full_answer += clean
             yield _sse({"type": "token", "content": clean})
 
     # Emit product recommendations only after the full answer has streamed (and
     # only for in-scope answers), so clients render them beneath the reply.
     # `has_advice` covers the fallbacks: there is no advice for products to sit
     # under when we could not answer at all.
-    if not (off_scope or no_product) and has_advice:
+    if (not (off_scope or no_product) and has_advice
+            and not _looks_non_product(full_answer)):
         yield _sse(
             {"type": "products",
              "recommended_products": [p.as_api() for p in products]}
