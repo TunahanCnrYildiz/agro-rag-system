@@ -952,6 +952,17 @@ def test_contains_any_avoids_the_measured_false_positives():
     assert not engine._contains_any("Gecmisi restore etti", ("storag",))       # not "restore"
 
 
+def test_production_activity_tuple_is_locked_against_the_wrong_stems():
+    """Locks the shipped _NON_PRODUCT_ACTIVITY tuple, not a local literal: each
+    trap word would match only if a stem were reverted to its intuitive-but-wrong
+    form (buda/aşı/prun/stor). If that regression ever lands, this fails."""
+    act = engine._NON_PRODUCT_ACTIVITY
+    assert not engine._contains_any("asiri miktarda su verildi", act)   # not aşı
+    assert not engine._contains_any("Prunus avium bir kiraz turudur", act)  # not prun
+    assert not engine._contains_any("budala olma dediler", act)         # not buda
+    assert not engine._contains_any("dosyayi restore etti", act)        # not stor
+
+
 def test_looks_non_product_suppresses_a_pure_pruning_answer():
     assert engine._looks_non_product(
         "Asmalarda budama kis sonunda, uyku doneminde yapilir.")
