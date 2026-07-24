@@ -199,6 +199,34 @@ def test_answer_suppresses_products_on_noproduct(monkeypatch):
     assert r.answer == "Budama kis sonunda yapilir."
 
 
+def test_answer_suppresses_products_when_answer_is_non_product_without_a_marker(
+        monkeypatch):
+    """The backstop's job: a model that forgets [NOPRODUCT] on a pruning answer
+    must still not get products shown under it. This is the gemma-4-26b failure
+    mode measured on OpenRouter."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_llm("Asmalarda budama kis sonunda yapilir."))
+    r = engine.answer("Asmada budama ne zaman yapilir?")
+    assert r.recommended_products == []          # backstop suppressed
+    assert r.answer == "Asmalarda budama kis sonunda yapilir."
+
+
+def test_answer_keeps_products_on_a_nutrition_answer_without_a_marker(monkeypatch):
+    """The regression guard - this is the one new risk. A nutrition answer with no
+    marker must keep its products; the backstop must not fire on it."""
+    p = engine.RecommendedProduct("P", "url")
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [p])
+    monkeypatch.setattr(
+        engine, "_get_llm",
+        lambda: _fake_llm("Azot eksikligi olabilir, dengeli bir gubre verin."))
+    r = engine.answer("Domates yapraklarim sarariyor")
+    assert r.recommended_products == [p]         # NOT suppressed
+
+
 # --------------------------------------------------------------------------- #
 # _build_messages structure
 # --------------------------------------------------------------------------- #

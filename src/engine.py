@@ -702,10 +702,10 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         products = []
 
     answer_text, off_scope, no_product = _strip_markers(answer_text)
-    if off_scope or no_product:
-        # off-scope refusal, or an in-scope question the fertilizer catalog
-        # cannot answer (pruning, pests, storage...) - see the product intent
-        # gate spec.
+    if off_scope or no_product or _looks_non_product(answer_text):
+        # off-scope refusal; or an in-scope non-nutrition question (pruning,
+        # pests, storage...). The marker is the primary signal; _looks_non_product
+        # backstops a model that did not emit it - see the backstop spec.
         products = []
     return ChatResult(answer=answer_text.strip(), recommended_products=products)
 
