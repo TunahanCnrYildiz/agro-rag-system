@@ -327,10 +327,19 @@ _NON_PRODUCT_ACTIVITY = (
     "prune", "pruning",                    # (NOT "prun": hits "Prunus" the genus)
     "aşıla", "graft",                      # grafting (NOT "aşı": hits "aşırı")
     "havaland", "ventilat",                # ventilation
-    "tozlaş", "pollinat",                  # pollination (NOT "döllen": ambiguous)
+    "tozla", "pollinat",                   # pollination + pollinizer (was "tozlaş";
+                                           #   "tozla" also catches "tozlayıcı".
+                                           #   NOT "döllen": ambiguous)
+    "partenokarp",                         # self-fertility / fruit set (pear cases)
     "sula", "irrigat",                     # irrigation practice
     "çoğalt", "propagat",                  # propagation
+    "anaç",                                # rootstock selection
+    "ekim",                                # sowing (also "Ekim" the month, but a
+                                           #   fertilize-in-October answer carries a
+                                           #   nutrition term, so the rule keeps it)
+    "terbiye",                             # training system
     "hasat", "depola", "muhafaza",         # harvest / storage
+    "kurut",                               # post-harvest drying
     "harvest", "storag",                   # (NOT "stor": hits "restore")
     "zararlı", "yabancı ot", "ilaçla",     # pest / weed control
     "pesticid", "weed",
@@ -339,7 +348,11 @@ _NON_PRODUCT_ACTIVITY = (
 # the guarantee that a working nutrition case is never regressed.
 _NUTRITION_TERMS = (
     "gübre", "besin", "besle", "azot", "fosfor", "potasyum", "npk", "doz",
-    "kompost", "verimli",
+    "kompost",
+    # "verimli" was REMOVED (2026-07-25): it is a FALSE nutrition signal on
+    # self-fertility answers ("kendine verimli" = reproductively fertile, not
+    # fertilized), which cancelled suppression on the pear cases. Soil-fertility
+    # nutrition answers always also carry gübre/besin/azot, so nothing is lost.
     "fertiliz", "nutrient", "nitrogen", "phosph", "potass", "compost", "feeding",
 )
 
