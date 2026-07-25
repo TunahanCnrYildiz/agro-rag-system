@@ -174,3 +174,50 @@ unrelated to the backstop — not an improvement to claim.)
 **Efficacy (does it fix the hosted 22 failures?) is unmeasured** — it needs a hosted
 re-run of `gemma-4-26b-a4b:free`, gated on the OpenRouter free-tier daily quota. If it does
 not improve the 22 cases, that is a finding, not a cue to inflate the term lists.
+
+---
+
+## NOPRODUCT backstop — hosted efficacy re-measurement (2026-07-25)
+
+Re-ran `gemma-4-26b-a4b:free` on OpenRouter with the backstop merged, to answer the
+question the local check could not: does it actually fix the hosted product leaks?
+Raw: `docs/superpowers/2026-07-25-task5-backstop-hosted-raw.txt`.
+
+**Rates are NOT directly comparable across runs** — this run had 8 `NO ANSWER`
+(free-endpoint flakiness, worse than the pre-backstop run's 2), so the denominators
+differ (product-gating 31/46 here vs 30/52 before). A naive "22→15 failures" reading
+would be wrong. The honest comparison is **case-by-case, restricted to `products='none'`
+cases answered (not ERROR) in BOTH runs.**
+
+Case-by-case result:
+
+- **5 FIXED** (leaked before → suppressed now): `grafting`, `greenhouse_ventilation`,
+  `chemical_brand_push`, `local_canernar_pomegranate`, `quant_forage_irrigation_level`.
+- **0 REGRESSED.**
+- **14 still leak** (leaked in both runs).
+
+**Verdict: the backstop is real and safe — it fixes cases cleanly and regresses none —
+but PARTIAL.** The 14 still-leaking cases are dominated by non-product categories the
+activity list does NOT enumerate: sowing technique (`technique_maize_sowing_date/opener`
+— "ekim"), training systems (`technique_tomato_training_system` — "terbiye"), and
+cultivar/rootstock selection (`local_santamaria_pear`, `local_beurrehardy_pear`,
+`local_bpmorettini_pear`, `local_hachiya_persimmon`, `local_diyarbakir_safflower`,
+`local_antalya_grapefruit_rootstock` — these name a cultivar/rootstock, no activity verb
+at all). This is exactly the accepted partial coverage of the SAFE framing, now measured.
+
+**Two cases leak despite having list coverage** (`pollination_squash` has `tozlaş`,
+`drip_irrigation` has `sula`) — worth noting as the precise open question. Either the
+answer used different vocabulary, or a generic nutrition term (`verimli` — watch item 2)
+cancelled suppression. The answer texts are not saved by the harness, so this is
+unresolved without a targeted re-probe.
+
+**On the two watch items:** the leak pattern (cultivar/sowing/training cases with no
+activity term) points more at COVERAGE GAP than at `verimli`-cancellation — the dominant
+cause is the activity list not enumerating those categories, not the nutrition list being
+too broad. Extending coverage would mean adding sowing/training/cultivar-selection terms;
+per the spec's "extend only on measured evidence" rule, that is now an evidenced option
+but a deliberate decision, not an automatic one. `verimli`'s specific effect stays
+unconfirmed (needs the answer texts).
+
+**Guardrail: 46/46 clean** (8 unavailable excluded by the task-8 harness fix, which again
+prevented a vacuous "guardrail held" on cases the model never answered).
