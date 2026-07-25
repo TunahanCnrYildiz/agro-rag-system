@@ -221,3 +221,30 @@ unconfirmed (needs the answer texts).
 
 **Guardrail: 46/46 clean** (8 unavailable excluded by the task-8 harness fix, which again
 prevented a vacuous "guardrail held" on cases the model never answered).
+
+---
+
+## NOPRODUCT backstop — coverage extension (round 2), local no-regression (2026-07-25)
+
+Extended the backstop per `2026-07-25-noproduct-backstop-coverage-design.md`: removed
+`verimli` from the nutrition terms (a false signal on "kendine verimli") and added
+`ekim`/`terbiye`/`anaç`/`kurut`/`partenokarp`, broadening `tozlaş`→`tozla`. pytest 223→228.
+
+Local full eval (`gemma-4-12b-qat`):
+
+```
+product-gating: 52/52 | grounding: 49/52 | guardrail: 52/52
+(2 cases NO ANSWER - local blank/unavailable flake, excluded)
+```
+
+**No product regression — product-gating 52/52 on all answered cases.** This is the
+empirical proof the `verimli` removal claimed only observationally: no nutrition/product
+answer was wrongly suppressed. The 3 grounding FAILs (`local_bpmorettini_pear`,
+`local_oltu_raspberry`, `quant_rose_pot_fertilizer_dose`) are all `prod=True` (gating
+passed) with `ground=False` — the known single-run grounding flakes, unrelated to this
+change. The 2 NO ANSWER are the local model's ~3% blank-answer rate, correctly excluded
+by the task-8 harness guard.
+
+**Hosted efficacy confirm still pending** — needs a fresh OpenRouter free-tier day
+(today's budget spent on the round-1 Task 5 re-measurement). Will compare the 14 leakers
+case-by-case against the 2026-07-25 pre-extension hosted run.
