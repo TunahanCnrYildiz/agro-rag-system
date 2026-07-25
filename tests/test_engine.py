@@ -1013,6 +1013,60 @@ def test_looks_non_product_keeps_a_neutral_answer():
         "Bu bitki genellikle ilkbaharda cicek acar ve yari golge sever.")
 
 
+# --- coverage extension (round 2, 2026-07-25): new categories + verimli removal ---
+def test_looks_non_product_suppresses_the_new_activity_categories():
+    """The categories the hosted measurement showed still leaking: sowing, training,
+    rootstock selection, post-harvest drying, self-fertility. Each target answer must
+    now suppress (activity term present, no nutrition term)."""
+    assert engine._looks_non_product(
+        "Misirda en uygun ekim zamani 20 Mayistir.")                    # ekim
+    assert engine._looks_non_product(
+        "Serada domateste atlatma terbiye sistemi onerilir.")           # terbiye
+    assert engine._looks_non_product(
+        "Marsh Seedless altintop icin carrizo anaci onerilir.")         # anaç
+    assert engine._looks_non_product(
+        "Hachiya hurmasi kurutulduktan sonra SMB uygulanmali.")         # kurut
+    assert engine._looks_non_product(
+        "Santa Maria armudu partenokarp bir cesittir, dolleyici gerekmez.")  # partenokarp
+    assert engine._looks_non_product(
+        "Beurre Hardy icin bahceye tozlayici cesit dikilmelidir.")      # tozla (pollinizer)
+
+
+def test_looks_non_product_suppresses_self_fertility_after_verimli_removal():
+    """The pear self-fertility answers say 'kendine verimli' - reproductive fertility,
+    NOT nutrition. Before removal, 'verimli' cancelled suppression; now it must suppress
+    (partenokarp / tozla is the activity term, no true nutrition term remains)."""
+    assert engine._looks_non_product(
+        "Santa Maria armudu partenokarp bir cesittir, kendine verimlidir.")
+    assert engine._looks_non_product(
+        "Asmada budama kis dinlenme doneminde, verimli surgun icin gozler birakilir.")
+
+
+def test_verimli_removal_still_keeps_soil_fertility_nutrition_answers():
+    """Removing 'verimli' must not regress a nutrition answer: soil-fertility answers
+    always carry gübre/besin/azot/kompost, so they stay protected."""
+    assert not engine._looks_non_product(
+        "Toprak verimliligini artirmak icin ahir gubresi ve kompost kullanin.")
+    assert not engine._looks_non_product(
+        "Bu cesit icin organik gubre ve kompost onerilir.")
+
+
+def test_ekim_month_is_safe_because_the_nutrition_half_keeps_it():
+    """'ekim' also means October. A fertilize-in-October answer carries a nutrition
+    term, so the rule keeps it despite the activity match."""
+    assert not engine._looks_non_product(
+        "Ekim ayinda azotlu gubre ile besleme yapin.")
+
+
+def test_production_tuples_carry_the_round2_terms():
+    """Locks the shipped tuples so a later edit cannot silently drop the round-2 work:
+    the new activity stems are present and 'verimli' is gone from nutrition."""
+    for stem in ("ekim", "terbiye", "anaç", "kurut", "partenokarp", "tozla"):
+        assert stem in engine._NON_PRODUCT_ACTIVITY
+    assert "tozlaş" not in engine._NON_PRODUCT_ACTIVITY   # broadened to "tozla"
+    assert "verimli" not in engine._NUTRITION_TERMS
+
+
 def test_stream_answer_suppresses_products_when_non_product_without_a_marker(
         monkeypatch):
     monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
