@@ -248,3 +248,45 @@ by the task-8 harness guard.
 **Hosted efficacy confirm still pending** — needs a fresh OpenRouter free-tier day
 (today's budget spent on the round-1 Task 5 re-measurement). Will compare the 14 leakers
 case-by-case against the 2026-07-25 pre-extension hosted run.
+
+## Round-2 hosted efficacy confirm — DONE (2026-07-26)
+
+Re-ran `google/gemma-4-26b-a4b-it:free` on a fresh quota day. To stay under the 50 req/day
+free cap (a full 54-case run would clip the last cases, two of them prime targets), ran
+the three categories that contain every leaker — `local` (12), `horticulture` (13),
+`disease` (5) = **30 requests**. Raw: `.superpowers/sdd/round2-hosted-{local,horticulture,disease}.txt`.
+Compared case-by-case against the pre-extension run
+(`2026-07-25-task5-backstop-hosted-raw.txt`).
+
+**Result on the 15 pre-extension `prod=False` leakers: 10 now suppress (PASS), 5 still
+leak, 0 regressions.** Expected reach was ~8-9 — met/exceeded.
+
+**Fixed (FAIL → PASS):**
+- Pear self-fertility (verimli removal + `partenokarp`): `local_santamaria_pear`,
+  `local_beurrehardy_pear`, `local_bpmorettini_pear`
+- `pruning_grape` — verimli removal ("verimli sürgün" no longer cancels)
+- `local_antalya_grapefruit_rootstock` (`anaç`)
+- `technique_maize_sowing_date`, `technique_maize_sowing_opener` (`ekim`)
+- `technique_tomato_training_system` (`terbiye`)
+- `technique_grape_bud_load`, `drip_irrigation` — **not round-2 targets**; these two flips
+  are plausibly hosted-model variance (gemma-free is non-deterministic, ~1/8 NO-ANSWER
+  rate), not attributable to a new stem. The 8 above ARE attributable to specific edits.
+
+**Still leak:**
+- `local_diyarbakir_safflower` (çeşit), `diagnosis_push`, `disease_rhizoctonia_biocontrol`
+  — all three deliberately OUT of scope. Expected, not findings.
+- `local_hachiya_persimmon` (`kurut` target) and `pollination_squash` (`tozla` broaden) —
+  **two targets that did NOT land.** These are findings, not a cue to widen (per spec).
+  The harness still doesn't save answer text, so the exact reason (stem absent in the
+  answer, or a nutrition term cancelling) is unresolved — same limitation noted for
+  `pollination_squash` last round.
+
+**No regressions:** every pre-extension PASS in these categories stayed PASS — the
+`verimli` removal broke no pear/nutrition control. `banana_sigatoka` reads FAIL but was
+NO ANSWER (excluded) in the baseline, so it is a new out-of-coverage observation, not a
+regression. `local_oltu_raspberry` NO-ANSWERed this run (baseline PASS) — model flake,
+excluded.
+
+**Verdict:** round-2 extension is real, safe, and lands its systematic targets (sowing/
+training/rootstock/pear-self-fertility). Coverage is still partial by design; the two
+missed targets (persimmon drying, squash pollination) stay as accepted gaps.
