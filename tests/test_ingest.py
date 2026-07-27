@@ -304,3 +304,42 @@ def test_hosted_model_id_does_not_trip_guard(monkeypatch):
     monkeypatch.setattr(settings, "embedding_identity", "bge-m3")
     monkeypatch.setattr(settings, "embedding_model", "BAAI/bge-m3")
     ing.get_vector_store()  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# get_embeddings() resolver wiring
+# --------------------------------------------------------------------------- #
+class _FakeOpenAIEmbeddings:
+    """Captures constructor kwargs instead of building a real client - a real
+    client's internals vary by langchain version, so we never introspect it."""
+
+    last_kwargs: dict = {}
+
+    def __init__(self, **kwargs):
+        _FakeOpenAIEmbeddings.last_kwargs = kwargs
+
+
+def _patch_openai_embeddings(monkeypatch):
+    _FakeOpenAIEmbeddings.last_kwargs = {}
+    monkeypatch.setattr(ing, "OpenAIEmbeddings", _FakeOpenAIEmbeddings)
+
+
+def test_get_embeddings_uses_hosted_endpoint_when_set(monkeypatch):
+    _patch_openai_embeddings(monkeypatch)
+    monkeypatch.setattr(settings, "embedding_base_url", "https://hosted.example/v1")
+    monkeypatch.setattr(settings, "embedding_api_key", "secret-key")
+    ing.get_embeddings()
+    kwargs = _FakeOpenAIEmbeddings.last_kwargs
+    assert kwargs.get("base_url") == "https://hosted.example/v1"
+    assert kwargs.get("api_key") == "secret-key"
+    assert kwargs.get("model") == settings.embedding_model
+
+
+def test_get_embeddings_falls_back_to_lm_studio_when_unset(monkeypatch):
+    _patch_openai_embeddings(monkeypatch)
+    monkeypatch.setattr(settings, "embedding_base_url", "")
+    monkeypatch.setattr(settings, "embedding_api_key", "")
+    ing.get_embeddings()
+    kwargs = _FakeOpenAIEmbeddings.last_kwargs
+    assert kwargs.get("base_url") == settings.lm_studio_base_url
+    assert kwargs.get("api_key") == settings.lm_studio_api_key

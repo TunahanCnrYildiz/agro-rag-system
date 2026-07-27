@@ -19,6 +19,12 @@ deploy. Nothing here changes local dev — local stays the default.
    - `CHAT_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...`, `OPENROUTER_MODEL=...`
    - `EMBEDDING_BASE_URL=...`, `EMBEDDING_API_KEY=...`, `EMBEDDING_MODEL=BAAI/bge-m3`,
      `EMBEDDING_IDENTITY=bge-m3`
+   - Migration note: a Chroma store stamped under the older guard recorded the
+     API model-id (e.g. `text-embedding-bge-m3`), not the logical `bge-m3`. The
+     guard now compares against `EMBEDDING_IDENTITY`, so such a store needs
+     `EMBEDDING_IDENTITY` set to that old stamped value, or a `--reset` re-ingest.
+     Only relevant to a store re-created between 2026-07-17 and now — the
+     current live store is unstamped.
    - `CORS_ALLOW_ORIGINS=https://your-site.example` (narrow it — the backend logs
      a warning while it is `*`).
 3. **Deploy the backend** (Docker image builds from the repo `Dockerfile`).
