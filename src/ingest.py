@@ -44,10 +44,12 @@ except ImportError:  # pragma: no cover
 
 
 def get_embeddings() -> OpenAIEmbeddings:
-    """Embeddings client pointed at the LM Studio OpenAI-compatible server."""
+    """Embeddings client for the configured embedding endpoint: LM Studio locally,
+    or a hosted bge-m3 provider when embedding_base_url/api_key are set. The model
+    stays bge-m3 either way (the store is stamped with the logical identity)."""
     return OpenAIEmbeddings(
-        base_url=settings.lm_studio_base_url,
-        api_key=settings.lm_studio_api_key,
+        base_url=settings.effective_embedding_base_url,
+        api_key=settings.effective_embedding_api_key,
         model=settings.embedding_model,
         # LM Studio embedding servers usually don't support batching well;
         # keep chunks modest and let our own batching drive throughput.
@@ -97,11 +99,11 @@ def get_vector_store(verify_model: bool = True):
         collection_name=settings.collection_name,
         embedding_function=get_embeddings(),
         persist_directory=str(VECTOR_STORE_DIR),
-        collection_metadata={"embedding_model": settings.embedding_model},
+        collection_metadata={"embedding_model": settings.embedding_identity},
     )
     if verify_model:
         recorded = (store._collection.metadata or {}).get("embedding_model")
-        _check_embedding_model(recorded, settings.embedding_model)
+        _check_embedding_model(recorded, settings.embedding_identity)
     return store
 
 

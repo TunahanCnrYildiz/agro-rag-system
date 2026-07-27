@@ -14,9 +14,11 @@ npm run ios        # iOS simulator (macOS only)
 
 ## API endpoint
 
-Set `API_BASE` in `src/api.ts` to wherever the backend runs. `127.0.0.1` only
-works when the app and API share a machine (e.g. web preview); a physical
-device or emulator needs a reachable address:
+Set `EXPO_PUBLIC_API_BASE` (in `mobile-app/.env` — see `.env.example` — or the
+shell / EAS build env) to wherever the backend runs; `src/api.ts` reads it at
+bundle time and falls back to a LAN IP only when it is unset. `127.0.0.1` only
+works when the app and API share a machine (e.g. web preview); a physical device
+or emulator needs a reachable address:
 
 - Android emulator → `http://10.0.2.2:8000`
 - Physical device → `http://<your-machine-LAN-IP>:8000`

@@ -267,10 +267,10 @@ def _patch_chroma(monkeypatch, recorded):
 
 
 def test_get_vector_store_passes_collection_metadata(monkeypatch):
-    _patch_chroma(monkeypatch, {"embedding_model": settings.embedding_model})
+    _patch_chroma(monkeypatch, {"embedding_model": settings.embedding_identity})
     ing.get_vector_store()
     assert _FakeChroma.last_kwargs.get("collection_metadata") == {
-        "embedding_model": settings.embedding_model
+        "embedding_model": settings.embedding_identity
     }
 
 
@@ -284,3 +284,62 @@ def test_get_vector_store_verify_false_skips(monkeypatch):
     _patch_chroma(monkeypatch, {"embedding_model": "SOME-OTHER-MODEL"})
     store = ing.get_vector_store(verify_model=False)
     assert store is not None
+
+
+def test_get_vector_store_stamps_identity_not_model_id(monkeypatch):
+    # embedding_model is the API id; the STAMP must be the logical identity.
+    _patch_chroma(monkeypatch, {"embedding_model": settings.embedding_identity})
+    monkeypatch.setattr(settings, "embedding_model", "some/api-model-id")
+    ing.get_vector_store()
+    assert _FakeChroma.last_kwargs.get("collection_metadata") == {
+        "embedding_model": settings.embedding_identity
+    }
+
+
+def test_hosted_model_id_does_not_trip_guard(monkeypatch):
+    # Store stamped with the logical identity ("bge-m3"); a hosted provider's
+    # differently named model-id ("BAAI/bge-m3") must NOT raise, because the
+    # guard compares identity, not the API id. This is the bug this task fixes.
+    _patch_chroma(monkeypatch, {"embedding_model": "bge-m3"})
+    monkeypatch.setattr(settings, "embedding_identity", "bge-m3")
+    monkeypatch.setattr(settings, "embedding_model", "BAAI/bge-m3")
+    ing.get_vector_store()  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# get_embeddings() resolver wiring
+# --------------------------------------------------------------------------- #
+class _FakeOpenAIEmbeddings:
+    """Captures constructor kwargs instead of building a real client - a real
+    client's internals vary by langchain version, so we never introspect it."""
+
+    last_kwargs: dict = {}
+
+    def __init__(self, **kwargs):
+        _FakeOpenAIEmbeddings.last_kwargs = kwargs
+
+
+def _patch_openai_embeddings(monkeypatch):
+    _FakeOpenAIEmbeddings.last_kwargs = {}
+    monkeypatch.setattr(ing, "OpenAIEmbeddings", _FakeOpenAIEmbeddings)
+
+
+def test_get_embeddings_uses_hosted_endpoint_when_set(monkeypatch):
+    _patch_openai_embeddings(monkeypatch)
+    monkeypatch.setattr(settings, "embedding_base_url", "https://hosted.example/v1")
+    monkeypatch.setattr(settings, "embedding_api_key", "secret-key")
+    ing.get_embeddings()
+    kwargs = _FakeOpenAIEmbeddings.last_kwargs
+    assert kwargs.get("base_url") == "https://hosted.example/v1"
+    assert kwargs.get("api_key") == "secret-key"
+    assert kwargs.get("model") == settings.embedding_model
+
+
+def test_get_embeddings_falls_back_to_lm_studio_when_unset(monkeypatch):
+    _patch_openai_embeddings(monkeypatch)
+    monkeypatch.setattr(settings, "embedding_base_url", "")
+    monkeypatch.setattr(settings, "embedding_api_key", "")
+    ing.get_embeddings()
+    kwargs = _FakeOpenAIEmbeddings.last_kwargs
+    assert kwargs.get("base_url") == settings.lm_studio_base_url
+    assert kwargs.get("api_key") == settings.lm_studio_api_key

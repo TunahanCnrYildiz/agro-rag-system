@@ -94,6 +94,19 @@ app.add_middleware(
 )
 
 
+def _warn_if_open_cors(origins: list[str]) -> None:
+    """One-time startup reminder when CORS is wide open. Fine for local/dev; a
+    public deploy should narrow CORS_ALLOW_ORIGINS to the real site origins."""
+    if origins == ["*"]:
+        print(
+            "[main] WARNING: CORS_ALLOW_ORIGINS='*' allows all origins - fine for "
+            "local/dev, but narrow it before a public deploy."
+        )
+
+
+_warn_if_open_cors(settings.cors_origins_list)
+
+
 @app.get("/health")
 def health() -> dict:
     # The model comes from the active profile, not settings.chat_model, so this
