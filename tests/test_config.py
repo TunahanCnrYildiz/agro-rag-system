@@ -78,3 +78,22 @@ def test_local_provider_does_not_require_openrouter_fields():
     """The default path must not be collateral damage of the new validation."""
     s = Settings(chat_provider="local", openrouter_api_key="", openrouter_model="")
     assert s.chat_provider == "local"
+
+
+def test_embedding_identity_defaults_to_bge_m3():
+    """Asserted on the FIELD DEFAULT (same reasoning as the chat_provider test):
+    the real .env is gitignored, so an instance-level assert would be env-dependent."""
+    assert Settings.model_fields["embedding_identity"].default == "bge-m3"
+
+
+def test_embedding_endpoint_falls_back_to_lm_studio_when_unset():
+    s = Settings(embedding_base_url="", embedding_api_key="")
+    assert s.effective_embedding_base_url == s.lm_studio_base_url
+    assert s.effective_embedding_api_key == s.lm_studio_api_key
+
+
+def test_embedding_endpoint_override_wins():
+    s = Settings(embedding_base_url="https://hosted.example/v1",
+                 embedding_api_key="secret-key")
+    assert s.effective_embedding_base_url == "https://hosted.example/v1"
+    assert s.effective_embedding_api_key == "secret-key"

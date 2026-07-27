@@ -82,6 +82,28 @@ class Settings(BaseSettings):
     openrouter_model: str = Field(
         default="", description="OpenRouter model id, e.g. 'vendor/model-name'.")
 
+    # --- Embedding provider (independent of chat_provider) --- #
+    # The store is stamped with a STABLE LOGICAL identity, not the API model-id,
+    # so a hosted bge-m3 endpoint (which names the model differently, e.g.
+    # "BAAI/bge-m3") is a clean config swap and does NOT trip the model guard.
+    # embedding_model (above) stays the id sent to the API; embedding_identity is
+    # the store's identity used for stamping + guard comparison.
+    embedding_identity: str = Field(default="bge-m3")
+    # Dedicated embedding endpoint/key. Empty -> fall back to the lm_studio_*
+    # values, so an existing local .env keeps working unchanged. A hosted deploy
+    # sets these to the real embedding provider without overloading the
+    # LM-Studio-named vars (which in prod point nowhere).
+    embedding_base_url: str = Field(default="")
+    embedding_api_key: str = Field(default="")
+
+    @property
+    def effective_embedding_base_url(self) -> str:
+        return self.embedding_base_url.strip() or self.lm_studio_base_url
+
+    @property
+    def effective_embedding_api_key(self) -> str:
+        return self.embedding_api_key.strip() or self.lm_studio_api_key
+
     # --- Generation params --- #
     # Low temperature keeps answers grounded/consistent for a factual RAG.
     # 0.4 matches the value actually in use (.env is gitignored, so a stale
