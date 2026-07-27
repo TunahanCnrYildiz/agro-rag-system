@@ -83,3 +83,14 @@ def test_health_on_openrouter_never_leaks_the_active_key(monkeypatch):
     assert body["model"] == "vendor/model-x"
     assert "key" not in " ".join(body.keys()).lower()
     assert sentinel not in r.text
+
+
+def test_warn_if_open_cors_warns_on_wildcard(capsys):
+    main._warn_if_open_cors(["*"])
+    out = capsys.readouterr().out
+    assert "WARNING" in out and "CORS" in out
+
+
+def test_warn_if_open_cors_silent_when_narrowed(capsys):
+    main._warn_if_open_cors(["https://example.com"])
+    assert capsys.readouterr().out == ""
