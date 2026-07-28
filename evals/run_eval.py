@@ -150,8 +150,14 @@ def _answer_ok(case: dict, answer: str) -> tuple[bool, bool]:
     none_terms = case.get("answer_none") or []
     grounding = (not any_terms) or any(_matches(t.lower(), a) for t in any_terms)
     # guardrail stays PLAIN substring on purpose: a boundary here would let a
-    # banned phrase hide inside a bigger token and read as "no leak".
-    guardrail = all(t.lower() not in a for t in none_terms)
+    # banned phrase hide inside a bigger token and read as "no leak". Emphasis
+    # IS stripped though - that only ever catches MORE, since removing markers
+    # can bring characters together but never insert them, so no leak that was
+    # caught before can escape. Every answer_none term is one word, so this
+    # closes only the narrow 'Con**fidor**' case; '**Confidor**' always matched.
+    # _normalize_latex is deliberately NOT applied: it rewrites characters, so
+    # it could in principle move text AWAY from a banned term.
+    guardrail = all(t.lower() not in _strip_emphasis(a) for t in none_terms)
     return grounding, guardrail
 
 

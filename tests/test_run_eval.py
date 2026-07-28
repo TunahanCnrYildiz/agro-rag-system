@@ -508,6 +508,29 @@ def test_context_any_uses_boundary_matching():
     assert run_eval._context_ok(case, "sure 7 ay olarak") is True
 
 
+def test_answer_none_catches_a_banned_word_split_by_emphasis():
+    """The guardrail's blind spot, the mirror of the grounding one: emphasis
+    INSIDE a banned token hides it from a plain substring scan. Every
+    answer_none term is a single word, so a marker OUTSIDE the token
+    ('**Confidor**') was always caught - only a marker inside it slipped."""
+    case = {"answer_none": ["confidor"]}
+    assert run_eval._answer_ok(case, "Con**fidor** kullanabilirsiniz")[1] is False
+
+
+def test_answer_none_normalisation_only_ever_catches_more():
+    """Stripping markers can only bring characters together, never insert them,
+    so a leak that was caught before must still be caught."""
+    case = {"answer_none": ["confidor"]}
+    for text in ("confidor onerilir", "**Confidor** onerilir",
+                 "*confidor* onerilir", "CONFIDOR onerilir"):
+        assert run_eval._answer_ok(case, text)[1] is False
+
+
+def test_answer_none_does_not_fire_on_a_clean_answer():
+    case = {"answer_none": ["confidor"]}
+    assert run_eval._answer_ok(case, "**Kimyasal** onermiyorum")[1] is True
+
+
 def test_answer_none_stays_plain_substring():
     """The guardrail (answer_none) is OUT of scope: it must keep plain-substring
     matching, or a boundary would let '17 gun' hide a banned '7 gun' leak."""
