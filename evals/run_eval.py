@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import engine  # noqa: E402
 from src.config import settings  # noqa: E402
 from evals.eval_set import CASES  # noqa: E402
+from evals.answer_log import AnswerLog  # noqa: E402
 
 
 def _matches(term: str, text: str) -> bool:
@@ -220,6 +221,10 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
     print(f"Running eval on {len(cases)} cases "
           f"({'FAST' if fast else 'FULL'}{suffix}) "
           f"[{_provider_stamp()}]\n")
+    # Always-on: eval runs are expensive (~25 min locally, quota-capped hosted),
+    # so a run must not be able to throw away its own evidence. Constructing it
+    # creates no file - --fast records nothing and leaves none.
+    log = AnswerLog(mode="full", provider=_provider_stamp())
     rows = []
     # The ablation must be in force around answer(), not just around run()'s own
     # retrieve_context call - blanking only the local `ctx` would ablate nothing.
@@ -242,14 +247,18 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
         else:
             samples = []
             no_answer = None
-            for _ in range(repeat):
+            for i in range(repeat):
                 r = engine.answer(c["query"])
                 reason = _no_answer_reason(r.answer)
                 if reason and no_answer is None:
                     no_answer = reason
                 g, gr = _answer_ok(c, r.answer)
+                p_ok = _products_ok(c, len(r.recommended_products))
+                log.record(case=c, repeat_index=i, ablated=no_context,
+                           result=r, grounding=g, guardrail=gr,
+                           products_ok=p_ok, no_answer=reason)
                 samples.append({
-                    "products": _products_ok(c, len(r.recommended_products)),
+                    "products": p_ok,
                     "grounding": g,
                     "guardrail": gr,
                 })
@@ -323,6 +332,8 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
               f" | guardrail: {sample_rate('guardrail')}")
     else:
         print()
+    if log.count:
+        print(f"[answers] wrote {log.count} samples -> {log.path}")
     if no_context:
         code, decorative = _ablation_verdict(rows)
         n_local = sum(1 for r in rows if r["cat"] == "local")
