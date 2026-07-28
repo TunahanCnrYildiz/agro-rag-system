@@ -376,12 +376,20 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
               "nothing to measure")
         return 1
     settings.request_timeout = 400.0
+    log = AnswerLog(mode="faithfulness", provider=_provider_stamp())
 
-    def grounded_hits(case: dict) -> int:
+    def grounded_hits(case: dict, ablated: bool) -> int:
         hits = 0
-        for _ in range(repeat):
-            answer = engine.answer(case["query"]).answer
+        for i in range(repeat):
+            result = engine.answer(case["query"])
+            answer = result.answer
             reason = _no_answer_reason(answer)
+            grounding, guardrail = _answer_ok(case, answer)
+            # Recorded BEFORE the abort below: the sample that kills the run is
+            # exactly the one someone will want to read.
+            log.record(case=case, repeat_index=i, ablated=ablated,
+                       result=result, grounding=grounding, guardrail=guardrail,
+                       products_ok=None, no_answer=reason)
             if reason:
                 # An unanswered sample reads as "ungrounded", which would
                 # silently mislabel this case as model-carried or
@@ -391,7 +399,7 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
                 sys.exit(f"[faithfulness] {case['id']} produced NO ANSWER "
                           f"({reason}) - aborting rather than misclassifying "
                           f"it as ungrounded.")
-            hits += _answer_ok(case, answer)[0]
+            hits += grounding
         return hits
 
     suffix = f", {repeat}x each" if repeat > 1 else ""
@@ -401,9 +409,9 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
               "retrieval-broken": 0, "corpus-harmful": 0}
     live_labels: dict[str, str] = {}
     for c in cases:
-        normal_hits = grounded_hits(c)
+        normal_hits = grounded_hits(c, ablated=False)
         with _corpus_ablated():
-            ablated_hits = grounded_hits(c)
+            ablated_hits = grounded_hits(c, ablated=True)
         label = _classify(normal_hits, ablated_hits, repeat)
         live_labels[c["id"]] = label
         counts[label] += 1
@@ -420,6 +428,8 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
     if regressed:
         print(f"\n  [drift] corpus-carried cases that REGRESSED: "
               f"{', '.join(regressed)}")
+    if log.count:
+        print(f"[answers] wrote {log.count} samples -> {log.path}")
     return code
 
 

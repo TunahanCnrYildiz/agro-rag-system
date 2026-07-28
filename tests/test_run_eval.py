@@ -627,3 +627,50 @@ def test_fast_mode_writes_no_answer_log(monkeypatch, tmp_path):
     run_eval.run(fast=True)
 
     assert not runs.exists()
+
+
+def test_faithfulness_logs_normal_and_ablated_samples(monkeypatch, tmp_path):
+    """Normal and ablated samples land in one file so they can be compared
+    directly - that comparison IS the diagnosis this log exists for."""
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)      # respects _corpus_ablated
+        return ChatResult("depo 2±0,5 derece" if ctx else "genel tavsiye", [])
+    monkeypatch.setattr(engine, "answer", fake)
+
+    run_eval.run_faithfulness()
+
+    rows = [json.loads(line) for line
+            in list(runs.glob("*.jsonl"))[0]
+            .read_text(encoding="utf-8").strip().splitlines()]
+    assert [r["ablated"] for r in rows] == [False, True]
+    assert rows[0]["answer"] == "depo 2±0,5 derece"
+    assert rows[1]["answer"] == "genel tavsiye"
+    assert rows[0]["mode"] == "faithfulness"
+    assert rows[0]["products_ok"] is None       # faithfulness does not gate products
+
+
+def test_faithfulness_logs_the_sample_it_aborts_on(monkeypatch, tmp_path):
+    """The abort path is exactly when the evidence is wanted, so the unanswered
+    sample must reach disk BEFORE sys.exit()."""
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    monkeypatch.setattr(
+        engine, "answer",
+        lambda msg, history=None: ChatResult(
+            engine._llm_unavailable_message(RuntimeError("429")), []))
+
+    with pytest.raises(SystemExit):
+        run_eval.run_faithfulness()
+
+    rows = [json.loads(line) for line
+            in list(runs.glob("*.jsonl"))[0]
+            .read_text(encoding="utf-8").strip().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["no_answer"] == "unavailable"
