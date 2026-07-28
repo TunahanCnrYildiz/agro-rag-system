@@ -303,6 +303,40 @@ case dicts, so no existing case *could* regress because of it. A gate defined pu
 "repeat 4 exits 0" therefore fails while nothing is wrong, and will do so more often as the
 panel grows and intermittent cases accumulate.
 
+> ### ⚠ CORRECTION 2026-07-29 — the numbers below are SUPERSEDED
+>
+> Everything from here to the end of this subsection was computed from `p` estimates that
+> two INSTRUMENT DEFECTS had deflated: the matcher could not see a value stated in LaTeX
+> (fixed `8048435`) or split by markdown emphasis (fixed `b09d334`). Re-measured at
+> `--repeat 8` after both fixes, pooled with the answer log:
+>
+> | case | `p` used below | measured `k/n` | `p̂` |
+> |---|---|---|---|
+> | `quant_rose_pot_fertilizer_dose` | 0.625 | **9/9** | 1.000 |
+> | `local_deveci_pear` | 0.750 | **9/9** | 1.000 |
+> | `local_scarletspur_apple` | 0.750 | **9/9** | 1.000 |
+> | `local_bpmorettini_pear` | 0.750 | **7/9** | 0.778 |
+>
+> Three of the four were artifacts. Only `local_bpmorettini_pear` is genuinely flaky, and
+> its estimate here was already about right. **Panel-wide: 29.7% → 3.7% at repeat 4, and
+> 21.1% → 1.6% at repeat 8** (point estimate, same structure — only known-flaky cases get
+> `p<1`). At each measured case's one-sided 95% lower bound it is 51.2% / 54.5%, a width
+> driven entirely by bpmorettini's `n=9`.
+>
+> **The two-stage protocol STANDS, but the reasoning below does NOT — do not re-quote it.**
+> "The proportional threshold means repeat-8 barely helps" is false at clean `p`: repeat-8
+> more than halves the panel figure. What actually justifies stopping at two stages is that
+> repeat-4's absolute false alarm is already ~3.7%.
+>
+> Also: the `p = 0.875 / repeat 4` cell below reads 1.2%; the correct value is **0.7%**
+> (1.2% is what `p = 0.85` gives). Verified against `_classify`'s actual flag condition,
+> `2*normal < repeat`, i.e. `fa(n,p) = P(Bin(n,p) < n/2)`.
+>
+> The rose paragraph's diagnosis ("the source writes '3 ile 6 g/saksı', so the model reports
+> the range") was a plausible corpus-level story fitted to a number the instrument produced.
+> All 8 fresh samples named 6 g. **The rose drop trigger is void.** Details in the
+> `handoff-next-steps` memory.
+
 **Why NOT simply raise the whole-panel gate to `--repeat 8`** — measured, and it is the
 expensive non-fix. `_classify`'s threshold is PROPORTIONAL (`normal ≥ n/2`), so extra samples
 sharpen the estimate without moving the bar: they help a high-`p` case and barely touch a
