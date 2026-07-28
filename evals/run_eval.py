@@ -60,6 +60,34 @@ def _normalize_latex(text: str) -> str:
     return out.replace("$", "")
 
 
+# Markdown emphasis lands INSIDE an anchor phrase and splits it. Measured
+# 2026-07-28 (repeat-8): 4 of 8 quant_rose_pot_fertilizer_dose samples read
+# ground=False on `saksı başına **6 gram**` while every one stated the right
+# dose - the case's p was an instrument artifact, not a corpus finding. Same
+# class as the LaTeX blind spot: emphasis is presentation, not a different claim.
+#
+# PAIRED runs only, and asterisks only. A lone '*' is multiplication here
+# ('5*10 cm'), and '_' runs would eat the chunk ids that appear in retrieved
+# context ('dp_19393 ve dp_21749') - the same narrowness _normalize_latex keeps.
+_EMPHASIS = re.compile(r"(\*{1,3})(?=\S)(.+?)(?<=\S)\1", re.S)
+
+
+def _strip_emphasis(text: str) -> str:
+    """Remove markdown emphasis markers, keeping the text they wrap.
+
+    Looped because the regex is non-greedy: `**a *b* c**` needs a second pass to
+    reach the inner run. Applied to the TEXT being searched, never to the anchor.
+    Runs BEFORE _matches' regex, so the left-boundary guard still applies to the
+    result: `3**6 g**` collapses to `36 g` and must NOT match the anchor `6 g`.
+    """
+    out = text
+    while True:
+        stripped = _EMPHASIS.sub(r"\2", out)
+        if stripped == out:
+            return out
+        out = stripped
+
+
 def _matches(term: str, text: str) -> bool:
     """Case-insensitive anchor match with a LEFT word boundary + a right
     digit-guard, so a short/numeric answer_any/context_any anchor cannot be a
@@ -78,7 +106,7 @@ def _matches(term: str, text: str) -> bool:
     chars on the left; re.escape keeps '/', '±', ',' literal.
     """
     pattern = r"(?<!\w)" + re.escape(term) + r"(?!\d)"
-    return re.search(pattern, _normalize_latex(text)) is not None
+    return re.search(pattern, _normalize_latex(_strip_emphasis(text))) is not None
 
 
 def _retrieval_ok(case: dict, ctx: str) -> bool:

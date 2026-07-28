@@ -443,6 +443,59 @@ def test_latex_normalisation_leaves_plain_text_alone():
     assert run_eval._matches("10 kg/da", "gubre 10 kg/da verildi") is True
 
 
+def test_matches_sees_through_markdown_emphasis():
+    """Measured live 2026-07-28 (repeat-8 on quant_rose_pot_fertilizer_dose):
+    4 of 8 samples read ground=False while every one of them stated the right
+    dose - the model had bolded the number, splitting the anchor phrase:
+    `saksi basina **6 gram**`. Same class as the LaTeX blind spot; emphasis is
+    presentation markup, not a different claim."""
+    bold = "arastirmalar saksi basina **6 gram** gubre onermektedir"
+    assert run_eval._matches("saksi basina 6 g", bold) is True
+
+
+def test_markdown_normalisation_handles_every_emphasis_run_length():
+    for marker in ("*", "**", "***"):
+        text = f"saksi basina {marker}6 gram{marker} gubre"
+        assert run_eval._matches("saksi basina 6 g", text) is True
+
+
+def test_markdown_normalisation_preserves_the_left_boundary_guard():
+    """The property most at risk: stripping markers must not GLUE tokens into a
+    spurious anchor. '3**6 g**' collapses to '36 g', which must still not match
+    the anchor '6 g'."""
+    assert run_eval._matches("6 g", "doz 3**6 g** olarak") is False
+
+
+def test_markdown_normalisation_preserves_the_trailing_digit_guard():
+    assert run_eval._matches("2±0,5", "depo **2±0,50** derece") is False
+
+
+def test_markdown_normalisation_leaves_underscores_alone():
+    """Deliberately narrow, following the LaTeX normaliser's precedent: only
+    asterisk emphasis was measured, and '_' runs would corrupt the chunk ids
+    that appear in retrieved context ('dp_19393 ve dp_21749')."""
+    ids = "kaynak dp_19393 ve dp_21749 karsilastirildi"
+    assert run_eval._matches("dp_19393", ids) is True
+    assert run_eval._matches("dp_21749", ids) is True
+
+
+def test_markdown_normalisation_ignores_an_unpaired_asterisk():
+    """Rules out the cheap 'delete every asterisk' fix. A lone '*' is a
+    MULTIPLICATION sign in this domain (plant spacing, '5*10 cm'), and deleting
+    it would mangle '5*10 cm' into '510 cm' - silently losing a '10 cm' anchor
+    that matches today. Only a PAIRED emphasis run is markup."""
+    assert run_eval._matches("10 cm", "fideler 5*10 cm aralikla dikildi") is True
+
+
+def test_markdown_normalisation_leaves_plain_text_alone():
+    """Ordinary answers must score exactly as before - the whole panel depends
+    on it. A bare list bullet is not an emphasis run."""
+    assert run_eval._matches("10 kg/da", "* gubre 10 kg/da verildi") is True
+    assert run_eval._matches("azot", "azotlu toprak") is True
+    assert run_eval._matches("azot", "kazot") is False
+    assert run_eval._matches("7 ay", "bitki 17 ay sonra") is False
+
+
 def test_answer_any_uses_boundary_matching():
     case = {"answer_any": ["7 ay"]}
     assert run_eval._answer_ok(case, "bitki 17 ay boyunca")[0] is False
