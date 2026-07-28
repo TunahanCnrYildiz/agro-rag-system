@@ -315,13 +315,15 @@ panel grows and intermittent cases accumulate.
 > | `quant_rose_pot_fertilizer_dose` | 0.625 | **9/9** | 1.000 |
 > | `local_deveci_pear` | 0.750 | **9/9** | 1.000 |
 > | `local_scarletspur_apple` | 0.750 | **9/9** | 1.000 |
-> | `local_bpmorettini_pear` | 0.750 | **7/9** | 0.778 |
+> | `local_bpmorettini_pear` | 0.750 | **15/17** | 0.882 |
 >
-> Three of the four were artifacts. Only `local_bpmorettini_pear` is genuinely flaky, and
-> its estimate here was already about right. **Panel-wide: 29.7% → 3.7% at repeat 4, and
-> 21.1% → 1.6% at repeat 8** (point estimate, same structure — only known-flaky cases get
-> `p<1`). At each measured case's one-sided 95% lower bound it is 51.2% / 54.5%, a width
-> driven entirely by bpmorettini's `n=9`.
+> Three of the four were artifacts. Only `local_bpmorettini_pear` is genuinely imperfect
+> (two repeat-8 runs, 6/8 then 8/8, pooled — either alone would have misled).
+> **Panel-wide: 29.7% → 0.6% at repeat 4, and 21.1% → 0.1% at repeat 8** (point estimate,
+> same structure — only known-flaky cases get `p<1`). At each measured case's one-sided 95%
+> lower bound it is 28.3% / 20.1%; that bound is floored by sample count, not by any measured
+> red, and its near-equality with the 29.2% below is a coincidence, not a vindication —
+> one is a point estimate, the other a worst case.
 >
 > **The two-stage protocol STANDS, but the reasoning below does NOT — do not re-quote it.**
 > "The proportional threshold means repeat-8 barely helps" is false at clean `p`: repeat-8
