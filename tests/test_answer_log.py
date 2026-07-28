@@ -88,6 +88,24 @@ def test_no_file_until_the_first_record(tmp_path, monkeypatch):
     assert log.count == 0
 
 
+def test_a_malformed_result_never_raises_and_warns_once(tmp_path, monkeypatch, capsys):
+    """record() must itself be the guarded boundary: row construction happens
+    before _write's try today, so a malformed `result` (no .answer, or
+    recommended_products=None) would raise straight out of record() and kill
+    a 25-minute run - the exact failure mode this module exists to prevent."""
+    log = _log(tmp_path, monkeypatch)
+
+    class Malformed:
+        recommended_products = None
+
+    for i in range(3):
+        log.record(case=CASE, repeat_index=i, ablated=False, result=Malformed(),
+                   grounding=True, guardrail=True, products_ok=True, no_answer=None)
+
+    assert log.count == 0
+    assert capsys.readouterr().out.count("[answers] WARNING") == 1
+
+
 def test_a_write_failure_never_raises_and_warns_once(tmp_path, monkeypatch, capsys):
     """The binding constraint: losing a 25-minute run to a disk error would be a
     worse bug than the missing answer texts this module exists to fix."""

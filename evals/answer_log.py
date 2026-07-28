@@ -50,29 +50,40 @@ class AnswerLog:
                result, grounding: bool, guardrail: bool,
                products_ok: bool | None, no_answer: str | None) -> None:
         """Log one sample. `ablated` is passed in, never inferred from `mode`:
-        both modes can produce either value."""
-        self._write({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "mode": self._mode,
-            "provider": self._provider,
-            "case_id": case.get("id"),
-            "category": case.get("category"),
-            "query": case.get("query"),
-            "repeat_index": repeat_index,
-            "ablated": ablated,
-            "answer": result.answer,
-            "products": [p.title for p in result.recommended_products],
-            "grounding": grounding,
-            "guardrail": guardrail,
-            "products_ok": products_ok,
-            "no_answer": no_answer,
-        })
+        both modes can produce either value.
 
-    def _write(self, row: dict) -> None:
-        """All I/O funnels here so one guard covers it. Appended and flushed per
-        row: run_faithfulness() aborts mid-run, and the aborting sample is
-        precisely the evidence someone will want."""
+        Row construction happens inside the guard too (not just the write):
+        a malformed `result` - missing `.answer`, `recommended_products` is
+        `None`, an item lacking `.title` - must warn like any other logging
+        failure, never raise out of here."""
+        self._write(case=case, repeat_index=repeat_index, ablated=ablated,
+                    result=result, grounding=grounding, guardrail=guardrail,
+                    products_ok=products_ok, no_answer=no_answer)
+
+    def _write(self, *, case: dict, repeat_index: int, ablated: bool,
+               result, grounding: bool, guardrail: bool,
+               products_ok: bool | None, no_answer: str | None) -> None:
+        """All I/O - and the row construction that feeds it - funnels here so
+        one guard covers both. Appended and flushed per row: run_faithfulness()
+        aborts mid-run, and the aborting sample is precisely the evidence
+        someone will want."""
         try:
+            row = {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "mode": self._mode,
+                "provider": self._provider,
+                "case_id": case.get("id"),
+                "category": case.get("category"),
+                "query": case.get("query"),
+                "repeat_index": repeat_index,
+                "ablated": ablated,
+                "answer": result.answer,
+                "products": [p.title for p in result.recommended_products],
+                "grounding": grounding,
+                "guardrail": guardrail,
+                "products_ok": products_ok,
+                "no_answer": no_answer,
+            }
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
