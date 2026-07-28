@@ -1,7 +1,10 @@
 """Harness tests for evals/run_eval.py (the LLM and store are stubbed)."""
 
+import json
+
 import pytest
 
+from evals import answer_log
 from evals import run_eval
 from src import engine
 from src.engine import ChatResult
@@ -581,3 +584,98 @@ def test_faithfulness_aborts_rather_than_misclassify_an_unanswered_case(monkeypa
 
     with pytest.raises(SystemExit):
         run_eval.run_faithfulness()
+
+
+def test_run_records_every_sample_with_its_answer_text(monkeypatch, tmp_path):
+    """The point of the log: the generated text survives the run."""
+    _stub(monkeypatch, ["azot verin."])
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+
+    run_eval.run(fast=False, repeat=2)
+
+    files = list(runs.glob("*.jsonl"))
+    assert len(files) == 1
+    rows = [json.loads(line) for line
+            in files[0].read_text(encoding="utf-8").strip().splitlines()]
+    assert [r["answer"] for r in rows] == ["azot verin.", "azot verin."]
+    assert [r["repeat_index"] for r in rows] == [0, 1]
+    assert rows[0]["case_id"] == "probe"
+    assert rows[0]["mode"] == "full"
+    assert rows[0]["ablated"] is False
+
+
+def test_a_broken_answer_log_does_not_change_the_run(monkeypatch, tmp_path, capsys):
+    """Binding constraint: the log is a pure side effect. With writing forced to
+    fail, the run still completes and its verdicts are unchanged."""
+    _stub(monkeypatch, ["azot verin."])
+    blocker = tmp_path / "not-a-dir"
+    blocker.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(answer_log, "RUNS_DIR", blocker / "runs")
+
+    rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "prod=True ground=True guard=True" in out
+    assert "1/1 cases passed" in out
+    assert "grounding: 1/1" in out
+    assert "[answers] WARNING" in out
+
+
+def test_fast_mode_writes_no_answer_log(monkeypatch, tmp_path):
+    """--fast never calls answer(), so there is nothing to log."""
+    _stub(monkeypatch, ["azot verin."])
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+
+    run_eval.run(fast=True)
+
+    assert not runs.exists()
+
+
+def test_faithfulness_logs_normal_and_ablated_samples(monkeypatch, tmp_path):
+    """Normal and ablated samples land in one file so they can be compared
+    directly - that comparison IS the diagnosis this log exists for."""
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+
+    def fake(msg, history=None):
+        ctx = engine.retrieve_context(msg)      # respects _corpus_ablated
+        return ChatResult("depo 2±0,5 derece" if ctx else "genel tavsiye", [])
+    monkeypatch.setattr(engine, "answer", fake)
+
+    run_eval.run_faithfulness()
+
+    rows = [json.loads(line) for line
+            in list(runs.glob("*.jsonl"))[0]
+            .read_text(encoding="utf-8").strip().splitlines()]
+    assert [r["ablated"] for r in rows] == [False, True]
+    assert rows[0]["answer"] == "depo 2±0,5 derece"
+    assert rows[1]["answer"] == "genel tavsiye"
+    assert rows[0]["mode"] == "faithfulness"
+    assert rows[0]["products_ok"] is None       # faithfulness does not gate products
+
+
+def test_faithfulness_logs_the_sample_it_aborts_on(monkeypatch, tmp_path):
+    """The abort path is exactly when the evidence is wanted, so the unanswered
+    sample must reach disk BEFORE sys.exit()."""
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(answer_log, "RUNS_DIR", runs)
+    monkeypatch.setattr(run_eval, "_select", lambda only: [_optin_case(["2±0,5"])])
+    monkeypatch.setattr(engine, "retrieve_context", lambda q, k=None: "CTX")
+    monkeypatch.setattr(
+        engine, "answer",
+        lambda msg, history=None: ChatResult(
+            engine._llm_unavailable_message(RuntimeError("429")), []))
+
+    with pytest.raises(SystemExit):
+        run_eval.run_faithfulness()
+
+    rows = [json.loads(line) for line
+            in list(runs.glob("*.jsonl"))[0]
+            .read_text(encoding="utf-8").strip().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["no_answer"] == "unavailable"

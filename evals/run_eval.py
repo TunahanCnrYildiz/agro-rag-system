@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import engine  # noqa: E402
 from src.config import settings  # noqa: E402
 from evals.eval_set import CASES  # noqa: E402
+from evals.answer_log import AnswerLog  # noqa: E402
 
 
 def _matches(term: str, text: str) -> bool:
@@ -220,6 +221,10 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
     print(f"Running eval on {len(cases)} cases "
           f"({'FAST' if fast else 'FULL'}{suffix}) "
           f"[{_provider_stamp()}]\n")
+    # Always-on: eval runs are expensive (~25 min locally, quota-capped hosted),
+    # so a run must not be able to throw away its own evidence. Constructing it
+    # creates no file - --fast records nothing and leaves none.
+    log = AnswerLog(mode="full", provider=_provider_stamp())
     rows = []
     # The ablation must be in force around answer(), not just around run()'s own
     # retrieve_context call - blanking only the local `ctx` would ablate nothing.
@@ -242,14 +247,18 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
         else:
             samples = []
             no_answer = None
-            for _ in range(repeat):
+            for i in range(repeat):
                 r = engine.answer(c["query"])
                 reason = _no_answer_reason(r.answer)
                 if reason and no_answer is None:
                     no_answer = reason
                 g, gr = _answer_ok(c, r.answer)
+                p_ok = _products_ok(c, len(r.recommended_products))
+                log.record(case=c, repeat_index=i, ablated=no_context,
+                           result=r, grounding=g, guardrail=gr,
+                           products_ok=p_ok, no_answer=reason)
                 samples.append({
-                    "products": _products_ok(c, len(r.recommended_products)),
+                    "products": p_ok,
                     "grounding": g,
                     "guardrail": gr,
                 })
@@ -323,6 +332,8 @@ def run(fast: bool, repeat: int = 1, only: str | None = None,
               f" | guardrail: {sample_rate('guardrail')}")
     else:
         print()
+    if log.count:
+        print(f"[answers] wrote {log.count} samples -> {log.path}")
     if no_context:
         code, decorative = _ablation_verdict(rows)
         n_local = sum(1 for r in rows if r["cat"] == "local")
@@ -365,12 +376,20 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
               "nothing to measure")
         return 1
     settings.request_timeout = 400.0
+    log = AnswerLog(mode="faithfulness", provider=_provider_stamp())
 
-    def grounded_hits(case: dict) -> int:
+    def grounded_hits(case: dict, ablated: bool) -> int:
         hits = 0
-        for _ in range(repeat):
-            answer = engine.answer(case["query"]).answer
+        for i in range(repeat):
+            result = engine.answer(case["query"])
+            answer = result.answer
             reason = _no_answer_reason(answer)
+            grounding, guardrail = _answer_ok(case, answer)
+            # Recorded BEFORE the abort below: the sample that kills the run is
+            # exactly the one someone will want to read.
+            log.record(case=case, repeat_index=i, ablated=ablated,
+                       result=result, grounding=grounding, guardrail=guardrail,
+                       products_ok=None, no_answer=reason)
             if reason:
                 # An unanswered sample reads as "ungrounded", which would
                 # silently mislabel this case as model-carried or
@@ -379,8 +398,8 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
                 # map rather than presenting a partial one as complete.
                 sys.exit(f"[faithfulness] {case['id']} produced NO ANSWER "
                           f"({reason}) - aborting rather than misclassifying "
-                          f"it as ungrounded.")
-            hits += _answer_ok(case, answer)[0]
+                          f"it as ungrounded. Answers: {log.path}")
+            hits += grounding
         return hits
 
     suffix = f", {repeat}x each" if repeat > 1 else ""
@@ -390,9 +409,9 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
               "retrieval-broken": 0, "corpus-harmful": 0}
     live_labels: dict[str, str] = {}
     for c in cases:
-        normal_hits = grounded_hits(c)
+        normal_hits = grounded_hits(c, ablated=False)
         with _corpus_ablated():
-            ablated_hits = grounded_hits(c)
+            ablated_hits = grounded_hits(c, ablated=True)
         label = _classify(normal_hits, ablated_hits, repeat)
         live_labels[c["id"]] = label
         counts[label] += 1
@@ -409,6 +428,8 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
     if regressed:
         print(f"\n  [drift] corpus-carried cases that REGRESSED: "
               f"{', '.join(regressed)}")
+    if log.count:
+        print(f"[answers] wrote {log.count} samples -> {log.path}")
     return code
 
 

@@ -38,3 +38,6 @@ docs/offtopic_candidates.txt
 
 # Generated retrieval diagnostic report (from `evals.inspect_retrieval`)
 docs/retrieval_report.md
+
+# Per-run eval answer logs (from evals.answer_log)
+evals/runs/
