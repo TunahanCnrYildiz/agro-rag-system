@@ -69,7 +69,14 @@ ve chat için ops yükü olmaz. Karma yaklaşım genelde en pratik.
 - **Store boyutu (~1.4 GB)** — host'ta kalıcı disk; git'e girmez, deploy'da kopyala/rebuild.
 - **Maliyet** — Faz 3'te GPU kirası (A) vs token ücreti (B).
 - **Veri gizliliği** — managed API (B) sorguları dışarı gönderir; firma için önemliyse A/C.
-- **LLM hızı** — lokalde yavaş (8 tok/s); hosted GPU/API bunu da **çözer** (bonus).
+- **LLM hızı** — lokalde sağlıklı hız **~65 tok/s** (RX 9070 XT, gemma-4-12b-qat Q4_0, model
+  tamamen VRAM'de). Hosted GPU/API yine de daha hızlı ve makineyi serbest bırakır.
+  **Not (2026-07-28):** bu satır uzun süre "8 tok/s" yazıyordu ve o rakam bir VRAM taşması
+  sırasında ölçülmüştü. Yanıltıcıydı: 8 tok/s'i "normal" sanıp gerçek bir arızayı elemek için
+  kullandık. 8 tok/s **sağlıklı değil, taşma belirtisidir** — teşhis reçetesi
+  `docs/deploy-runbook.md` değil, ops notlarındadır: `llama-server` için
+  `\GPU Process Memory(*)\Shared Usage` sıfır olmalı; değilse VRAM'i boşalt ve modeli
+  LM Studio'da yeniden yükle.
 
 ## Önerilen sıra
 Faz 0 (config hijyeni) + Faz 1 (Docker) **şimdi** yapılabilir; lokali bozmaz ve
