@@ -312,18 +312,19 @@ panel grows and intermittent cases accumulate.
 >
 > | case | `p` used below | measured `k/n` | `p̂` |
 > |---|---|---|---|
-> | `quant_rose_pot_fertilizer_dose` | 0.625 | **9/9** | 1.000 |
-> | `local_deveci_pear` | 0.750 | **9/9** | 1.000 |
-> | `local_scarletspur_apple` | 0.750 | **9/9** | 1.000 |
-> | `local_bpmorettini_pear` | 0.750 | **15/17** | 0.882 |
+> | `quant_rose_pot_fertilizer_dose` | 0.625 | **19/19** | 1.000 |
+> | `local_deveci_pear` | 0.750 | **19/19** | 1.000 |
+> | `local_scarletspur_apple` | 0.750 | **19/19** | 1.000 |
+> | `local_bpmorettini_pear` | 0.750 | **23/25** | 0.920 |
 >
-> Three of the four were artifacts. Only `local_bpmorettini_pear` is genuinely imperfect
-> (two repeat-8 runs, 6/8 then 8/8, pooled — either alone would have misled).
-> **Panel-wide: 29.7% → 0.6% at repeat 4, and 21.1% → 0.1% at repeat 8** (point estimate,
+> Three of the four were artifacts. Only `local_bpmorettini_pear` is genuinely imperfect —
+> and its `p̂` walked up as samples accumulated (`0.778 → 0.882 → 0.920`), so every earlier
+> reading of it, including the 0.750 assumed below, was over-confident.
+>
+> **Panel-wide: 29.7% → 0.2% at repeat 4, and 21.1% → 0.0% at repeat 8** (point estimate,
 > same structure — only known-flaky cases get `p<1`). At each measured case's one-sided 95%
-> lower bound it is 28.3% / 20.1%; that bound is floored by sample count, not by any measured
-> red, and its near-equality with the 29.2% below is a coincidence, not a vindication —
-> one is a point estimate, the other a worst case.
+> lower bound it is **7.2% / 2.7%**, so even the worst case is a quarter of the old point
+> estimate. All counts are POOLED across runs, pre-committed before each run.
 >
 > **The two-stage protocol STANDS, but the reasoning below does NOT — do not re-quote it.**
 > "The proportional threshold means repeat-8 barely helps" is false at clean `p`: repeat-8
