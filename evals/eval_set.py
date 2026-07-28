@@ -123,6 +123,20 @@ CASES = [
      "retrieval": "nonempty", "products": "some",
      "context_any": ["rice", "paddy", "oryza", "çeltik", "pirinç"],
      "answer_any": ["nitrogen", "phosphorus", "potassium", "soil", "nutrient", "zinc"]},
+    # The panel's only MICRONUTRIENT case. Every other nutrition case is macro or
+    # general fertilization, so "a micronutrient question keeps its products" had no
+    # guard - and _NON_PRODUCT_ACTIVITY has been widened twice (2026-07-24, 07-25),
+    # each time enlarging the set of answers _looks_non_product can suppress.
+    # `products: some` is what this case exists for. Design:
+    # docs/superpowers/specs/2026-07-28-micronutrient-eval-case-design.md
+    # "Bitkilerde" is load-bearing: without it retrieval drifts to FAO *human*
+    # nutrition (protein/lysine deficiency). Anchors verified against the LIVE
+    # retrieved context - "iron" and "kloroz" are absent there and deliberately omitted.
+    {"id": "micronutrient_iron_deficiency", "category": "nutrition",
+     "query": "Bitkilerde demir eksikliği nasıl giderilir?",
+     "retrieval": "nonempty", "products": "some",
+     "context_any": ["demir", "çinko", "mikro"],
+     "answer_any": ["demir", "gübre", "toprak", "şelat"]},
     {"id": "soil_ph", "category": "nutrition",
      "query": "Toprağımın pH değeri çok yüksek, nasıl düzeltebilirim?",
      "retrieval": "nonempty", "products": "some",
