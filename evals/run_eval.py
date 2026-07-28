@@ -25,6 +25,41 @@ from evals.eval_set import CASES  # noqa: E402
 from evals.answer_log import AnswerLog  # noqa: E402
 
 
+# LaTeX the model sometimes wraps a value in. Measured 2026-07-28: on a full run
+# `local_deveci_pear` read ground=False while its answer DID state the fact, as
+# `$2\pm0,5^\circ\text{C}$` - the matcher just could not see it through the markup.
+# That is an instrument defect of the same class as a dead anchor: it does not fail
+# loudly, it reads as a finding about the corpus. See
+# docs/superpowers/specs/2026-07-28-latex-anchor-normalisation-design.md
+_LATEX_UNICODE = {
+    r"\pm": "±", r"\circ": "°", r"\times": "×",
+    r"\approx": "≈", r"\leq": "≤", r"\geq": "≥",
+}
+_LATEX_WRAPPER = re.compile(r"\\(?:text|mathrm)\{([^}]*)\}")
+# \, \; \! are LaTeX SPACING commands, so they become a space - deleting them would
+# glue tokens together and turn `$5\,\text{C}$` into `5C`, losing a `5 C` anchor.
+_LATEX_SPACING = re.compile(r"\\[,;!]")
+
+
+def _normalize_latex(text: str) -> str:
+    """Rewrite LaTeX math markup into the plain notation anchors are written in.
+
+    Applied to the TEXT being searched, never to the anchor, and deliberately
+    narrow: general `_` subscripts and bare `{}` are NOT touched - they add risk
+    for no measured benefit (the one subscript case observed, `$P_2O_5$`, grounds
+    on word anchors anyway).
+
+    Runs BEFORE _matches' regex, so the left-boundary and trailing-digit guards
+    still apply to the result: `2±0,50` must not match `2±0,5` however it is
+    wrapped.
+    """
+    out = _LATEX_WRAPPER.sub(r"\1", text)
+    for command, char in _LATEX_UNICODE.items():
+        out = out.replace(command, char)
+    out = _LATEX_SPACING.sub(" ", out)
+    return out.replace("$", "")
+
+
 def _matches(term: str, text: str) -> bool:
     """Case-insensitive anchor match with a LEFT word boundary + a right
     digit-guard, so a short/numeric answer_any/context_any anchor cannot be a
@@ -43,7 +78,7 @@ def _matches(term: str, text: str) -> bool:
     chars on the left; re.escape keeps '/', '±', ',' literal.
     """
     pattern = r"(?<!\w)" + re.escape(term) + r"(?!\d)"
-    return re.search(pattern, text) is not None
+    return re.search(pattern, _normalize_latex(text)) is not None
 
 
 def _retrieval_ok(case: dict, ctx: str) -> bool:

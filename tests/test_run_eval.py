@@ -411,6 +411,38 @@ def test_matches_treats_turkish_letters_as_word_chars_on_the_left():
     assert run_eval._matches("azot", "azotlu toprak") is True
 
 
+def test_matches_sees_through_latex_notation():
+    """The model sometimes states a value in LaTeX. Measured live 2026-07-28:
+    local_deveci_pear read ground=False on a full run while its answer said
+    `$2\\pm0,5^\\circ\\text{C}$` - the right value the matcher could not see. That
+    is an instrument defect, the same class as a dead anchor: it reads as a
+    finding about the corpus rather than as a blind spot in the harness."""
+    latex = "depolarda $2\\pm0,5^\\circ\\text{C}$ sicaklikta saklanir"
+    assert run_eval._matches("2±0,5", latex) is True
+
+
+def test_latex_normalisation_preserves_the_trailing_digit_guard():
+    """The property most at risk from a careless 'just strip symbols' fix:
+    normalisation runs BEFORE the existing regex, so '2±0,50' must still not
+    match '2±0,5' even when it arrives wrapped in LaTeX."""
+    assert run_eval._matches("2±0,5", "depo $2\\pm0,50^\\circ$ derece") is False
+    assert run_eval._matches("2±0,5", "depo 2±0,50 derece") is False
+
+
+def test_latex_normalisation_unwraps_text_and_mathrm():
+    assert run_eval._matches("5 C", "sicaklik $5\\,\\text{C}$ olmali") is True
+    assert run_eval._matches("5 C", "sicaklik $5\\,\\mathrm{C}$ olmali") is True
+
+
+def test_latex_normalisation_leaves_plain_text_alone():
+    """Ordinary answers must score exactly as before - the whole panel depends
+    on it."""
+    assert run_eval._matches("azot", "azotlu toprak") is True
+    assert run_eval._matches("azot", "kazot") is False
+    assert run_eval._matches("7 ay", "bitki 17 ay sonra") is False
+    assert run_eval._matches("10 kg/da", "gubre 10 kg/da verildi") is True
+
+
 def test_answer_any_uses_boundary_matching():
     case = {"answer_any": ["7 ay"]}
     assert run_eval._answer_ok(case, "bitki 17 ay boyunca")[0] is False
