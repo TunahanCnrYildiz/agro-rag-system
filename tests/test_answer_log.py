@@ -89,10 +89,10 @@ def test_no_file_until_the_first_record(tmp_path, monkeypatch):
 
 
 def test_a_malformed_result_never_raises_and_warns_once(tmp_path, monkeypatch, capsys):
-    """record() must itself be the guarded boundary: row construction happens
-    before _write's try today, so a malformed `result` (no .answer, or
-    recommended_products=None) would raise straight out of record() and kill
-    a 25-minute run - the exact failure mode this module exists to prevent."""
+    """Row construction is inside the guard, not just the write: a malformed
+    `result` (no `.answer`, `recommended_products=None`, an item without
+    `.title`) must warn like any other logging failure rather than raise out
+    of `record()` and kill a 25-minute run."""
     log = _log(tmp_path, monkeypatch)
 
     class Malformed:

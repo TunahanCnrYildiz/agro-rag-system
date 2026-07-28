@@ -52,21 +52,12 @@ class AnswerLog:
         """Log one sample. `ablated` is passed in, never inferred from `mode`:
         both modes can produce either value.
 
-        Row construction happens inside the guard too (not just the write):
-        a malformed `result` - missing `.answer`, `recommended_products` is
-        `None`, an item lacking `.title` - must warn like any other logging
-        failure, never raise out of here."""
-        self._write(case=case, repeat_index=repeat_index, ablated=ablated,
-                    result=result, grounding=grounding, guardrail=guardrail,
-                    products_ok=products_ok, no_answer=no_answer)
-
-    def _write(self, *, case: dict, repeat_index: int, ablated: bool,
-               result, grounding: bool, guardrail: bool,
-               products_ok: bool | None, no_answer: str | None) -> None:
-        """All I/O - and the row construction that feeds it - funnels here so
-        one guard covers both. Appended and flushed per row: run_faithfulness()
-        aborts mid-run, and the aborting sample is precisely the evidence
-        someone will want."""
+        Row construction - and the write it feeds - both live inside one guard:
+        a malformed `result` (missing `.answer`, `recommended_products` is
+        `None`, an item lacking `.title`) must warn like any other logging
+        failure, never raise out of here. Appended and flushed per row:
+        run_faithfulness() aborts mid-run, and the aborting sample is precisely
+        the evidence someone will want."""
         try:
             row = {
                 "ts": datetime.now(timezone.utc).isoformat(),
@@ -84,6 +75,9 @@ class AnswerLog:
                 "products_ok": products_ok,
                 "no_answer": no_answer,
             }
+            # Deliberately inside the try, on every call, not hoisted into
+            # __init__: a first-write failure is exactly what this guard
+            # exists for, and __init__ is not guarded.
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")

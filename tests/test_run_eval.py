@@ -605,17 +605,22 @@ def test_run_records_every_sample_with_its_answer_text(monkeypatch, tmp_path):
     assert rows[0]["ablated"] is False
 
 
-def test_a_broken_answer_log_does_not_change_the_run(monkeypatch, tmp_path):
+def test_a_broken_answer_log_does_not_change_the_run(monkeypatch, tmp_path, capsys):
     """Binding constraint: the log is a pure side effect. With writing forced to
-    fail, the run still completes and its exit code is unchanged."""
+    fail, the run still completes and its verdicts are unchanged."""
     _stub(monkeypatch, ["azot verin."])
     blocker = tmp_path / "not-a-dir"
     blocker.write_text("x", encoding="utf-8")
     monkeypatch.setattr(answer_log, "RUNS_DIR", blocker / "runs")
 
     rc = run_eval.run(fast=False)
+    out = capsys.readouterr().out
 
     assert rc == 0
+    assert "prod=True ground=True guard=True" in out
+    assert "1/1 cases passed" in out
+    assert "grounding: 1/1" in out
+    assert "[answers] WARNING" in out
 
 
 def test_fast_mode_writes_no_answer_log(monkeypatch, tmp_path):

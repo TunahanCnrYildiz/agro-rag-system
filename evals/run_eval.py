@@ -398,7 +398,7 @@ def run_faithfulness(repeat: int = 1, only: str | None = None,
                 # map rather than presenting a partial one as complete.
                 sys.exit(f"[faithfulness] {case['id']} produced NO ANSWER "
                           f"({reason}) - aborting rather than misclassifying "
-                          f"it as ungrounded.")
+                          f"it as ungrounded. Answers: {log.path}")
             hits += grounding
         return hits
 
