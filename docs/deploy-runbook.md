@@ -19,12 +19,32 @@ deploy. Nothing here changes local dev — local stays the default.
    - `CHAT_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...`, `OPENROUTER_MODEL=...`
    - `EMBEDDING_BASE_URL=...`, `EMBEDDING_API_KEY=...`, `EMBEDDING_MODEL=BAAI/bge-m3`,
      `EMBEDDING_IDENTITY=bge-m3`
-   - Migration note: a Chroma store stamped under the older guard recorded the
-     API model-id (e.g. `text-embedding-bge-m3`), not the logical `bge-m3`. The
-     guard now compares against `EMBEDDING_IDENTITY`, so such a store needs
-     `EMBEDDING_IDENTITY` set to that old stamped value, or a `--reset` re-ingest.
-     Only relevant to a store re-created between 2026-07-17 and now — the
-     current live store is unstamped.
+   - **Migration note — this bites real stores, it is not hypothetical.** A Chroma
+     store stamped under the older guard recorded the API model-id (e.g.
+     `text-embedding-bge-m3`), not the logical `bge-m3`. The guard now compares
+     against `EMBEDDING_IDENTITY`, so such a store raises
+     `EmbeddingModelMismatchError` on open and **every retrieval fails** — backend,
+     eval and app alike. The maintainer's own store hit exactly this (measured
+     2026-07-28); the earlier claim that the live store was unstamped was wrong.
+     The vectors are fine — only the label differs — so **re-stamp, never
+     re-ingest**:
+
+     ```python
+     # one-time, from the repo root; touches metadata only, not the 81k vectors
+     from langchain_chroma import Chroma
+     from src.config import settings, VECTOR_STORE_DIR
+     from src.ingest import get_embeddings
+     store = Chroma(collection_name=settings.collection_name,
+                    embedding_function=get_embeddings(),
+                    persist_directory=str(VECTOR_STORE_DIR))
+     store._collection.modify(metadata={"embedding_model": settings.embedding_identity})
+     ```
+
+     Then confirm `get_vector_store()` opens with no override. Setting
+     `EMBEDDING_IDENTITY` to the old stamped value also works, but drags the
+     LM Studio model-id into every later hosted config — prefer re-stamping.
+     Note the guard deliberately does NOT auto-migrate: silently rewriting a
+     mismatched stamp would defeat the very swap it exists to catch.
    - `CORS_ALLOW_ORIGINS=https://your-site.example` (narrow it — the backend logs
      a warning while it is `*`).
 3. **Deploy the backend** (Docker image builds from the repo `Dockerfile`).
