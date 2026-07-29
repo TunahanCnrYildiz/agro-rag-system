@@ -423,3 +423,16 @@ A `git clone` alone is **not** a fully working system. Checklist:
 Catalog data (`products.json`, `articles.json`) is committed, so the Products
 and Academy tabs work immediately; re-run `python -m src.scraper` /
 `python -m src.articles_scraper` only to refresh them.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE) — © 2026 Tunahan Caner YILDIZ.
+
+The licence covers the **code in this repository**. It does not cover the
+third-party material the system ingests or links to: the botany corpus is
+assembled from Internet Archive, DergiPark, OpenAlex and FAO sources under their
+own terms, and the product catalogue and article content belong to
+[ekolojiktarim.com.tr](https://www.ekolojiktarim.com.tr/). Neither is
+redistributed here — both are fetched at run time.
