@@ -80,8 +80,10 @@ app = FastAPI(
     title="Agro-Botany RAG & Product Linker",
     version="0.1.0",
     description=(
-        "Expert Agricultural Engineer chatbot: organic plant nutrition advice "
-        "grounded in botany references, with linked company products."
+        "Advisory plant-science chatbot: organic plant nutrition guidance "
+        "grounded in botany references, with linked company products. Answers "
+        "in the style of an agricultural engineer; it is an AI, not a licensed "
+        "professional."
     ),
 )
 

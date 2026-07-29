@@ -4,13 +4,19 @@ A production-ready, Python RAG backend that powers a mobile-app chatbot and a
 web widget for an ecological agriculture company
 ([ekolojiktarim.com.tr](https://www.ekolojiktarim.com.tr/)).
 
-The AI acts as an **expert Agricultural Engineer (Ziraat Mühendisi)** covering
-**any plant-related topic** — nutrition, soil health, physiology, horticulture,
-agronomy, propagation, irrigation, post-harvest, and the **organic** management
-of plant diseases and pests — across all crops. Non-plant topics (animal
-husbandry, economics, machinery) are out of scope. Two hard rules always hold:
-**never give a definitive disease diagnosis** and **never recommend chemical
-pesticides/drugs**. Plus automatic language matching and off-scope refusal.
+The assistant reasons and communicates **in the style of** an expert
+Agricultural Engineer (Ziraat Mühendisi) — knowledgeable, precise, advisory —
+but it is an AI and **never presents itself as a licensed professional**. That
+distinction is enforced in the system prompt, not just implied here (see
+`# IDENTITY` in `src/config.py`).
+
+It covers **any plant-related topic** — nutrition, soil health, physiology,
+horticulture, agronomy, propagation, irrigation, post-harvest, and the
+**organic** management of plant diseases and pests — across all crops. Non-plant
+topics (animal husbandry, economics, machinery) are out of scope. Two hard rules
+always hold: **never give a definitive disease diagnosis** and **never recommend
+chemical pesticides/drugs**. Plus automatic language matching and off-scope
+refusal.
 
 ---
 
@@ -71,6 +77,10 @@ with `cross_lingual_retrieval`.
 
 ## Safety guardrails (enforced on every query)
 
+- **No false credentials.** The assistant never claims to *be* a Ziraat
+  Mühendisi, agronomist, or any licensed professional, and never opens a reply
+  with "As an agricultural engineer…". It adopts the reasoning style, not the
+  title.
 - **No definitive disease diagnosis.** Describes likely causes/symptoms as
   possibilities and points to a professional for certainty.
 - **No chemical pesticides / medical treatments / illegal substances** — even
