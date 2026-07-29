@@ -548,9 +548,9 @@ def main() -> None:
                         "failures; N>1 costs N x ~20 min.")
     p.add_argument("--only", metavar="ID|CATEGORY",
                    help="Run just one case id, or one category (nutrition, "
-                        "horticulture, disease, chemical, offscope). Pair with "
-                        "--repeat: sampling all 31 cases N times costs N x ~20 "
-                        "min, one category is minutes.")
+                        "horticulture, local, disease, chemical, offscope). Pair "
+                        "with --repeat: sampling all 55 cases N times costs "
+                        "N x ~20 min, one category is minutes.")
     p.add_argument("--no-context", action="store_true",
                    help="Ablation: run with an EMPTY corpus to prove the `local` "
                         "cases actually depend on retrieval. Exit 0 only if every "

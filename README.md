@@ -44,13 +44,20 @@ User query ─▶ FastAPI /api/chat ─▶ RAG Engine
 
 | Layer            | Choice                                             |
 | ---------------- | -------------------------------------------------- |
-| LLM provider     | LM Studio local server (`http://localhost:1234/v1`)|
+| Chat LLM         | Selectable: LM Studio local server (default) or OpenRouter (`CHAT_PROVIDER`) |
+| Embeddings       | bge-m3, local or hosted — the store is stamped with a stable logical identity so switching host needs no re-index |
 | RAG framework    | LangChain                                          |
 | Vector DB        | ChromaDB (persistent, local)                       |
 | Backend API      | FastAPI + Uvicorn                                  |
 | Doc processing   | pypdfium2 + RecursiveCharacterTextSplitter (1000/200)|
 | Scraping         | requests + BeautifulSoup                           |
-| Tests / quality  | pytest + `evals/` quality harness + CI on push/PR  |
+| Tests / quality  | pytest (262 tests) + `evals/` quality harness (55 cases) + CI on push/PR |
+
+The chat provider is a config swap, not a code change: `CHAT_PROVIDER=local`
+(default) talks to LM Studio, `CHAT_PROVIDER=openrouter` talks to a hosted
+OpenAI-compatible endpoint. Embeddings are configured independently — see
+`.env.example`, which documents the traps (setting only `EMBEDDING_BASE_URL`
+still sends the LM Studio dummy key to the provider and 401s).
 
 **Cross-lingual retrieval.** The corpus is ~half Turkish, ~half English. A Turkish
 query about a crop covered only in the English sources (FAO/OpenAlex) would
@@ -104,22 +111,49 @@ agro-rag-system/
 │   ├── engine.py            # retrieval + product match + LM Studio
 │   └── main.py              # FastAPI app
 ├── tests/                   # pytest unit tests (fetchers, ingest, engine, API)
-├── evals/                   # repeatable RAG quality harness (run_eval.py)
+├── evals/
+│   ├── eval_set.py          # the 55 cases + their assertions
+│   ├── run_eval.py          # scoring, ablation, corpus-dependence map
+│   └── runs/                # per-sample answer log (generated, gitignored)
+├── mobile-app/              # Expo / React Native client
+├── web-widget/              # embeddable chat widget
+├── Dockerfile               # backend image
+├── docker-compose.yml       # container + local LM Studio + mounted store
 ├── requirements.txt
 └── README.md
 ```
+
+### Where the reasoning is written down
+
+`docs/` holds more than generated data — it is the project's decision record:
+
+| Path | What it is |
+| --- | --- |
+| `docs/deploy-runbook.md` | ordered go-live checklist |
+| `docs/roadmap-deployment.md` | hosting strategy and trade-offs |
+| `docs/roadmap-plant-wide-scope.md` | how the scope grew beyond one crop |
+| `docs/global-sources-research.md` | which corpora were considered and why |
+| `docs/superpowers/` | design specs, measurement write-ups, and raw eval dumps |
+
+`docs/superpowers/` is the honest part of the history: it records which ideas
+were tried, measured, and **rejected** — freshness-weighted retrieval, query
+translation through the LLM, reranking, lexicon bridges, four rounds of corpus
+mining that came back empty — with the evidence that killed each one. If you
+want to know why something is *not* in this system, it is usually there.
 
 ---
 
 ## Quickstart
 
-> **Note on a fresh clone:** the repo ships the code and the scraped
-> `products.json` / `articles.json`, but **not** the botany knowledge base.
-> The vector store (`data/vector_store/`, ~700 MB) and the source PDFs
-> (`docs/books/`) are gitignored because of their size. On a new machine you
-> either copy those two folders over manually, or rebuild them with steps 4–5
-> below. Without them the API still runs, but the assistant has no botany
-> knowledge to ground its answers. See **Running on a new machine** at the end.
+> **Note on a fresh clone — read this before cloning.** The repo ships the code
+> and the scraped `products.json` / `articles.json`, but **not** the botany
+> knowledge base. The vector store (`data/vector_store/`, **~1.7 GB**,
+> 81,426 chunks from ~1,050 documents) and the source PDFs (`docs/books/`,
+> **~5.2 GB**) are gitignored because of their size. On a new machine you either
+> copy those two folders over manually, or rebuild them with steps 4–5 below.
+> Without them the API still runs and answers, but nothing is grounded in the
+> corpus — the model answers from its own knowledge alone. See **Running on a
+> new machine** at the end.
 
 ### 1. Install dependencies
 
@@ -201,31 +235,100 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 Open http://localhost:8000/docs for the interactive Swagger UI.
 
+### 7. Or run the backend in Docker
+
+```bash
+docker compose up --build      # API on http://localhost:8000
+```
+
+The container still uses the **local** LM Studio (`host.docker.internal:1234`)
+and the **local** vector store (`./data` is mounted as a volume, not baked into
+the image). Running this does not affect non-Docker development.
+
+---
+
+## Deployment
+
+Local is the default and nothing here is required to develop. Going hosted is a
+**configuration change, not a code change** — set `CHAT_PROVIDER=openrouter`
+plus a hosted embedding endpoint, attach a persistent disk for the vector store,
+and deploy the existing image.
+
+`docs/deploy-runbook.md` is the ordered go-live checklist, including a migration
+trap that bit this project for real: a store stamped by older code records the
+API model-id instead of the logical `bge-m3`, so the identity guard raises on
+open and **every** retrieval fails. The vectors are fine — re-stamp, never
+re-ingest.
+
+What is deliberately *not* decided yet is the product question: which host and
+which embedding vendor. At actual launch, `CORS_ALLOW_ORIGINS` must also be
+narrowed off `*`.
+
 ---
 
 ## Testing & quality
 
+Two layers: ordinary unit tests, and an eval harness that measures whether the
+RAG actually works. The second is where most of the engineering effort went.
+
 ```bash
-python -m pytest                    # unit tests (fetchers, ingest, engine, API)
-
-# Repeatable RAG quality eval (needs LM Studio's embedding model; full mode also
-# needs the chat model). Measures retrieval, product gating, grounding, guardrails.
-python -m evals.run_eval --fast     # retrieval + product gating only (seconds)
-python -m evals.run_eval            # full: also generates answers + keyword checks
-
-# Generation is sampled (temperature > 0), so ONE run can hide an intermittent
-# failure - a ~5% blank-answer bug once survived four consecutive clean evals.
-# --repeat samples each case N times; a case passes only if EVERY sample passes,
-# and the sampled dimensions then report over samples (guardrail: 9/9). Retrieval
-# and context are deterministic, so they stay single-sample either way.
-# --only keeps that affordable: all 31 cases x N costs N x ~20 min.
-python -m evals.run_eval --repeat 10 --only chemical   # guardrails, ~15 min
-python -m evals.run_eval --repeat 3  --only gap_taro_tr # one case, ~2 min
+python -m pytest                    # 262 unit tests (fetchers, ingest, engine, API)
 ```
 
-The eval turns corpus/scope changes into measured deltas rather than spot checks,
-and exits non-zero on any failure (so it can gate CI). Cases live in
-`evals/eval_set.py`.
+CI (`.github/workflows/tests.yml`) runs `pytest` on every push and PR. The eval
+stays local — it needs LM Studio and the gitignored vector store.
+
+### The eval harness
+
+55 cases in `evals/eval_set.py`, scored on five independent dimensions:
+retrieval, context relevance, product gating, answer grounding, and guardrail
+compliance.
+
+```bash
+python -m evals.run_eval --fast     # retrieval + context only, no chat LLM (seconds)
+python -m evals.run_eval            # full run: ~20 min, ~22s per case
+python -m evals.run_eval --only <id|category>        # one case or category
+python -m evals.run_eval --repeat 8 --only <id>      # sample a case 8 times
+```
+
+**Why sampling matters.** Generation is stochastic, so one clean run proves
+little — a ~3% blank-answer bug once survived four consecutive green evals.
+`--repeat N` samples each case N times; in a normal run a case passes only if
+every sample passes.
+
+### Does the corpus actually carry the answer?
+
+A RAG eval that only checks the final answer cannot tell "the corpus supplied
+this" from "the model already knew it". Two modes separate them:
+
+```bash
+python -m evals.run_eval --no-context --only local   # ablation: empty the corpus
+python -m evals.run_eval --faithfulness --repeat 4   # corpus-dependence map
+```
+
+`--no-context` forces retrieval to return nothing; cases that claim to depend on
+the corpus must then FAIL. `--faithfulness` runs each `corpus_fact` case both
+normally and ablated and labels it **corpus-carried / model-carried /
+retrieval-broken / corpus-harmful**. 23 of the 55 cases opt into this panel; it
+is a drift guard, proving retrieval still reaches the sources it used to.
+
+This distinction produced the project's most important finding, and it is not
+the flattering one: **the corpus is not more accurate than the model — it is
+more specific and more citable.** The panel is kept because it detects
+regressions, not because a bigger number means better coverage.
+
+### The harness is itself under test
+
+Every answer is written to `evals/runs/<UTC>-<mode>.jsonl` (gitignored), which
+makes it possible to re-score past runs without re-generating them. That paid
+off: cases were reading red while the model had actually answered correctly,
+because the matcher could not see values written as LaTeX (`$2\pm0,5^\circ$`) or
+split by markdown emphasis (`**6 gram**`). Both were fixed by normalising the
+searched text, never the anchor — and re-scoring the stored answers proved the
+fix changed exactly the intended verdicts and nothing else.
+
+The lesson is recorded because it generalises: **a measurement instrument's
+blind spots look exactly like findings about the thing being measured.**
 
 ---
 
@@ -276,16 +379,20 @@ npx expo start     # dev server for Expo Go / device
 ```
 
 **Point it at your backend.** A physical phone cannot reach `127.0.0.1` — that
-is the phone itself. Set `API_BASE` in `mobile-app/src/api.ts` to the host
-machine's LAN IP (both devices on the same Wi-Fi), e.g.:
+is the phone itself. The app reads the backend URL from an environment variable
+and falls back to a hard-coded LAN address:
 
 ```ts
-export const API_BASE = "http://192.168.1.103:8000";
+// mobile-app/src/api.ts
+export const API_BASE =
+  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.103:8000";
 ```
 
-The IP is assigned by your router (DHCP) and can change; check it with
-`ipconfig` (Windows) / `ifconfig` (Unix) and update it here. Also allow the
-backend port through the OS firewall so the phone can connect.
+Prefer setting `EXPO_PUBLIC_API_BASE` at build time (that is what makes a hosted
+deploy possible without touching source); edit the fallback only for quick local
+work. The LAN IP is assigned by your router (DHCP) and can change — check it
+with `ipconfig` (Windows) / `ifconfig` (Unix). Also allow the backend port
+through the OS firewall so the phone can connect.
 
 **Build an installable APK.** Cloud build via EAS
 (`eas build -p android --profile preview`), or a local Gradle build after
@@ -307,9 +414,11 @@ A `git clone` alone is **not** a fully working system. Checklist:
    original machine, **or** rebuild with `python -m src.fetch_books` +
    `python -m src.ingest`. (A rebuild is *similar* but not identical — the
    Internet Archive returns different books over time.)
-4. **Backend** — `uvicorn src.main:app --host 0.0.0.0 --port 8000`.
-5. **Mobile app** — `npm install`, set `API_BASE` to the new machine's LAN IP,
-   then rebuild the APK (see above).
+4. **Backend** — `uvicorn src.main:app --host 0.0.0.0 --port 8000`, or
+   `docker compose up --build`.
+5. **Mobile app** — `npm install`, set `EXPO_PUBLIC_API_BASE` to the new
+   machine's LAN IP (or edit the fallback in `src/api.ts`), then rebuild the APK
+   (see above).
 
 Catalog data (`products.json`, `articles.json`) is committed, so the Products
 and Academy tabs work immediately; re-run `python -m src.scraper` /
