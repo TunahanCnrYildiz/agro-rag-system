@@ -436,13 +436,12 @@ and Academy tabs work immediately; re-run `python -m src.scraper` /
 
 ---
 
-## License
+## Rights
 
-Released under the [MIT License](LICENSE) — © 2026 Tunahan Caner YILDIZ.
+© 2026 Tunahan Caner YILDIZ. No licence is granted — all rights reserved.
 
-The licence covers the **code in this repository**. It does not cover the
-third-party material the system ingests or links to: the botany corpus is
+Third-party material is separate and was never owned here: the botany corpus is
 assembled from Internet Archive, DergiPark, OpenAlex and FAO sources under their
 own terms, and the product catalogue and article content belong to
 [ekolojiktarim.com.tr](https://www.ekolojiktarim.com.tr/). Neither is
-redistributed here — both are fetched at run time.
+redistributed in this repository — both are fetched at run time.
