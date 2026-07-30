@@ -183,6 +183,23 @@ def _extract_blocks(body, title: str) -> list[str]:
     return blocks
 
 
+def _restates_title(text: str, title: str) -> bool:
+    """Does this summary open by repeating the whole headline?
+
+    The card renders the excerpt right under the title, so such an excerpt shows
+    the headline twice. The boundary check keeps a title that merely prefixes a
+    longer word ("...bağlantı" in "...bağlantıyı anlamanıza").
+    """
+    body, name = _normalize(text), _normalize(title)
+    if not name or not body.startswith(name):
+        return False
+    return not body[len(name):len(name) + 1].isalnum()
+
+
+def _shorten(text: str, limit: int = 200) -> str:
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "..."
+
+
 def _clean_excerpt(excerpt: str, title: str) -> str:
     """Drop a meta description that only restates the title.
 
@@ -207,6 +224,23 @@ def _clean_excerpt(excerpt: str, title: str) -> str:
     return text
 
 
+def _pick_excerpt(meta: str, blocks: list[str], title: str) -> str:
+    """The card summary: the meta description, or the first prose paragraph that
+    does not simply repeat the headline. Section headings are never a summary."""
+    cleaned = _clean_excerpt(meta, title)
+    if cleaned and not _restates_title(cleaned, title):
+        return cleaned
+
+    for block in blocks:
+        if block.startswith("**"):
+            continue
+        text = block.lstrip("- ").strip()
+        if text and not _restates_title(text, title):
+            return _shorten(text)
+
+    return cleaned
+
+
 def _fetch_content(session: requests.Session, url: str, title: str = "") -> tuple[str, str]:
     """Return (excerpt, full_content) for an article detail page."""
     soup = fetch(session, url, "articles")
@@ -218,12 +252,7 @@ def _fetch_content(session: requests.Session, url: str, title: str = "") -> tupl
     blocks = _extract_blocks(body, title) if body else []
     content = "\n\n".join(blocks)
 
-    excerpt = _clean_excerpt(extract_meta_description(soup), title)
-    if not excerpt and blocks:
-        first = blocks[0].replace("*", "").lstrip("- ")
-        excerpt = first if len(first) <= 200 else first[:200].rsplit(" ", 1)[0] + "..."
-
-    return excerpt, content
+    return _pick_excerpt(extract_meta_description(soup), blocks, title), content
 
 
 def crawl(max_articles: int = 60) -> list[Article]:

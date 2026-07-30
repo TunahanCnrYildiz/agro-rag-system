@@ -55,9 +55,14 @@ export default function ArticlesScreen() {
               )}
               <View style={styles.cardText}>
                 <Text style={styles.cardCategory}>{a.category} · {a.date}</Text>
-                <Text style={styles.cardTitle} numberOfLines={3}>
+                <Text style={styles.cardTitle} numberOfLines={2}>
                   {a.title}
                 </Text>
+                {a.excerpt ? (
+                  <Text style={styles.cardExcerpt} numberOfLines={2}>
+                    {a.excerpt}
+                  </Text>
+                ) : null}
               </View>
             </TouchableOpacity>
           ))}
@@ -87,4 +92,5 @@ const styles = StyleSheet.create({
   cardText: { flex: 1, justifyContent: "center" },
   cardCategory: { fontSize: 10.5, color: colors.green, fontWeight: "600", marginBottom: 4 },
   cardTitle: { fontSize: 13, color: colors.dark, fontWeight: "600", lineHeight: 18 },
+  cardExcerpt: { fontSize: 11.5, color: colors.muted, lineHeight: 16, marginTop: 4 },
 });

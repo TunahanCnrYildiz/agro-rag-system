@@ -178,22 +178,58 @@ def test_excerpt_drops_a_leading_title_sentence(monkeypatch):
     assert excerpt.startswith("Bitkilerinizin yapraklarında")
 
 
-def test_excerpt_keeps_a_title_that_opens_a_sentence(monkeypatch):
-    """21 excerpts open with the title as the sentence's subject - cutting there
-    would leave a fragment starting with a comma."""
+def test_excerpt_skips_a_meta_that_opens_with_the_whole_title(monkeypatch):
+    """8 excerpts open with the title as their sentence subject. That was fine
+    while nothing rendered them, but the academy card now shows the excerpt
+    directly under the title, where it reads as the headline twice."""
     title = "Toprak Canlılığı ve Mikroorganizmalar: Sağlam Köklerin Temeli"
     html = f"""
     <html><head><meta name="description"
-        content="{title}, bitkilerinizin çevresel faktörlere karşı direncini artıran biyolojik sistemdir."></head>
+        content="{title}, bitkilerinizin çevresel faktörlere karşı direncini artırır."></head>
     <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
-      <p>Gövde metni burada.</p>
+      <p>{title}, bitkilerinizin çevresel faktörlere karşı direncini artırır.</p>
+      <p>Sağlıklı bir toprağın bir çay kaşığında milyarlarca mikroorganizma bulunur.</p>
     </div></div></body></html>
     """
     _patch_fetch(monkeypatch, html)
 
     excerpt, _ = articles_scraper._fetch_content(None, "https://example.test/a/", title)
 
-    assert excerpt.startswith(title + ",")
+    assert excerpt.startswith("Sağlıklı bir toprağın")
+
+
+def test_excerpt_keeps_a_title_that_only_prefixes_a_longer_word(monkeypatch):
+    """One title is a prefix of the excerpt's first word ("...bağlantı" vs
+    "...bağlantıyı"), which is not a repeat."""
+    title = "Gübreleme ve toprak sağlığı arasındaki bağlantı"
+    html = f"""
+    <html><head><meta name="description"
+        content="{title}yı anlamanıza ve sürdürülebilir tarım uygulamalarını benimsemenize yardımcı olur."></head>
+    <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
+      <p>Gövde metni burada yer alıyor ve konuyu ayrıntısıyla açıklıyor.</p>
+    </div></div></body></html>
+    """
+    _patch_fetch(monkeypatch, html)
+
+    excerpt, _ = articles_scraper._fetch_content(None, "https://example.test/a/", title)
+
+    assert excerpt.startswith(title + "yı anlamanıza")
+
+
+def test_excerpt_never_falls_back_to_a_section_heading(monkeypatch):
+    title = "Başlık"
+    html = """
+    <html><head></head>
+    <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
+      <p><b>Görünmez İşçiler: Topraktaki Yaşam Ağı</b></p>
+      <p>Sağlıklı bir toprağın bir çay kaşığında milyarlarca mikroorganizma bulunur.</p>
+    </div></div></body></html>
+    """
+    _patch_fetch(monkeypatch, html)
+
+    excerpt, _ = articles_scraper._fetch_content(None, "https://example.test/a/", title)
+
+    assert excerpt.startswith("Sağlıklı bir toprağın")
 
 
 def test_excerpt_falls_back_to_the_first_paragraph_without_markup(monkeypatch):
