@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ScreenHeader } from "../../src/ScreenHeader";
@@ -51,7 +52,11 @@ export default function ArticlesScreen() {
               {a.image_url ? (
                 <Image source={{ uri: a.image_url }} style={styles.thumb} />
               ) : (
-                <View style={[styles.thumb, styles.thumbPlaceholder]} />
+                // One post has no featured image on the site at all, so a bare
+                // grey box would read as a broken thumbnail.
+                <View style={[styles.thumb, styles.thumbPlaceholder]}>
+                  <Ionicons name="book-outline" size={28} color={colors.greenLight} />
+                </View>
               )}
               <View style={styles.cardText}>
                 <Text style={styles.cardCategory}>{a.category} · {a.date}</Text>
@@ -88,7 +93,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   thumb: { width: 88, height: 88, borderRadius: 10, backgroundColor: "#eef2ea" },
-  thumbPlaceholder: {},
+  thumbPlaceholder: { alignItems: "center", justifyContent: "center" },
   cardText: { flex: 1, justifyContent: "center" },
   cardCategory: { fontSize: 10.5, color: colors.green, fontWeight: "600", marginBottom: 4 },
   cardTitle: { fontSize: 13, color: colors.dark, fontWeight: "600", lineHeight: 18 },
