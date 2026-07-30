@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from dataclasses import asdict, dataclass
 
@@ -39,6 +40,13 @@ except ImportError:  # pragma: no cover
 
 ARTICLES_DIR = DOCS_DIR / "articles"
 ARTICLES_JSON = ARTICLES_DIR / "articles.json"
+
+# Block elements that become their own paragraph in the stored content.
+BLOCK_TAGS = ("p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote")
+
+# get_text(" ") separates inline markup with a space, which lands in front of the
+# punctuation that follows it ("azot <b>, potasyum").
+_SPACE_BEFORE_PUNCTUATION = re.compile(r"\s+([,.;:!?%)\]])")
 
 # Academy category + its subcategories (from the site's navigation).
 CATEGORY_SLUGS = [
@@ -119,7 +127,63 @@ def _crawl_category(session: requests.Session, slug: str, max_pages: int = 3) ->
     return list(cards.values())
 
 
-def _fetch_content(session: requests.Session, url: str) -> tuple[str, str]:
+def _normalize(text: str) -> str:
+    """Fold quote styles and whitespace so a heading can be compared to a title."""
+    folded = text.replace("“", '"').replace("”", '"').replace("’", "'").replace("*", "")
+    return " ".join(folded.split()).strip(" \"'").casefold()
+
+
+def _block_to_text(el) -> str:
+    """One block element as a line of the stored content.
+
+    Section headings on the site are <p><b>...</b></p> rather than real heading
+    tags, so a bold-only paragraph is emitted as **bold** - the app's
+    MarkdownText renders that, and a plain get_text() would lose the distinction.
+    """
+    text = " ".join(el.get_text(" ", strip=True).split())
+    text = _SPACE_BEFORE_PUNCTUATION.sub(r"\1", text)
+    if not text:
+        return ""
+    if el.name == "li":
+        return f"- {text}"
+    bold = el.find(["b", "strong"])
+    if bold is not None and _normalize(bold.get_text(" ", strip=True)) == _normalize(text):
+        return f"**{text}**"
+    if el.name.startswith("h"):
+        return f"**{text}**"
+    return text
+
+
+def _repeats_the_title(line: str, title: str) -> bool:
+    """Is this leading block the body's own copy of the post title?
+
+    Only a heading block counts: three posts open their prose with the title
+    text, and dropping that would eat the first sentence. Two others head the
+    body with a LONGER variant of the listing title, so this is a prefix test
+    rather than equality.
+    """
+    if not line.startswith("**"):
+        return False
+    head, name = _normalize(line), _normalize(title)
+    return bool(name) and (head.startswith(name) or name.startswith(head))
+
+
+def _extract_blocks(body, title: str) -> list[str]:
+    """Block texts of an article body, minus the heading that repeats the title."""
+    blocks: list[str] = []
+    for el in body.find_all(BLOCK_TAGS):
+        if el.find_parent(BLOCK_TAGS) is not None:
+            continue  # nested block; its outer block already carries the text
+        line = _block_to_text(el)
+        if line:
+            blocks.append(line)
+
+    if blocks and _repeats_the_title(blocks[0], title):
+        blocks.pop(0)
+    return blocks
+
+
+def _fetch_content(session: requests.Session, url: str, title: str = "") -> tuple[str, str]:
     """Return (excerpt, full_content) for an article detail page."""
     soup = fetch(session, url, "articles")
     if soup is None:
@@ -127,11 +191,13 @@ def _fetch_content(session: requests.Session, url: str) -> tuple[str, str]:
     body = soup.select_one(
         ".elementor-widget-theme-post-content .elementor-widget-container"
     )
-    content = body.get_text(" ", strip=True) if body else ""
+    blocks = _extract_blocks(body, title) if body else []
+    content = "\n\n".join(blocks)
 
     excerpt = extract_meta_description(soup)
-    if not excerpt and content:
-        excerpt = content[:200].rsplit(" ", 1)[0] + "..."
+    if not excerpt and blocks:
+        first = blocks[0].replace("*", "").lstrip("- ")
+        excerpt = first if len(first) <= 200 else first[:200].rsplit(" ", 1)[0] + "..."
 
     return excerpt, content
 
@@ -151,7 +217,7 @@ def crawl(max_articles: int = 60) -> list[Article]:
     articles: list[Article] = []
     for url, card in list(cards_by_url.items())[:max_articles]:
         time.sleep(REQUEST_DELAY_SECONDS)
-        excerpt, content = _fetch_content(session, url)
+        excerpt, content = _fetch_content(session, url, card["title"])
         articles.append(
             Article(
                 title=card["title"],

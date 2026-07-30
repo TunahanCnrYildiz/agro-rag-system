@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { colors } from "../../src/theme";
 import { useArticles } from "../../src/data";
+import { MarkdownText } from "../../src/MarkdownText";
 import { openExternalUrl } from "../../src/openExternalUrl";
 
 export default function ArticleDetailScreen() {
@@ -44,7 +45,7 @@ export default function ArticleDetailScreen() {
         {article.category} · {article.date}
       </Text>
       <Text style={styles.title}>{article.title}</Text>
-      <Text style={styles.body}>{article.content || article.excerpt}</Text>
+      <MarkdownText text={article.content || article.excerpt} color="#3a3f36" />
 
       <TouchableOpacity
         style={styles.siteButton}
@@ -70,7 +71,6 @@ const styles = StyleSheet.create({
   },
   category: { fontSize: 12, color: colors.green, fontWeight: "700" },
   title: { fontSize: 18, fontWeight: "800", color: colors.dark, marginTop: 6, marginBottom: 12 },
-  body: { fontSize: 13.5, lineHeight: 21, color: "#3a3f36" },
   siteButton: {
     marginTop: 22,
     backgroundColor: colors.green,
