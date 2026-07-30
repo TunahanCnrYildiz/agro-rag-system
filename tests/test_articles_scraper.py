@@ -137,6 +137,65 @@ def test_no_stray_space_before_punctuation(monkeypatch):
     assert content == "Özellikle azot, potasyum ve kalsiyum önemlidir."
 
 
+def test_excerpt_ignores_a_meta_description_that_is_just_the_title(monkeypatch):
+    """Same Yoast decoy the product scraper already guards against: with no
+    hand-written description the meta tag echoes the title, which summarises
+    nothing. Two of the 60 academy posts land here."""
+    html = """
+    <html><head><meta name="description"
+        content="TOPRAK KALSİYUMLA DOLU. BİTKİLER HÂLÂ KALSİYUM AÇLIĞI ÇEKİYOR. NEDEN?"></head>
+    <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
+      <p>Bitkilerin sağlıklı gelişimi için temel besin maddelerine ihtiyacı bulunur.</p>
+    </div></div></body></html>
+    """
+    _patch_fetch(monkeypatch, html)
+
+    excerpt, _ = articles_scraper._fetch_content(
+        None,
+        "https://example.test/a/",
+        "TOPRAK KALSİYUMLA DOLU. BİTKİLER HÂLÂ KALSİYUM AÇLIĞI ÇEKİYOR. NEDEN?",
+    )
+
+    assert excerpt.startswith("Bitkilerin sağlıklı gelişimi")
+
+
+def test_excerpt_drops_a_leading_title_sentence(monkeypatch):
+    """One meta description runs "TITLE <intro>" - next to the title the card
+    already shows, the repeat is noise. This post's title carries its own
+    trailing period, so the intro follows with no separator of its own."""
+    title = "SARARAN YAPRAKLAR DEMİR EKSİKLİĞİ DEĞİL OLABİLİR. FARKI ŞÖYLE ANLARSINIZ."
+    html = f"""
+    <html><head><meta name="description"
+        content="{title} Bitkilerinizin yapraklarında sararma fark ettiğinizde akla ilk gelen demir eksikliğidir."></head>
+    <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
+      <p>Gövde metni burada.</p>
+    </div></div></body></html>
+    """
+    _patch_fetch(monkeypatch, html)
+
+    excerpt, _ = articles_scraper._fetch_content(None, "https://example.test/a/", title)
+
+    assert excerpt.startswith("Bitkilerinizin yapraklarında")
+
+
+def test_excerpt_keeps_a_title_that_opens_a_sentence(monkeypatch):
+    """21 excerpts open with the title as the sentence's subject - cutting there
+    would leave a fragment starting with a comma."""
+    title = "Toprak Canlılığı ve Mikroorganizmalar: Sağlam Köklerin Temeli"
+    html = f"""
+    <html><head><meta name="description"
+        content="{title}, bitkilerinizin çevresel faktörlere karşı direncini artıran biyolojik sistemdir."></head>
+    <body><div class="elementor-widget-theme-post-content"><div class="elementor-widget-container">
+      <p>Gövde metni burada.</p>
+    </div></div></body></html>
+    """
+    _patch_fetch(monkeypatch, html)
+
+    excerpt, _ = articles_scraper._fetch_content(None, "https://example.test/a/", title)
+
+    assert excerpt.startswith(title + ",")
+
+
 def test_excerpt_falls_back_to_the_first_paragraph_without_markup(monkeypatch):
     """The old fallback sliced content[:200], which now would carry newlines and
     '**' markers into the one-line card summary."""

@@ -183,6 +183,30 @@ def _extract_blocks(body, title: str) -> list[str]:
     return blocks
 
 
+def _clean_excerpt(excerpt: str, title: str) -> str:
+    """Drop a meta description that only restates the title.
+
+    Yoast falls back to the post title when the author wrote no description, so
+    the tag is a decoy - the same trap `scraper._fetch_description` guards for
+    products. Returning "" hands the caller its first-paragraph fallback.
+    """
+    text = " ".join(excerpt.split())
+    if not text or _normalize(text) == _normalize(title):
+        return ""
+
+    if title and text.casefold().startswith(title.casefold()):
+        rest = text[len(title):].lstrip()
+        # "TITLE. <intro>" repeats the headline; "TITLE, <clause>" is a sentence.
+        # Some titles carry their own trailing period, so the break can sit on
+        # either side of the split.
+        ends_sentence = title.rstrip()[-1:] in {".", "!", "?", ":"}
+        if rest[:1] in {".", "!", "?", ":"}:
+            rest, ends_sentence = rest[1:].lstrip(), True
+        if ends_sentence and len(rest) >= 40:
+            return rest
+    return text
+
+
 def _fetch_content(session: requests.Session, url: str, title: str = "") -> tuple[str, str]:
     """Return (excerpt, full_content) for an article detail page."""
     soup = fetch(session, url, "articles")
@@ -194,7 +218,7 @@ def _fetch_content(session: requests.Session, url: str, title: str = "") -> tupl
     blocks = _extract_blocks(body, title) if body else []
     content = "\n\n".join(blocks)
 
-    excerpt = extract_meta_description(soup)
+    excerpt = _clean_excerpt(extract_meta_description(soup), title)
     if not excerpt and blocks:
         first = blocks[0].replace("*", "").lstrip("- ")
         excerpt = first if len(first) <= 200 else first[:200].rsplit(" ", 1)[0] + "..."
