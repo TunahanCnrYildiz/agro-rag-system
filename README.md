@@ -30,9 +30,13 @@ the RAG backend.
 | --- | --- |
 | ![Home](docs/screenshots/home.png) | ![Products](docs/screenshots/products.png) |
 
-| Academy | AI Assistant |
+| Product detail | Academy |
 | --- | --- |
-| ![Academy](docs/screenshots/articles.png) | ![AI Assistant](docs/screenshots/chat.png) |
+| ![Product detail](docs/screenshots/product-detail.png) | ![Academy](docs/screenshots/articles.png) |
+
+| Article | AI Assistant |
+| --- | --- |
+| ![Article](docs/screenshots/article-detail.png) | ![AI Assistant](docs/screenshots/chat.png) |
 
 ---
 
