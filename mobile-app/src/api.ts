@@ -13,7 +13,7 @@
 // (ipconfig / Settings > Network) and set EXPO_PUBLIC_API_BASE (or edit below).
 // Android emulator (not a physical device) would instead use 10.0.2.2.
 export const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.103:8000";
+  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.102:8000";
 
 export type ChatRole = "user" | "assistant";
 
