@@ -146,11 +146,31 @@ async function capture(port) {
     sizes[name] = `${buf.readUInt32BE(16)}x${buf.readUInt32BE(20)}`;
     console.log(`${name}.png  ${sizes[name]}`);
   };
-  const go = async (route, settle = 4000) => {
-    await send("Page.navigate", { url: BASE + route });
-    await sleep(settle);
+  // Wait for the CONTENT, never for a fixed number of seconds: a cold backend
+  // takes longer than any sleep you'd be willing to hard-code, and the screen
+  // that comes back in the meantime is a spinner that photographs just fine.
+  const waitFor = async (what, expression, timeout = 60000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < timeout) {
+      if (await evaluate(expression)) return;
+      await sleep(250);
+    }
+    throw new Error(`${what} never showed up within ${timeout / 1000}s`);
   };
-  const clickText = async (label) => {
+  const settle = async (expression) => {
+    await waitFor(`content (${expression})`, expression);
+    // Images arrive after the text; a half-decoded photo is a bad screenshot.
+    await waitFor("images", "[...document.images].every(i => i.complete)", 20000).catch(
+      (e) => console.warn(`  ${e.message} — shooting anyway`)
+    );
+    await sleep(700);
+  };
+  const has = (needle) => `document.body.innerText.includes(${JSON.stringify(needle)})`;
+  const go = async (route, expression) => {
+    await send("Page.navigate", { url: BASE + route });
+    await settle(expression);
+  };
+  const clickText = async (label, expression) => {
     const box = await evaluate(`
       (() => {
         const hits = [...document.querySelectorAll('div')]
@@ -173,27 +193,31 @@ async function capture(port) {
       });
       await sleep(60);
     }
-    await sleep(3000);
+    await settle(expression);
   };
 
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Emulation.setDeviceMetricsOverride", VIEWPORT);
 
-  await go("/");
+  // "Sitede Görüntüle" is the button both detail screens render once loaded, and
+  // neither list screen has it — so it proves the tap landed AND the data arrived.
+  const DETAIL_LOADED = has("Sitede Görüntüle");
+
+  await go("/", has("Keşfedin"));
   await shot("home");
 
-  await go("/products", 5000);
+  await go("/products", has("HIGRO WETT"));
   await shot("products");
-  await clickText("HIGRO WETT");
+  await clickText("HIGRO WETT", DETAIL_LOADED);
   await shot("product-detail");
 
-  await go("/articles", 5000);
+  await go("/articles", has("Toprak Canlılığı"));
   await shot("articles");
-  await clickText("Toprak Canlılığı");
+  await clickText("Toprak Canlılığı", DETAIL_LOADED);
   await shot("article-detail");
 
-  await go("/chat");
+  await go("/chat", "!!document.querySelector('input')");
   await evaluate(`
     (() => {
       const i = document.querySelector('input');
@@ -206,17 +230,16 @@ async function capture(port) {
       return true;
     })()`);
 
-  // The reply streams in; wait for the text to stop growing rather than a guess.
-  // Watching for "Yazıyor..." to vanish fires on the first token and catches a
-  // half-written answer.
-  let last = -1;
-  for (let i = 0; i < 40; i++) {
-    await sleep(3000);
-    const len = await evaluate("document.body.innerText.length");
-    if (len === last && len > 400) break;
-    last = len;
-  }
-  await sleep(1500);
+  // chat.tsx renders the box as `editable={!loading}`, which React Native Web
+  // puts on the DOM as `readOnly`, and `loading` is cleared only by the stream's
+  // onDone. So readOnly going true-then-false IS the app saying "answer finished".
+  // Neither cheaper signal works: "Yazıyor..." disappears on the first token, and
+  // waiting for the text to stop growing photographed a half-written reply the
+  // one time the stream paused 3s mid-answer.
+  const READONLY = "document.querySelector('input').readOnly";
+  await waitFor("the send to register", READONLY, 20000);
+  await waitFor("the streamed answer", `!${READONLY}`, 300000);
+  await sleep(1500); // the ScrollView animates to the end after the last token
   await shot("chat");
 
   ws.close();
