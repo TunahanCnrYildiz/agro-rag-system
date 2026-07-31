@@ -12,6 +12,12 @@ npm run android    # Android emulator/device (Expo Go)
 npm run ios        # iOS simulator (macOS only)
 ```
 
+## Screenshots
+
+`node scripts/capture_screenshots.js` (from the repo root) refreshes the README's
+`docs/screenshots/` with the web build, driven headlessly at phone size. It needs
+`npm run web`, the backend and LM Studio running; it starts Chrome itself.
+
 ## API endpoint
 
 Set `EXPO_PUBLIC_API_BASE` (in `mobile-app/.env` — see `.env.example` — or the
