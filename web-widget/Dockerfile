@@ -7,5 +7,7 @@ FROM nginx:1.27-alpine
 
 COPY site/ /usr/share/nginx/html/
 COPY widget/ /usr/share/nginx/html/widget/
+COPY docker-entrypoint.d/10-api-base.sh /docker-entrypoint.d/10-api-base.sh
+RUN chmod +x /docker-entrypoint.d/10-api-base.sh
 
 EXPOSE 80
