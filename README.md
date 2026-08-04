@@ -399,7 +399,7 @@ and falls back to a hard-coded LAN address:
 ```ts
 // mobile-app/src/api.ts
 export const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.103:8000";
+  process.env.EXPO_PUBLIC_API_BASE ?? "http://192.168.1.102:8000";
 ```
 
 Prefer setting `EXPO_PUBLIC_API_BASE` at build time (that is what makes a hosted
@@ -414,29 +414,89 @@ through the OS firewall so the phone can connect.
 release APK lands in
 `android/app/build/outputs/apk/release/app-release.apk`.
 
+The local build only works from a path with **no spaces**. This project's own
+path has both a space and an `&`, which Android tooling cannot handle, so the
+app has to be copied somewhere like `C:\build\` and built there. The generated
+`android/` and `ios/` folders are not tracked in git — `expo prebuild` creates
+them, so a fresh clone will not have them.
+
 ---
 
 ## Running on a new machine
 
-A `git clone` alone is **not** a fully working system. Checklist:
+A `git clone` alone is **not** a working system: nearly all of the project's
+7.3 GB lives outside git.
 
-1. **Python deps** — `pip install -r requirements.txt`.
-2. **LM Studio** — install it, download a chat model (e.g. Gemma) and an
-   embedding model (e.g. bge-m3), start the local server on port `1234`, and
-   set the exact model ids in `.env` (copy `.env.example`).
-3. **Knowledge base** — copy `data/vector_store/` and `docs/books/` from the
-   original machine, **or** rebuild with `python -m src.fetch_books` +
-   `python -m src.ingest`. (A rebuild is *similar* but not identical — the
-   Internet Archive returns different books over time.)
-4. **Backend** — `uvicorn src.main:app --host 0.0.0.0 --port 8000`, or
+| What | Size | In git | Needed to run |
+| --- | --- | --- | --- |
+| Code + catalogue (`products.json`, `articles.json`) | ~40 MB | yes | yes |
+| `data/vector_store/` | 1.7 GB | no | **yes** |
+| `docs/books/` (1,219 PDFs) | 5.2 GB | no | only to re-ingest |
+| `.env` | — | no | yes (copy `.env.example`) |
+| `mobile-app/android/`, `node_modules/` | ~0.3 GB | no | regenerated |
+
+**You can leave the PDFs behind.** Answering never reads them — retrieval queries
+the Chroma store — so 1.7 GB is enough to move. The PDFs are only needed to
+rebuild the corpus or to re-derive `year`/`era` metadata.
+
+### Checklist
+
+1. **Python 3.14** (CI runs the same version), then
+   `pip install -r requirements.txt`.
+2. **LM Studio** — download a chat model (`google/gemma-4-12b-qat` here) and the
+   embedding model (`text-embedding-bge-m3`), serve on port `1234`. Two settings
+   matter: context **8192**, and **Max Concurrent Predictions = 1** (parallel 4
+   overflows VRAM and runs ~3.5× slower).
+3. **`.env`** — copy `.env.example`. Keep `EMBEDDING_MODEL=text-embedding-bge-m3`
+   and `EMBEDDING_IDENTITY=bge-m3` unless you are deliberately switching provider.
+4. **Copy `data/vector_store/` as-is.** Do not re-ingest to save the transfer: it
+   takes hours *and* does not reproduce the same corpus, because the Internet
+   Archive returns different books over time.
+5. **Backend** — `python -m src.main` (uvicorn on `:8000`), or
    `docker compose up --build`.
-5. **Mobile app** — `npm install`, set `EXPO_PUBLIC_API_BASE` to the new
-   machine's LAN IP (or edit the fallback in `src/api.ts`), then rebuild the APK
-   (see above).
+6. **Mobile app** (optional) — `npm install`, then set `EXPO_PUBLIC_API_BASE` to
+   the new machine's LAN IP.
 
-Catalog data (`products.json`, `articles.json`) is committed, so the Products
+Catalogue data (`products.json`, `articles.json`) is committed, so the Products
 and Academy tabs work immediately; re-run `python -m src.scraper` /
 `python -m src.articles_scraper` only to refresh them.
+
+### Four things that will catch you out
+
+**Install to a path with no spaces.** This project's own path contains a space
+and an `&`, which breaks the Expo CLI (`npx expo` truncates — use
+`node node_modules/expo/bin/cli`) and breaks a local Gradle APK build outright.
+A destination like `C:\agro-rag` removes both problems at once, and moving is
+the cheapest moment to fix it.
+
+**Run everything from the repo root.** `config.py` reads a relative `.env`; from
+any other directory it silently falls back to the wrong embedding model.
+
+**`EmbeddingModelMismatchError` is a stamp problem, never a vector problem.** The
+copied store is stamped `bge-m3`; if `EMBEDDING_IDENTITY` disagrees, every
+retrieval raises. Re-stamp — do not re-ingest. Recipe in
+[docs/deploy-runbook.md](docs/deploy-runbook.md).
+
+**The Windows console cannot encode Turkish.** Any script that prints corpus or
+answer text dies with `UnicodeEncodeError` on `ğ`/`ı`. Prefix with
+`PYTHONIOENCODING=utf-8`, or write results to a UTF-8 file.
+
+### Verify the move, in this order
+
+```bash
+python -m pytest -q                 # 276 tests, needs no LM Studio
+python -m evals.run_eval --fast     # retrieval + context only, no LLM
+python -m evals.run_eval            # full run, ~20-25 min
+```
+
+The middle step is the one that matters here: it exercises the copied vector
+store without waiting on the model, so a bad copy or a stamp mismatch fails in
+seconds instead of twenty minutes. A full run scoring 55/55 means the system
+moved intact.
+
+One hardware note: the chat model needs enough VRAM to stay on the GPU (~7.8 GB
+here). If it spills to system RAM, generation slows roughly 8× and the full eval
+takes hours rather than minutes.
 
 ---
 
