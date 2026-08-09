@@ -109,3 +109,28 @@ def classify_by_rules(message: str) -> Route | None:
         return "offscope"
 
     return None
+
+
+# The route taken whenever no rule fires. plant_info is today's corpus path, so
+# an undecided question behaves exactly as it does now.
+#
+# There is deliberately NO model fallback here. Measured against the frozen set,
+# the rules leave 17 of 42 cases undecided and 15 of those expect plant_info or
+# nutrition - which is structural, since between them those two ARE the default
+# and cannot have a positive rule. And they run the SAME corpus path, so a model
+# call to tell them apart would change nothing while costing latency, money and
+# reproducibility. Same trade this codebase already made when it replaced LLM
+# query translation with the deterministic crop lexicon.
+_DEFAULT_ROUTE: Route = "plant_info"
+
+
+def classify(message: str, history: list[dict] | None = None) -> tuple[Route, str]:
+    """Return (route, how) where how is 'rule' or 'default'.
+
+    `history` is accepted but unused: Task 5 and the follow-up plans pass it, and
+    taking it now means no signature change later.
+    """
+    ruled = classify_by_rules(message)
+    if ruled is not None:
+        return ruled, "rule"
+    return _DEFAULT_ROUTE, "default"

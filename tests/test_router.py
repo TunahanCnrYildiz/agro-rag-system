@@ -2,6 +2,7 @@
 
 import pytest
 
+from src import router
 from src.router import classify_by_rules
 
 
@@ -150,3 +151,29 @@ def test_recycling_does_not_leak_to_budget():
 ])
 def test_frozen_cases_still_hold(query, route):
     assert classify_by_rules(query) == route
+
+
+def test_rule_hit_reports_rule():
+    assert router.classify("Buğday ekmenin dekara maliyeti nedir?") == ("budget", "rule")
+
+
+def test_silent_rules_take_the_default_without_a_model_call(monkeypatch):
+    # No network, no client, no chat profile. If classify() ever reaches for the
+    # LLM, _get_llm is the first thing it would touch - so make touching it fatal.
+    from src import engine
+    def explode(*a, **k):
+        raise AssertionError("classify() must not call the model")
+    monkeypatch.setattr(engine, "_get_llm", explode)
+    assert router.classify("Asmada budama ne zaman yapılır?") == ("plant_info", "default")
+
+
+def test_default_is_todays_corpus_path():
+    # plant_info and nutrition both run the corpus path; the default must be one
+    # of them, or a rule-silent question would change behaviour.
+    assert router._DEFAULT_ROUTE in ("plant_info", "nutrition")
+
+
+def test_history_argument_is_accepted_and_ignored_for_now():
+    history = [{"role": "user", "content": "Manisa'dayım"}]
+    assert router.classify("Asmada budama ne zaman yapılır?", history) == \
+        router.classify("Asmada budama ne zaman yapılır?")
