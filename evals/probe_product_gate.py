@@ -46,6 +46,7 @@ GATE_OFFSCOPE = "marker_offscope"
 GATE_NOPRODUCT = "marker_noproduct"
 GATE_BACKSTOP = "backstop"      # _looks_non_product fired on the answer text
 GATE_OPEN = "open"              # nothing closed: products shown
+GATE_ERROR = "error"        # the model call raised - NOT a gate closure
 
 
 def _attribute_gate(raw_count: int, answer_text: str) -> tuple[str, dict]:
@@ -174,11 +175,16 @@ def main() -> None:
 
         gates: list[str] = []
         for i in range(args.repeat):
+            err = None
             try:
                 text = engine._complete_text(messages)
             except Exception as exc:  # noqa: BLE001
+                err = f"{type(exc).__name__}: {str(exc)[:120]}"
                 text = engine._llm_unavailable_message(exc)
-            gate, flags = _attribute_gate(len(raw), text)
+            if err:
+                gate, flags = GATE_ERROR, {"error": err}
+            else:
+                gate, flags = _attribute_gate(len(raw), text)
             gates.append(gate)
             totals[gate] = totals.get(gate, 0) + 1
             fh.write(json.dumps({
@@ -209,11 +215,22 @@ def main() -> None:
     for gate, n in sorted(totals.items(), key=lambda kv: -kv[1]):
         print(f"  {gate:<18} {n:>4}  ({n / max(1, sum(totals.values())):.0%})")
 
+    errs = totals.get(GATE_ERROR, 0)
+    if errs:
+        print(f"\nUYARI: {errs} ornek model cagrisi hatasiyla dustu "
+              f"(zaman asimi / baglanti).")
+        print("Bu ornekler urun kapisini OLCMEZ. Uretim saglikli hale "
+              "gelmeden kapi yorumlanamaz.")
+
     unstable = [r for r in rows if 0 < r[2] < r[3]]
     print(f"\nkararsiz vaka (ayni soru bazen acik bazen kapali): {len(unstable)}")
     for r in unstable:
         print(f"  {r[0]:<34} {r[2]}/{r[3]} acik")
-    print("\nKararsizlik varsa sorun esik degil, model/marker kaynaklidir.")
+    if errs:
+        print("\nKararsizligin bir kismi cagri hatasindan olabilir - "
+              "once UYARI satirina bak.")
+    else:
+        print("\nKararsizlik varsa sorun esik degil, model/marker kaynaklidir.")
 
 
 if __name__ == "__main__":
