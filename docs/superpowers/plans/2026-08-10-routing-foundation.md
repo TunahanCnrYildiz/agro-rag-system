@@ -434,15 +434,39 @@ git commit -m "Add deterministic rule layer for intent routing"
 
 ---
 
-### Task 4: Model layer and safe default
+### Task 4: Public entry point and safe default
+
+**REVISED 2026-08-10, after measuring Task 3.** This task originally added a
+model classification call for messages the rules could not decide. Measurement
+killed it before it was written.
+
+Against the frozen set the rule layer leaves 17 of 42 cases undecided, and 15 of
+those 17 expect `plant_info` or `nutrition`. That is structural, not a gap in the
+rule list: neither route has — or can have — a positive rule, because between
+them they *are* the default. Widening the rules does not help; adding a nutrition
+rule only moves 17 to 13.
+
+The decisive point is that **`plant_info` and `nutrition` run the same corpus
+path.** Paying for a model call to tell them apart buys nothing. So the model
+layer is not built: when no rule fires, the default is taken directly.
+
+This is the same trade this project already made once, when LLM query
+translation was replaced by a deterministic lexicon: a model call that a fixed
+rule can replace costs latency, money and reproducibility, and buys none of them
+back.
+
+The cost is real and worth stating: a special-route question phrased in a way no
+rule catches now goes to the corpus path instead of its own route. Plans 2 and 3
+will show whether that happens often enough to justify reviving the model layer,
+and the routing set measures it every run.
 
 **Files:**
 - Modify: `src/router.py`
 - Test: `tests/test_router.py`
 
 **Interfaces:**
-- Consumes: `classify_by_rules` (Task 3); `engine._chat_profile()`, `engine._get_llm()` (existing).
-- Produces: `classify(message: str, history: list[dict] | None = None) -> tuple[Route, str]` where the second element is `"rule"`, `"model"`, or `"default"`.
+- Consumes: `classify_by_rules` (Task 3).
+- Produces: `classify(message: str, history: list[dict] | None = None) -> tuple[Route, str]` where the second element is `"rule"` or `"default"`. No model call, no network, no `history` use yet — the parameter exists so Task 5 and later plans need no signature change.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -452,97 +476,64 @@ Append to `tests/test_router.py`:
 from src import router
 
 
-def test_rule_hit_does_not_call_the_model(monkeypatch):
-    def explode(*a, **k):
-        raise AssertionError("model must not be called when a rule fires")
-    monkeypatch.setattr(router, "_classify_by_model", explode)
+def test_rule_hit_reports_rule():
     assert router.classify("Buğday ekmenin dekara maliyeti nedir?") == ("budget", "rule")
 
 
-def test_model_layer_used_when_rules_are_silent(monkeypatch):
-    monkeypatch.setattr(router, "_classify_by_model", lambda m, h: "plant_info")
-    assert router.classify("Asmada budama ne zaman yapılır?") == ("plant_info", "model")
+def test_silent_rules_take_the_default_without_a_model_call(monkeypatch):
+    # No network, no client, no chat profile. If classify() ever reaches for the
+    # LLM, _get_llm is the first thing it would touch - so make touching it fatal.
+    from src import engine
+    def explode(*a, **k):
+        raise AssertionError("classify() must not call the model")
+    monkeypatch.setattr(engine, "_get_llm", explode)
+    assert router.classify("Asmada budama ne zaman yapılır?") == ("plant_info", "default")
 
 
-def test_model_failure_falls_back_to_default(monkeypatch):
-    def boom(m, h):
-        raise TimeoutError("Request timed out.")
-    monkeypatch.setattr(router, "_classify_by_model", boom)
-    route, how = router.classify("Asmada budama ne zaman yapılır?")
-    assert (route, how) == ("plant_info", "default")
+def test_default_is_todays_corpus_path():
+    # plant_info and nutrition both run the corpus path; the default must be one
+    # of them, or a rule-silent question would change behaviour.
+    assert router._DEFAULT_ROUTE in ("plant_info", "nutrition")
 
 
-def test_unknown_label_from_model_falls_back_to_default(monkeypatch):
-    monkeypatch.setattr(router, "_classify_by_model", lambda m, h: "banana")
-    route, how = router.classify("Asmada budama ne zaman yapılır?")
-    assert (route, how) == ("plant_info", "default")
+def test_history_argument_is_accepted_and_ignored_for_now():
+    history = [{"role": "user", "content": "Manisa'dayım"}]
+    assert router.classify("Asmada budama ne zaman yapılır?", history) == \
+        router.classify("Asmada budama ne zaman yapılır?")
 ```
 
 - [ ] **Step 2: Run to verify they fail**
 
-Run: `PYTHONIOENCODING=utf-8 python -m pytest tests/test_router.py -k "model or rule_hit or default" -v`
+Run: `PYTHONIOENCODING=utf-8 python -m pytest tests/test_router.py -k "classify or default or history" -v`
 Expected: FAIL — `AttributeError: module 'src.router' has no attribute 'classify'`
 
-- [ ] **Step 3: Implement the model layer**
+- [ ] **Step 3: Implement the entry point**
 
 Append to `src/router.py`:
 
 ```python
-# The route used whenever routing cannot be decided. plant_info is today's
-# corpus path, so a failed classification degrades to current behaviour rather
-# than to an error. This is what makes the router unable to break the system.
+# The route taken whenever no rule fires. plant_info is today's corpus path, so
+# an undecided question behaves exactly as it does now.
+#
+# There is deliberately NO model fallback here. Measured against the frozen set,
+# the rules leave 17 of 42 cases undecided and 15 of those expect plant_info or
+# nutrition - which is structural, since between them those two ARE the default
+# and cannot have a positive rule. And they run the SAME corpus path, so a model
+# call to tell them apart would change nothing while costing latency, money and
+# reproducibility. Same trade this codebase already made when it replaced LLM
+# query translation with the deterministic crop lexicon.
 _DEFAULT_ROUTE: Route = "plant_info"
-
-_CLASSIFY_PROMPT = (
-    "Sen bir siniflandiricisin. Kullanicinin mesajini SADECE su etiketlerden "
-    "biriyle etiketle ve baska hicbir sey yazma:\n"
-    "plant_info - bitki yetistirme, hastalik, budama, cogaltma, sulama\n"
-    "nutrition - gubreleme, besin, toprak verimliligi (zamanlama sorulmuyor)\n"
-    "fert_plan - gubrelemenin ZAMANI veya programi soruluyor\n"
-    "budget - maliyet, kar, gelir, gider\n"
-    "crop_choice - hangi urunun ekilecegi soruluyor\n"
-    "offscope - bitkiyle ilgisi yok\n"
-    "Yalnizca etiketi yaz."
-)
-
-
-def _classify_by_model(message: str, history: list[dict] | None) -> str:
-    """One classification call on the CONFIGURED chat profile.
-
-    Deliberately the same provider and model the answer path uses. A separate
-    model would mean a second provider-portability surface to keep measured, and
-    this project has already paid for one of those.
-    """
-    from src import engine
-
-    profile = engine._chat_profile()
-    client = engine._get_llm()
-    resp = client.chat.completions.create(
-        model=profile.model,
-        messages=[
-            {"role": "system", "content": _CLASSIFY_PROMPT},
-            {"role": "user", "content": message},
-        ],
-        max_tokens=8,
-        temperature=0.0,
-    )
-    return (resp.choices[0].message.content or "").strip().lower()
 
 
 def classify(message: str, history: list[dict] | None = None) -> tuple[Route, str]:
-    """Return (route, how) where how is 'rule', 'model' or 'default'."""
+    """Return (route, how) where how is 'rule' or 'default'.
+
+    `history` is accepted but unused: Task 5 and the follow-up plans pass it, and
+    taking it now means no signature change later.
+    """
     ruled = classify_by_rules(message)
     if ruled is not None:
         return ruled, "rule"
-
-    try:
-        label = _classify_by_model(message, history)
-    except Exception:  # noqa: BLE001 - any failure degrades, never raises
-        return _DEFAULT_ROUTE, "default"
-
-    for route in ROUTES:
-        if label == route:
-            return route, "model"  # type: ignore[return-value]
     return _DEFAULT_ROUTE, "default"
 ```
 
@@ -555,7 +546,7 @@ Expected: all pass.
 
 ```bash
 git add src/router.py tests/test_router.py
-git commit -m "Add router model layer with a fallback that cannot fail"
+git commit -m "Add the router entry point; no model fallback, by measurement"
 ```
 
 ---
