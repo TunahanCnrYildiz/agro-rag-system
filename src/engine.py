@@ -220,7 +220,7 @@ MIN_RETRIEVAL_RELEVANCE = 0.36
 
 # Turkish -> ASCII fold, one character in, one character out, so a match span
 # found in the normalised text maps straight back onto the original query.
-_TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇI", "iigguussooccI")
+_TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇIâÂ", "iigguussooccIaA")
 
 
 def _normalize_tr(text: str) -> str:
