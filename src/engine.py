@@ -50,6 +50,8 @@ class RecommendedProduct:
 class ChatResult:
     answer: str
     recommended_products: list[RecommendedProduct]
+    route: str = ""
+    route_how: str = ""
 
     def as_api(self) -> dict:
         return {
@@ -700,6 +702,15 @@ def _strip_markers(text: str) -> tuple[str, bool, bool]:
 
 def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
+    # Routing is diagnostic in this release: every route still runs the corpus
+    # path below. Wiring it now, with behaviour unchanged, is what lets the 55
+    # eval cases prove the router is harmless before any route diverges.
+    try:
+        from src import router
+        route, route_how = router.classify(message, history)
+    except Exception:  # noqa: BLE001 - routing must never break answering
+        route, route_how = "", ""
+
     context = retrieve_context(message, history=history)
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
@@ -720,7 +731,8 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         # pests, storage...). The marker is the primary signal; _looks_non_product
         # backstops a model that did not emit it - see the backstop spec.
         products = []
-    return ChatResult(answer=answer_text.strip(), recommended_products=products)
+    return ChatResult(answer=answer_text.strip(), recommended_products=products,
+                      route=route, route_how=route_how)
 
 
 def stream_answer(

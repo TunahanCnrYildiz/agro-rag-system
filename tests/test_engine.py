@@ -1109,3 +1109,32 @@ def test_stream_answer_backstop_sees_the_whole_answer_not_just_the_warmup(
         lambda: _fake_stream_llm([head, "Once kuru dallari budamak gerekir."]))
     out = "".join(engine.stream_answer("Nasil yapilir?"))
     assert '"type": "products"' not in out           # suppressed on the late term
+
+
+def test_answer_records_the_route(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    r = engine.answer("Buğday ekmenin dekara maliyeti nedir?")
+    assert r.route == "budget"
+    assert r.route_how == "rule"
+
+
+def test_route_is_not_exposed_over_the_api(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    r = engine.answer("Buğday ekmenin dekara maliyeti nedir?")
+    assert set(r.as_api()) == {"answer", "recommended_products"}
+
+
+def test_router_failure_does_not_break_answering(monkeypatch):
+    from src import router
+    monkeypatch.setattr(router, "classify",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    r = engine.answer("Herhangi bir soru")
+    assert r.answer == "Kompost kullanabilirsiniz."
+    assert r.route == ""
