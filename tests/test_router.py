@@ -68,3 +68,26 @@ def test_short_stem_mac_does_not_leak():
 
 def test_unknown_returns_none():
     assert classify_by_rules("Asmada budama ne zaman yapılır?") is None
+
+
+@pytest.mark.parametrize("query", [
+    "Bitkilerde demir eksikliği nasıl giderilir?",
+    "Yaprak bitleri buğdaya zarar verir mi?",
+    "Don zararı gören fidanlar kurtarılır mı?",
+    "Elma ağacım ne zaman meyveye gelir?",
+    "Bu hastalık kendiliğinden geçip gider mi?",
+])
+def test_budget_stems_do_not_leak_plant_questions(query):
+    # 'gider'/'zarar'/'gelir' are high-frequency non-financial agriculture
+    # words. Matching them as budget stems misrouted plant questions.
+    assert classify_by_rules(query) != "budget"
+
+
+@pytest.mark.parametrize("query", [
+    "Malç filmi serada nasıl kullanılır?",
+    "Fide takımı nasıl hazırlanır?",
+])
+def test_offscope_stems_do_not_leak_horticulture(query):
+    # 'film' prefixes plastic mulch film and 'takim' means set/kit as often
+    # as sports team; both are ordinary horticulture vocabulary.
+    assert classify_by_rules(query) != "offscope"

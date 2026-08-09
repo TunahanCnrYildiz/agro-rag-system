@@ -26,8 +26,12 @@ ROUTES: tuple[str, ...] = ("plant_info", "nutrition", "fert_plan", "budget",
 
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
-_BUDGET_STEMS = ("maliyet", "masraf", "gelir", "gider", "butce", "kazanc",
-                 "ciro", "zarar", "yatirim", "geri donus")
+_BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
+                 "ciro", "yatirim", "geri donus")
+# 'gelir', 'gider' and 'zarar' were dropped: all three are high-frequency
+# non-financial agriculture words ('giderilir' = remedied, 'zarar' = pest/frost
+# damage, 'gelir' = comes into fruit) and misrouted plant questions to budget.
+# See routing review, finding 1.
 # Whole-word only: folding 'kâr' gives 'kar', which is a left prefix of karar,
 # karnabahar, karisim, kardes. A stem match here would be a silent false positive.
 _BUDGET_WORDS = ("kar", "karli", "karlilik", "karlimi")
@@ -44,7 +48,10 @@ _CROP_CHOICE_PHRASES = ("ne eksem", "ne ekmek", "ne ekmeli", "ne ekeyim",
 
 _OFFSCOPE_STEMS = ("inek", "buzagi", "koyun", "tavuk", "hayvancilik",
                    "balik yetistir", "su urun", "traktor", "bicerdover",
-                   "banka", "kredi", "dolar", "borsa", "film", "takim")
+                   "banka", "kredi", "dolar", "borsa")
+# 'film' and 'takim' were dropped: 'film' prefixes plastic mulch film (a real
+# protected-cropping practice) and 'takim' means set/kit as often as sports
+# team ('fide takimi' = seedling kit). See routing review, finding 2.
 # Whole-word only: folded 'mac' is a left prefix of 'macar', and 'Macar fiği' is
 # a real forage legume. Same trap as 'kar'/'karar' above.
 _OFFSCOPE_WORDS = ("mac", "maci", "maclar")
