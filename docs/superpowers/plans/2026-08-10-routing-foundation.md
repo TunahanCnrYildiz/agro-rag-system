@@ -4,7 +4,9 @@
 
 **Goal:** Add intent routing in front of the answer pipeline and measure it, while changing no user-visible behaviour.
 
-**Architecture:** A new `src/router.py` classifies each query into one of six routes: a deterministic rule layer first, one classification call through the existing `ChatProfile` when the rules are undecided, and a fall back to today's behaviour on any failure. `engine.answer()` and `engine.stream_answer()` compute the route and record it, but every route still runs today's corpus path. Behaviour changes land in the two follow-up plans; this one makes routing exist, safe, and measurable.
+**Architecture:** A new `src/router.py` classifies each query into one of six routes with a deterministic rule layer, falling back to today's behaviour when no rule fires. `engine.answer()` computes the route and records it on `ChatResult`, but every route still runs today's corpus path. Behaviour changes land in the two follow-up plans; this one makes routing exist, safe, and measurable.
+
+**`stream_answer()` deliberately does NOT route in this plan.** It yields SSE events and has no result object to carry a diagnostic field, and emitting the route on the wire would change a response shape two clients already parse. Computing a route there that nothing reads would be dead code. But `stream_answer()` **is** the production path for both the mobile app and the web widget (`stream: true`), so **Plan 2 must wire routing into it as its first task** — otherwise the divergent routes ship to no real user. Recorded here rather than left to be discovered.
 
 **Tech Stack:** Python 3.14, pytest, existing `evals/` harness, OpenAI-compatible client already configured in `src/engine.py`.
 

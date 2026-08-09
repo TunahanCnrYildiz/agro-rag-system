@@ -706,6 +706,9 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
     # path below. Wiring it now, with behaviour unchanged, is what lets the 55
     # eval cases prove the router is harmless before any route diverges.
     try:
+        # Deferred on purpose: src/router.py imports _normalize_tr from THIS
+        # module at load time, so hoisting this to a top-level import makes the
+        # cycle real and raises ImportError on every startup. Keep it local.
         from src import router
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
