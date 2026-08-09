@@ -27,7 +27,11 @@ ROUTES: tuple[str, ...] = ("plant_info", "nutrition", "fert_plan", "budget",
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
 _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
-                 "ciro", "yatirim", "geri donus")
+                 "ciro", "yatirim")
+# 'geri donus' was dropped: it is a left-boundary prefix of 'geri dönüşüm'
+# (recycling), and misrouted plant-waste/composting questions to budget. The
+# one frozen case that used it ("Bu yatırımın geri dönüşü ne kadar sürer?")
+# already carries 'yatirim', so nothing is lost. See routing review, finding 4.
 # 'gelir', 'gider' and 'zarar' were dropped: all three are high-frequency
 # non-financial agriculture words ('giderilir' = remedied, 'zarar' = pest/frost
 # damage, 'gelir' = comes into fruit) and misrouted plant questions to budget.
@@ -39,6 +43,13 @@ _BUDGET_PHRASES = ("kac para", "ne kadar tutar", "ne kadar kazan")
 
 _NUTRITION_STEMS = ("gubre", "besle", "besleme", "azot", "fosfor", "potasyum",
                     "npk", "kompost", "besin")
+# 'besle'/'besin' are generic Turkish for "feed"/"nutrient", not plant-specific,
+# and matched animal-feeding questions ("İneklerimi nasıl beslerim?"). The
+# nutrition rule (no time stem to add specificity) needs a narrower set; the
+# fert_plan rule keeps the full tuple above because its required time stem
+# already supplies the missing specificity. See routing review, finding 5.
+_PLANT_NUTRITION_STEMS = ("gubre", "azot", "fosfor", "potasyum", "npk",
+                          "kompost")
 _TIME_STEMS = ("ne zaman", "hangi ay", "hangi donem", "takvim", "program",
                "donemde", "bu ay", "zamanla")
 
@@ -91,7 +102,7 @@ def classify_by_rules(message: str) -> Route | None:
     # gubre atmak"). Checking this before offscope keeps those in scope instead
     # of letting the livestock/machinery stems below catch them. See routing
     # review, finding 3.
-    if _has_stem(folded, _NUTRITION_STEMS):
+    if _has_stem(folded, _PLANT_NUTRITION_STEMS):
         return "nutrition"
 
     if _has_stem(folded, _OFFSCOPE_STEMS) or _has_word(folded, _OFFSCOPE_WORDS):

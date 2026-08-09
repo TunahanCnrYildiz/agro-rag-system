@@ -122,3 +122,31 @@ def test_livestock_without_nutrition_stays_offscope():
     # No nutrition stem here, so the carve-out must not fire and the livestock
     # stem must still route this to offscope.
     assert classify_by_rules("İneklerimin sütü azaldı, ne yapmalıyım?") == "offscope"
+
+
+@pytest.mark.parametrize("query", [
+    "İneklerimi nasıl beslerim?",
+    "Tavuklarımı ne ile beslemeliyim?",
+    "Buzağıları nasıl beslerim?",
+])
+def test_generic_feeding_verb_does_not_leak_to_nutrition(query):
+    # 'besle'/'besin' are generic Turkish for "feed"/"nutrient", not
+    # plant-specific. Without a plant-specific stem alongside them, an
+    # animal-feeding question must not route to nutrition.
+    assert classify_by_rules(query) != "nutrition"
+
+
+def test_recycling_does_not_leak_to_budget():
+    # 'geri donus' is a left-boundary prefix of 'geri dönüşüm' (recycling).
+    # Composting/organic-waste questions are in scope, not budget.
+    assert classify_by_rules("Bitki atıklarının geri dönüşümü nasıl yapılır?") != "budget"
+
+
+@pytest.mark.parametrize("query, route", [
+    ("İnek gübresi nasıl kullanılır?", "nutrition"),
+    ("Domates fidesi diktim, ne zaman besleyeyim?", "fert_plan"),
+    ("Bu yatırımın geri dönüşü ne kadar sürer?", "budget"),
+    ("İneklerimin sütü azaldı, ne yapmalıyım?", "offscope"),
+])
+def test_frozen_cases_still_hold(query, route):
+    assert classify_by_rules(query) == route
