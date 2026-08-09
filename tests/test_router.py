@@ -158,12 +158,15 @@ def test_rule_hit_reports_rule():
 
 
 def test_silent_rules_take_the_default_without_a_model_call(monkeypatch):
-    # No network, no client, no chat profile. If classify() ever reaches for the
-    # LLM, _get_llm is the first thing it would touch - so make touching it fatal.
+    # This test guards the central routing decision: classify() must never call
+    # the model when no rule fires. It patches OpenAI (not _get_llm itself) because
+    # _get_llm() constructs OpenAI(...) by looking the name up in engine's module
+    # globals at call time, so this intercepts the client construction no matter
+    # how _get_llm itself is imported or referenced.
     from src import engine
     def explode(*a, **k):
         raise AssertionError("classify() must not call the model")
-    monkeypatch.setattr(engine, "_get_llm", explode)
+    monkeypatch.setattr(engine, "OpenAI", explode)
     assert router.classify("Asmada budama ne zaman yapılır?") == ("plant_info", "default")
 
 
