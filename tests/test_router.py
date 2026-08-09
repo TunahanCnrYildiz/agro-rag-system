@@ -91,3 +91,34 @@ def test_offscope_stems_do_not_leak_horticulture(query):
     # 'film' prefixes plastic mulch film and 'takim' means set/kit as often
     # as sports team; both are ordinary horticulture vocabulary.
     assert classify_by_rules(query) != "offscope"
+
+
+@pytest.mark.parametrize("query", [
+    "İnek gübresi nasıl kullanılır?",
+    "Koyun gübresi hangi bitkilerde kullanılır?",
+    "Tavuk gübresi bitkilere zarar verir mi?",
+    "Traktörle gübre atarken nelere dikkat etmeliyim?",
+])
+def test_nutrition_stems_do_not_leak_to_offscope(query):
+    # These carry a nutrition stem ('gubre') but no time stem, so fert_plan's
+    # AND-gate does not fire. Without a carve-out they fell through to offscope,
+    # where 'inek'/'koyun'/'tavuk'/'traktor' matched. Animal manure is ordinary
+    # organic-fertilizer vocabulary; it must not be misrouted just because the
+    # animal is also named. See routing review, finding 3.
+    assert classify_by_rules(query) != "offscope"
+
+
+@pytest.mark.parametrize("query", [
+    "İnek gübresi nasıl kullanılır?",
+    "Koyun gübresi hangi bitkilerde kullanılır?",
+    "Tavuk gübresi bitkilere zarar verir mi?",
+    "Traktörle gübre atarken nelere dikkat etmeliyim?",
+])
+def test_nutrition_stems_route_to_nutrition(query):
+    assert classify_by_rules(query) == "nutrition"
+
+
+def test_livestock_without_nutrition_stays_offscope():
+    # No nutrition stem here, so the carve-out must not fire and the livestock
+    # stem must still route this to offscope.
+    assert classify_by_rules("İneklerimin sütü azaldı, ne yapmalıyım?") == "offscope"

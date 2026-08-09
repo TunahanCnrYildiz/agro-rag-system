@@ -86,6 +86,14 @@ def classify_by_rules(message: str) -> Route | None:
     if _has_stem(folded, _NUTRITION_STEMS) and _has_stem(folded, _TIME_STEMS):
         return "fert_plan"
 
+    # A nutrition stem without a time stem is still a plant-nutrition question,
+    # whatever animal or machine it happens to name ("inek gubresi", "traktorle
+    # gubre atmak"). Checking this before offscope keeps those in scope instead
+    # of letting the livestock/machinery stems below catch them. See routing
+    # review, finding 3.
+    if _has_stem(folded, _NUTRITION_STEMS):
+        return "nutrition"
+
     if _has_stem(folded, _OFFSCOPE_STEMS) or _has_word(folded, _OFFSCOPE_WORDS):
         return "offscope"
 
