@@ -868,3 +868,7 @@ Two follow-up plans complete the spec:
 
 - **Plan 2 — context and fertilization planning:** `src/context/{season,location,weather}.py`, `src/fertplan.py`, and the `fert_plan` route consuming them. Carries the agronomic review gate from spec §5.5 and the code-appended framing sentence from §7.
 - **Plan 3 — budget and crop choice:** `src/budget.py` and the `budget` / `crop_choice` routes. Asks for missing numbers, never invents them.
+
+**Binding condition on both.** The routing accuracy gate stays at 0.90, and Plan 2 may not make any route dispatch different behaviour until that gate is green. Merging the inert router over a correctly-reported failed gate is acceptable precisely because nothing dispatches on it yet — the moment a route changes behaviour, an 88%-accurate router starts misrouting real questions instead of harmlessly disagreeing with itself.
+
+Both real clients stream: `mobile-app/src/api.ts` and `web-widget/widget/agro-chat-widget.js` both send `stream: true`. `stream_answer()` does not route, so the router today runs on zero production traffic, and the 55-case eval exercises `answer()` — the path users do not hit. Consequently, a green shield in Plan 2 will say nothing about production until `stream_answer()` routes.

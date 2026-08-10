@@ -46,13 +46,13 @@ GATE_OFFSCOPE = "marker_offscope"
 GATE_NOPRODUCT = "marker_noproduct"
 GATE_BACKSTOP = "backstop"      # _looks_non_product fired on the answer text
 GATE_OPEN = "open"              # nothing closed: products shown
-GATE_ERROR = "error"        # the model call raised - NOT a gate closure
+GATE_ERROR = "error"            # the model call raised - NOT a gate closure
 
 
 def _attribute_gate(raw_count: int, answer_text: str) -> tuple[str, dict]:
     """Mirror engine.answer()'s gating order and name the gate that closes.
 
-    Kept as a faithful replay of engine.answer() lines 712-722 rather than a
+    Kept as a faithful replay of engine.answer() lines 726-736 rather than a
     reimplementation of the rules: every predicate below is the engine's own
     function, so only the ORDER is restated here. _selftest() guards that.
     """

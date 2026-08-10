@@ -21,9 +21,6 @@ from src.engine import _normalize_tr
 Route = Literal["plant_info", "nutrition", "fert_plan", "budget",
                 "crop_choice", "offscope"]
 
-ROUTES: tuple[str, ...] = ("plant_info", "nutrition", "fert_plan", "budget",
-                           "crop_choice", "offscope")
-
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
 _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
@@ -31,7 +28,7 @@ _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
 # 'geri donus' was dropped: it is a left-boundary prefix of 'geri dönüşüm'
 # (recycling), and misrouted plant-waste/composting questions to budget. The
 # one frozen case that used it ("Bu yatırımın geri dönüşü ne kadar sürer?")
-# already carries 'yatirim', so nothing is lost. See routing review, finding 4.
+# already carries 'yatirim', so nothing is lost. See routing review, finding 4.2.
 # 'gelir', 'gider' and 'zarar' were dropped: all three are high-frequency
 # non-financial agriculture words ('giderilir' = remedied, 'zarar' = pest/frost
 # damage, 'gelir' = comes into fruit) and misrouted plant questions to budget.
@@ -41,13 +38,19 @@ _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
 _BUDGET_WORDS = ("kar", "karli", "karlilik", "karlimi")
 _BUDGET_PHRASES = ("kac para", "ne kadar tutar", "ne kadar kazan")
 
-_NUTRITION_STEMS = ("gubre", "besle", "besleme", "azot", "fosfor", "potasyum",
+_NUTRITION_STEMS = ("gubre", "besle", "azot", "fosfor", "potasyum",
                     "npk", "kompost", "besin")
 # 'besle'/'besin' are generic Turkish for "feed"/"nutrient", not plant-specific,
 # and matched animal-feeding questions ("İneklerimi nasıl beslerim?"). The
-# nutrition rule (no time stem to add specificity) needs a narrower set; the
-# fert_plan rule keeps the full tuple above because its required time stem
-# already supplies the missing specificity. See routing review, finding 5.
+# nutrition rule (no time stem to add specificity) needs a narrower set, so it
+# uses _PLANT_NUTRITION_STEMS below instead. See routing review, finding 4.1.
+# The fert_plan rule still uses the full tuple above. The time stem does NOT
+# fix the collision, though: "İneklerimi ne zaman beslerim?", "Tavuklarımı
+# hangi ayda beslemeliyim?" and "Buzağıları ne zaman beslerim?" all measure
+# fert_plan. fert_plan is checked before the nutrition carve-out, so the same
+# collision just moves one precedence level up instead of being closed.
+# Fixing it is deferred to the next plan (see
+# docs/superpowers/2026-08-10-routing-foundation-findings.md).
 _PLANT_NUTRITION_STEMS = ("gubre", "azot", "fosfor", "potasyum", "npk",
                           "kompost")
 _TIME_STEMS = ("ne zaman", "hangi ay", "hangi donem", "takvim", "program",

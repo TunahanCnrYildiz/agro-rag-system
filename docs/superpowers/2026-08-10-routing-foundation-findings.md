@@ -159,6 +159,28 @@ product"), `ne ekmek` (collides with *ekmek* = bread), and `program` in
 `_TIME_STEMS`. None breaks the frozen set; none is user-visible while all routes
 share a path.
 
+Four more, found the same way — verified directly against `classify_by_rules`,
+none breaks the frozen set, none fixed:
+
+- `kar` in `_BUDGET_WORDS` is also *snow*. `"Kar yağışı bitkilere zarar verir
+  mi?"` → `budget`, and `"Karlı havada seraya ne yapmalıyım?"` → `budget` via
+  `karli`. This is the worst of the set: snow damage and snow cover are
+  ordinary agronomy vocabulary, not edge cases. The existing whole-word
+  matching fixed the *prefix* trap (`karar`, `karnabahar`) but does nothing
+  against homonymy — `kar` the word for money and `kar` the word for snow fold
+  to the identical token.
+- `koyun` in `_OFFSCOPE_STEMS` is also the imperative "put" (from *koymak*).
+  `"Fideleri saksıya koyun."` → `offscope`.
+- `dolar` in `_OFFSCOPE_STEMS` is also the verb "fills" (from *dolmak*).
+  `"Sera nemle dolar mı?"` → `offscope`.
+- `bu ay` in `_TIME_STEMS` left-boundary-matches inside `bu ayçiçeği`
+  ("this sunflower"). `"Bu ayçiçeği tarlasına ne kadar gübre atmalıyım?"` →
+  `fert_plan`.
+
+All seven collisions in this section are inert today — every route still runs
+through the same answer path — and become user-visible the moment a route
+dispatches to different behaviour.
+
 **The underlying property, not a bug to patch away.** Four rounds of collisions
 were found and fixed in the rule lists — `gider`/`giderilir`, `zararlı` = pest,
 `İnek gübresi` → offscope, `besle` → animal feeding, `geri dönüş` → recycling.
