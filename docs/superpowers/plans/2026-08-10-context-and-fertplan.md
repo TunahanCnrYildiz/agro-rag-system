@@ -466,15 +466,34 @@ _FOLDED = {_normalize_tr(p): p for p in PROVINCES}
 _ORDERED = sorted(_FOLDED, key=len, reverse=True)
 
 
+# Case suffixes that may follow a bare province name. ENUMERATED on purpose:
+# allowing "any letters" makes "Van" match inside "vantilator". Text reaching
+# here is already ASCII-folded, so the suffixes appear folded too.
+_SUFFIX = r"(?:[dt][ae]n?|[yn]?[aeiu]n?|l[iu])?"
+
+# Provinces this short collide with ordinary words once folded: "kars"+i is
+# "karsi" (karsi), "mus"+a is "musa". For these a bare vowel suffix is not
+# evidence enough - require an apostrophe or an explicit locative/ablative.
+_SHORT = 4
+_STRICT_SUFFIX = r"(?:[dt][ae]n?|[yn]?[ae])"
+
+
 def _find(text: str) -> str | None:
-    """Left-boundary match, so a province may carry Turkish case suffixes
-    ("Manisa'dayım", "manisada") but never fires inside a longer word
-    ("Van" must not match "vantilatör")."""
+    """Match a province, tolerating Turkish case suffixes but never firing
+    inside a longer word.
+
+    Two forms are accepted. An apostrophe is an unambiguous proper-noun
+    boundary in Turkish, so anything may follow it ("Manisa'dayim",
+    "Kars'ta"). Without one, only a known case suffix may follow and the word
+    must then END - which is what keeps "Van" out of "vantilator".
+    """
     folded = _normalize_tr(text)
     for key in _ORDERED:
-        if re.search(rf"(?<!\w){re.escape(key)}(?!\w|')", folded):
+        k = re.escape(key)
+        if re.search(rf"(?<!\w){k}'", folded):
             return _FOLDED[key]
-        if re.search(rf"(?<!\w){re.escape(key)}(?=[a-z']*\b)", folded):
+        suffix = _STRICT_SUFFIX if len(key) <= _SHORT else _SUFFIX
+        if re.search(rf"(?<!\w){k}{suffix}(?!\w)", folded):
             return _FOLDED[key]
     return None
 
