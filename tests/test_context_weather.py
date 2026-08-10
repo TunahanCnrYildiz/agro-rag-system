@@ -4,10 +4,12 @@ would be slow, flaky, and would fail in CI."""
 import src.context.weather as weather
 
 
-def _stub(monkeypatch, geo=None, fc=None, boom=None):
+def _stub(monkeypatch, geo=None, fc=None, boom=None, fc_boom=None):
     def fake_get(url, params=None, timeout=None):
         if boom:
             raise boom
+        if fc_boom and "geocoding" not in url:
+            raise fc_boom
         class R:
             status_code = 200
             def raise_for_status(self): pass
@@ -34,6 +36,20 @@ def test_returns_a_phrase_naming_rain_and_temperature(monkeypatch):
 
 def test_network_failure_returns_none_and_does_not_raise(monkeypatch):
     _stub(monkeypatch, boom=TimeoutError("timed out"))
+    assert weather.forecast("Manisa") is None
+
+
+def test_forecast_request_failure_after_successful_geocode_returns_none(monkeypatch):
+    _stub(monkeypatch, geo=GEO, fc_boom=TimeoutError("timed out"))
+    assert weather.forecast("Manisa") is None
+
+
+def test_malformed_forecast_payload_returns_none_and_does_not_raise(monkeypatch):
+    _stub(monkeypatch, geo=GEO, fc={"daily": {
+        "precipitation_sum": ["N/A"],
+        "temperature_2m_min": ["N/A"],
+        "temperature_2m_max": ["N/A"],
+    }})
     assert weather.forecast("Manisa") is None
 
 

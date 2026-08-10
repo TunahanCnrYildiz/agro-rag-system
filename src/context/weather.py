@@ -65,9 +65,8 @@ def forecast(province: str) -> str | None:
         tmax = [x for x in (daily.get("temperature_2m_max") or []) if x is not None]
         if not (rain and tmin and tmax):
             return None
+        total_rain = round(sum(rain), 1)
+        return (f"önümüzdeki hafta toplam {total_rain} mm yağış bekleniyor, "
+                f"sıcaklık {round(min(tmin))}-{round(max(tmax))} °C aralığında")
     except Exception:  # noqa: BLE001
         return None
-
-    total_rain = round(sum(rain), 1)
-    return (f"önümüzdeki hafta toplam {total_rain} mm yağış bekleniyor, "
-            f"sıcaklık {round(min(tmin))}-{round(max(tmax))} °C aralığında")
