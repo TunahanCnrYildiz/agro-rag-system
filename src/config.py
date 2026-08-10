@@ -134,6 +134,29 @@ class Settings(BaseSettings):
     # Set False to restore single-query retrieval.
     cross_lingual_retrieval: bool = Field(default=True)
 
+    # --- Prebuilt vector store (first-boot bootstrap) --- #
+    # Defaults are the REAL archive, not placeholders, for the same reason the
+    # generation params above carry real values: a fresh clone or container must
+    # end up with the corpus the system was measured against, without anyone
+    # having to be told a magic URL. Re-ingesting instead does NOT reproduce it -
+    # the Internet Archive returns different books over time - so a machine that
+    # builds its own store answers from a different, much smaller knowledge base.
+    #
+    # The checksum is not optional decoration: a truncated download yields a
+    # store that opens and answers badly rather than failing, which is far harder
+    # to notice than a crash.
+    #
+    # MAINTENANCE: this URL is a personal Google Drive share. It works, but Drive
+    # has a daily download quota and the link dies with that account's access.
+    # Move the archive to a company-owned location (a release asset or an R2/S3
+    # object) and change these two lines - nothing else needs to know.
+    vector_store_url: str = Field(
+        default="https://drive.google.com/file/d/1t0TCPAw4kKDE_APZw6KPNqvb5CsHAu44/view?usp=sharing"
+    )
+    vector_store_sha256: str = Field(
+        default="64cb1eba3fe1f87646cb158bd2a40342a2b1d6c904436eba1f5f3f15150a9d25"
+    )
+
     # --- Ingestion params --- #
     chunk_size: int = Field(default=1000)
     chunk_overlap: int = Field(default=200)

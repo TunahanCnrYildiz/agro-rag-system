@@ -16,22 +16,23 @@ set -eu
 
 VECTOR_STORE_DIR="data/vector_store"
 
-if [ -n "${VECTOR_STORE_URL:-}" ]; then
-    # The "is it already populated?" decision lives in the Python module, which
-    # knows a lone .gitkeep is not a store. Running it unconditionally keeps
-    # that judgement in one place.
-    echo "[entrypoint] VECTOR_STORE_URL set - fetching the prebuilt store"
-    python -m src.fetch_vector_store
-elif [ ! -d "$VECTOR_STORE_DIR" ] || [ -z "$(ls -A "$VECTOR_STORE_DIR" 2>/dev/null)" ]; then
-    echo "[entrypoint] no VECTOR_STORE_URL and $VECTOR_STORE_DIR is empty"
-    echo "[entrypoint] falling back to fetch+ingest - this builds a DIFFERENT, smaller corpus"
+# No configuration needed: the archive URL and its checksum are defaults in
+# src/config.py, and VECTOR_STORE_URL / VECTOR_STORE_SHA256 override them if a
+# deployment wants a different source. The "is it already populated?" decision
+# lives in the Python module too, which knows a lone .gitkeep is not a store -
+# keeping that judgement in one place.
+echo "[entrypoint] ensuring $VECTOR_STORE_DIR is populated"
+if python -m src.fetch_vector_store; then
+    :
+else
+    echo "[entrypoint] prebuilt store unavailable - falling back to fetch+ingest"
+    echo "[entrypoint] WARNING: this builds a DIFFERENT corpus, roughly a tenth the size,"
+    echo "[entrypoint] because the Internet Archive returns different books over time."
     python -m src.fetch_fao --max "${FETCH_FAO_MAX:-100}"
     python -m src.fetch_dergipark --max "${FETCH_DERGIPARK_MAX:-120}"
     python -m src.fetch_openalex --max "${FETCH_OPENALEX_MAX:-25}"
     python -m src.fetch_books --max "${FETCH_BOOKS_MAX:-250}"
     python -m src.ingest
-else
-    echo "[entrypoint] $VECTOR_STORE_DIR already populated - nothing to do"
 fi
 
 echo "[entrypoint] data/ (persisted on the volume):"

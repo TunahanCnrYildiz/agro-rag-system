@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import re
 import shutil
 import sqlite3
@@ -36,7 +35,7 @@ from pathlib import Path
 
 import requests
 
-from src.config import VECTOR_STORE_DIR
+from src.config import VECTOR_STORE_DIR, settings
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
@@ -231,16 +230,21 @@ def run(url: str, force: bool = False, expected_sha: str | None = None) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--url", default=os.getenv("VECTOR_STORE_URL"),
-                   help="archive URL (default: VECTOR_STORE_URL)")
-    p.add_argument("--sha256", default=os.getenv("VECTOR_STORE_SHA256"),
-                   help="expected SHA-256 (default: VECTOR_STORE_SHA256)")
+    # Both default to the configured archive, so a fresh machine needs no
+    # arguments and no environment at all. settings already layers .env and the
+    # environment over the values in config.py, so VECTOR_STORE_URL /
+    # VECTOR_STORE_SHA256 still override without any extra plumbing here.
+    p.add_argument("--url", default=settings.vector_store_url,
+                   help="archive URL (default: settings.vector_store_url)")
+    p.add_argument("--sha256", default=settings.vector_store_sha256,
+                   help="expected SHA-256 (default: settings.vector_store_sha256)")
     p.add_argument("--force", action="store_true",
                    help="replace an existing store instead of skipping")
     args = p.parse_args()
     if not args.url:
         raise SystemExit(
-            "URL yok. --url verin ya da VECTOR_STORE_URL ayarlayin."
+            "URL yok. --url verin, VECTOR_STORE_URL ayarlayin, ya da "
+            "src/config.py'deki vector_store_url varsayilanini doldurun."
         )
     run(args.url, force=args.force, expected_sha=args.sha256)
 
