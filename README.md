@@ -451,25 +451,28 @@ rebuild the corpus or to re-derive `year`/`era` metadata.
    and `EMBEDDING_IDENTITY=bge-m3` unless you are deliberately switching provider.
 4. **Get `data/vector_store/` — do not re-ingest it.** Re-ingesting takes hours
    *and* does not reproduce the same corpus, because the Internet Archive
-   returns different books over time. Either copy the directory across, or let
-   the machine fetch a prebuilt archive:
+   returns different books over time. One command, no arguments:
 
    ```bash
-   export VECTOR_STORE_URL=https://.../vector_store.zip
-   export VECTOR_STORE_SHA256=64cb1eba...          # always set this
    python -m src.fetch_vector_store
    ```
 
-   It skips silently if the store is already populated (`--force` to replace,
-   which moves the old one aside rather than deleting it). Any URL that serves
-   the zip works — a GitHub release asset, an S3/R2 object, a plain web server;
-   Google Drive share links are handled too. **Set the checksum.** A truncated
-   download yields a store that opens and answers badly instead of failing,
-   which is much harder to notice than a crash.
+   The archive URL and its checksum are defaults in `src/config.py`, so this
+   needs no configuration. It skips silently when the store is already
+   populated (`--force` replaces it, moving the old one aside rather than
+   deleting it).
 
-   The same variables drive `docker-entrypoint.sh`, so a container fetches the
-   store on first boot. Without them it falls back to the old fetch+ingest,
-   which builds a corpus roughly a tenth the size.
+   `docker-entrypoint.sh` runs the same command on first boot, so a container
+   needs no setup either. If the download fails it falls back to the old
+   fetch+ingest, which builds a corpus roughly a tenth the size — the log says
+   so loudly when that happens.
+
+   To serve the archive from somewhere else, set `VECTOR_STORE_URL` and
+   `VECTOR_STORE_SHA256` (or edit the two defaults). Any URL that serves the zip
+   works — a release asset, an S3/R2 object, a plain web server; Google Drive
+   share links are handled too. **Change the checksum with the URL.** A
+   truncated download yields a store that opens and answers badly instead of
+   failing, which is much harder to notice than a crash.
 5. **Backend** — `python -m src.main` (uvicorn on `:8000`), or
    `docker compose up --build`.
 6. **Mobile app** (optional) — `npm install`, then set `EXPO_PUBLIC_API_BASE` to
