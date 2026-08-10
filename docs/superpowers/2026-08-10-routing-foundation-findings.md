@@ -11,14 +11,19 @@ changes what a user receives — that was the point of doing this first.
 
 ## 1. Environment
 
-The Faz 0 baseline was measured on a chat model that had fallen back to CPU:
-**8.2 tok/s** against a 120 s client timeout, so 25 of 57 probe samples timed out
-and measured nothing. Restarting LM Studio did not fix it; the machine has an
-**AMD Radeon RX 9070 XT** and no NVIDIA GPU, and LM Studio silently uses the CPU
-unless a suitable runtime is selected.
+The Faz 0 baseline was measured at **8.2 tok/s** against a 120 s client timeout,
+so 25 of 57 probe samples timed out and measured nothing. Reloading the model in
+LM Studio restored **61.3 tok/s**, a 7.5× recovery. Every number below was
+measured after that.
 
-After the GPU was engaged: **61.3 tok/s**, a 7.5× recovery. Every number below
-was measured after that.
+This is the same fault, and the same fix, as the one already diagnosed on
+2026-07-28: model layers spill from VRAM to system RAM, throughput drops ~8×,
+and **the spill does not self-correct — the model must be ejected and reloaded**.
+It is not a CPU fallback and not a runtime-selection problem; the backend is
+Vulkan llama.cpp and that is correct. The GPU-memory counter
+(`Get-Counter '\GPU Process Memory(*)\Shared Usage'`) is what distinguishes the
+two, and it was not run this time — the cause here is inferred from the identical
+symptom and the identical fix, not measured.
 
 A second observation from the same check, unrelated to this branch but worth
 recording: with the production settings, a typical answer spends **~2,028
