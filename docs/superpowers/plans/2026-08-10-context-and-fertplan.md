@@ -79,8 +79,15 @@ def test_stream_answer_survives_a_router_failure(monkeypatch):
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
     monkeypatch.setattr(engine, "_get_llm", lambda: (_ for _ in ()).throw(RuntimeError("no stream")))
-    out = "".join(engine.stream_answer("Herhangi bir soru"))
-    assert "Kompost kullanabilirsiniz." in out
+    # The router raises. What must hold is that streaming COMPLETES and closes
+    # cleanly instead of propagating - what the reply says is the LLM path's
+    # business, not the router's. (With _get_llm down, stream_answer takes its
+    # own unavailable-message branch and never reaches _complete_text; asserting
+    # on the mocked text here would test that branch, not the router.)
+    events = [json.loads(e[6:]) for e in engine.stream_answer("Herhangi bir soru")
+              if e.startswith("data: ")]
+    assert events[-1]["type"] == "done"
+    assert any(e["type"] == "token" for e in events)
 ```
 
 - [ ] **Step 2: Run to verify they fail**
