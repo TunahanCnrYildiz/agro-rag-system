@@ -676,7 +676,9 @@ The mechanism ships now; the agronomy does not. The table starts **empty** and s
 - Test: `tests/test_fertplan.py`
 
 **Interfaces:**
-- Produces: `lookup(crop: str, stage: str | None) -> list[dict]` returning reviewed rows for a crop (empty list when none), `available_crops() -> tuple[str, ...]`, and `FRAMING` — the fixed sentence Task 7 appends.
+- Produces: `lookup(crop: str, stage: str | None) -> list[dict]` returning reviewed rows for a crop (empty list when none), `available_crops() -> tuple[str, ...]`, `detect_crop(message: str) -> str | None`, and `FRAMING` — the fixed sentence Task 7 appends.
+
+**`detect_crop` matches against the table's OWN keys**, not a separate crop list. Two consequences worth having: with an empty table it always returns `None`, so nothing downstream can produce a plan; and when a reviewed crop is added, detection starts working with no code change. There is no second list to keep in sync.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -736,6 +738,22 @@ def test_a_missing_table_file_is_not_an_error(monkeypatch, tmp_path):
 
 def test_framing_sentence_exists_and_says_it_is_an_estimate():
     assert "tahmin" in fertplan.FRAMING.lower()
+
+
+def test_detect_crop_finds_nothing_while_the_table_is_empty():
+    assert fertplan.detect_crop("Domatese ne zaman gübre vermeliyim?") is None
+
+
+def test_detect_crop_matches_a_reviewed_crop_with_turkish_suffixes(monkeypatch, tmp_path):
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
+    assert fertplan.detect_crop("Domatese ne zaman gübre vermeliyim?") == "domates"
+    assert fertplan.detect_crop("domatesin gübrelemesi") == "domates"
+    assert fertplan.detect_crop("Buğdaya ne zaman gübre vereyim?") is None
 ```
 
 - [ ] **Step 2: Run to verify they fail**
@@ -770,10 +788,12 @@ with `reviewed_by` filled in by the person who checked them. No code changes.
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
 from src.config import DATA_DIR
+from src.engine import _normalize_tr
 
 _TABLE_PATH = DATA_DIR / "fertplan_table.json"
 
@@ -805,6 +825,23 @@ def _load() -> dict[str, list[dict]]:
 def available_crops() -> tuple[str, ...]:
     """Crops with at least one reviewed row."""
     return tuple(sorted(_load()))
+
+
+def detect_crop(message: str) -> str | None:
+    """Which reviewed crop the message is about, or None.
+
+    Matched against the TABLE'S OWN KEYS so there is no second list to drift.
+    While the table is empty this can only return None, which is exactly the
+    behaviour we want before review has happened.
+
+    Left-boundary match, so a crop may carry Turkish suffixes ("domatese",
+    "domatesin") - the same convention the crop lexicon and the router use.
+    """
+    folded = _normalize_tr(message)
+    for crop in sorted(_load(), key=len, reverse=True):
+        if re.search(rf"(?<!\w){re.escape(_normalize_tr(crop))}", folded):
+            return crop
+    return None
 
 
 def lookup(crop: str, stage: str | None) -> list[dict]:
@@ -887,6 +924,7 @@ def test_context_block_survives_a_weather_outage(monkeypatch):
 
 
 def test_empty_table_does_not_refuse(monkeypatch):
+    from src import fertplan
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -894,19 +932,25 @@ def test_empty_table_does_not_refuse(monkeypatch):
     r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
     assert r.route == "fert_plan"
     assert "Domatese azot verebilirsiniz." in r.answer
-    assert engine.fertplan.FRAMING not in r.answer   # no plan, so no framing
+    assert fertplan.FRAMING not in r.answer   # no reviewed rows, so no framing
 
 
-def test_reviewed_rows_add_the_framing_sentence(monkeypatch):
+def test_reviewed_rows_add_the_framing_sentence(monkeypatch, tmp_path):
+    import json as _json
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(_json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "Fide döneminde ..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
-    monkeypatch.setattr(engine.fertplan, "lookup",
-                        lambda crop, stage: [{"stage": "fide", "reviewed_by": "Z",
-                                              "note": "Fide döneminde ..."}])
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Program: ...")
     r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
-    assert engine.fertplan.FRAMING in r.answer
+    assert fertplan.FRAMING in r.answer
+    fertplan._load.cache_clear()
 ```
 
 - [ ] **Step 2: Run to verify they fail**
@@ -919,9 +963,6 @@ Expected: FAIL — `AttributeError: module 'src.engine' has no attribute '_conte
 In `src/engine.py`, add near `_build_messages`:
 
 ```python
-from src import fertplan  # noqa: E402  (module level: no cycle, fertplan imports only config)
-
-
 def _context_block(route: str, message: str, history: list[dict] | None, today) -> str:
     """Situation lines for the fert_plan route: where, when, and what the weather
     is about to do. Empty string for every other route, so nothing else pays for
@@ -958,10 +999,15 @@ In `src/engine.py`, in `answer()`, after the marker stripping and before the ret
 
 ```python
     # Framing is appended by CODE, never asked of the model, so no model can drop
-    # it. Only when a reviewed plan was actually supplied - a general answer is
-    # advice already and does not need a prescription disclaimer.
-    if route == "fert_plan" and fertplan.available_crops():
-        answer_text = f"{answer_text.rstrip()}\n\n{fertplan.FRAMING}"
+    # it. Gated on rows ACTUALLY FOUND for this question, not on the table being
+    # non-empty: a general answer is advice already and needs no disclaimer.
+    if route == "fert_plan":
+        # Deferred import, same reason as router: fertplan reads _normalize_tr
+        # from this module, so a top-level import here is a real cycle.
+        from src import fertplan
+        crop = fertplan.detect_crop(message)
+        if crop and fertplan.lookup(crop, None):
+            answer_text = f"{answer_text.rstrip()}\n\n{fertplan.FRAMING}"
 ```
 
 - [ ] **Step 5: Run the tests**
