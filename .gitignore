@@ -8,7 +8,10 @@ env/
 .env
 
 # Vector store (persistent DB is large / regenerable)
-data/vector_store/
+# Any vector store, including the _old / _replaced backups the cleanup and
+# `fetch_vector_store --force` leave behind. The bare path missed those and
+# a `git add -A` swept 1.7 GB of them into a commit.
+data/vector_store*/
 
 # Source documents (books can be huge — keep out of git). The ** covers
 # subdirectories too (e.g. docs/books/_offtopic/, .../lowrelevance/), which the
