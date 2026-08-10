@@ -41,3 +41,7 @@ docs/retrieval_report.md
 
 # Per-run eval answer logs (from evals.answer_log)
 evals/runs/
+
+# Vector-store archives built for transfer - never commit (GB-scale)
+data/vector_store*.zip
+data/vector_store*.tar.gz
