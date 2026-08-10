@@ -41,3 +41,18 @@ def test_decide_ignores_by_how_entirely():
     assert decide({**passing, "by_how": {}}) is True
     assert decide({**failing, "by_how": {"model": 0, "default": 0}}) is False
     assert decide({**failing, "by_how": {"rule": 100}}) is False
+
+
+def test_wrong_entries_counts_only_incoming_errors(monkeypatch):
+    from evals import run_routing
+    # 'a' is right; 'b' expected plant_info but landed on budget.
+    routed = {"a": "budget", "b": "budget"}
+    monkeypatch.setattr(run_routing, "classify",
+                        lambda q, h=None: (routed[q], "rule"))
+    cases = [
+        {"query": "a", "route": "budget"},
+        {"query": "b", "route": "plant_info"},
+    ]
+    out = run_routing.wrong_entries(cases)
+    assert out["budget"] == 1        # one case wrongly ENTERED budget
+    assert out["plant_info"] == 0    # nothing wrongly entered plant_info

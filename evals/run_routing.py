@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
-from evals.routing_set import ROUTING_CASES  # noqa: E402
+from evals.routing_set import ROUTES, ROUTING_CASES  # noqa: E402
 from src.router import classify  # noqa: E402
 
 
@@ -42,6 +42,22 @@ def score(cases: list[dict]) -> dict:
         "by_how": dict(by_how),
         "misses": misses,
     }
+
+
+def wrong_entries(cases: list[dict]) -> dict[str, int]:
+    """Per route: how many cases from OTHER routes landed on it.
+
+    This is the risk the dispatch condition cares about. A route that only ever
+    LOSES cases to the default is harmless to dispatch on; a route that gains
+    cases it should not have starts handling real questions with the wrong
+    machinery the moment its behaviour diverges.
+    """
+    out = {r: 0 for r in ROUTES}
+    for c in cases:
+        got, _ = classify(c["query"])
+        if got != c["route"] and got in out:
+            out[got] += 1
+    return out
 
 
 ACCURACY_GATE = 0.90
@@ -73,6 +89,12 @@ def main() -> None:
         print("\nkacirilanlar:")
         for q, exp, got in out["misses"]:
             print(f"  beklenen={exp:<12} gelen={got:<12} {q}")
+    we = wrong_entries(ROUTING_CASES)
+    safe = [r for r, n in we.items() if n == 0]
+    unsafe = {r: n for r, n in we.items() if n}
+    print(f"\nsevke uygun rotalar (sifir yanlis giris): {', '.join(sorted(safe))}")
+    if unsafe:
+        print(f"yanlis giris alan rotalar: {unsafe}   <- bunlar davranis ayristiramaz")
     ok = decide(out)
     print("\nKAPILAR: " + ("GECTI" if ok else "GECMEDI"))
     sys.exit(0 if ok else 1)
