@@ -912,9 +912,15 @@ def stream_answer(
         if clean:
             full_answer += clean
             yield _sse({"type": "token", "content": clean})
+            emitted = True
 
     suffix = _framing_suffix(route, message)
-    if suffix and not (off_scope or no_product) and has_advice and emitted:
+    # Gated on full_answer, not `emitted`: the blank-answer backstop above streams
+    # a recovered answer without touching `emitted`, and framing that only lands
+    # on the warm path is framing the model can drop by returning an empty stream.
+    # full_answer carries real answer text only - the LLM-unavailable message is
+    # deliberately not accumulated into it.
+    if suffix and not (off_scope or no_product) and has_advice and full_answer:
         yield _sse({"type": "token", "content": f"\n\n{suffix}"})
 
     # Emit product recommendations only after the full answer has streamed (and

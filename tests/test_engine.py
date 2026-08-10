@@ -1227,8 +1227,10 @@ def test_context_block_survives_a_weather_outage(monkeypatch):
     assert out != ""
 
 
-def test_context_block_reaches_the_system_prompt(monkeypatch):
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+def test_context_block_reaches_the_system_prompt():
+    # Calls _build_messages directly, which never touches weather - patching
+    # src.context.weather.forecast here would make the test read as if it
+    # exercised the weather path when it does not.
     msgs = engine._build_messages("soru", None, "CTX", [], "DURUM SATIRI")
     assert "DURUM SATIRI" in msgs[0]["content"]
     assert msgs[0]["role"] == "system"
@@ -1246,9 +1248,23 @@ def test_build_messages_without_a_block_is_unchanged():
 # --------------------------------------------------------------------------- #
 # fert_plan framing sentence
 # --------------------------------------------------------------------------- #
-def test_empty_table_does_not_refuse(monkeypatch):
+@pytest.fixture(autouse=True)
+def _clear_fertplan_load_cache():
+    """`fertplan._load` is `lru_cache`d, but `monkeypatch.setattr(_TABLE_PATH, ...)`
+    only restores the path at teardown - it never touches the cache. Without
+    this, a table written by test N can still be sitting in the cache when test
+    N+1 runs, so tests would pass or fail depending on execution order. Clear
+    both before (so this test reads its own fixture) and after (so the next
+    test doesn't inherit this one's). Modeled on the identical fixture in
+    tests/test_fertplan.py."""
     from src import fertplan
     fertplan._load.cache_clear()
+    yield
+    fertplan._load.cache_clear()
+
+
+def test_empty_table_does_not_refuse(monkeypatch):
+    from src import fertplan
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -1257,7 +1273,6 @@ def test_empty_table_does_not_refuse(monkeypatch):
     assert r.route == "fert_plan"
     assert "Domatese azot verebilirsiniz." in r.answer
     assert fertplan.FRAMING not in r.answer   # no reviewed rows, so no framing
-    fertplan._load.cache_clear()
 
 
 def test_reviewed_rows_add_the_framing_sentence(monkeypatch, tmp_path):
@@ -1267,14 +1282,12 @@ def test_reviewed_rows_add_the_framing_sentence(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "Fide döneminde ..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Program: ...")
     r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
     assert fertplan.FRAMING in r.answer
-    fertplan._load.cache_clear()
 
 
 def test_framing_is_not_appended_to_a_fallback_message(monkeypatch, tmp_path):
@@ -1287,7 +1300,6 @@ def test_framing_is_not_appended_to_a_fallback_message(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -1295,7 +1307,6 @@ def test_framing_is_not_appended_to_a_fallback_message(monkeypatch, tmp_path):
                         lambda m: (_ for _ in ()).throw(RuntimeError("down")))
     r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
     assert fertplan.FRAMING not in r.answer
-    fertplan._load.cache_clear()
 
 
 def _fake_stream_client(text: str, chunk_size: int = 40):
@@ -1332,7 +1343,6 @@ def test_streaming_also_appends_the_framing_sentence(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -1348,13 +1358,17 @@ def test_streaming_also_appends_the_framing_sentence(monkeypatch, tmp_path):
         assert e["type"] in ("token", "products", "done"), e
     text = "".join(e["content"] for e in events if e["type"] == "token")
     assert fertplan.FRAMING in text
-    assert text.rstrip().endswith(fertplan.FRAMING)   # appended at the end, not mid-answer
-    fertplan._load.cache_clear()
+    # Ordering must be pinned on event position, not on the joined token text:
+    # joining only `token` events would still pass if framing were yielded
+    # AFTER the `products` event, which is exactly the ordering bug this guards.
+    framing_idx = next(i for i, e in enumerate(events)
+                       if e["type"] == "token" and fertplan.FRAMING in e["content"])
+    products_idx = next(i for i, e in enumerate(events) if e["type"] == "products")
+    assert framing_idx < products_idx
 
 
 def test_streaming_does_not_append_framing_without_reviewed_rows(monkeypatch):
     from src import fertplan
-    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -1366,7 +1380,6 @@ def test_streaming_does_not_append_framing_without_reviewed_rows(monkeypatch):
     text = "".join(e["content"] for e in events if e["type"] == "token")
     assert "Cevap:" in text
     assert fertplan.FRAMING not in text
-    fertplan._load.cache_clear()
 
 
 def test_streaming_does_not_frame_an_outage_message(monkeypatch, tmp_path):
@@ -1379,7 +1392,6 @@ def test_streaming_does_not_frame_an_outage_message(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    fertplan._load.cache_clear()
     monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
@@ -1390,4 +1402,31 @@ def test_streaming_does_not_frame_an_outage_message(monkeypatch, tmp_path):
               if e.startswith("data: ")]
     text = "".join(e["content"] for e in events if e["type"] == "token")
     assert fertplan.FRAMING not in text
-    fertplan._load.cache_clear()
+
+
+def test_streaming_appends_framing_on_the_blank_answer_backstop(monkeypatch, tmp_path):
+    # Finding 1: the third recovery branch in stream_answer (`not emitted and
+    # not failed`) streamed a recovered answer via _complete_text but never set
+    # `emitted = True` - so gating framing on `emitted` silently dropped it on
+    # exactly the path the backstop exists for: an empty stream that ends with
+    # finish_reason 'stop'. The gate must key off `full_answer` instead, which
+    # this branch does set.
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    # A stream that yields no content at all and closes with finish_reason
+    # 'stop' - the exact blank-answer case the backstop exists for.
+    monkeypatch.setattr(engine, "_get_llm", lambda: _fake_stream_llm([], finish="stop"))
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda m: "Domateste program: " + "x" * 200)
+    events = [json.loads(e[6:])
+              for e in engine.stream_answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+              if e.startswith("data: ")]
+    text = "".join(e["content"] for e in events if e["type"] == "token")
+    assert fertplan.FRAMING in text
