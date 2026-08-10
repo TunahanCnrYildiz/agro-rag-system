@@ -1138,3 +1138,51 @@ def test_router_failure_does_not_break_answering(monkeypatch):
     r = engine.answer("Herhangi bir soru")
     assert r.answer == "Kompost kullanabilirsiniz."
     assert r.route == ""
+
+
+def test_stream_answer_computes_the_route(monkeypatch):
+    seen = {}
+    from src import router
+    real = router.classify
+
+    def spy(message, history=None):
+        seen["route"] = real(message, history)
+        return seen["route"]
+
+    monkeypatch.setattr(router, "classify", spy)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    monkeypatch.setattr(engine, "_get_llm", lambda: (_ for _ in ()).throw(RuntimeError("no stream")))
+    list(engine.stream_answer("Domatese ne zaman gübre vermeliyim?"))
+    assert seen["route"] == ("fert_plan", "rule")
+
+
+def test_stream_answer_wire_format_has_no_route_field(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    monkeypatch.setattr(engine, "_get_llm", lambda: (_ for _ in ()).throw(RuntimeError("no stream")))
+    events = [json.loads(e[6:]) for e in engine.stream_answer("Merhaba") if e.startswith("data: ")]
+    for e in events:
+        assert "route" not in e, e
+        assert e["type"] in ("token", "products", "done"), e
+
+
+def test_stream_answer_survives_a_router_failure(monkeypatch):
+    from src import router
+    monkeypatch.setattr(router, "classify",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
+    monkeypatch.setattr(engine, "_get_llm", lambda: (_ for _ in ()).throw(RuntimeError("no stream")))
+    # The router raises. What must hold is that streaming COMPLETES and closes
+    # cleanly instead of propagating - what the reply says is the LLM path's
+    # business, not the router's. (With _get_llm down, stream_answer takes its
+    # own unavailable-message branch and never reaches _complete_text; asserting
+    # on the mocked text here would test that branch, not the router.)
+    events = [json.loads(e[6:]) for e in engine.stream_answer("Herhangi bir soru")
+              if e.startswith("data: ")]
+    assert events[-1]["type"] == "done"
+    assert any(e["type"] == "token" for e in events)

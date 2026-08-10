@@ -744,6 +744,15 @@ def stream_answer(
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
     a final 'done' event closes the stream."""
+    # Same deferred import as answer(): src/router.py imports _normalize_tr from
+    # THIS module at load time, so a top-level import here is a real cycle.
+    # Behaviour-neutral in this task - Task 7 is what consumes the route.
+    try:
+        from src import router
+        route, route_how = router.classify(message, history)
+    except Exception:  # noqa: BLE001 - routing must never break answering
+        route, route_how = "", ""
+
     context = retrieve_context(message, history=history)
     products = match_products(message, context)
     messages = _build_messages(message, history, context, products)
