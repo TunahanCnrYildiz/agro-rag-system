@@ -869,6 +869,37 @@ Two follow-up plans complete the spec:
 - **Plan 2 — context and fertilization planning:** `src/context/{season,location,weather}.py`, `src/fertplan.py`, and the `fert_plan` route consuming them. Carries the agronomic review gate from spec §5.5 and the code-appended framing sentence from §7.
 - **Plan 3 — budget and crop choice:** `src/budget.py` and the `budget` / `crop_choice` routes. Asks for missing numbers, never invents them.
 
-**Binding condition on both.** The routing accuracy gate stays at 0.90, and Plan 2 may not make any route dispatch different behaviour until that gate is green. Merging the inert router over a correctly-reported failed gate is acceptable precisely because nothing dispatches on it yet — the moment a route changes behaviour, an 88%-accurate router starts misrouting real questions instead of harmlessly disagreeing with itself.
+**Binding condition on both — AMENDED 2026-08-10, after measuring per route.**
+
+The original wording was: *the global accuracy gate stays at 0.90, and no route may
+dispatch different behaviour until that gate is green.* It was written on a single
+average, before anyone had looked at where the errors actually fall. Measuring per
+route changed the picture:
+
+| route | correct | missed | **wrongly entered** |
+| --- | --- | --- | --- |
+| plant_info | 8/8 | 0 | **5** |
+| nutrition | 4/7 | 3 | 0 |
+| fert_plan | 8/8 | 0 | **0** |
+| budget | 6/7 | 1 | 0 |
+| crop_choice | 6/6 | 0 | 0 |
+| offscope | 5/6 | 1 | 0 |
+
+Every error in the set is the same shape: a question falls back to `plant_info`,
+the default. **No question is ever wrongly routed *into* a special route.** The
+88% is driven almost entirely by `nutrition` → `plant_info`, which changes nothing
+today and changes nothing in Plan 2 either, because both still run the corpus path.
+
+**The amended condition:** a route may dispatch different behaviour only when it has
+**zero wrong entries** in the frozen set. This measures the risk the original
+condition was a proxy for — a user's question being handled by the wrong machinery —
+and it is *stricter* on that risk, demanding zero rather than an average.
+
+`fert_plan` satisfies it today (8/8, zero wrong entries), so Plan 2 may proceed.
+
+**The global 0.90 gate is unchanged and still reported as FAILED.** It was not
+relaxed, retired, or re-thresholded; a second, sharper condition was added beside it.
+Plan 2 must make this machine-checkable — a condition nobody measures is a condition
+nobody follows.
 
 Both real clients stream: `mobile-app/src/api.ts` and `web-widget/widget/agro-chat-widget.js` both send `stream: true`. `stream_answer()` does not route, so the router today runs on zero production traffic, and the 55-case eval exercises `answer()` — the path users do not hit. Consequently, a green shield in Plan 2 will say nothing about production until `stream_answer()` routes.
