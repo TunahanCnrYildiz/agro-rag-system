@@ -2,6 +2,7 @@
 embedding clients are all monkeypatched)."""
 
 import json
+from datetime import date
 
 from src import engine
 from src.engine import _cosine, _strip_markers, detect_language
@@ -1186,3 +1187,207 @@ def test_stream_answer_survives_a_router_failure(monkeypatch):
               if e.startswith("data: ")]
     assert events[-1]["type"] == "done"
     assert any(e["type"] == "token" for e in events)
+
+
+# --------------------------------------------------------------------------- #
+# fert_plan context block
+# --------------------------------------------------------------------------- #
+def test_context_block_is_empty_off_the_fert_plan_route():
+    assert engine._context_block(
+        "plant_info", "Asmada budama ne zaman yapılır?", None, date(2026, 8, 10)) == ""
+    assert engine._context_block(
+        "", "Herhangi bir soru", None, date(2026, 8, 10)) == ""
+
+
+def test_context_block_names_season_and_province(monkeypatch):
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: "yağış yok")
+    out = engine._context_block(
+        "fert_plan", "Manisa'dayım, domatese ne zaman gübre vermeliyim?",
+        None, date(2026, 8, 10))
+    assert "Manisa" in out
+    assert "Ağustos" in out
+    assert "yağış yok" in out
+
+
+def test_context_block_asks_for_the_province_when_missing(monkeypatch):
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: "yağış yok")
+    out = engine._context_block(
+        "fert_plan", "Domatese ne zaman gübre vermeliyim?", None, date(2026, 8, 10))
+    assert "Ağustos" in out                      # season still known
+    assert "ili BILINMIYOR" in out               # and it says the province is unknown
+    assert "yağış" not in out                    # no province => no weather line
+
+
+def test_context_block_survives_a_weather_outage(monkeypatch):
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    out = engine._context_block(
+        "fert_plan", "Manisa'dayım, domatese ne zaman gübre vermeliyim?",
+        None, date(2026, 8, 10))
+    assert "Manisa" in out
+    assert out != ""
+
+
+def test_context_block_reaches_the_system_prompt(monkeypatch):
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    msgs = engine._build_messages("soru", None, "CTX", [], "DURUM SATIRI")
+    assert "DURUM SATIRI" in msgs[0]["content"]
+    assert msgs[0]["role"] == "system"
+    assert len(msgs) == 2                        # shape unchanged: system + user
+
+
+def test_build_messages_without_a_block_is_unchanged():
+    # The 4-argument call site (evals/probe_product_gate.py) must keep working
+    # and must produce exactly what it produced before this task.
+    a = engine._build_messages("soru", None, "CTX", [])
+    b = engine._build_messages("soru", None, "CTX", [], "")
+    assert a == b
+
+
+# --------------------------------------------------------------------------- #
+# fert_plan framing sentence
+# --------------------------------------------------------------------------- #
+def test_empty_table_does_not_refuse(monkeypatch):
+    from src import fertplan
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Domatese azot verebilirsiniz.")
+    r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+    assert r.route == "fert_plan"
+    assert "Domatese azot verebilirsiniz." in r.answer
+    assert fertplan.FRAMING not in r.answer   # no reviewed rows, so no framing
+    fertplan._load.cache_clear()
+
+
+def test_reviewed_rows_add_the_framing_sentence(monkeypatch, tmp_path):
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "Fide döneminde ..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: "Program: ...")
+    r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+    assert fertplan.FRAMING in r.answer
+    fertplan._load.cache_clear()
+
+
+def test_framing_is_not_appended_to_a_fallback_message(monkeypatch, tmp_path):
+    # The LLM is down, so the reply is our own "cannot answer" text. Appending
+    # "this programme is an estimate" to it would claim a programme that does
+    # not exist.
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda m: (_ for _ in ()).throw(RuntimeError("down")))
+    r = engine.answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+    assert fertplan.FRAMING not in r.answer
+    fertplan._load.cache_clear()
+
+
+def _fake_stream_client(text: str, chunk_size: int = 40):
+    """A stand-in LM Studio client that actually streams `text`.
+
+    Mocking _get_llm to RAISE cannot be used to exercise anything downstream of
+    the stream: stream_answer then takes its own unavailable-message branch,
+    sets has_advice=False, and never reaches _complete_text - so the test would
+    measure the outage path instead. See the comment on
+    test_stream_answer_survives_a_router_failure, which records the same trap.
+    """
+    from types import SimpleNamespace
+
+    def _chunk(content, finish=None):
+        return SimpleNamespace(choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=content), finish_reason=finish)])
+
+    parts = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+    def create(**kwargs):
+        return iter([_chunk(p) for p in parts] + [_chunk("", "stop")])
+
+    return SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+
+def test_streaming_also_appends_the_framing_sentence(monkeypatch, tmp_path):
+    # BOTH real clients stream (mobile-app/src/api.ts and
+    # web-widget/widget/agro-chat-widget.js send stream:true). Framing that only
+    # lands on answer() reaches no user at all.
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_client("Domateste program: " + "x" * 200))
+    events = [json.loads(e[6:])
+              for e in engine.stream_answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+              if e.startswith("data: ")]
+    # The framing must arrive as ordinary answer text, before the stream closes,
+    # and the wire format must not have grown a new event type.
+    assert events[-1]["type"] == "done"
+    for e in events:
+        assert e["type"] in ("token", "products", "done"), e
+    text = "".join(e["content"] for e in events if e["type"] == "token")
+    assert fertplan.FRAMING in text
+    assert text.rstrip().endswith(fertplan.FRAMING)   # appended at the end, not mid-answer
+    fertplan._load.cache_clear()
+
+
+def test_streaming_does_not_append_framing_without_reviewed_rows(monkeypatch):
+    from src import fertplan
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_client("Cevap: " + "x" * 200))
+    events = [json.loads(e[6:])
+              for e in engine.stream_answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+              if e.startswith("data: ")]
+    text = "".join(e["content"] for e in events if e["type"] == "token")
+    assert "Cevap:" in text
+    assert fertplan.FRAMING not in text
+    fertplan._load.cache_clear()
+
+
+def test_streaming_does_not_frame_an_outage_message(monkeypatch, tmp_path):
+    # The LLM is unreachable, so the reply is our own fallback text. Framing it
+    # would claim a fertilization programme that was never produced. This is the
+    # streaming twin of test_framing_is_not_appended_to_a_fallback_message.
+    from src import fertplan
+    table = tmp_path / "t.json"
+    table.write_text(json.dumps({"domates": [
+        {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
+    ]}), encoding="utf-8")
+    monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
+    fertplan._load.cache_clear()
+    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: (_ for _ in ()).throw(RuntimeError("down")))
+    events = [json.loads(e[6:])
+              for e in engine.stream_answer("Manisa'dayım, domatese ne zaman gübre vermeliyim?")
+              if e.startswith("data: ")]
+    text = "".join(e["content"] for e in events if e["type"] == "token")
+    assert fertplan.FRAMING not in text
+    fertplan._load.cache_clear()

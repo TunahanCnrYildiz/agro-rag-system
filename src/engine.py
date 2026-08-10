@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from typing import Iterator
 
@@ -626,11 +627,63 @@ def _complete_text(messages: list[dict]) -> str:
     return _empty_answer_message()
 
 
+def _context_block(route: str, message: str, history: list[dict] | None,
+                   today: date) -> str:
+    """Situation lines for the fert_plan route: where, when, and what the weather
+    is about to do. Empty string for every other route, so nothing else pays for
+    it and nothing else changes.
+
+    Weather is best-effort by design (see src/context/weather.py) - its absence
+    removes one line and never blocks the answer. The province is asked for in
+    chat rather than guessed: a wrong province produces confidently wrong timing.
+    """
+    if route != "fert_plan":
+        return ""
+
+    # Deferred: src/context/location.py imports _normalize_tr from THIS module at
+    # load time, so a top-level import here is a real cycle.
+    from src.context import location, season, weather
+
+    lines = [f"Tarih: {season.describe(today)}."]
+    province = location.extract_province(message, history)
+    if province:
+        lines.append(f"Kullanicinin ili: {province}.")
+        fc = weather.forecast(province)
+        if fc:
+            lines.append(f"Hava durumu: {fc}.")
+    else:
+        lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
+                     "oldugunu sor, tavsiyeni genel tut.")
+    lines.append("Bitkinin fenolojik donemi bilinmiyorsa cevabinda sor "
+                 "(fide, cicek, meyve tutumu gibi).")
+    return "\n".join(lines)
+
+
+def _framing_suffix(route: str, message: str) -> str:
+    """The framing sentence, when this question actually has a reviewed plan
+    behind it. Empty string otherwise.
+
+    Gated on rows ACTUALLY FOUND for this question, not on the table being
+    non-empty: a general corpus answer is advice already and needs no
+    programme disclaimer. Appended by CODE, never asked of the model, so no
+    model can drop it.
+    """
+    if route != "fert_plan":
+        return ""
+    # Deferred: src/fertplan.py imports _normalize_tr from THIS module.
+    from src import fertplan
+    crop = fertplan.detect_crop(message)
+    if crop and fertplan.lookup(crop, None):
+        return fertplan.FRAMING
+    return ""
+
+
 def _build_messages(
     message: str,
     history: list[dict] | None,
     context: str,
     products: list[RecommendedProduct],
+    context_block: str = "",
 ) -> list[dict]:
     language_hint = detect_language(message)
     products_block = (
@@ -643,6 +696,12 @@ def _build_messages(
         context=context or "(no botany context retrieved)",
         products=products_block,
     )
+    if context_block:
+        # Prepended, not merged into `context`: the {context} slot is corpus
+        # material the model may cite, and these are facts about the user's
+        # situation. Keeping them apart stops the model attributing "Manisa" to
+        # a book.
+        system_content = f"{context_block}\n\n{system_content}"
 
     messages: list[dict] = [{"role": "system", "content": system_content}]
     # Carry prior turns for conversational continuity.
@@ -716,14 +775,16 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
 
     context = retrieve_context(message, history=history)
     products = match_products(message, context)
-    messages = _build_messages(message, history, context, products)
+    messages = _build_messages(message, history, context, products,
+                               _context_block(route, message, history, date.today()))
 
     try:
         answer_text = _complete_text(messages)
     except Exception as exc:  # noqa: BLE001
         answer_text = _llm_unavailable_message(exc)
 
-    if not _has_advice(answer_text):
+    has_advice = _has_advice(answer_text)
+    if not has_advice:
         # There is no advice for products to sit under - a "sorry, I couldn't
         # answer" reply with three fertilizers beneath it is an ad, not help.
         products = []
@@ -734,6 +795,14 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         # pests, storage...). The marker is the primary signal; _looks_non_product
         # backstops a model that did not emit it - see the backstop spec.
         products = []
+
+    suffix = _framing_suffix(route, message)
+    if suffix and not (off_scope or no_product) and has_advice:
+        # Not on a refusal and not on one of our own fallback messages: telling a
+        # user "this programme is an estimate" under "I could not answer" claims
+        # a programme that does not exist.
+        answer_text = f"{answer_text.rstrip()}\n\n{suffix}"
+
     return ChatResult(answer=answer_text.strip(), recommended_products=products,
                       route=route, route_how=route_how)
 
@@ -755,7 +824,8 @@ def stream_answer(
 
     context = retrieve_context(message, history=history)
     products = match_products(message, context)
-    messages = _build_messages(message, history, context, products)
+    messages = _build_messages(message, history, context, products,
+                               _context_block(route, message, history, date.today()))
 
     # Hold back the opening tokens until we have a WARMUP's worth of clean content
     # (marker stripped). Two jobs at once: (1) strip a leading control marker
@@ -842,6 +912,10 @@ def stream_answer(
         if clean:
             full_answer += clean
             yield _sse({"type": "token", "content": clean})
+
+    suffix = _framing_suffix(route, message)
+    if suffix and not (off_scope or no_product) and has_advice and emitted:
+        yield _sse({"type": "token", "content": f"\n\n{suffix}"})
 
     # Emit product recommendations only after the full answer has streamed (and
     # only for in-scope answers), so clients render them beneath the reply.
