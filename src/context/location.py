@@ -55,10 +55,14 @@ _SUFFIX = r"(?:[dt][ae]n?|[yn]?[aeiu]n?|l[iu])" + _PERSON
 _SHORT = 4
 _STRICT_SUFFIX = r"(?:[dt][ae]n?|l[iu])" + _PERSON
 
-# "Manisa ilindeyim" - an explicit "il" makes a bare name unambiguous.
-_IL = r"il(?:i|imde|imdeyim|inde|indeyim|inden|ine)?"
+# A place noun immediately after a bare name makes it unambiguous. "Diyarbakir
+# kosullarinda", "Antalya bolgesinde", "Manisa civarinda", "Izmir tarafinda" are how
+# growers actually state where they are, and requiring a case suffix alone missed all
+# of them. It must follow IMMEDIATELY: "Trabzon hurmasi bolgemizde yetisir mi" has
+# the produce in between, so it still does not match.
+_PLACE = r"(?:il|bolge|yore|civar|kosul|taraf|ilce|ovas|havzas)\w*"
 
-_TRIM = " \t\n\r.,!?;:()\"'"
+_TRIM = " \t\n\r.,!?;:()\"'-…"
 
 
 def _find(text: str) -> str | None:
@@ -74,8 +78,15 @@ def _find(text: str) -> str | None:
     province - "Trabzon hurmasi", "Amasya elmasi", "Isparta gulu" - and in an
     agriculture assistant those are the SUBJECT of the question, not the user's
     address. A bare name is accepted only where it cannot be a modifier: when it is
-    the whole message (the natural reply to "hangi ildesiniz?"), or when an explicit
-    "il" follows it.
+    the whole message (the natural reply to "hangi ildesiniz?"), or when a place noun
+    follows it immediately ("Diyarbakir kosullarinda", "Antalya bolgesinde").
+
+    WHAT THIS DOES NOT CLOSE: the other branch of the regex still resolves ordinary
+    Turkish words that happen to be a province plus a legal case suffix - "kilise"
+    (church) -> Kilis, "hataya" (mistake) -> Hatay, "mersini" (myrtle, a PLANT) ->
+    Mersin, "tokati" -> Tokat, "sivasi" -> Sivas. Same harm shape as the produce
+    names, lower frequency, and pre-existing. Do not read this function as having
+    solved the collision problem; it solved one branch of it.
     """
     folded = _normalize_tr(text)
     whole = folded.strip(_TRIM)
@@ -88,7 +99,7 @@ def _find(text: str) -> str | None:
             return _FOLDED[key]
         if whole == key:
             return _FOLDED[key]
-        if re.search(rf"(?<!\w){k}\s+{_IL}(?!\w)", folded):
+        if re.search(rf"(?<!\w){k}\s+{_PLACE}(?!\w)", folded):
             return _FOLDED[key]
     return None
 

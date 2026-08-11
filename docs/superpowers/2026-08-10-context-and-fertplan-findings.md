@@ -2,7 +2,7 @@
 
 Plan: `docs/superpowers/plans/2026-08-10-context-and-fertplan.md`
 Spec: `docs/superpowers/specs/2026-08-09-routing-and-context-design.md`
-Branch: `context-and-fertplan`, head `c411bb9`
+Branch: `context-and-fertplan`, head `6a396fa` + the post-review fixes
 
 This is the first plan in which a route changes what a user receives. `fert_plan`
 answers now carry the user's province, the month and season, and the coming week's
@@ -37,8 +37,11 @@ Every lever, in the order pulled, each measured:
 - **It is not a VRAM spill.** `Get-Counter '\GPU Process Memory(*)\Shared Usage'` —
   the counter the routing-foundation findings named as the discriminator and did not
   run — shows `llama-server` holding **8.57 GB dedicated (VRAM) against 0.9 GB shared
-  (system RAM)**. The model was resident on the card the whole time. Under the
-  documented spill fault this number is large; here it was not.
+  (system RAM)**. That is one reading, taken while the machine was slow; it says the
+  model was resident *then*, not across the whole period. Note also that "under the
+  documented spill fault this number is large" is theory — this project has never
+  actually taken the reading during a confirmed spill, so the discriminator proposed
+  below is a reasonable one, not a validated one.
 - **It is not a CPU fallback.** During generation the GPU compute engine sat at
   **90.3%** while the CPU sat at 57%. The work was on the GPU, and the GPU was busy —
   just slow per token.
@@ -80,9 +83,15 @@ characters mean):
 | 2026-08-09 22:47 | **24 s** |
 | 2026-08-10 14:45 | **68 s** |
 
-A 2.8× regression on identical work, which no code change can produce. That
-comparison is what established the slowdown was environmental before any lever was
-pulled.
+A 2.8× regression on identical work. A code change *can* produce 2.8× in general —
+longer prompts, a different `k`, more retrieved context — so the comparison only
+carries here because **zero of the 55 eval cases route to `fert_plan`** (measured:
+`{plant_info: 40, nutrition: 13, offscope: 2}`). This branch therefore adds nothing
+to any of the 55 prompts, which is what makes the two runs the same work. That is the
+clause the argument rests on.
+
+The `66.2` figure is the median of the last four of five consecutive 400-token
+completions, warm-up excluded (58.8 / 66.2 / 66.0 / 66.2 / 66.2).
 
 ### For next time
 
@@ -101,11 +110,11 @@ met at 66.2. All gates below were re-run at that speed.
 
 ```
 PYTHONIOENCODING=utf-8 python -m pytest -q
-411 passed
+451 passed
 ```
 
-Baseline at the start of this plan was 334. The plan added 77 tests across eight
-tasks.
+Baseline at the start of this plan was 334. The plan added 117 tests across eight
+tasks plus the post-review fixes.
 
 ---
 
@@ -191,13 +200,20 @@ PROMPT IDENTICAL TO PRE-BRANCH: True
 ```
 
 The case is on `plant_info`, so `_context_block` returns `""`, and the message list
-this branch builds is **byte-identical** to the one it built before the branch. There
-is no mechanism by which this branch could have changed the answer.
+this branch builds is **byte-identical** to the one it built before the branch (pinned
+by `test_build_messages_without_a_block_is_unchanged`, not just by this one probe).
+There is no mechanism by which **this branch's code** could have changed the answer.
+That is deliberately narrower than "nothing changed": the runtime and driver state
+were not controlled between the two runs — see §1 — and a different backend can change
+numerics and therefore which tokens get sampled at `temperature=0.4`.
 
 What it is instead: this case's grounding is intermittent. It was pooled at **23/25
 (~0.92)** on 2026-07-29, and the project's own notes record that two of its runs then
 read **6/8 and 8/8**, with the explicit warning that either alone would mislead
-("weak guard at 0.75" / "perfect at 1.0"). Today's 6/8 is one of those two readings.
+("weak guard at 0.75" / "perfect at 1.0"). Today's 6/8 is one of those two readings —
+and at p = 0.92, P(X ≤ 6 | n = 8) ≈ **0.13**, so this reading is not distinguishable
+from the historical rate. That is positive evidence for "intermittent", not merely an
+absence of evidence for "regressed".
 Reading the answer confirms the mode: the model answers the pollination question
 correctly but qualitatively ("yıllara ve çeşide göre değişen oranlarda") instead of
 carrying the source's figure.
@@ -375,3 +391,24 @@ Both are test-only and neither blocks the merge.
 - **`budget` and `crop_choice` do not dispatch.** They are dispatch-safe by the wrong-
   entry measure but were deliberately left on the corpus path; they need the numeric
   data layer, which is a separate spec.
+- **A bare province name is no longer evidence of location, and that costs recall.**
+  Requiring a case suffix is what stops `Trabzon hurması`, but it also drops any
+  phrasing that puts an unmarked province before a noun. A whitelist of place nouns
+  (`il`, `bölge`, `yöre`, `civar`, `koşul`, `taraf`, `ilçe`, `ova`, `havza`) rescues
+  the common ones — "Diyarbakır koşullarında", "Antalya bölgesinde" — but
+  province + district ("Manisa Salihli'de") is still missed. **This trade is
+  deliberate:** a missed province makes the assistant ask, which the user recovers
+  from in one turn; a wrong province produced confidently wrong weather, which they
+  cannot detect at all.
+- **The collision problem is closed for ONE branch of the regex, not in general.**
+  Ordinary Turkish words that are a province plus a legal case suffix still resolve:
+  `kilise` (church) → Kilis, `hataya` (mistake) → Hatay, **`mersini` (myrtle — a
+  plant, in a plant assistant) → Mersin**, `tokatı` → Tokat, `sıvası` → Sivas. Same
+  harm shape as the produce names, lower frequency, and **pre-existing rather than
+  introduced here**, which is why it was not treated as blocking. Do not read the
+  produce-name fix as having solved province matching.
+- **A one-word user turn is read as a province regardless of what was asked.**
+  `_find` sees one turn at a time, so an assistant question about which *plant* the
+  user means, answered "Mersin" (myrtle), yields the province Mersin. The
+  whole-message rule's stated rationale ("the natural reply to *hangi ildesiniz?*")
+  does not actually hold; it is a heuristic that happens to be right most of the time.

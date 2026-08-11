@@ -127,3 +127,36 @@ def test_a_bare_province_reply_is_picked_up_from_history():
 ])
 def test_locative_forms_of_short_provinces_still_work(text, expected):
     assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    # MOBILE KEYBOARDS EMIT U+2019, not the ASCII apostrophe. Both real clients are
+    # mobile/web and pass the text through unmodified, so a matcher that only knows
+    # ' passes every desktop demo while failing the primary client.
+    ("Manisa’dayım, domatese ne zaman gübre vermeliyim?", "Manisa"),
+    ("Manisa’da bağım var", "Manisa"),
+    ("Kahramanmaraş’ta zeytin yetiştiriyorum", "Kahramanmaraş"),
+    ("Aydın’dayım", "Aydın"),
+])
+def test_the_smart_apostrophe_is_understood(text, expected):
+    assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    # Province + place noun is how growers actually say where they are. Requiring a
+    # case suffix on the province alone missed every one of these.
+    ("Diyarbakır koşullarında hangi aspir çeşidi önerilir?", "Diyarbakır"),
+    ("Antalya koşullarında hangi anaç önerilir?", "Antalya"),
+    ("Erzurum yöresinde hangi ahududu çeşidi iyi adapte olur?", "Erzurum"),
+    ("Manisa civarında bağ var", "Manisa"),
+    ("Antalya bölgesinde sera işletiyorum", "Antalya"),
+    ("İzmir tarafında seram var", "İzmir"),
+])
+def test_a_place_noun_makes_a_bare_province_unambiguous(text, expected):
+    assert extract_province(text) == expected
+
+
+def test_the_place_noun_rule_does_not_rescue_a_produce_name():
+    # The noun must follow the province IMMEDIATELY. Here the produce is in between,
+    # so this stays a question ABOUT Trabzon persimmon, not a user in Trabzon.
+    assert extract_province("Trabzon hurması bölgemizde yetişir mi?") is None

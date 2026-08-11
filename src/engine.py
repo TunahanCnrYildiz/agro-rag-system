@@ -223,7 +223,14 @@ MIN_RETRIEVAL_RELEVANCE = 0.36
 
 # Turkish -> ASCII fold, one character in, one character out, so a match span
 # found in the normalised text maps straight back onto the original query.
-_TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇIâÂ", "iigguussooccIaA")
+# The typographic apostrophes are folded to ASCII because MOBILE KEYBOARDS EMIT
+# THEM: iOS and Android Turkish layouts produce U+2019, and both real clients pass
+# the text through unmodified. Without this, "Manisa'dayim" typed on a phone does
+# not match the province matcher's apostrophe rule while the same text typed on a
+# desktop does - the demo passes and the primary client fails.
+# Still strictly 1:1 and length-preserving, which _expand_query's span slice needs.
+_TR_FOLD = str.maketrans("ıİğĞüÜşŞöÖçÇIâÂ’‘ʼ",
+                         "iigguussooccIaA'''")
 
 
 def _normalize_tr(text: str) -> str:
