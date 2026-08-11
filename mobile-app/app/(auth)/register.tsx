@@ -8,6 +8,7 @@ export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [name, setName] = useState("");
   const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [province, setProvince] = useState("");
@@ -17,13 +18,17 @@ export default function RegisterScreen() {
   async function submit() {
     if (!name.trim()) return setError("Adınızı ve soyadınızı yazın.");
     if (userId.trim().length < 3) return setError("Kullanıcı ID en az 3 karakter olmalı.");
+    // Pragmatic check, not a full RFC 5322 parser: the point is to catch a typo,
+    // not to reject an unusual but valid address.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      return setError("Geçerli bir e-posta adresi yazın.");
     if (password.length < 4) return setError("Şifre en az 4 karakter olmalı.");
     if (password !== password2) return setError("Şifreler birbirini tutmuyor.");
 
     setError(null);
     setBusy(true);
     try {
-      await signUp({ name, userId, password, province });
+      await signUp({ name, userId, email, password, province });
       router.replace("/(tabs)");
     } catch {
       setError("Profil kaydedilemedi. Lütfen tekrar deneyin.");
@@ -62,6 +67,15 @@ export default function RegisterScreen() {
         value={userId}
         onChangeText={setUserId}
         autoCapitalize="none"
+      />
+      <Field
+        label="E-posta"
+        placeholder="ornek@eposta.com"
+        hint="Yalnızca bu cihazda saklanır; size e-posta gönderilmez."
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
       />
       <Field
         label="Şifre"

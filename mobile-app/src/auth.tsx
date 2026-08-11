@@ -39,6 +39,7 @@ const STORAGE_KEY = "eta.profile.v2";
 export type Profile = {
   name: string;
   userId: string;
+  email: string;
   province?: string;
 };
 
@@ -47,6 +48,7 @@ type StoredProfile = Profile & { salt: string; digest: string };
 type SignUpInput = {
   name: string;
   userId: string;
+  email: string;
   password: string;
   province?: string;
 };
@@ -131,13 +133,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored: StoredProfile = {
       name: input.name.trim(),
       userId: input.userId.trim(),
+      email: input.email.trim(),
       province: input.province?.trim() || undefined,
       salt,
       digest: await digest(salt, input.password),
     };
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     setHasAccount(true);
-    setProfile({ name: stored.name, userId: stored.userId, province: stored.province });
+    setProfile({
+      name: stored.name,
+      userId: stored.userId,
+      email: stored.email,
+      province: stored.province,
+    });
   }, []);
 
   const signIn = useCallback(async (userId: string, password: string) => {
@@ -148,7 +156,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Both halves must match. A wrong ID and a wrong password are reported to
     // the user identically, so the screen does not confirm which IDs exist.
     if (attempt !== stored.digest) return false;
-    setProfile({ name: stored.name, userId: stored.userId, province: stored.province });
+    setProfile({
+      name: stored.name,
+      userId: stored.userId,
+      // Tolerated as absent: profiles created before the e-mail field existed
+      // must still open rather than being thrown away.
+      email: stored.email ?? "",
+      province: stored.province,
+    });
     return true;
   }, []);
 
