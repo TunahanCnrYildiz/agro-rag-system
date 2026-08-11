@@ -42,8 +42,11 @@ export function ProfileCard() {
         <Text style={styles.name} numberOfLines={1}>
           Merhaba, {profile.name}
         </Text>
+        {/* What is stored is shown, so a user can see their own record rather
+            than having to trust a claim about it. */}
         <Text style={styles.sub} numberOfLines={1}>
-          {profile.province ? profile.province : "İl bilgisi eklenmedi"}
+          {[profile.province, profile.email].filter(Boolean).join(" · ") ||
+            "İl bilgisi eklenmedi"}
         </Text>
       </View>
       <View style={styles.actions}>
