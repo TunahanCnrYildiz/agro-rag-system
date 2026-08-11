@@ -135,10 +135,17 @@ keyword at the other end of a long sentence must not.
 
 | Slot | Accepted |
 | --- | --- |
-| Area | a number with `dönüm`, `dekar`, `da`, `hektar`, `ha`, `m²` |
+| Area | a number with `dönüm`, `dekar`, `hektar`, `ha`. **Bare `da` is NOT accepted** — see below. |
 | Cost | a number with an adjacent cost keyword — `masraf`, `gider`, `maliyet`, `harcadım`, `harcama`. **`TL` is optional**: the frozen case is *"1 milyon masraf ettim"*, with no currency written, and it must extract. |
 | Price | an explicit per-weight form — `TL/kg`, `kilosu X TL`, `tonu X TL` (a per-ton figure is divided by 1000 into the canonical TL/kg) |
 | Yield | **only** an explicit per-area form — see below |
+
+**Why bare `da` is excluded** (found by verifying the extractor against this table
+before writing the plan, 2026-08-11). `da` is one of the commonest words in Turkish
+— a clitic meaning "also/too" — and it sits next to numbers constantly. *"2024 da
+ekim yaptım"* would extract **2024 dekar**. It is only kept inside the compound
+`kg/da`, where the slash makes it unambiguous. The abbreviation is a real one, but
+accepting it costs more than it buys.
 
 **The trap that gets its own rule.** In Turkish, *"8 ton verim aldım"* means the
 total; *"dekara 8 ton"* means per unit area. Reading one as the other inflates or
@@ -232,10 +239,28 @@ The table must include, at minimum:
 | `8 ton verim aldım` | **yield stays None** — total vs per-area is ambiguous |
 | `1 milyon` with no keyword nearby | **cost stays None** |
 | `geçen yıl 40 ton aldım` | **nothing extracted** |
+| `2024 da ekim yaptım` | **nothing extracted** — `da` is not an area unit |
+| `tarlada çalıştım` | **nothing extracted** |
 
-The whole frozen `budget` set must also be run through the extractor and the
-result recorded, so what each of the seven real questions yields is on the record
-before any behaviour depends on it.
+**The frozen `budget` set through the verified extractor, recorded 2026-08-11**,
+so what each of the seven real questions yields is on the record before any
+behaviour depends on it:
+
+| Question | Extracted |
+| --- | --- |
+| 5 dönüm domates ektim 1 milyon masraf ettim, ne kadar kâr ederim? | `area_da=5`, `cost_tl=1 000 000` |
+| Buğday ekmenin dekara maliyeti nedir? | nothing |
+| Zeytinlikten yıllık ne kadar gelir beklerim? | nothing |
+| Fındık bahçesi kurmak kaç para tutar? | nothing |
+| Serada domates yetiştirmek kârlı mı? | nothing |
+| Girdi masraflarım ne kadar olur? | nothing |
+| Bu yatırımın geri dönüşü ne kadar sürer? | nothing |
+
+**Six of seven extract nothing, and that is the correct result** — they contain no
+numbers. It also means six of seven real budget questions will be answered by
+explaining the cost structure and asking, and only one will ever reach the
+arithmetic. That is the honest state of this route without the numeric data layer,
+and it should not be read as the extractor underperforming.
 
 **Eval coverage in the same change.** Cases for both routes, taking the set from
 58 to about 63. At minimum: a budget question with all inputs (must produce the
