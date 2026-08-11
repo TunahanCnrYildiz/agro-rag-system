@@ -436,12 +436,20 @@ Both are test-only and neither blocks the merge.
   the cache "lives only as long as the process" — but the process is a uvicorn
   container that runs for weeks. A two-week-old "önümüzdeki hafta toplam 0.0 mm yağış
   bekleniyor" is wrong advice, not stale advice.
-- **Zero of the 55 eval cases route to `fert_plan`** (measured:
-  `{plant_info: 40, nutrition: 13, offscope: 2}`). The shield therefore proves the
-  divergence did not leak into the other routes — which is genuinely what it was for —
-  but it exercises the changed route **not at all**. The only evidence for the changed
-  route is the hand-run answers in §6. Adding two or three `fert_plan` cases to the
-  eval set would close this, and it should be done before the route diverges further.
+- ~~Zero of the 55 eval cases route to `fert_plan`~~ — **CLOSED 2026-08-11 (commit
+  8f51cbd).** The set is now 58 cases with three on the diverging route, and the
+  first full run at that size is **58/58 across all five dimensions**:
+  `fertplan_province_reaches_the_answer` (the province must reach the reply),
+  `fertplan_asks_which_province` (with none given, the assistant must ask rather than
+  invent one), and `fertplan_user_province_beats_produce_name` — "Antalya'dayım,
+  Trabzon hurmasına..." — which is the shield-level guard for the Critical found in
+  whole-branch review.
+  **The anchors are province names and deliberately nothing else.** The month and
+  season come from `season.describe(date.today())`, so an anchor like "Ağustos" would
+  be green today and red in December with nothing about the product having changed.
+  The province is the only part of the context block that does not move with the
+  calendar, and it is also the part that proves the block reached the model at all.
+  Note this raises the baseline: **the shield is 58/58 from now on, not 55/55.**
 - **A one-word user turn is read as a province regardless of what was asked.**
   `_find` sees one turn at a time, so an assistant question about which *plant* the
   user means, answered "Mersin" (myrtle), yields the province Mersin. The
