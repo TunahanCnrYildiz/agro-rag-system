@@ -160,3 +160,41 @@ def test_the_place_noun_rule_does_not_rescue_a_produce_name():
     # The noun must follow the province IMMEDIATELY. Here the produce is in between,
     # so this stays a question ABOUT Trabzon persimmon, not a user in Trabzon.
     assert extract_province("Trabzon hurması bölgemizde yetişir mi?") is None
+
+
+@pytest.mark.parametrize("text", [
+    # `il\w*` swallows two of the commonest words in Turkish plus everyday
+    # agriculture vocabulary. The "il" alternatives must stay ENUMERATED.
+    "Trabzon ile Rize arasında hangi çeşit yetişir?",
+    "Trabzon ilaçlama zamanı ne zaman gübre verilir?",
+    "Ankara ilk defa gübre vereceğim",
+    "Ordu ilgili bir soru soracağım",
+    "Amasya ilave gübre ister mi?",
+    "Manisa iletişim bilgileri",
+    "Isparta gülü ilaçlaması ne zaman?",
+    "Amasya elması ilkbaharda budanır mı?",
+    "Ankara armudu ile Deveci armudu arası fark ne?",
+])
+def test_the_place_noun_rule_does_not_swallow_ordinary_words(text):
+    assert extract_province(text) is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    # _ORDERED is longest-first, so a spurious hit on a LONG province name would be
+    # returned before a genuine apostrophe statement of a shorter one is ever tried.
+    # The user says explicitly that the other province is not what they mean.
+    ("Kahramanmaraş ile ilgili değil, Van'dayım, ne zaman gübre vermeliyim?", "Van"),
+    ("Afyonkarahisar ilk sorum değildi; Manisa'dayım", "Manisa"),
+    ("Diyarbakır ilgisi yok, Rize'deyim", "Rize"),
+])
+def test_a_spurious_long_name_does_not_shadow_a_real_statement(text, expected):
+    assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Konya ovasında buğday ekiyorum", "Konya"),
+    ("Konya ovalarında buğday ekiyorum", "Konya"),   # plural was missed before
+    ("Manisa ilçesinde bağ var", "Manisa"),
+])
+def test_place_noun_inflections_are_covered(text, expected):
+    assert extract_province(text) == expected

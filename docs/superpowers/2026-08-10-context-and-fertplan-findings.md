@@ -2,7 +2,7 @@
 
 Plan: `docs/superpowers/plans/2026-08-10-context-and-fertplan.md`
 Spec: `docs/superpowers/specs/2026-08-09-routing-and-context-design.md`
-Branch: `context-and-fertplan`, head `6a396fa` + the post-review fixes
+Branch: `context-and-fertplan`, head `865c6ac` + the post-review fixes
 
 This is the first plan in which a route changes what a user receives. `fert_plan`
 answers now carry the user's province, the month and season, and the coming week's
@@ -37,11 +37,15 @@ Every lever, in the order pulled, each measured:
 - **It is not a VRAM spill.** `Get-Counter '\GPU Process Memory(*)\Shared Usage'` —
   the counter the routing-foundation findings named as the discriminator and did not
   run — shows `llama-server` holding **8.57 GB dedicated (VRAM) against 0.9 GB shared
-  (system RAM)**. That is one reading, taken while the machine was slow; it says the
-  model was resident *then*, not across the whole period. Note also that "under the
-  documented spill fault this number is large" is theory — this project has never
-  actually taken the reading during a confirmed spill, so the discriminator proposed
-  below is a reasonable one, not a validated one.
+  (system RAM)** while the machine was slow. Two claims live here and they have
+  different strengths, so keep them apart:
+  - *This* slowdown was not a spill of this model — **well supported**. 0.9 GB shared
+    against an 8.57 GB resident model is definitionally incompatible with that model
+    having spilled, whatever else is true.
+  - Shared usage is a reliable discriminator *in general* — **theory**. This project
+    has never taken the reading during a confirmed spill, so the "check this first"
+    advice below is a reasonable diagnostic, not a validated one. Take the reading
+    next time a spill is confirmed and this becomes settled.
 - **It is not a CPU fallback.** During generation the GPU compute engine sat at
   **90.3%** while the CPU sat at 57%. The work was on the GPU, and the GPU was busy —
   just slow per token.
@@ -110,11 +114,11 @@ met at 66.2. All gates below were re-run at that speed.
 
 ```
 PYTHONIOENCODING=utf-8 python -m pytest -q
-451 passed
+466 passed
 ```
 
-Baseline at the start of this plan was 334. The plan added 117 tests across eight
-tasks plus the post-review fixes.
+Baseline at the start of this plan was 334. The plan added 132 tests across eight
+tasks plus three rounds of post-review fixes.
 
 ---
 
@@ -211,9 +215,10 @@ What it is instead: this case's grounding is intermittent. It was pooled at **23
 (~0.92)** on 2026-07-29, and the project's own notes record that two of its runs then
 read **6/8 and 8/8**, with the explicit warning that either alone would mislead
 ("weak guard at 0.75" / "perfect at 1.0"). Today's 6/8 is one of those two readings —
-and at p = 0.92, P(X ≤ 6 | n = 8) ≈ **0.13**, so this reading is not distinguishable
-from the historical rate. That is positive evidence for "intermittent", not merely an
-absence of evidence for "regressed".
+and at p = 0.92, P(X ≤ 6 | n = 8) ≈ **0.13**, so the observation is consistent with
+the historical rate and gives no reason to think the rate has moved. That is not the
+same as evidence the rate is unchanged, and an earlier draft of this document claimed
+it was.
 Reading the answer confirms the mode: the model answers the pollination question
 correctly but qualitatively ("yıllara ve çeşide göre değişen oranlarda") instead of
 carrying the source's figure.
@@ -407,6 +412,23 @@ Both are test-only and neither blocks the merge.
   harm shape as the produce names, lower frequency, and **pre-existing rather than
   introduced here**, which is why it was not treated as blocking. Do not read the
   produce-name fix as having solved province matching.
+- **The weather module caches its own failures, forever.** `forecast()` and `_geocode`
+  are `lru_cache`d and `None` is a cacheable value, so **one transient 2 s timeout
+  disables weather for that province in that worker until the process restarts** —
+  and the 2 s timeout makes the very first request on a cold container the most likely
+  to be poisoned. There is no retry and no expiry.
+- **The weather cache is not keyed by date, and spec §5.4 says it should be.** This is
+  the one deviation in this plan that was never recorded until now. The module
+  justifies it as "a forecast a few hours stale changes no advice" on the grounds that
+  the cache "lives only as long as the process" — but the process is a uvicorn
+  container that runs for weeks. A two-week-old "önümüzdeki hafta toplam 0.0 mm yağış
+  bekleniyor" is wrong advice, not stale advice.
+- **Zero of the 55 eval cases route to `fert_plan`** (measured:
+  `{plant_info: 40, nutrition: 13, offscope: 2}`). The shield therefore proves the
+  divergence did not leak into the other routes — which is genuinely what it was for —
+  but it exercises the changed route **not at all**. The only evidence for the changed
+  route is the hand-run answers in §6. Adding two or three `fert_plan` cases to the
+  eval set would close this, and it should be done before the route diverges further.
 - **A one-word user turn is read as a province regardless of what was asked.**
   `_find` sees one turn at a time, so an assistant question about which *plant* the
   user means, answered "Mersin" (myrtle), yields the province Mersin. The

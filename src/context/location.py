@@ -59,8 +59,19 @@ _STRICT_SUFFIX = r"(?:[dt][ae]n?|l[iu])" + _PERSON
 # kosullarinda", "Antalya bolgesinde", "Manisa civarinda", "Izmir tarafinda" are how
 # growers actually state where they are, and requiring a case suffix alone missed all
 # of them. It must follow IMMEDIATELY: "Trabzon hurmasi bolgemizde yetisir mi" has
-# the produce in between, so it still does not match.
-_PLACE = r"(?:il|bolge|yore|civar|kosul|taraf|ilce|ovas|havzas)\w*"
+# the produce in between, so it still does not match - that adjacency is load-bearing,
+# and relaxing it brings the produce-name collision straight back.
+#
+# "il" IS ENUMERATED, the rest take \w*. An earlier version wrote `il\w*` and it
+# swallowed `ile`, `ilgili`, `ilac`, `ilave`, `ilk` - two of the commonest words in
+# the language plus everyday agriculture vocabulary. Worse, _ORDERED is longest-first,
+# so a spurious hit on a long province name was RETURNED BEFORE a genuine apostrophe
+# statement of a shorter one was ever tried: "Kahramanmaras ile ilgili degil,
+# Van'dayim" answered Kahramanmaras. The other nouns have no common short prefixes,
+# so \w* is safe for them - and it is what lets "ovalarinda" work as well as
+# "ovasinda".
+_PLACE = (r"(?:il|ili|ilin|ilinde|ilindeyim|ilinden|iline|ilimde|ilimdeyim|ilimizde"
+          r"|ilce\w*|bolge\w*|yore\w*|civar\w*|kosul\w*|taraf\w*|ova\w*|havza\w*)")
 
 _TRIM = " \t\n\r.,!?;:()\"'-…"
 
