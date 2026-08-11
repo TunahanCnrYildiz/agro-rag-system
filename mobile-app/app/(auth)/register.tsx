@@ -71,7 +71,7 @@ export default function RegisterScreen() {
       <Field
         label="E-posta"
         placeholder="ornek@eposta.com"
-        hint="Yalnızca bu cihazda saklanır; size e-posta gönderilmez."
+        hint="Şifrenizi unutursanız hesabınıza erişmek için kullanılacak."
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
