@@ -2,7 +2,8 @@
 
 Plan: `docs/superpowers/plans/2026-08-10-context-and-fertplan.md`
 Spec: `docs/superpowers/specs/2026-08-09-routing-and-context-design.md`
-Branch: `context-and-fertplan`, head `865c6ac` + the post-review fixes
+Branch: `context-and-fertplan`, through the three post-review fix rounds
+(`261061e`, `865c6ac`, `bc6690a`) and this record
 
 This is the first plan in which a route changes what a user receives. `fert_plan`
 answers now carry the user's province, the month and season, and the coming week's
@@ -405,6 +406,18 @@ Both are test-only and neither blocks the merge.
   deliberate:** a missed province makes the assistant ask, which the user recovers
   from in one turn; a wrong province produced confidently wrong weather, which they
   cannot detect at all.
+- **Two place nouns carry known, accepted collisions.** `taraf\w*` also matches
+  `tarafından` ("by"), `taraftarı` ("supporter") and `tarafsız` ("neutral"), so
+  "Ankara tarafından onaylandı" resolves to Ankara; `ova\w*` also matches `oval`, a
+  real botanical descriptor. Both were weighed and kept. What makes them tolerable is
+  that the matched province is genuinely *mentioned* in each case — unlike the
+  finding-H class, where the user explicitly disclaimed the matched province and named
+  another. If `taraf` is ever revisited, `taraf(?:ı|ında|ındaki|ımız\w*)` covers the
+  location sense and drops all three. **These are recorded so the next person does not
+  rediscover them as bugs.**
+- **`ilimizden` and `ilinizde` are not matched.** That is the price of enumerating
+  rather than using `\w*`, and it is the right price — see the entry below. Add them
+  if a real user writes one.
 - **The collision problem is closed for ONE branch of the regex, not in general.**
   Ordinary Turkish words that are a province plus a legal case suffix still resolve:
   `kilise` (church) → Kilis, `hataya` (mistake) → Hatay, **`mersini` (myrtle — a
