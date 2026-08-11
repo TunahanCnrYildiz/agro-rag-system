@@ -89,10 +89,12 @@ export function AuthScreen({
           {footer}
 
           {/* Said plainly, on the screen itself, because a login box that looks
-              real implies a server behind it. There is not one. */}
+              real implies a server behind it. There is not one, and the earlier
+              wording here ("parola istenmez") stopped being true the moment a
+              password field was added. */}
           <Text style={styles.notice}>
-            Bilgileriniz yalnızca bu cihazda saklanır, sunucuya gönderilmez.
-            Parola istenmez.
+            Bilgileriniz ve şifreniz yalnızca bu cihazda saklanır, sunucuya
+            gönderilmez. Şifre cihazda şifrelenmiş olarak tutulur.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

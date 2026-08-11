@@ -15,7 +15,7 @@ import { colors } from "../src/theme";
  * that would bounce a returning user through the sign-in screen every launch.
  */
 function AuthGate() {
-  const { profile, ready } = useAuth();
+  const { profile, ready, hasAccount } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -23,11 +23,14 @@ function AuthGate() {
     if (!ready) return;
     const inAuth = segments[0] === "(auth)";
     if (!profile && !inAuth) {
-      router.replace("/(auth)/register");
+      // A device that already has a profile opens on sign-in; a fresh one opens
+      // on sign-up. Sending a returning user to the sign-up form would invite
+      // them to overwrite the profile they were trying to sign in to.
+      router.replace(hasAccount ? "/(auth)/login" : "/(auth)/register");
     } else if (profile && inAuth) {
       router.replace("/(tabs)");
     }
-  }, [ready, profile, segments, router]);
+  }, [ready, profile, hasAccount, segments, router]);
 
   // Hold a plain background until the stored profile has been read, so neither
   // the tabs nor the sign-in screen flashes before we know which is correct.
