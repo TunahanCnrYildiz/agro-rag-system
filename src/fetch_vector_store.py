@@ -44,6 +44,33 @@ _CHUNK = 8 << 20          # 8 MiB
 _TIMEOUT = 60             # per-read; a 900 MB body legitimately takes minutes
 _DRIVE_HOSTS = ("drive.google.com", "drive.usercontent.google.com")
 
+# Exit codes are a CONTRACT with docker-entrypoint.sh, which decides from them
+# whether falling back to fetch+ingest is acceptable. Two failures look the same
+# from the outside and must not be treated the same:
+#
+#   1  COULD NOT OBTAIN the archive - no URL, Drive quota, network, a truncated
+#      body. The archive is simply unavailable, and building a corpus locally is
+#      the designed answer. Falling back is correct.
+#
+#   2  OBTAINED SOMETHING THAT IS NOT THE CORPUS - checksum mismatch, no
+#      chroma.sqlite3 inside, zero embeddings. The download succeeded and what
+#      arrived is not what the maintainer published. Falling back here would
+#      replace a loud, fixable problem with a silent one: a corpus roughly a
+#      tenth the size that answers questions badly rather than failing. That is
+#      precisely what the checksum exists to prevent, so we stop instead.
+EXIT_UNAVAILABLE = 1
+EXIT_INTEGRITY = 2
+
+
+def _fail_integrity(message: str) -> "NoReturn":  # noqa: F821
+    """Stop with exit code 2. See EXIT_INTEGRITY above for why this is not a
+    fallback-able failure."""
+    print(f"BUTUNLUK HATASI: {message}", file=sys.stderr)
+    print("Arsiv indirildi ama beklenen havuz DEGIL. fetch+ingest'e dusmek bunu "
+          "gizler ve onda bir buyuklukte bir korpus kurar - onun yerine "
+          "duruyoruz.", file=sys.stderr)
+    raise SystemExit(EXIT_INTEGRITY)
+
 
 def _drive_id(url: str) -> str | None:
     """The file id inside a Google Drive share link, or None for a plain URL."""
@@ -157,7 +184,7 @@ def _report_store(store_dir: Path) -> None:
     """
     db = store_dir / "chroma.sqlite3"
     if not db.exists():
-        raise SystemExit(f"acilan arsivde chroma.sqlite3 yok: {store_dir}")
+        _fail_integrity(f"acilan arsivde chroma.sqlite3 yok: {store_dir}")
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
         names = [r[0] for r in con.execute("select name from collections")]
@@ -167,7 +194,7 @@ def _report_store(store_dir: Path) -> None:
     print(f"  koleksiyon : {', '.join(names) or '(yok)'}")
     print(f"  parca      : {n:,}")
     if n == 0:
-        raise SystemExit("havuz bos gorunuyor - yanlis arsiv olabilir.")
+        _fail_integrity("havuz bos gorunuyor - yanlis arsiv olabilir.")
 
 
 def run(url: str, force: bool = False, expected_sha: str | None = None) -> None:
@@ -189,7 +216,7 @@ def run(url: str, force: bool = False, expected_sha: str | None = None) -> None:
         digest = _sha256(archive)
         print(f"  sha256     : {digest}")
         if expected_sha and digest.lower() != expected_sha.lower():
-            raise SystemExit(
+            _fail_integrity(
                 "SHA256 UYUSMUYOR - dosya yarim inmis ya da degismis.\n"
                 f"  beklenen : {expected_sha}\n"
                 f"  gelen    : {digest}"

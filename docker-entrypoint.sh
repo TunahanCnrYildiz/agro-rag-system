@@ -21,11 +21,33 @@ VECTOR_STORE_DIR="data/vector_store"
 # deployment wants a different source. The "is it already populated?" decision
 # lives in the Python module too, which knows a lone .gitkeep is not a store -
 # keeping that judgement in one place.
+#
+# THE EXIT CODE DECIDES WHETHER FALLING BACK IS ALLOWED (see src/fetch_vector_store.py):
+#   0  store is in place
+#   1  could not obtain the archive - quota, network, no URL. Fall back; that is
+#      what the fallback is for.
+#   2  obtained something that is NOT the corpus - checksum mismatch, wrong or
+#      empty archive. DO NOT fall back. Falling back would swap a loud problem
+#      for a silent one: a corpus a tenth the size that answers badly instead of
+#      failing, which is exactly what the checksum exists to prevent.
 echo "[entrypoint] ensuring $VECTOR_STORE_DIR is populated"
 if python -m src.fetch_vector_store; then
-    :
+    fetch_status=0
 else
-    echo "[entrypoint] prebuilt store unavailable - falling back to fetch+ingest"
+    fetch_status=$?
+fi
+
+if [ "$fetch_status" -eq 0 ]; then
+    :
+elif [ "$fetch_status" -eq 2 ]; then
+    echo "[entrypoint] FATAL: the prebuilt store failed its INTEGRITY check."
+    echo "[entrypoint] Refusing to fall back to fetch+ingest - that would hide this"
+    echo "[entrypoint] behind a corpus roughly a tenth the size, which answers badly"
+    echo "[entrypoint] rather than failing. Republish the archive, or point"
+    echo "[entrypoint] VECTOR_STORE_URL / VECTOR_STORE_SHA256 at a good one."
+    exit 1
+else
+    echo "[entrypoint] prebuilt store unavailable (exit $fetch_status) - falling back to fetch+ingest"
     echo "[entrypoint] WARNING: this builds a DIFFERENT corpus, roughly a tenth the size,"
     echo "[entrypoint] because the Internet Archive returns different books over time."
     python -m src.fetch_fao --max "${FETCH_FAO_MAX:-100}"

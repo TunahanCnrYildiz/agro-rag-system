@@ -124,30 +124,37 @@ def test_a_truncated_archive_is_rejected(tmp_path, store_dir, serve):
     assert not store_dir.exists()
 
 
-def test_a_checksum_mismatch_aborts(tmp_path, store_dir, serve):
+def test_a_checksum_mismatch_aborts_with_the_integrity_code(tmp_path, store_dir,
+                                                            serve, capsys):
+    # Exit code 2 is a CONTRACT with docker-entrypoint.sh: it falls back to
+    # fetch+ingest on 1 but must NOT on 2, because falling back after an
+    # integrity failure hides it behind a corpus a tenth the size.
     serve(_Resp(_make_store_zip(tmp_path)))
     with pytest.raises(SystemExit) as e:
         fvs.run("https://example.com/vector_store.zip", expected_sha="0" * 64)
-    assert "UYUSMUYOR" in str(e.value)
+    assert e.value.code == fvs.EXIT_INTEGRITY == 2
+    assert "UYUSMUYOR" in capsys.readouterr().err
     assert not store_dir.exists()
 
 
-def test_an_archive_without_chroma_sqlite_is_rejected(tmp_path, store_dir, serve):
+def test_an_archive_without_chroma_sqlite_is_rejected(tmp_path, store_dir, serve, capsys):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("readme.txt", "wrong archive")
     serve(_Resp(buf.getvalue()))
     with pytest.raises(SystemExit) as e:
         fvs.run("https://example.com/vector_store.zip")
-    assert "chroma.sqlite3 yok" in str(e.value)
+    assert e.value.code == fvs.EXIT_INTEGRITY
+    assert "chroma.sqlite3 yok" in capsys.readouterr().err
     assert not store_dir.exists()
 
 
-def test_an_empty_store_is_rejected(tmp_path, store_dir, serve):
+def test_an_empty_store_is_rejected(tmp_path, store_dir, serve, capsys):
     serve(_Resp(_make_store_zip(tmp_path, chunks=0)))
     with pytest.raises(SystemExit) as e:
         fvs.run("https://example.com/vector_store.zip")
-    assert "bos gorunuyor" in str(e.value)
+    assert e.value.code == fvs.EXIT_INTEGRITY
+    assert "bos gorunuyor" in capsys.readouterr().err
 
 
 # --------------------------------------------------------------------------- #
@@ -202,3 +209,15 @@ def test_a_gitkeep_alone_does_not_count_as_populated(tmp_path, store_dir, serve)
     serve(_Resp(_make_store_zip(tmp_path)))
     fvs.run("https://example.com/vector_store.zip")
     assert (store_dir / "chroma.sqlite3").exists()
+
+
+def test_an_unavailable_archive_keeps_the_fallback_code(tmp_path, store_dir, serve,
+                                                        capsys):
+    """The other half of the contract: 'could not obtain it' must stay exit 1, or
+    the entrypoint would refuse to fall back on an ordinary Drive quota day."""
+    serve(_Resp(b"<html>Sorry, you have exceeded your download quota</html>",
+                content_type="text/html"))
+    with pytest.raises(SystemExit) as e:
+        fvs.run("https://example.com/vector_store.zip")
+    assert e.value.code != fvs.EXIT_INTEGRITY
+    assert not store_dir.exists()
