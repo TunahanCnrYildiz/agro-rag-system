@@ -8,32 +8,15 @@
  * their information gone should not have to guess which button does that.
  */
 import React from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "./theme";
-import { forgetProfile, useAuth } from "./auth";
+import { useAuth } from "./auth";
 
 export function ProfileCard() {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
   if (!profile) return null;
-
-  async function leave(alsoForget: boolean) {
-    if (alsoForget) await forgetProfile();
-    await signOut();
-    router.replace("/(auth)/login");
-  }
-
-  function confirmDelete() {
-    Alert.alert(
-      "Profili sil",
-      "Bu cihazdaki profil bilgileriniz silinecek. Devam edilsin mi?",
-      [
-        { text: "Vazgeç", style: "cancel" },
-        { text: "Sil", style: "destructive", onPress: () => leave(true) },
-      ],
-    );
-  }
 
   return (
     <View style={styles.card}>
@@ -49,14 +32,14 @@ export function ProfileCard() {
             "İl bilgisi eklenmedi"}
         </Text>
       </View>
-      <View style={styles.actions}>
-        <Pressable onPress={() => leave(false)} hitSlop={8}>
-          <Text style={styles.action}>Çıkış</Text>
-        </Pressable>
-        <Pressable onPress={confirmDelete} hitSlop={8}>
-          <Text style={[styles.action, styles.danger]}>Profili sil</Text>
-        </Pressable>
-      </View>
+      <Pressable
+        style={styles.actions}
+        onPress={() => router.push("/profile")}
+        hitSlop={8}
+      >
+        <Text style={styles.action}>Profilim</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.green} />
+      </Pressable>
     </View>
   );
 }
@@ -77,7 +60,7 @@ const styles = StyleSheet.create({
   who: { flex: 1, minWidth: 0 },
   name: { color: colors.dark, fontSize: 15, fontWeight: "700" },
   sub: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  actions: { alignItems: "flex-end", gap: 6 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 2 },
   action: { color: colors.green, fontSize: 13, fontWeight: "600" },
   danger: { color: "#b3261e" },
 });

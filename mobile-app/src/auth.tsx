@@ -64,6 +64,14 @@ type AuthState = {
   signUp: (input: SignUpInput) => Promise<void>;
   signIn: (userId: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  /** Edit the stored details. The user ID is not editable: it is the login
+   *  handle, and letting it change silently would strand anyone who wrote it
+   *  down. */
+  updateProfile: (patch: Omit<Profile, "userId">) => Promise<void>;
+  /** Verifies the current password before setting a new one. Returns false when
+   *  the current password is wrong — the screen must not just take the user's
+   *  word for it. */
+  changePassword: (current: string, next: string) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -167,6 +175,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
+  const updateProfile = useCallback(async (patch: Omit<Profile, "userId">) => {
+    const stored = await readStored();
+    if (!stored) return;
+    const merged: StoredProfile = {
+      ...stored,
+      name: patch.name.trim(),
+      email: patch.email.trim(),
+      province: patch.province?.trim() || undefined,
+    };
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    setProfile({
+      name: merged.name,
+      userId: merged.userId,
+      email: merged.email,
+      province: merged.province,
+    });
+  }, []);
+
+  const changePassword = useCallback(async (current: string, next: string) => {
+    const stored = await readStored();
+    if (!stored) return false;
+    if ((await digest(stored.salt, current)) !== stored.digest) return false;
+    // A fresh salt with every change, so two accounts that happen to pick the
+    // same password never share a digest.
+    const salt = await newSalt();
+    await AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...stored, salt, digest: await digest(salt, next) }),
+    );
+    return true;
+  }, []);
+
   const signOut = useCallback(async () => {
     // The stored profile stays; signing back in needs the ID and password
     // again. "Profili sil" is what removes it.
@@ -174,8 +214,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ profile, ready, hasAccount, signUp, signIn, signOut }),
-    [profile, ready, hasAccount, signUp, signIn, signOut],
+    () => ({
+      profile, ready, hasAccount, signUp, signIn, signOut,
+      updateProfile, changePassword,
+    }),
+    [profile, ready, hasAccount, signUp, signIn, signOut,
+     updateProfile, changePassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
