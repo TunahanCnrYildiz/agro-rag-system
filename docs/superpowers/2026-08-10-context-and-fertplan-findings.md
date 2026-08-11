@@ -11,57 +11,89 @@ and stays empty until an agricultural engineer reviews rows.
 
 ---
 
-## 1. Environment — the speed gate was NOT met
+## 1. Environment — a SECOND slowdown fault, with a different cause and a different fix
 
-The plan's own gate for this step is "verify above 40 tok/s". **It was not met.**
-Every number below was measured at ~14 tok/s, and that is recorded here rather than
-worked around.
+This project already had a documented throughput fault: model layers spill from VRAM
+to system RAM, throughput drops ~8×, and the fix is to eject and reload the model
+(2026-07-28, and again in the routing-foundation findings). **What happened here was
+not that fault, and that fix did not work.** Both are recorded because telling them
+apart is what saves the next day.
 
-| Configuration | tok/s |
+Every lever, in the order pulled, each measured:
+
+| Lever | tok/s | Verdict |
+|---|---|---|
+| — (as found) | 8.1 | |
+| `lms unload` + `lms load` — the documented remedy | 13.7 | partial, did not hold |
+| Runtime switched to ROCm, then back | 14.4 | see the caveat below — **not a valid comparison** |
+| Closed all other apps (free RAM 5.9 → 19.8 GB) | 14.4 | no change |
+| Restarted LM Studio | 9.5, then 16.4 | unstable, no fix |
+| **Rebooted the machine** | **66.2** | **fixed** |
+
+**Reboot was the fix. Nothing short of it worked.**
+
+### How this fault differs from the documented one
+
+- **It is not a VRAM spill.** `Get-Counter '\GPU Process Memory(*)\Shared Usage'` —
+  the counter the routing-foundation findings named as the discriminator and did not
+  run — shows `llama-server` holding **8.57 GB dedicated (VRAM) against 0.9 GB shared
+  (system RAM)**. The model was resident on the card the whole time. Under the
+  documented spill fault this number is large; here it was not.
+- **It is not a CPU fallback.** During generation the GPU compute engine sat at
+  **90.3%** while the CPU sat at 57%. The work was on the GPU, and the GPU was busy —
+  just slow per token.
+- **The runtime comparison was botched and proves nothing.** ROCm was selected
+  mid-session and switched back before the timings were repeated, and which engine was
+  active for which measurement was never recorded — `lms runtime ls` was only run at
+  the end, by which point Vulkan 2.28.2 was selected. So "Vulkan 13.65 vs ROCm 14.4"
+  is not a comparison; both figures may be the same engine. What the numbers do show
+  is that **nothing in that whole 13–16 tok/s band mattered** — the reboot is what
+  moved it, from 16.4 to 66.2. The project's standing note against switching runtimes
+  to chase speed is still the right advice; this session did not add evidence for it,
+  and claiming otherwise in an earlier draft of this document was wrong.
+- **It is not host-memory pressure or background load.** Closing BlueStacks and the
+  browser took free RAM from 5.9 GB to 19.8 GB and dropped `llama-server`'s host
+  working set from 11.2 GB to 1.33 GB. Throughput did not move.
+
+### What it appears to be
+
+Accumulated GPU driver / WDDM memory-manager state. The corroborating observation:
+`AMDRSServ` — the AMD Radeon Software **system service** — reported **27.49 GB** of
+dedicated GPU memory on a 16 GB card. Once the committed total across processes
+exceeds physical VRAM the driver must evict and page, which produces exactly the
+signature seen: GPU busy, model resident, throughput a quarter of normal. That
+service is not restarted by restarting LM Studio, which is why every user-space
+lever failed.
+
+This is the mechanism the evidence points to, not a mechanism that was proven —
+the counter reading and the reboot result are the measurements; the causal link
+between them is inference. Recorded at that strength deliberately.
+
+### The independent confirmation
+
+Two full 55-case eval runs of identical work, same model
+(`local:google/gemma-4-12b-qat` in both jsonl headers), same answer lengths (~900
+characters mean):
+
+| Run | Median seconds per case |
 |---|---|
-| As found | 8.1 |
-| After `lms unload` + `lms load` (Vulkan, other apps running) | 13.7 / 13.6 |
-| ROCm runtime, other apps closed, 19.8 GB RAM free | 14.4 (median, warm-up excluded) |
+| 2026-08-09 22:47 | **24 s** |
+| 2026-08-10 14:45 | **68 s** |
 
-Three levers were pulled and **all three were measured, and none of them worked**:
+A 2.8× regression on identical work, which no code change can produce. That
+comparison is what established the slowdown was environmental before any lever was
+pulled.
 
-- **Model eject/reload** — the project's documented remedy for the 2026-07-28 and
-  2026-08-10 slowdowns. Recovered 8.1 → 13.7. Real but small.
-- **Runtime selection** (Vulkan → ROCm). 13.65 → 14.4. That is noise. The standing
-  warning in this project's notes — *do not switch runtimes to chase speed* — held
-  up, and this time there is a number behind it rather than an assertion.
-- **Background load.** Closing BlueStacks and the browser took free system RAM from
-  5.9 GB to 19.8 GB and dropped `llama-server`'s host working set from 11.2 GB to
-  1.33 GB. **Throughput did not move.**
+### For next time
 
-### What was ruled out, by measurement
+**If throughput is low, check `\GPU Process Memory(*)\Shared Usage` first.** A large
+shared figure means the documented spill fault — eject and reload the model. A small
+one (like the 0.9 GB here) means this second fault, and **the only fix measured to
+work is a full reboot.** Do not spend the afternoon on runtimes and background apps;
+this session did, and the measurements above are what that afternoon bought.
 
-- **Not a VRAM spill.** `Get-Counter '\GPU Process Memory(*)\Shared Usage'` — the
-  counter the routing-foundation findings named as the discriminator and did not run
-  — shows `llama-server` holding **8.57 GB dedicated (VRAM) against 0.9 GB shared
-  (system RAM)**. The model is resident on the card. This is the measurement that
-  earlier rounds inferred instead of taking.
-- **Not a CPU fallback.** During generation the GPU compute engine sat at **90.3%**
-  while the CPU sat at 57%. The work is on the GPU and the GPU is busy.
-- **Not host-memory pressure.** See the background-load lever above.
-
-### What is not explained
-
-`docs/superpowers/2026-08-10-routing-foundation-findings.md` records **61.3 tok/s**
-on this same machine earlier the same day, on the Vulkan runtime. Today the same
-model on the same machine does 14.4 and none of the three levers recovers it. The
-cause is **not established** and is deliberately not guessed at here — the last time
-a plausible-sounding cause was written down as fact in this project it cost a day.
-
-One cell of the comparison is still empty: **Vulkan on a cleaned machine** was never
-measured. Vulkan is the configuration that produced 61.3, so that is the next thing
-to try, and this section should be amended when it is.
-
-Practical consequence for this run: none. `evals/run_eval.py` sets
-`request_timeout = 400.0`, which at 14.4 tok/s is roughly 5,700 tokens of headroom,
-so the timeout failures that destroyed the Faz 0 measurement at 8.2 tok/s did not
-recur. Every case below completed and was scored. The full run took ~70 s per case,
-~65 minutes total.
+The plan's own gate for this step is "verify above 40 tok/s". After the reboot it is
+met at 66.2. All gates below were re-run at that speed.
 
 ---
 
@@ -123,20 +155,62 @@ PYTHONIOENCODING=utf-8 python -m evals.run_eval --fast
   retrieval: 55/55 | context: 55/55
 ```
 
+The full run was made twice, once before the reboot and once after. **Both are
+reported.**
+
 ```
-PYTHONIOENCODING=utf-8 python -m evals.run_eval
+# 14.4 tok/s, before the reboot
 === 55/55 cases passed ===
   retrieval: 55/55 | context: 55/55 | product-gating: 55/55 | grounding: 55/55 | guardrail: 55/55
-[answers] wrote 55 samples -> evals/runs/20260810T144554Z-full.jsonl
+  -> evals/runs/20260810T144554Z-full.jsonl
+
+# 66.2 tok/s, after the reboot
+=== 54/55 cases passed ===
+  retrieval: 55/55 | context: 55/55 | product-gating: 55/55 | grounding: 54/55 | guardrail: 55/55
+  -> evals/runs/20260811T084737Z-full.jsonl
 ```
 
-**Zero reds, so there is no red analysis to report.** This matters more here than in
-previous rounds: the `fert_plan` system prompt genuinely changed, and a green shield
-is the evidence that the change did not leak into the other 54 cases or into the
-product gate, the grounding check or the guardrails.
+### The red, and why it is not a regression from this branch
 
-An aborted earlier attempt at this run is retained as
-`evals/runs/20260810T142516Z-full.ABORTED-1of55.jsonl` and renamed so it cannot be
+`local_bpmorettini_pear` lost grounding in the second run. Escalated **once** at
+`--repeat 8`, per the two-stage rule — and the verdict stands both ways, no re-running
+until green:
+
+```
+[FAIL] local_bpmorettini_pear  ret=True ctx=True prod=8/8 ground=6/8 guard=8/8
+```
+
+**As a gate this is a fail and it is recorded as one.** What it is not is a
+consequence of this branch, and that was measured rather than assumed:
+
+```
+ROUTE                : plant_info / default
+CONTEXT BLOCK        : ''
+FRAMING SUFFIX       : ''
+PROMPT IDENTICAL TO PRE-BRANCH: True
+```
+
+The case is on `plant_info`, so `_context_block` returns `""`, and the message list
+this branch builds is **byte-identical** to the one it built before the branch. There
+is no mechanism by which this branch could have changed the answer.
+
+What it is instead: this case's grounding is intermittent. It was pooled at **23/25
+(~0.92)** on 2026-07-29, and the project's own notes record that two of its runs then
+read **6/8 and 8/8**, with the explicit warning that either alone would mislead
+("weak guard at 0.75" / "perfect at 1.0"). Today's 6/8 is one of those two readings.
+Reading the answer confirms the mode: the model answers the pollination question
+correctly but qualitatively ("yıllara ve çeşide göre değişen oranlarda") instead of
+carrying the source's figure.
+
+Both runs used the same model (`local:google/gemma-4-12b-qat`, recorded in both jsonl
+headers). The active runtime at the time of each run was not recorded — see §1 — so
+that variable is uncontrolled between them. It does not change the conclusion, which
+rests on the prompt being byte-identical, not on the two runs being comparable.
+
+The `--fast` shield passed 55/55 in both configurations.
+
+An aborted earlier attempt is retained as
+`evals/runs/20260810T142516Z-full.ABORTED-1of55.jsonl`, renamed so it cannot be
 mistaken for a result. It stopped because it was competing for the GPU with the
 throughput measurements above, not because of a defect.
 
@@ -250,8 +324,24 @@ edits the file; `detect_crop` matches against the table's own keys, so an empty 
 can only return `None` and there is no second crop list to drift; and the framing
 sentence is appended by code, never requested in the prompt, so no model can omit it.
 
-**Adding a crop is therefore a review task, not a programming task.** Append rows with
-`reviewed_by` filled in by the person who checked them. No code changes, no deploy.
+**But the table is not yet wired to do anything useful, and an earlier draft of this
+document said otherwise.** Correcting that here, because it is the sentence a
+non-programmer would act on:
+
+- The only consumer of `fertplan.lookup()` is the framing gate. **Row content —
+  `stage`, `note` — never reaches the prompt.** The calendar assembly this plan's goal
+  describes ("adds a calendar only for crops whose table rows have passed agronomic
+  review") is **not implemented**.
+- So adding one reviewed row today produces exactly one user-visible change: the
+  disclaimer "Bu program bir tahmindir" appended to an answer that still contains no
+  programme. That reads worse than not having the row.
+- `_load` is `@lru_cache(maxsize=1)`, so even that change needs a process restart. It
+  is not a live data edit.
+
+**Do not add rows to the table until the assembly step exists.** Adding a crop will
+become a review task rather than a programming task once it does; it is not one yet.
+The review gate, the drop-unreviewed-rows rule and the framing sentence are the parts
+that are finished.
 
 ---
 

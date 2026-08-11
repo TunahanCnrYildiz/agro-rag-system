@@ -6,8 +6,17 @@ nor the developer is an agricultural engineer. A row without a `reviewed_by` is
 dropped at load time, so an unreviewed line cannot reach a user even if someone
 adds one to the file.
 
-Adding a crop is therefore a review task, not a programming task: append rows
-with `reviewed_by` filled in by the person who checked them. No code changes.
+DO NOT ADD ROWS YET. The assembly step that would turn a row into a calendar is
+not written: the only consumer of `lookup()` is the framing gate in
+`engine._framing_suffix`, so `stage` and `note` never reach the prompt. Adding a
+reviewed row today changes exactly one thing - it appends "Bu program bir
+tahmindir" to an answer that still contains no programme, which reads worse than
+having no row at all. (`_load` is cached for the process lifetime too, so it is
+not a live data edit either.)
+
+Once assembly exists, adding a crop becomes a review task rather than a
+programming one: append rows with `reviewed_by` filled in by the person who
+checked them. It is not one yet.
 """
 from __future__ import annotations
 
