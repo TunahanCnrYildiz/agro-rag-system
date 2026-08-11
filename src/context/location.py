@@ -41,34 +41,54 @@ _FOLDED = {_normalize_tr(p): p for p in PROVINCES}
 _ORDERED = sorted(_FOLDED, key=len, reverse=True)
 
 
-# Case suffixes that may follow a bare province name. ENUMERATED on purpose:
-# allowing "any letters" makes "Van" match inside "vantilator". Text reaching
-# here is already ASCII-folded, so the suffixes appear folded too.
-_SUFFIX = r"(?:[dt][ae]n?|[yn]?[aeiu]n?|l[iu])?"
+# Personal endings Turkish speakers actually use when saying where they are:
+# "Manisadayim", "Izmirdeyim", "Manisaliyim".
+_PERSON = r"(?:y[iu]m|y[iu]z|s[iu]n|d[iu]r)?"
 
-# Provinces this short collide with ordinary words once folded: "kars"+i is
-# "karsi" (karsi), "mus"+a is "musa". For these a bare vowel suffix is not
-# evidence enough - require an apostrophe or an explicit locative/ablative.
+# Case suffix. MANDATORY - a bare name is handled separately below.
+_SUFFIX = r"(?:[dt][ae]n?|[yn]?[aeiu]n?|l[iu])" + _PERSON
+
+# Short provinces collide with ordinary words once folded: "mus"+a is "musa",
+# "van"+a is "vana" (an irrigation valve - this is an agriculture assistant),
+# "kars"+i is "karsi". A bare vowel suffix is not evidence for these; require an
+# explicit locative/ablative or -li.
 _SHORT = 4
-_STRICT_SUFFIX = r"(?:[dt][ae]n?|[yn]?[ae])"
+_STRICT_SUFFIX = r"(?:[dt][ae]n?|l[iu])" + _PERSON
+
+# "Manisa ilindeyim" - an explicit "il" makes a bare name unambiguous.
+_IL = r"il(?:i|imde|imdeyim|inde|indeyim|inden|ine)?"
+
+_TRIM = " \t\n\r.,!?;:()\"'"
 
 
 def _find(text: str) -> str | None:
-    """Match a province, tolerating Turkish case suffixes but never firing
-    inside a longer word.
+    """Match a province, tolerating Turkish case suffixes but never firing inside
+    a longer word and never firing on a produce name.
 
-    Two forms are accepted. An apostrophe is an unambiguous proper-noun
-    boundary in Turkish, so anything may follow it ("Manisa'dayim",
-    "Kars'ta"). Without one, only a known case suffix may follow and the word
-    must then END - which is what keeps "Van" out of "vantilator".
+    Three forms are accepted. An apostrophe is an unambiguous proper-noun boundary
+    in Turkish, so anything may follow it ("Manisa'dayim", "Kars'ta"). A known case
+    suffix, optionally with a personal ending, carries the ordinary statements of
+    location ("manisada", "Manisadayim", "Manisaliyim").
+
+    A BARE name is deliberately NOT evidence of location. Turkish names produce by
+    province - "Trabzon hurmasi", "Amasya elmasi", "Isparta gulu" - and in an
+    agriculture assistant those are the SUBJECT of the question, not the user's
+    address. A bare name is accepted only where it cannot be a modifier: when it is
+    the whole message (the natural reply to "hangi ildesiniz?"), or when an explicit
+    "il" follows it.
     """
     folded = _normalize_tr(text)
+    whole = folded.strip(_TRIM)
     for key in _ORDERED:
         k = re.escape(key)
         if re.search(rf"(?<!\w){k}'", folded):
             return _FOLDED[key]
         suffix = _STRICT_SUFFIX if len(key) <= _SHORT else _SUFFIX
         if re.search(rf"(?<!\w){k}{suffix}(?!\w)", folded):
+            return _FOLDED[key]
+        if whole == key:
+            return _FOLDED[key]
+        if re.search(rf"(?<!\w){k}\s+{_IL}(?!\w)", folded):
             return _FOLDED[key]
     return None
 

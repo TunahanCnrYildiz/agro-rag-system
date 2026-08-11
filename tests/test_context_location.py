@@ -63,3 +63,67 @@ def test_most_recent_history_mention_wins():
 def test_does_not_match_inside_a_longer_word():
     # 'Van' must not fire inside 'vantilatör'.
     assert extract_province("Serada vantilatör kullanmalı mıyım?") is None
+
+
+@pytest.mark.parametrize("text", [
+    # Turkish produce is named after provinces, and in an agriculture assistant
+    # the produce is the SUBJECT of the question, not the user's address. Matching
+    # here sends the model another province's real weather forecast.
+    "Trabzon hurmasına ne zaman gübre vermeliyim?",
+    "Amasya elmasına ne zaman gübre atmalıyım?",
+    "Malatya kayısısına ne zaman gübre verilir?",
+    "Isparta gülüne ne zaman gübre verilir?",
+    "Aydın incirine hangi dönemde gübre verilir?",
+    "Ankara armuduna hangi ayda gübre verilir?",
+    "Trabzon hurması yetiştirmek istiyorum",
+    "Bu ağaç Amasya elması",
+])
+def test_produce_named_after_a_province_is_not_a_location(text):
+    assert extract_province(text) is None
+
+
+@pytest.mark.parametrize("text", [
+    "Musa Bey ne zaman gübre versin?",      # 'Muş' + a
+    "Sulama vanası arızalandı",             # 'Van' + a - a valve, in an irrigation answer
+    "Vanayı kapatmayı unuttum",
+    "Aydınlatma bitkiyi etkiler mi?",       # 'Aydın' + latma
+])
+def test_short_names_do_not_leak_into_ordinary_words(text):
+    assert extract_province(text) is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    # The context block tells the model to ASK which province. These are what a
+    # Turkish speaker actually replies. Every one of them used to return None.
+    ("Manisadayım", "Manisa"),
+    ("İzmirdeyim", "İzmir"),
+    ("Konyadayım", "Konya"),
+    ("Rizedeyim", "Rize"),
+    ("Manisalıyım", "Manisa"),
+    ("Bursalıyım", "Bursa"),
+    ("Vanlıyım", "Van"),
+    ("Van", "Van"),
+    ("Rize", "Rize"),
+    ("Bolu", "Bolu"),
+    ("Manisa.", "Manisa"),
+    ("Manisa ilindeyim", "Manisa"),
+    ("Trabzon ili", "Trabzon"),
+])
+def test_the_answers_the_assistant_asks_for_are_understood(text, expected):
+    assert extract_province(text) == expected
+
+
+def test_a_bare_province_reply_is_picked_up_from_history():
+    # The assistant asked; the user answered with one word; the next turn must know.
+    history = [{"role": "assistant", "content": "Hangi ildesiniz?"},
+               {"role": "user", "content": "Van"}]
+    assert extract_province("Peki ne zaman gübre vereyim?", history) == "Van"
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Vanda kayısı yetiştiriyorum", "Van"),
+    ("Siirtte fıstık var", "Siirt"),
+    ("Rizede çay bahçem var", "Rize"),
+])
+def test_locative_forms_of_short_provinces_still_work(text, expected):
+    assert extract_province(text) == expected
