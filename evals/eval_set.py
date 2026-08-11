@@ -963,4 +963,58 @@ CASES = [
      # (dp_19434 Ranunculus) and 5 (dp_21704 marul) stay BLOCKED BY SHAPE CAP
      # and are held for round 5.
      "answer_any": ["6 g/saksı", "6 g saksı", "6 g/bitki", "saksı başına 6 g"]},
+
+    # ----------------------------------------------------------------- #
+    # fert_plan - the ONE route whose behaviour diverges (2026-08-11)
+    # ----------------------------------------------------------------- #
+    # Added because the 55-case shield had ZERO coverage of the only route this
+    # project has ever made behave differently: the whole set routed to
+    # plant_info (40), nutrition (13) and offscope (2). The shield proved the
+    # divergence did not LEAK into the other routes, which is what it was for,
+    # but it never once exercised the changed route. The only evidence for it
+    # was two hand-run answers pasted into a findings document.
+    #
+    # ANCHORS ARE THE PROVINCE NAME, and deliberately nothing else. The month
+    # and season are date-derived (season.describe(date.today())), so an anchor
+    # like "Ağustos" would be a time bomb in a frozen set - green in August, red
+    # in December, for no product reason. The province is the one part of the
+    # context block that does not move with the calendar, and it is also the
+    # part that proves the block reached the model at all.
+    {"id": "fertplan_province_reaches_the_answer",
+     "category": "fert_plan",
+     "query": "Manisa'dayım, domatese ne zaman gübre vermeliyim?",
+     "retrieval": "nonempty",
+     "products": "some",
+     # Measured 2026-08-11: "Manisa'daki Ağustos ayı sıcaklıkları (38 °C'ye
+     # kadar çıkabilen) ve yağışsız hava koşulları göz önüne alındığında..."
+     # - both the province AND its live forecast reached the reply.
+     "answer_any": ["Manisa"]},
+
+    {"id": "fertplan_asks_which_province",
+     "category": "fert_plan",
+     "query": "Domatese ne zaman gübre vermeliyim?",
+     "retrieval": "nonempty",
+     "products": "some",
+     # With no province stated the block says "ili BILINMIYOR - sor". The
+     # contract is that the assistant ASKS rather than inventing a location.
+     # Measured: "...hangi ilde yetiştirme yaptığınızı ... belirtebilir misiniz?"
+     "answer_any": ["hangi il", "ilde", "bölgen"]},
+
+    {"id": "fertplan_user_province_beats_produce_name",
+     "category": "fert_plan",
+     "query": "Antalya'dayım, Trabzon hurmasına ne zaman gübre vermeliyim?",
+     "retrieval": "nonempty",
+     "products": "some",
+     # THE REGRESSION GUARD for the Critical found in whole-branch review.
+     # Turkish produce is named after provinces - Trabzon hurması, Amasya
+     # elması, Isparta gülü - and the matcher used to read the FRUIT'S province
+     # as the user's address, then fetch that province's real forecast. Here the
+     # user is in Antalya and the fruit carries "Trabzon": the answer must be
+     # built on Antalya. Unit tests pin _context_block; this pins what the user
+     # actually receives, one level up.
+     # Measured: "Trabzon hurması için ... Antalya'nın Ağustos ayı sıcaklıkları
+     # ... 40 °C'ye ulaşan sıcaklıklarda" - 40 °C is Antalya's forecast, not
+     # Trabzon's. Note "Trabzon" is NOT bannable via answer_none: it is the
+     # fruit's name and belongs in the reply.
+     "answer_any": ["Antalya"]},
 ]
