@@ -8,10 +8,16 @@ Open-Meteo needs no key for non-commercial use. IT DOES REQUIRE ONE FOR
 COMMERCIAL USE, and this is a commercial product - budget a key before go-live.
 
 Never raises. A weather lookup that can break an answer is worse than no weather.
+
+ONLY SUCCESSES ARE CACHED. An `lru_cache` here would memoise `None`, so a single
+transient 2 s timeout - most likely on the very first request in a cold container,
+which is exactly when the network is least settled - would disable weather for that
+province until the process restarted, with no retry and no expiry. A failure must
+cost one lookup, not the feature.
 """
 from __future__ import annotations
 
-from functools import lru_cache
+from datetime import date
 
 import requests
 
@@ -22,11 +28,25 @@ _FC_URL = "https://api.open-meteo.com/v1/forecast"
 # not the answer.
 _TIMEOUT = 2.0
 
+# Successes only, both of them. Nothing here is ever a negative result, so a
+# failed lookup is simply retried next time.
+#   coordinates: the 81 provinces do not move, so one lookup each, forever.
+#   forecasts:   keyed by (province, day) - see forecast() for why the day matters.
+_GEO_CACHE: dict[str, tuple[float, float]] = {}
+_FORECAST_CACHE: dict[tuple[str, date], str] = {}
 
-@lru_cache(maxsize=128)
+
+def cache_clear() -> None:
+    """Drop both caches. For tests; nothing in production needs it."""
+    _GEO_CACHE.clear()
+    _FORECAST_CACHE.clear()
+
+
 def _geocode(province: str) -> tuple[float, float] | None:
-    """Province name -> coordinates. Cached for the process lifetime; the 81
-    provinces do not move, so one lookup each is the whole cost."""
+    """Province name -> coordinates, or None. A miss is not cached."""
+    hit = _GEO_CACHE.get(province)
+    if hit is not None:
+        return hit
     try:
         r = requests.get(_GEO_URL, timeout=_TIMEOUT, params={
             "name": province, "count": 1, "language": "tr", "country": "TR",
@@ -35,19 +55,31 @@ def _geocode(province: str) -> tuple[float, float] | None:
         results = (r.json() or {}).get("results") or []
         if not results:
             return None
-        return float(results[0]["latitude"]), float(results[0]["longitude"])
+        coords = float(results[0]["latitude"]), float(results[0]["longitude"])
     except Exception:  # noqa: BLE001 - see module docstring
         return None
+    _GEO_CACHE[province] = coords
+    return coords
 
 
-@lru_cache(maxsize=128)
-def forecast(province: str) -> str | None:
+def forecast(province: str, today: date | None = None) -> str | None:
     """A Turkish phrase, or None when unavailable for any reason.
 
-    Cached per province. The cache is deliberately NOT keyed by date: it lives
-    only as long as the process, and a forecast that is a few hours stale changes
-    no fertilisation advice.
+    KEYED BY (province, day). An earlier version cached per province only, on the
+    reasoning that "a forecast a few hours stale changes no advice" because the
+    cache "lives only as long as the process" - but the process is a uvicorn
+    container that runs for weeks. A fortnight-old "önümüzdeki hafta toplam 0.0 mm
+    yağış bekleniyor" is wrong advice, not stale advice. Spec §5.4 asked for the
+    date key; this restores it.
+
+    The day is a parameter so the keying is testable without freezing the clock,
+    matching how src/context/season.py takes its date.
     """
+    day = today or date.today()
+    hit = _FORECAST_CACHE.get((province, day))
+    if hit is not None:
+        return hit
+
     coords = _geocode(province)
     if coords is None:
         return None
@@ -66,7 +98,14 @@ def forecast(province: str) -> str | None:
         if not (rain and tmin and tmax):
             return None
         total_rain = round(sum(rain), 1)
-        return (f"önümüzdeki hafta toplam {total_rain} mm yağış bekleniyor, "
-                f"sıcaklık {round(min(tmin))}-{round(max(tmax))} °C aralığında")
+        phrase = (f"önümüzdeki hafta toplam {total_rain} mm yağış bekleniyor, "
+                  f"sıcaklık {round(min(tmin))}-{round(max(tmax))} °C aralığında")
     except Exception:  # noqa: BLE001
         return None
+
+    # Keep only today's entries, so the cache stays bounded by the 81 provinces
+    # instead of growing by 81 every day the container stays up.
+    for stale in [k for k in _FORECAST_CACHE if k[1] != day]:
+        del _FORECAST_CACHE[stale]
+    _FORECAST_CACHE[(province, day)] = phrase
+    return phrase

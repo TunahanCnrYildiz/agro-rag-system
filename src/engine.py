@@ -655,7 +655,9 @@ def _context_block(route: str, message: str, history: list[dict] | None,
     province = location.extract_province(message, history)
     if province:
         lines.append(f"Kullanicinin ili: {province}.")
-        fc = weather.forecast(province)
+        # `today` is passed through so the weather cache keys on the same day the
+        # season line does - one clock read per answer, not two.
+        fc = weather.forecast(province, today)
         if fc:
             lines.append(f"Hava durumu: {fc}.")
     else:

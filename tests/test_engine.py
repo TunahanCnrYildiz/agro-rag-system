@@ -1200,7 +1200,7 @@ def test_context_block_is_empty_off_the_fert_plan_route():
 
 
 def test_context_block_names_season_and_province(monkeypatch):
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: "yağış yok")
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: "yağış yok")
     out = engine._context_block(
         "fert_plan", "Manisa'dayım, domatese ne zaman gübre vermeliyim?",
         None, date(2026, 8, 10))
@@ -1210,7 +1210,7 @@ def test_context_block_names_season_and_province(monkeypatch):
 
 
 def test_context_block_asks_for_the_province_when_missing(monkeypatch):
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: "yağış yok")
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: "yağış yok")
     out = engine._context_block(
         "fert_plan", "Domatese ne zaman gübre vermeliyim?", None, date(2026, 8, 10))
     assert "Ağustos" in out                      # season still known
@@ -1219,7 +1219,7 @@ def test_context_block_asks_for_the_province_when_missing(monkeypatch):
 
 
 def test_context_block_survives_a_weather_outage(monkeypatch):
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     out = engine._context_block(
         "fert_plan", "Manisa'dayım, domatese ne zaman gübre vermeliyim?",
         None, date(2026, 8, 10))
@@ -1265,7 +1265,7 @@ def _clear_fertplan_load_cache():
 
 def test_empty_table_does_not_refuse(monkeypatch):
     from src import fertplan
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Domatese azot verebilirsiniz.")
@@ -1282,7 +1282,7 @@ def test_reviewed_rows_add_the_framing_sentence(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "Fide döneminde ..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Program: ...")
@@ -1300,7 +1300,7 @@ def test_framing_is_not_appended_to_a_fallback_message(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text",
@@ -1343,7 +1343,7 @@ def test_streaming_also_appends_the_framing_sentence(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_get_llm",
@@ -1369,7 +1369,7 @@ def test_streaming_also_appends_the_framing_sentence(monkeypatch, tmp_path):
 
 def test_streaming_does_not_append_framing_without_reviewed_rows(monkeypatch):
     from src import fertplan
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_get_llm",
@@ -1392,7 +1392,7 @@ def test_streaming_does_not_frame_an_outage_message(monkeypatch, tmp_path):
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_get_llm",
@@ -1417,7 +1417,7 @@ def test_streaming_appends_framing_on_the_blank_answer_backstop(monkeypatch, tmp
         {"stage": "fide", "reviewed_by": "Z. Müh.", "note": "..."},
     ]}), encoding="utf-8")
     monkeypatch.setattr(fertplan, "_TABLE_PATH", table)
-    monkeypatch.setattr("src.context.weather.forecast", lambda p: None)
+    monkeypatch.setattr("src.context.weather.forecast", lambda p, today=None: None)
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     # A stream that yields no content at all and closes with finish_reason
