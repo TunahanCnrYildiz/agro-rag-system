@@ -76,7 +76,8 @@ source satisfies both.** A decision is needed:
   grower, who is the actual user today.
 - **(c)** Turkey first, world later — smallest, and defers R1.
 
-**This decision has not been made.** It belongs to Hüseyin, not to the developer.
+**DECIDED 2026-08-11: option (a).** See §6. The granularity difference between
+Turkey and the rest of the world must therefore be visible in any answer built on it.
 
 ---
 
@@ -103,8 +104,8 @@ and put the numbers in a **queryable table** that the assistant reads determinis
 already work this way. The user-visible result is what Hüseyin asked for ("the system
 knows regional product data"); the mechanism underneath is a query, not a retrieval.
 
-**This has not been agreed with him.** It should be, before the data layer is built,
-because it changes what "yap bir RAG" means in the delivery.
+**AGREED 2026-08-11.** A queryable table is accepted as the answer to "bir RAG yap".
+See §6.
 
 ---
 
