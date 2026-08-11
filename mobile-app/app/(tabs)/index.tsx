@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
 import { openExternalUrl } from "../../src/openExternalUrl";
+import { ProfileCard } from "../../src/ProfileCard";
 
 const HERO_IMAGE = require("../../assets/logo-wordmark.png");
 const SITE_URL = "https://www.ekolojiktarim.com.tr/";
@@ -31,6 +32,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <ScreenHeader title="Ekolojik Tarım A.Ş." />
       <ScrollView contentContainerStyle={styles.content}>
+        <ProfileCard />
         <View style={styles.hero}>
           <Image
             source={HERO_IMAGE}
