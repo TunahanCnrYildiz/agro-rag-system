@@ -425,17 +425,19 @@ Both are test-only and neither blocks the merge.
   harm shape as the produce names, lower frequency, and **pre-existing rather than
   introduced here**, which is why it was not treated as blocking. Do not read the
   produce-name fix as having solved province matching.
-- **The weather module caches its own failures, forever.** `forecast()` and `_geocode`
-  are `lru_cache`d and `None` is a cacheable value, so **one transient 2 s timeout
-  disables weather for that province in that worker until the process restarts** —
-  and the 2 s timeout makes the very first request on a cold container the most likely
-  to be poisoned. There is no retry and no expiry.
-- **The weather cache is not keyed by date, and spec §5.4 says it should be.** This is
-  the one deviation in this plan that was never recorded until now. The module
-  justifies it as "a forecast a few hours stale changes no advice" on the grounds that
-  the cache "lives only as long as the process" — but the process is a uvicorn
-  container that runs for weeks. A two-week-old "önümüzdeki hafta toplam 0.0 mm yağış
-  bekleniyor" is wrong advice, not stale advice.
+- ~~The weather module caches its own failures, forever~~ and ~~is not keyed by
+  date~~ — **BOTH CLOSED 2026-08-11.** `lru_cache` is gone; two plain dicts hold
+  **successes only**, so a transient 2 s timeout now costs one lookup instead of
+  disabling weather for that province until the process restarts. Forecasts are keyed
+  by `(province, day)` with yesterday's entries dropped on insert, so the cache stays
+  bounded by the 81 provinces rather than growing by 81 a day — and a container that
+  runs for weeks no longer serves a fortnight-old "önümüzdeki hafta". This restores
+  spec §5.4, which this plan had deviated from without recording it.
+  `forecast(province, today=None)` takes the day as a parameter, the way
+  `season.describe` does, so the keying is testable without freezing the clock; the
+  cost was updating ten one-argument mocks in `tests/test_engine.py`. Non-vacuity
+  proven: all four new tests go RED against the old caching behaviour and green after.
+  Shield re-run at 58/58 with the change in place.
 - ~~Zero of the 55 eval cases route to `fert_plan`~~ — **CLOSED 2026-08-11 (commit
   8f51cbd).** The set is now 58 cases with three on the diverging route, and the
   first full run at that size is **58/58 across all five dimensions**:
