@@ -1,0 +1,11 @@
+# Shell scripts that run INSIDE the Linux container must keep LF endings.
+#
+# Without this, a Windows clone gets CRLF and the container dies at startup with
+# "exec ./docker-entrypoint.sh: no such file or directory" — the file is there,
+# but its shebang reads as "#!/bin/sh\r" and no such interpreter exists. The
+# message names the script, so the obvious reading is that it is missing.
+# Measured on 2026-08-13 while reproducing a deployment on Windows.
+#
+# Anyone cloning on Linux never sees this, which is why it went unnoticed.
+*.sh text eol=lf
+Dockerfile text eol=lf
