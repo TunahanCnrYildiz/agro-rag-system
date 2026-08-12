@@ -3,10 +3,11 @@
  *
  * Editing the details and changing the password BOTH genuinely work — they are
  * local operations and need no server, so they were built rather than mocked.
- * What is not built is anything that requires one: password recovery by e-mail,
- * and syncing a profile between devices. Those say so on screen instead of
- * pretending, because a button that looks live and does nothing is worse than
- * one that explains itself.
+ * Password recovery works too (see app/(auth)/forgot.tsx); what is missing is
+ * only its DELIVERY channel, since there is no server to send mail from. What is
+ * genuinely absent is syncing between devices, and the screen says so rather
+ * than pretending, because a control that looks live and does nothing is worse
+ * than one that explains itself.
  */
 import React, { useState } from "react";
 import {
@@ -182,8 +183,9 @@ export default function ProfileScreen() {
 
           <Text style={styles.notice}>
             Profiliniz yalnızca bu cihazda saklanır. Şifreniz şifrelenmiş olarak
-            tutulur ve sunucuya gönderilmez. Cihazlar arası eşitleme ve
-            e-posta ile şifre sıfırlama henüz aktif değildir.
+            tutulur ve sunucuya gönderilmez. Şifre sıfırlama çalışır; yeni şifre
+            e-posta gönderimi henüz aktif olmadığı için ekranda gösterilir.
+            Cihazlar arası eşitleme henüz yoktur.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

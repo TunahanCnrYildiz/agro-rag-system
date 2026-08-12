@@ -77,6 +77,11 @@ type AuthState = {
    *  the current password is wrong — the screen must not just take the user's
    *  word for it. */
   changePassword: (current: string, next: string) => Promise<boolean>;
+  /** Verify the e-mail against the stored profile and, if it matches, set a
+   *  freshly generated password. Returns the new password in plain text so the
+   *  screen can show it — see the note on delivery in resetPassword. Returns
+   *  null when the e-mail does not match. */
+  resetPassword: (email: string) => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -89,6 +94,18 @@ async function digest(salt: string, password: string): Promise<string> {
     Crypto.CryptoDigestAlgorithm.SHA256,
     `${salt}:${password}`,
   );
+}
+
+/** A readable one-time password.
+ *
+ * The alphabet omits characters people misread when copying by hand — 0/O, 1/l/I —
+ * because this one is read off a screen rather than pasted.
+ */
+const _PW_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+
+async function randomPassword(length = 8): Promise<string> {
+  const bytes = await Crypto.getRandomBytesAsync(length);
+  return Array.from(bytes, (b) => _PW_ALPHABET[b % _PW_ALPHABET.length]).join("");
 }
 
 async function newSalt(): Promise<string> {
@@ -217,6 +234,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const stored = await readStored();
+    if (!stored) return null;
+    if (
+      !stored.email ||
+      stored.email.trim().toLocaleLowerCase("tr") !==
+        email.trim().toLocaleLowerCase("tr")
+    ) {
+      return null;
+    }
+    const plain = await randomPassword();
+    const salt = await newSalt();
+    await AsyncStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...stored, salt, digest: await digest(salt, plain) }),
+    );
+    return plain;
+  }, []);
+
   const signOut = useCallback(async () => {
     // The stored profile stays; signing back in needs the ID and password
     // again. "Profili sil" is what removes it.
@@ -226,10 +262,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       profile, ready, hasAccount, signUp, signIn, signOut,
-      updateProfile, changePassword,
+      updateProfile, changePassword, resetPassword,
     }),
     [profile, ready, hasAccount, signUp, signIn, signOut,
-     updateProfile, changePassword],
+     updateProfile, changePassword, resetPassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
