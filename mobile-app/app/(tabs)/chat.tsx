@@ -1,7 +1,8 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,12 +11,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { MarkdownText } from "../../src/MarkdownText";
 import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
 import { getGreeting } from "../../src/greeting";
 import { openExternalUrl } from "../../src/openExternalUrl";
 import { useAuth } from "../../src/auth";
+import { clearChat, loadChat, recentWithinBudget, saveChat } from "../../src/chatStore";
 import {
   ChatTurn,
   RecommendedProduct,
@@ -50,19 +53,52 @@ function newId() {
 }
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: newId(),
-      role: "bot",
-      text: getGreeting(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [restored, setRestored] = useState(false);
   const { profile } = useAuth();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const historyRef = useRef<ChatTurn[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Restore the stored conversation once. Until this finishes the screen shows
+  // nothing rather than the greeting, so a returning user does not watch their
+  // history be replaced a frame later.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const saved = await loadChat();
+      if (cancelled) return;
+      if (saved && saved.messages.length) {
+        setMessages(saved.messages as Message[]);
+        historyRef.current = saved.history;
+        // Keep ids ahead of anything restored, or a new bubble can collide with
+        // an old one and React will reuse the wrong row.
+        const maxId = Math.max(0, ...saved.messages.map((m) => Number(m.id) || 0));
+        nextId = maxId + 1;
+      } else {
+        setMessages([{ id: newId(), role: "bot", text: getGreeting() }]);
+      }
+      setRestored(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist after every change, but only once the restore has run - saving the
+  // empty initial state would wipe the very history we are about to load.
+  useEffect(() => {
+    if (!restored) return;
+    saveChat({ messages: messages as never, history: historyRef.current });
+  }, [messages, restored]);
+
+  async function startNewChat() {
+    await clearChat();
+    historyRef.current = [];
+    setMessages([{ id: newId(), role: "bot", text: getGreeting() }]);
+  }
 
   function scrollToEnd() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
@@ -85,7 +121,12 @@ export default function ChatScreen() {
     // never typed it, so showing it as something they said would be a lie. It is
     // rebuilt from the current profile on every send, so editing the profile
     // takes effect on the next message with no extra wiring.
-    const requestHistory = [...profileTurns(profile), ...historyRef.current];
+    // The profile always goes; the rest is trimmed to what the model's context
+    // window can actually hold (see src/chatStore.ts for the measurement).
+    const requestHistory = [
+      ...profileTurns(profile),
+      ...recentWithinBudget(historyRef.current),
+    ];
     setLoading(true);
     scrollToEnd();
 
@@ -146,6 +187,17 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <ScreenHeader title="Ekolojik Tarım Asistanı" />
+
+      {/* Only offered once there is something to clear, so a fresh install is
+          not invited to reset an empty conversation. */}
+      {messages.length > 1 ? (
+        <View style={styles.toolbar}>
+          <Pressable onPress={startNewChat} hitSlop={8} style={styles.newChat}>
+            <Ionicons name="create-outline" size={16} color={colors.green} />
+            <Text style={styles.newChatText}>Yeni sohbet</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -219,6 +271,14 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  toolbar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
+  newChat: { flexDirection: "row", alignItems: "center", gap: 4 },
+  newChatText: { color: colors.green, fontSize: 13, fontWeight: "600" },
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.bg },
   messages: { flex: 1 },
