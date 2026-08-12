@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, Pressable, Text } from "react-native";
+import { Pressable, Text } from "react-native";
 import { router } from "expo-router";
 import { AuthScreen, Field, authStyles } from "../../src/AuthForm";
 import { useAuth } from "../../src/auth";
@@ -42,18 +42,7 @@ export default function LoginScreen() {
       disabled={busy}
       footer={
         <>
-          <Pressable
-            onPress={() =>
-              // Honest about the state of it: the field is collected and the
-              // flow is planned, but there is no server to send a reset from,
-              // so saying "we sent you an e-mail" would be a lie.
-              Alert.alert(
-                "Şifremi unuttum",
-                "E-posta ile şifre sıfırlama henüz aktif değil. Şimdilik " +
-                  "profilinizi silip yeniden oluşturabilirsiniz.",
-              )
-            }
-          >
+          <Pressable onPress={() => router.push("/(auth)/forgot")}>
             <Text style={[authStyles.hint, { textAlign: "center", marginTop: 14 }]}>
               Şifremi unuttum
             </Text>
