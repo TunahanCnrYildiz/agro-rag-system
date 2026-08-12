@@ -15,6 +15,7 @@ import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
 import { getGreeting } from "../../src/greeting";
 import { openExternalUrl } from "../../src/openExternalUrl";
+import { useAuth } from "../../src/auth";
 import {
   ChatTurn,
   RecommendedProduct,
@@ -29,6 +30,21 @@ interface Message {
 }
 
 let nextId = 1;
+/** The profile as a conversation turn, or nothing when there is no profile.
+ *  A single user turn: two consecutive user messages are valid in the chat
+ *  format, and inventing an assistant reply the assistant never gave would put
+ *  words in its mouth. */
+function profileTurns(profile: { name: string; province?: string } | null): ChatTurn[] {
+  if (!profile?.name) return [];
+  const where = profile.province ? ` ${profile.province}'dayım.` : "";
+  return [
+    {
+      role: "user",
+      content: `Adım ${profile.name}.${where} Bunu aklında tut, her cevapta tekrar etme.`,
+    },
+  ];
+}
+
 function newId() {
   return String(nextId++);
 }
@@ -41,6 +57,7 @@ export default function ChatScreen() {
       text: getGreeting(),
     },
   ]);
+  const { profile } = useAuth();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -58,7 +75,17 @@ export default function ChatScreen() {
     setMessages((prev) => [...prev, { id: newId(), role: "user", text }]);
     // Prior turns only - the current message is sent separately as `text`,
     // so it must not also be the last entry in the history we send.
-    const requestHistory = historyRef.current.slice();
+    //
+    // The profile is prepended as the FIRST user turn so the assistant knows who
+    // it is talking to and where they are. Doing it here rather than server-side
+    // is deliberate: `history` is already part of the request, so this needs no
+    // backend change and works against the older deployment too.
+    //
+    // It is NOT pushed into historyRef and NOT rendered as a bubble - the user
+    // never typed it, so showing it as something they said would be a lie. It is
+    // rebuilt from the current profile on every send, so editing the profile
+    // takes effect on the next message with no extra wiring.
+    const requestHistory = [...profileTurns(profile), ...historyRef.current];
     setLoading(true);
     scrollToEnd();
 
