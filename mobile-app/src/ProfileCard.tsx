@@ -28,7 +28,7 @@ export function ProfileCard() {
         {/* What is stored is shown, so a user can see their own record rather
             than having to trust a claim about it. */}
         <Text style={styles.sub} numberOfLines={1}>
-          {[profile.province, profile.email].filter(Boolean).join(" · ") ||
+          {[profile.province, profile.crops].filter(Boolean).join(" · ") ||
             "İl bilgisi eklenmedi"}
         </Text>
       </View>

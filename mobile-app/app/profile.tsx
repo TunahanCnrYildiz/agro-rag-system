@@ -33,6 +33,7 @@ export default function ProfileScreen() {
   const [name, setName] = useState(profile?.name ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
   const [province, setProvince] = useState(profile?.province ?? "");
+  const [crops, setCrops] = useState(profile?.crops ?? "");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
 
@@ -49,7 +50,7 @@ export default function ProfileScreen() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return setDetailError("Geçerli bir e-posta adresi yazın.");
     setDetailError(null);
-    await updateProfile({ name, email, province });
+    await updateProfile({ name, email, province, crops });
     setSavedMsg("Bilgileriniz kaydedildi.");
     setTimeout(() => setSavedMsg(null), 2500);
   }
@@ -121,6 +122,13 @@ export default function ProfileScreen() {
             value={province}
             onChangeText={setProvince}
             autoCapitalize="words"
+          />
+          <Field
+            label="Yetiştirdiğiniz ürünler"
+            placeholder="Örn. domates, biber"
+            value={crops}
+            onChangeText={setCrops}
+            autoCapitalize="none"
           />
           {detailError ? <Text style={styles.error}>{detailError}</Text> : null}
           {savedMsg ? <Text style={styles.ok}>{savedMsg}</Text> : null}
