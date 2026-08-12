@@ -34,15 +34,15 @@ let nextId = 1;
  *  A single user turn: two consecutive user messages are valid in the chat
  *  format, and inventing an assistant reply the assistant never gave would put
  *  words in its mouth. */
-function profileTurns(profile: { name: string; province?: string } | null): ChatTurn[] {
+function profileTurns(
+  profile: { name: string; province?: string; crops?: string } | null,
+): ChatTurn[] {
   if (!profile?.name) return [];
-  const where = profile.province ? ` ${profile.province}'dayım.` : "";
-  return [
-    {
-      role: "user",
-      content: `Adım ${profile.name}.${where} Bunu aklında tut, her cevapta tekrar etme.`,
-    },
-  ];
+  const parts = [`Adım ${profile.name}.`];
+  if (profile.province) parts.push(`${profile.province}'dayım.`);
+  if (profile.crops) parts.push(`${profile.crops} yetiştiriyorum.`);
+  parts.push("Bunu aklında tut, her cevapta tekrar etme.");
+  return [{ role: "user", content: parts.join(" ") }];
 }
 
 function newId() {

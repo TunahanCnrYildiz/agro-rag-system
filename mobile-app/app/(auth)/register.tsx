@@ -12,6 +12,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [province, setProvince] = useState("");
+  const [crops, setCrops] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,7 +29,7 @@ export default function RegisterScreen() {
     setError(null);
     setBusy(true);
     try {
-      await signUp({ name, userId, email, password, province });
+      await signUp({ name, userId, email, password, province, crops });
       router.replace("/(tabs)");
     } catch {
       setError("Profil kaydedilemedi. Lütfen tekrar deneyin.");
@@ -103,6 +104,14 @@ export default function RegisterScreen() {
         value={province}
         onChangeText={setProvince}
         autoCapitalize="words"
+      />
+      <Field
+        label="Yetiştirdiğiniz ürünler (isteğe bağlı)"
+        placeholder="Örn. domates, biber"
+        hint="Asistan sorularınızı bu ürünler üzerinden yanıtlar."
+        value={crops}
+        onChangeText={setCrops}
+        autoCapitalize="none"
         onSubmitEditing={submit}
       />
     </AuthScreen>

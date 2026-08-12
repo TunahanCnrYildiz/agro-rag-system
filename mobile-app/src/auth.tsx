@@ -41,6 +41,10 @@ export type Profile = {
   userId: string;
   email: string;
   province?: string;
+  /** Free text, e.g. "domates, biber". In an agriculture assistant what someone
+   *  GROWS is at least as decisive as where they are, and it is the field the
+   *  budget route's crop slot will eventually be filled from. */
+  crops?: string;
 };
 
 type StoredProfile = Profile & { salt: string; digest: string };
@@ -51,6 +55,7 @@ type SignUpInput = {
   email: string;
   password: string;
   province?: string;
+  crops?: string;
 };
 
 type AuthState = {
@@ -143,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: input.userId.trim(),
       email: input.email.trim(),
       province: input.province?.trim() || undefined,
+      crops: input.crops?.trim() || undefined,
       salt,
       digest: await digest(salt, input.password),
     };
@@ -153,6 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: stored.userId,
       email: stored.email,
       province: stored.province,
+      crops: stored.crops,
     });
   }, []);
 
@@ -171,6 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // must still open rather than being thrown away.
       email: stored.email ?? "",
       province: stored.province,
+      crops: stored.crops,
     });
     return true;
   }, []);
@@ -183,6 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: patch.name.trim(),
       email: patch.email.trim(),
       province: patch.province?.trim() || undefined,
+      crops: patch.crops?.trim() || undefined,
     };
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     setProfile({
@@ -190,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: merged.userId,
       email: merged.email,
       province: merged.province,
+      crops: merged.crops,
     });
   }, []);
 
