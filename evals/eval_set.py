@@ -1031,29 +1031,18 @@ CASES = [
      "retrieval": "any",
      "products": "any",
      "answer_any": ["toprak", "sulama", "münavebe", "pazar"],
-     # The prohibition is a PROMPT constraint, not something code can enforce, so
-     # it is measured here. These ban the ACT of recommending - the nominalised
-     # "ekmenizi/ekilmesini" plus a recommendation verb - not the crop name:
-     # banning crop names would red on a legitimate answer that mentions one while
-     # explaining rotation.
-     #
-     # THE LEADING SPACE IS LOAD-BEARING. _answer_ok matches answer_none with a
-     # plain `in` and no word boundary, on the stated assumption that every term
-     # is one word. These are the first multi-word terms in this file, and Turkish
-     # agglutination collides at once: "çekmenizi öneririm" (draw the water) ends
-     # in "ekmenizi öneririm", and "çekilmesini" in "ekilmesini". Both are
-     # compliant irrigation answers. The space is the boundary the harness does
-     # not apply.
-     #
-     # KNOWN ESCAPES, both deliberate:
-     #  - "buğday ekebilirsiniz" is a real violation these anchors miss. Catching
-     #    it needs "crop name + modal verb", which a substring test cannot express.
-     #    The bare modal "ekebilirsiniz" was tried and removed: it fires on
-     #    compliant answers like "en uygun türü seçip ekebilirsiniz".
-     #  - a sentence-initial "Ekmenizi öneririm" has no preceding space and would
-     #    escape. No model writes that without naming what to plant first.
-     #
-     # A red here is a finding to report, not an anchor to soften.
-     "answer_none": [" ekmenizi öner", " ekmenizi tavsiye",
-                     " ekilmesini öner", " ekilmesini tavsiye"]},
+     # NO answer_none, and that is a measured finding rather than an omission.
+     # Spec §5 says the crop-naming prohibition "is measured by the eval's
+     # answer_none dimension". With this harness it is NOT, and four rounds of
+     # narrowing established why. answer_none is a plain substring test, and on
+     # realistic Turkish it runs BACKWARDS:
+     #   "Buğday ekmenizi kesinlikle öneririm."          -> escapes (adverb splits it)
+     #   "Size ne ekmenizi önereceğimi söyleyebilmem      -> flagged, though this is
+     #    için toprak analizi gerekli."                      exactly the compliant answer
+     # The two differ by the verb's OBJECT - a crop name versus an interrogative -
+     # which no substring or regex can see; it needs a crop lexicon, a route this
+     # project already measured and rejected. So the prohibition is UNMEASURED
+     # here, and this case measures only that the factors are explained. See
+     # docs/superpowers/2026-08-13-crop-choice-findings.md.
+     },
 ]
