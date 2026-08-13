@@ -1032,10 +1032,15 @@ CASES = [
      "products": "any",
      "answer_any": ["toprak", "sulama", "münavebe", "pazar"],
      # The prohibition is a PROMPT constraint, not something code can enforce, so
-     # it is measured here. These ban the ACT of recommending, not the crop name:
-     # a violation reads "pamuk ekmenizi öneririm", and banning crop names instead
-     # would red on a legitimate answer that mentions one while explaining
-     # rotation. A red here is a finding to report, not an anchor to soften.
-     "answer_none": ["ekmenizi öneririm", "ekmenizi tavsiye ederim",
-                     "ekebilirsiniz"]},
+     # it is measured here. These ban the ACT of recommending - the nominalised
+     # "ekmenizi/ekilmesini" plus a recommendation verb - not the crop name:
+     # banning crop names would red on a legitimate answer that mentions one while
+     # explaining rotation.
+     # KNOWN ESCAPE: "buğday ekebilirsiniz" is a real violation these anchors miss.
+     # Catching it needs "crop name + modal verb", and answer_none is a plain
+     # substring test. The bare modal "ekebilirsiniz" was tried and removed: it
+     # fires on compliant answers like "en uygun türü seçip ekebilirsiniz".
+     # A red here is a finding to report, not an anchor to soften.
+     "answer_none": ["ekmenizi öner", "ekmenizi tavsiye",
+                     "ekilmesini öner", "ekilmesini tavsiye"]},
 ]
