@@ -106,9 +106,33 @@ is instead: the model's answer was TRUNCATED.** Diagnosis, in order:
    8,192 window, so 3,312 + 2,048 = 5,360 leaves roughly 2,800 tokens unused.
 
 **This is a product defect, not an eval artifact — a real user asking this
-question can receive a sentence that stops mid-word.** It is out of scope for
-this branch (it lives in configuration and affects every route), and it is
-raised as separate work rather than fixed here.
+question can receive a sentence that stops mid-word.** It was out of scope for
+this branch (it lives in configuration and affects every route) and was fixed
+immediately afterwards on `truncated-answers`; what that found is worth
+recording here, because two of the three facts contradict what this section
+originally assumed:
+
+- **There are two regimes, and only one was unhandled.** Forcing the cap down
+  reproduced both. If the budget goes entirely on invisible reasoning, no
+  visible text survives and the existing blank-answer backstop already catches
+  it. If reasoning finishes and the budget runs out while the answer is being
+  written, the half sentence passes through silently. Only the second was a
+  gap, and `_complete_text` now retries it exactly as it retries a blank.
+- **The config default was not what was running.** `.env` and the committed
+  `.env.example` both pinned `MAX_TOKENS=2048`, which overrides `src/config.py`,
+  so raising the default alone changed nothing anywhere — including on the
+  server, which copies `.env.example`. All three had to move together.
+- **The retry, not the ceiling, is what fixed it.** The case that had been
+  failing went to 8/8 and the whole shield to 59/59 while the effective cap was
+  still 2048. Raising it to 3072 afterwards is about latency, not correctness:
+  at 2048 one generation in nine hit the ceiling and paid ~25 s for a retry; at
+  3072 the heaviest of eight cases across every route used 1,688 tokens.
+
+One gap is deliberately left open: on the **streaming** path a truncation after
+the warmup threshold cannot be retried, because those tokens have already
+reached the client. The mobile app sends `stream: false` and is unaffected; the
+web widget is. It is documented rather than fixed because undoing it needs
+either invented user-facing copy or a new client event.
 
 So exit gate 2 is **not clean**: the plan asked for 59/59 and the run gave
 58/59. The failure is diagnosed, attributed away from this branch, and

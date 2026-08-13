@@ -151,6 +151,7 @@ def _fake_llm(content):
 
     class _Choice:
         message = msg
+        finish_reason = "stop"      # a complete answer; see _complete_text
 
     class _Comp:
         choices = [_Choice()]
@@ -475,9 +476,15 @@ def test_stream_answer_emits_products_without_marker(monkeypatch):
 # --------------------------------------------------------------------------- #
 # _complete_text() — never hand back a blank answer
 # --------------------------------------------------------------------------- #
-def _fake_llm_seq(contents):
-    """Chat client returning a different content per successive call."""
+def _fake_llm_seq(contents, finish_reasons=None):
+    """Chat client returning a different content per successive call.
+
+    `finish_reasons` mirrors `contents` and defaults to "stop" everywhere, which
+    is what a model that finished on its own returns. Pass "length" to model the
+    other failure: the generation budget ran out mid-answer.
+    """
     calls = {"n": 0}
+    reasons = finish_reasons or ["stop"] * len(contents)
 
     class _Msg:
         pass
@@ -487,12 +494,15 @@ def _fake_llm_seq(contents):
             class completions:
                 @staticmethod
                 def create(**kwargs):
+                    i = min(calls["n"], len(contents) - 1)
                     msg = _Msg()
-                    msg.content = contents[min(calls["n"], len(contents) - 1)]
+                    msg.content = contents[i]
+                    reason = reasons[min(i, len(reasons) - 1)]
                     calls["n"] += 1
 
                     class _Choice:
                         message = msg
+                        finish_reason = reason
 
                     class _Comp:
                         choices = [_Choice()]
@@ -530,6 +540,58 @@ def test_complete_text_falls_back_when_blank_twice(monkeypatch):
 def test_complete_text_does_not_retry_a_short_answer(monkeypatch):
     """Short is legitimate - [OFFSCOPE] refusals are short. Only BLANK retries."""
     client, calls = _fake_llm_seq(["Hayir.", "ikinci"])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    assert engine._complete_text([]) == "Hayir."
+    assert calls["n"] == 1
+
+
+def test_complete_text_retries_a_truncated_answer(monkeypatch):
+    """Measured 2026-08-13: this model spends a large and VARIABLE share of its
+    budget on invisible reasoning - 1076 to 2023 completion tokens on one
+    identical question against a 2048 cap - so it sits under the ceiling and
+    occasionally crosses it, cutting the answer mid-sentence. Reproduced by
+    lowering the cap: finish_reason 'length', 318 visible characters ending on
+    "(Örneğin: Fide dönemi mi, çiçeklenme". It scatters like a blank answer, so
+    it retries like one."""
+    client, calls = _fake_llm_seq(
+        ["Domates bitkisinde gubreleme zamani, bitkinin (",
+         "Domates bitkisinde gubreleme zamani fenolojik doneme baglidir."],
+        ["length", "stop"])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    out = engine._complete_text([])
+    assert out == "Domates bitkisinde gubreleme zamani fenolojik doneme baglidir."
+    assert calls["n"] == 2
+
+
+def test_complete_text_keeps_the_longer_partial_when_both_truncate(monkeypatch):
+    """Most of an answer beats a failure message. This is also what the caller
+    already received before the retry existed, so the retry can only improve
+    the outcome, never replace a partial answer with nothing."""
+    client, calls = _fake_llm_seq(["Kisa parca", "Bu ikinci parca daha uzun ve"],
+                                  ["length", "length"])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    out = engine._complete_text([])
+    assert out == "Bu ikinci parca daha uzun ve"
+    assert out != engine._empty_answer_message()
+    assert calls["n"] == 2                    # exactly one retry, not a loop
+
+
+def test_complete_text_falls_back_when_truncation_left_nothing(monkeypatch):
+    """The severe case: the budget went entirely on invisible reasoning and no
+    visible text survived. That is a blank answer however it is labelled, and
+    the user must get the honest message rather than an empty string."""
+    client, calls = _fake_llm_seq(["", ""], ["length", "length"])
+    monkeypatch.setattr(engine, "_get_llm", lambda: client)
+    out = engine._complete_text([])
+    assert out == engine._empty_answer_message()
+    assert out.strip()
+    assert calls["n"] == 2
+
+
+def test_complete_text_does_not_retry_a_complete_short_answer(monkeypatch):
+    """finish_reason 'stop' means the model chose to end. Short is legitimate -
+    [OFFSCOPE] refusals are short - and must not be mistaken for truncation."""
+    client, calls = _fake_llm_seq(["Hayir.", "ikinci"], ["stop", "stop"])
     monkeypatch.setattr(engine, "_get_llm", lambda: client)
     assert engine._complete_text([]) == "Hayir."
     assert calls["n"] == 1
@@ -810,6 +872,7 @@ def _capturing_llm(seen: dict, reply: str = "Cevap."):
 
     class _Choice:
         message = _Msg()
+        finish_reason = "stop"      # a complete answer; see _complete_text
 
     class _Resp:
         choices = [_Choice()]
