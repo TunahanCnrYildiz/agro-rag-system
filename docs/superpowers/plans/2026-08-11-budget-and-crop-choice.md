@@ -1,5 +1,26 @@
 # Budget and Crop-Choice Routes Implementation Plan
 
+> **SUPERSEDED — DO NOT EXECUTE TASKS 1, 2, 3 AND 5 (the `budget` half).**
+> The extractor built in Tasks 1-2 came out of review with five Criticals, every
+> one a demonstrated wrong money figure (e.g. `"5 dönümde 2 ton aldım, kilosu
+> 10 TL, masrafım 5000 TL"` produced a 95,000 TL margin instead of 15,000). The
+> root cause is the approach, not the patches: hand-curated Turkish token sets
+> with ±2 windows cannot survive Turkish inflection, and each fix opened new
+> holes across three rounds. The deciding number is that **six of the seven
+> frozen budget questions contain no numbers at all**, so the extractor served
+> one question in seven while carrying five silent wrong-money defects.
+>
+> `budget` waits for a new spec in which the numbers come from a **form**, not
+> from parsing prose. That changes the interaction model, so it needs
+> brainstorming → spec → plan, not an amendment to this document.
+>
+> **The `crop_choice` half was split out and executed** as
+> `docs/superpowers/plans/2026-08-13-crop-choice.md`. Tasks 4 and 6 here are
+> superseded by it; the code they describe lives there.
+>
+> `src/budget.py` and its tests remain on the `budget-and-crop-choice` branch,
+> wired to nothing.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the `budget` and `crop_choice` routes answer their questions instead of falling through to a corpus search that cannot hold the answer — computing money in Python from numbers the user supplied, and never inventing one.

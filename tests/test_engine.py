@@ -1430,3 +1430,50 @@ def test_streaming_appends_framing_on_the_blank_answer_backstop(monkeypatch, tmp
               if e.startswith("data: ")]
     text = "".join(e["content"] for e in events if e["type"] == "token")
     assert fertplan.FRAMING in text
+
+
+def test_crop_choice_block_names_the_factors_and_forbids_a_recommendation():
+    out = engine._context_block(
+        "crop_choice", "Manisa'dayım, bu yıl ne eksem?", None, date(2026, 8, 11))
+    assert "Manisa" in out
+    assert "toprak" in out and "sulama" in out and "munavebe" in out
+    assert "ONERME" in out
+
+
+def test_crop_choice_block_asks_for_the_province_when_missing():
+    out = engine._context_block(
+        "crop_choice", "Bu yıl ne eksem?", None, date(2026, 8, 11))
+    assert "BILINMIYOR" in out
+    # The factors are still explained without a province - an unknown location
+    # costs one line, not the answer.
+    assert "toprak" in out and "ONERME" in out
+
+
+def test_crop_choice_block_carries_the_season():
+    """The month comes from `today`, not from the clock, so this is stable."""
+    out = engine._context_block(
+        "crop_choice", "Manisa'dayım, bu yıl ne eksem?", None, date(2026, 8, 11))
+    assert "Ağustos" in out
+
+
+def test_a_crop_choice_failure_degrades_to_an_empty_block(monkeypatch):
+    """Spec §8: a context failure must cost the situation lines, not the answer."""
+    monkeypatch.setattr("src.context.season.describe",
+                        lambda d: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert engine._context_block(
+        "crop_choice", "Bu yıl ne eksem?", None, date(2026, 8, 11)) == ""
+
+
+def test_crop_choice_never_gets_a_framing_sentence():
+    """`crop_choice` has no reviewed programme behind it, so it gets no framing
+    suffix. This passes today by virtue of the `route != "fert_plan"` guard; it is
+    here so that adding a second framing route later cannot silently give this one
+    a sentence it has no basis for."""
+    assert engine._framing_suffix("crop_choice", "Bu yıl ne eksem?") == ""
+
+
+def test_other_routes_still_get_an_empty_context_block():
+    """The regression that matters: adding a branch must not disturb the default."""
+    for route in ("plant_info", "nutrition", "budget", "offscope"):
+        assert engine._context_block(
+            route, "Bu yıl ne eksem?", None, date(2026, 8, 11)) == "", route

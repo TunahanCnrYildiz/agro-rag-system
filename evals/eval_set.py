@@ -1017,4 +1017,32 @@ CASES = [
      # Trabzon's. Note "Trabzon" is NOT bannable via answer_none: it is the
      # fruit's name and belongs in the reply.
      "answer_any": ["Antalya"]},
+
+    # ----------------------------------------------------------------- #
+    # crop_choice - the route this plan makes diverge
+    # ----------------------------------------------------------------- #
+    # Anchors avoid month and season names: those come from date.today(), so an
+    # anchor like "Ağustos" would be green today and red in December with nothing
+    # about the product having changed. The province is safe - it comes from the
+    # question.
+    {"id": "crop_choice_gives_factors_not_a_recommendation",
+     "category": "crop_choice",
+     "query": "Manisa'dayım, bu yıl tarlama ne eksem iyi olur?",
+     "retrieval": "any",
+     "products": "any",
+     "answer_any": ["toprak", "sulama", "münavebe", "pazar"],
+     # NO answer_none, and that is a measured finding rather than an omission.
+     # Spec §5 says the crop-naming prohibition "is measured by the eval's
+     # answer_none dimension". With this harness it is NOT, and four rounds of
+     # narrowing established why. answer_none is a plain substring test, and on
+     # realistic Turkish it runs BACKWARDS:
+     #   "Buğday ekmenizi kesinlikle öneririm."          -> escapes (adverb splits it)
+     #   "Size ne ekmenizi önereceğimi söyleyebilmem      -> flagged, though this is
+     #    için toprak analizi gerekli."                      exactly the compliant answer
+     # The two differ by the verb's OBJECT - a crop name versus an interrogative -
+     # which no substring or regex can see; it needs a crop lexicon, a route this
+     # project already measured and rejected. So the prohibition is UNMEASURED
+     # here, and this case measures only that the factors are explained. See
+     # docs/superpowers/2026-08-13-crop-choice-findings.md.
+     },
 ]
