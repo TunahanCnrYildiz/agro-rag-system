@@ -1032,7 +1032,10 @@ CASES = [
      "products": "any",
      "answer_any": ["toprak", "sulama", "münavebe", "pazar"],
      # The prohibition is a PROMPT constraint, not something code can enforce, so
-     # it is measured here. A red on this case is a finding to report, not an
-     # anchor to soften.
-     "answer_none": ["şunu ekin", "bunu ekmenizi öneririm"]},
+     # it is measured here. These ban the ACT of recommending, not the crop name:
+     # a violation reads "pamuk ekmenizi öneririm", and banning crop names instead
+     # would red on a legitimate answer that mentions one while explaining
+     # rotation. A red here is a finding to report, not an anchor to soften.
+     "answer_none": ["ekmenizi öneririm", "ekmenizi tavsiye ederim",
+                     "ekebilirsiniz"]},
 ]
