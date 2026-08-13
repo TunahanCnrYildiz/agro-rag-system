@@ -128,13 +128,18 @@ class Settings(BaseSettings):
     # ceiling and crossed it often enough to cut real answers mid-sentence
     # (docs/superpowers/2026-08-13-crop-choice-findings.md section 2).
     #
-    # 3072 is bounded by the 8192 context window, not by preference. The largest
-    # prompt the eval set produces is 3452 tokens (the crop_choice case, whose
-    # context block is the longest), and the mobile client adds up to 3000
-    # characters of history on top - roughly 900 tokens. 3452 + 900 + 3072 leaves
-    # about 750 tokens of headroom. Raising this further without re-measuring the
-    # prompt would trade a truncated answer for a truncated PROMPT, which is the
-    # worse failure: it drops the system instructions silently.
+    # 3072 is bounded by the 8192 context window, not by preference, and the
+    # bound was MEASURED end to end rather than estimated. Worst case: the
+    # crop_choice question (longest context block) is 3,452 prompt tokens on its
+    # own, and 4,681 once the mobile client's full history budget of 3,000
+    # characters rides along. 4,681 + 3,072 = 7,753 of 8,192, so **439 tokens
+    # spare** - real but thin.
+    #
+    # Two things therefore cannot move independently of this one: raising this
+    # value, and raising SEND_BUDGET_CHARS in mobile-app/src/chatStore.ts. Either
+    # would trade a truncated ANSWER for a truncated PROMPT, and that is the
+    # worse failure - it drops the system instructions silently instead of
+    # visibly cutting a sentence.
     max_tokens: int = Field(default=3072)
     request_timeout: float = Field(default=120.0)
 
