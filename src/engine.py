@@ -636,19 +636,33 @@ def _complete_text(messages: list[dict]) -> str:
 
 def _context_block(route: str, message: str, history: list[dict] | None,
                    today: date) -> str:
-    """Situation lines for the fert_plan route: where, when, and what the weather
-    is about to do. Empty string for every other route, so nothing else pays for
-    it and nothing else changes.
+    """Route-specific situation lines. Empty string for the routes that have
+    none, so they pay nothing and nothing about them changes.
+
+    `fert_plan` gets where, when and what the weather is about to do.
+    `crop_choice` gets where and when, plus the factors that decide what to
+    plant - no weather, because the question spans a season rather than the
+    next few days.
 
     Weather is best-effort by design (see src/context/weather.py) - its absence
     removes one line and never blocks the answer. The province is asked for in
     chat rather than guessed: a wrong province produces confidently wrong timing.
     """
+    # Deferred: src/context/location.py imports _normalize_tr from THIS module at
+    # load time, so a top-level import here is a real cycle.
+    if route == "crop_choice":
+        try:
+            return _crop_choice_block(message, history, today)
+        except Exception as exc:                      # noqa: BLE001
+            # Spec §8: the situation lines are an enhancement. Losing them must
+            # cost those lines and nothing else, so the answer still gets built
+            # from the corpus exactly as it did before this route diverged.
+            print(f"[engine] crop_choice context failed, continuing without it: {exc}")
+            return ""
+
     if route != "fert_plan":
         return ""
 
-    # Deferred: src/context/location.py imports _normalize_tr from THIS module at
-    # load time, so a top-level import here is a real cycle.
     from src.context import location, season, weather
 
     lines = [f"Tarih: {season.describe(today)}."]
@@ -665,6 +679,39 @@ def _context_block(route: str, message: str, history: list[dict] | None,
                      "oldugunu sor, tavsiyeni genel tut.")
     lines.append("Bitkinin fenolojik donemi bilinmiyorsa cevabinda sor "
                  "(fide, cicek, meyve tutumu gibi).")
+    return "\n".join(lines)
+
+
+def _crop_choice_block(message: str, history: list[dict] | None,
+                       today: date) -> str:
+    """Situation lines for the crop-choice route: where, when, and the factors
+    that actually decide what to plant.
+
+    No module and no arithmetic - province and season come from context modules
+    that already shipped, and the rest is prompt text.
+
+    The prohibition on naming a crop is a PROMPT constraint, not something this
+    code can enforce; spec §5 says so and the eval measures whether it holds.
+    Enforcing it here would mean detecting "recommended a crop" in Turkish free
+    text, which is the same problem the product-suppression backstop already
+    finds hard.
+    """
+    from src.context import location, season
+
+    lines = [f"Tarih: {season.describe(today)}."]
+    province = location.extract_province(message, history)
+    if province:
+        lines.append(f"Kullanicinin ili: {province}.")
+    else:
+        lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
+                     "oldugunu sor.")
+    lines.append("Bu bir urun secimi sorusu. Karari belirleyen faktorleri anlat "
+                 "ve eksik olanlari sor: toprak yapisi ve analiz, sulama imkani, "
+                 "arazi buyuklugu, onceki urun ve munavebe, pazara mesafe, "
+                 "isgucu ve makine.")
+    lines.append("BELIRLI BIR URUN ONERME. Kullanicinin kosullarini bilmeden "
+                 "urun onermek bir sezonluk gecim karari hakkinda temelsiz "
+                 "tavsiye olur.")
     return "\n".join(lines)
 
 
