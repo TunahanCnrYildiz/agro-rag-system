@@ -69,11 +69,50 @@ diverge. The overall gate still reads `KAPILAR: GECMEDI` because `plant_info`
 absorbs five cases that belong to other routes; that is a pre-existing,
 expected failure this plan does not touch and is not responsible for fixing.
 
-**The full 59-case shield has NOT been run.** LM Studio was down for the
-entire session — every attempt to reach it is recorded in the Task 2 report
-as deferred. This is the plan's own exit gate 2 (`evals.run_eval` at 59/59)
-and it is **open**. Nothing in this document should be read as implying that
-gate passed; it has simply not been attempted yet.
+**The full 59-case shield ran at the end of the session: 58/59.** LM Studio
+was down while the tasks were implemented — the Task 2 report records the
+deferral — and the run happened once it came back up
+(`evals/runs/20260813T182652Z-full.jsonl`).
+
+```
+=== 58/59 cases passed ===
+  retrieval: 59/59 | context: 59/59 | product-gating: 59/59
+  grounding: 58/59 | guardrail: 59/59
+```
+
+**`crop_choice` passed on all five dimensions**, both alone (`--only
+crop_choice`, 34 s) and inside the full run. The single red is
+`fertplan_province_reaches_the_answer`, a `fert_plan` case from the previous
+plan, on the grounding dimension.
+
+**That red is not a regression from this branch, and the evidence says what it
+is instead: the model's answer was TRUNCATED.** Diagnosis, in order:
+
+1. The failing answer is 73 characters and stops mid-parenthesis: `"Domates
+   bitkisinde gübreleme zamanı, bitkinin şu anki gelişim aşamasına ("`. The
+   anchor for this case is the single term `Manisa`, so a cut-off answer fails
+   grounding without the province having anything to do with it.
+2. Re-run three times: 2/3 grounding. The one failure again ended early — 325
+   characters closing on a colon, promising a list it never wrote. **Both
+   observed failures are truncations; neither is an answer that merely omits
+   the province.**
+3. Cause, measured directly by spying on `finish_reason` and usage through
+   `engine.OpenAI`: `settings.max_tokens` is **2048**, and completion tokens on
+   this one question came back **1218, 1524 and 2023** across three runs. The
+   model spends a large and variable share of its budget on invisible
+   reasoning, so it sits just under the cap and occasionally crosses it; when
+   it does, the visible answer is cut wherever generation stopped.
+4. There is headroom for a fix: the prompt measured 3,312 tokens against an
+   8,192 window, so 3,312 + 2,048 = 5,360 leaves roughly 2,800 tokens unused.
+
+**This is a product defect, not an eval artifact — a real user asking this
+question can receive a sentence that stops mid-word.** It is out of scope for
+this branch (it lives in configuration and affects every route), and it is
+raised as separate work rather than fixed here.
+
+So exit gate 2 is **not clean**: the plan asked for 59/59 and the run gave
+58/59. The failure is diagnosed, attributed away from this branch, and
+attached to a defect that predates it.
 
 ---
 
@@ -138,6 +177,19 @@ against `guardrail=True` on all three test sentences above (nothing left to
 measure the prohibition), `grounding` split `False` / `True` / `True` in the
 same order — the factors-explained requirement discriminates even though the
 crop-naming prohibition no longer does.
+
+**One live observation, read by eye because nothing measures it.** In the
+`--only crop_choice` run the model named **no crop**, listed all six factors
+under headings, asked for the missing details, and stated the rationale in its
+own words: *"Mevcut koşullarınızı bilmeden spesifik bir ürün önermek, temelsiz
+bir tavsiye olur."* So the prohibition held here. **One observation is not
+proof** — it is a single sample from a sampled model, and the point of section
+3 is that nothing in the harness will tell us when it stops holding.
+
+That answer also settles, in retrospect, why banning crop names would have been
+the wrong instrument: it contains *"hububat gibi alan bitkileri"* and *"sebze
+veya meyve"* — categories used to explain how field size shapes the decision,
+not recommendations. A crop-name ban would have failed this compliant answer.
 
 **A process finding worth recording on its own.** Twice during these four
 rounds, a verification probe used `_matches` directly rather than going
