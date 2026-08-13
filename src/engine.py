@@ -613,13 +613,34 @@ def _has_advice(text: str) -> bool:
 def _complete_text(messages: list[dict]) -> str:
     """Return the model's answer text, never "".
 
-    Blank output is stochastic (temperature is non-zero and the failures scatter
-    across runs of an identical prompt), so one retry usually lands. Raises on
-    transport errors - the caller maps those to _llm_unavailable_message, which
-    is a different failure and must stay distinguishable.
+    Two stochastic failures each get one retry, and they are not the same
+    failure:
+
+    BLANK - the model emits nothing at all. Temperature is non-zero and the
+    failures scatter across runs of an identical prompt, so a second attempt
+    usually lands.
+
+    TRUNCATION (`finish_reason == "length"`) - the generation budget ran out
+    while the answer was still being written, so the user receives half a
+    sentence. Measured 2026-08-13: this model spends a large and VARIABLE share
+    of its budget on invisible reasoning - 1076 to 2023 completion tokens on one
+    identical question against a 2048 cap - so it sits under the ceiling and
+    occasionally crosses it. That scatters exactly like a blank answer, so it
+    retries like one.
+
+    If both attempts truncate, the longer partial is returned rather than the
+    failure message: most of an answer beats none, and it is what the caller
+    already received before this retry existed, so the retry can only improve
+    the outcome. A truncation that leaves no visible text at all is a blank
+    answer however it is labelled, and takes the blank path.
+
+    Raises on transport errors - the caller maps those to
+    _llm_unavailable_message, which is a different failure and must stay
+    distinguishable.
     """
     client = _get_llm()
     profile = _chat_profile()
+    truncated = ""
     for _ in range(2):  # first attempt + one retry
         completion = client.chat.completions.create(
             model=profile.model,
@@ -627,11 +648,18 @@ def _complete_text(messages: list[dict]) -> str:
             stream=False,
             **profile.sampling,
         )
-        text = completion.choices[0].message.content or ""
-        if text.strip():
-            return text
-        print("[engine] model returned a blank answer; retrying once")
-    return _empty_answer_message()
+        choice = completion.choices[0]
+        text = choice.message.content or ""
+        if not text.strip():
+            print("[engine] model returned a blank answer; retrying once")
+            continue
+        if choice.finish_reason == "length":
+            print("[engine] model ran out of budget mid-answer; retrying once")
+            if len(text) > len(truncated):
+                truncated = text
+            continue
+        return text
+    return truncated or _empty_answer_message()
 
 
 def _context_block(route: str, message: str, history: list[dict] | None,

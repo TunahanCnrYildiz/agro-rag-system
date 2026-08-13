@@ -121,7 +121,21 @@ class Settings(BaseSettings):
     # Kept generous: reasoning-capable local builds (e.g. Gemma QAT) spend
     # tokens "thinking" before the visible answer, so a tight budget can return
     # empty content with finish_reason="length".
-    max_tokens: int = Field(default=2048)
+    #
+    # RAISED 2048 -> 3072 on 2026-08-13, from measurement rather than taste.
+    # 2048 was not generous enough: on ONE identical question the model returned
+    # 1076-2023 completion tokens across nine runs, i.e. it lived just under the
+    # ceiling and crossed it often enough to cut real answers mid-sentence
+    # (docs/superpowers/2026-08-13-crop-choice-findings.md section 2).
+    #
+    # 3072 is bounded by the 8192 context window, not by preference. The largest
+    # prompt the eval set produces is 3452 tokens (the crop_choice case, whose
+    # context block is the longest), and the mobile client adds up to 3000
+    # characters of history on top - roughly 900 tokens. 3452 + 900 + 3072 leaves
+    # about 750 tokens of headroom. Raising this further without re-measuring the
+    # prompt would trade a truncated answer for a truncated PROMPT, which is the
+    # worse failure: it drops the system instructions silently.
+    max_tokens: int = Field(default=3072)
     request_timeout: float = Field(default=120.0)
 
     # --- Retrieval params --- #
