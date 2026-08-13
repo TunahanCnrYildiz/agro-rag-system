@@ -1036,11 +1036,24 @@ CASES = [
      # "ekmenizi/ekilmesini" plus a recommendation verb - not the crop name:
      # banning crop names would red on a legitimate answer that mentions one while
      # explaining rotation.
-     # KNOWN ESCAPE: "buğday ekebilirsiniz" is a real violation these anchors miss.
-     # Catching it needs "crop name + modal verb", and answer_none is a plain
-     # substring test. The bare modal "ekebilirsiniz" was tried and removed: it
-     # fires on compliant answers like "en uygun türü seçip ekebilirsiniz".
+     #
+     # THE LEADING SPACE IS LOAD-BEARING. _answer_ok matches answer_none with a
+     # plain `in` and no word boundary, on the stated assumption that every term
+     # is one word. These are the first multi-word terms in this file, and Turkish
+     # agglutination collides at once: "çekmenizi öneririm" (draw the water) ends
+     # in "ekmenizi öneririm", and "çekilmesini" in "ekilmesini". Both are
+     # compliant irrigation answers. The space is the boundary the harness does
+     # not apply.
+     #
+     # KNOWN ESCAPES, both deliberate:
+     #  - "buğday ekebilirsiniz" is a real violation these anchors miss. Catching
+     #    it needs "crop name + modal verb", which a substring test cannot express.
+     #    The bare modal "ekebilirsiniz" was tried and removed: it fires on
+     #    compliant answers like "en uygun türü seçip ekebilirsiniz".
+     #  - a sentence-initial "Ekmenizi öneririm" has no preceding space and would
+     #    escape. No model writes that without naming what to plant first.
+     #
      # A red here is a finding to report, not an anchor to soften.
-     "answer_none": ["ekmenizi öner", "ekmenizi tavsiye",
-                     "ekilmesini öner", "ekilmesini tavsiye"]},
+     "answer_none": [" ekmenizi öner", " ekmenizi tavsiye",
+                     " ekilmesini öner", " ekilmesini tavsiye"]},
 ]
