@@ -1017,4 +1017,22 @@ CASES = [
      # Trabzon's. Note "Trabzon" is NOT bannable via answer_none: it is the
      # fruit's name and belongs in the reply.
      "answer_any": ["Antalya"]},
+
+    # ----------------------------------------------------------------- #
+    # crop_choice - the route this plan makes diverge
+    # ----------------------------------------------------------------- #
+    # Anchors avoid month and season names: those come from date.today(), so an
+    # anchor like "Ağustos" would be green today and red in December with nothing
+    # about the product having changed. The province is safe - it comes from the
+    # question.
+    {"id": "crop_choice_gives_factors_not_a_recommendation",
+     "category": "crop_choice",
+     "query": "Manisa'dayım, bu yıl tarlama ne eksem iyi olur?",
+     "retrieval": "any",
+     "products": "any",
+     "answer_any": ["toprak", "sulama", "münavebe", "pazar"],
+     # The prohibition is a PROMPT constraint, not something code can enforce, so
+     # it is measured here. A red on this case is a finding to report, not an
+     # anchor to soften.
+     "answer_none": ["şunu ekin", "bunu ekmenizi öneririm"]},
 ]
