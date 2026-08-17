@@ -58,6 +58,19 @@ def test_an_invalid_value_is_a_field_error_not_a_422(client):
     assert errors["price"] is not None
 
 
+def test_a_boolean_value_is_a_field_error_not_a_silent_one(client):
+    """A JSON `true` must not be coerced into 1 of whatever unit; it must
+    come back as a field error, same as any other bad value."""
+    bad = dict(PAYLOAD, area={"value": True, "unit": "donum"})
+    resp = client.post("/api/chat", json={
+        "message": BUDGET_Q, "history": [], "budget": bad})
+    assert resp.status_code == 200
+    body = resp.json()
+    errors = {f["id"]: f["error"] for f in body["form"]["fields"]}
+    assert errors["area"] is not None
+    assert "TL" not in body["answer"]
+
+
 def test_a_structurally_wrong_body_is_still_a_422(client):
     """A genuine client bug must stay loud."""
     resp = client.post("/api/chat", json={

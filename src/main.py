@@ -40,8 +40,12 @@ class ChatTurn(BaseModel):
 class BudgetField(BaseModel):
     # Deliberately loose: a text input produces strings, and src/budget.py does
     # the real checking. A bad value must come back as a field error inside a
-    # 200, not as a 422 in the middle of a conversation.
-    value: str | int | float = ""
+    # 200, not as a 422 in the middle of a conversation. bool is listed here
+    # too: without it, Pydantic's smart union coerces a JSON `true` into the
+    # int 1 before src/budget.py ever sees it, defeating the bool guard there
+    # and silently turning it into 1 of whatever unit. Listing bool keeps the
+    # value a bool so that guard can reject it as a field error instead.
+    value: str | int | float | bool = ""
     unit: str = ""
 
 
