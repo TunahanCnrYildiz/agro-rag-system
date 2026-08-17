@@ -88,3 +88,68 @@ def _load() -> dict:
         return {"years": years, "crops": crops}
     except Exception:  # noqa: BLE001 - a broken data file must not break answering
         return {}
+
+
+@dataclass(frozen=True)
+class NormValue:
+    """One figure and where it came from. The provenance travels with the value
+    because a provincial reading and a national one must never look alike."""
+    amount: float
+    year: int
+    scope: str          # "il" | "tr"
+    region: str         # "Manisa" | "Türkiye"
+
+
+@dataclass(frozen=True)
+class CropNorm:
+    crop: str
+    label: str
+    yield_kg_da: NormValue | None
+    price_tl_kg: NormValue | None
+
+
+def available_crops() -> tuple[tuple[str, str], ...]:
+    """(id, label) for every crop the file carries, sorted by label."""
+    crops = _load().get("crops", {})
+    return tuple(sorted(((cid, c["label"]) for cid, c in crops.items()),
+                        key=lambda pair: pair[1]))
+
+
+def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
+    """The province's row when the measure has one, otherwise the national row,
+    then the most recent non-null year in it."""
+    provincial = (measure.get("scope") == "il"
+                  and province is not None
+                  and province in measure)
+    key = province if provincial else NATIONAL_KEY
+    series = measure.get(key)
+    if not isinstance(series, list):
+        return None
+    for i in range(len(series) - 1, -1, -1):
+        if series[i] is not None:
+            return NormValue(
+                amount=float(series[i]),
+                year=years[i],
+                scope="il" if provincial else "tr",
+                region=key if provincial else NATIONAL_LABEL,
+            )
+    return None
+
+
+def lookup(crop: str, province: str | None) -> CropNorm | None:
+    """Norms for a crop, or None when the file does not carry it.
+
+    A measure that resolves to nothing is None on the result rather than absent,
+    so the caller prefills the fields it can and leaves the rest to the user.
+    """
+    data = _load()
+    entry = data.get("crops", {}).get(crop)
+    if entry is None:
+        return None
+    years = data["years"]
+    return CropNorm(
+        crop=crop,
+        label=entry["label"],
+        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
+        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+    )

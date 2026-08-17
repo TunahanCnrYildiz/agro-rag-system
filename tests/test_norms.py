@@ -111,3 +111,90 @@ def test_a_non_finite_value_drops_its_crop(tmp_path, monkeypatch):
     payload["crops"]["domates"]["yield_kg_da"]["TR"][0] = float("inf")
     _write(tmp_path, monkeypatch, payload)
     assert norms._load().get("crops", {}) == {}
+
+
+def test_available_crops_returns_id_label_pairs(tmp_path, monkeypatch):
+    payload = json.loads(json.dumps(GOOD))
+    payload["crops"]["armut"] = {
+        "label": "Armut",
+        "yield_kg_da": {"scope": "tr", "TR": [1, 2, 3]},
+        "price_tl_kg": {"scope": "tr", "TR": [4, 5, 6]},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    assert norms.available_crops() == (("armut", "Armut"), ("domates", "Domates"))
+
+
+def test_available_crops_is_empty_without_a_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.available_crops() == ()
+
+
+def test_a_province_row_is_used_and_reported_as_provincial(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    n = norms.lookup("domates", "Manisa")
+    assert n.yield_kg_da.amount == 6500.0
+    assert n.yield_kg_da.year == 2025
+    assert n.yield_kg_da.scope == "il"
+    assert n.yield_kg_da.region == "Manisa"
+
+
+def test_a_province_without_a_row_falls_back_to_the_nation(tmp_path, monkeypatch):
+    """And says so - the user must be able to read which one they got."""
+    _write(tmp_path, monkeypatch, GOOD)
+    n = norms.lookup("domates", "Rize")
+    assert n.yield_kg_da.amount == 5700.0
+    assert n.yield_kg_da.scope == "tr"
+    assert n.yield_kg_da.region == "Türkiye"
+
+
+def test_no_province_at_all_falls_back_to_the_nation(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    n = norms.lookup("domates", None)
+    assert n.yield_kg_da.scope == "tr"
+
+
+def test_a_national_scope_measure_ignores_the_province(tmp_path, monkeypatch):
+    """price_tl_kg has scope 'tr': naming a province must not invent a
+    provincial reading of a national figure."""
+    _write(tmp_path, monkeypatch, GOOD)
+    n = norms.lookup("domates", "Manisa")
+    assert n.price_tl_kg.amount == 12.40
+    assert n.price_tl_kg.scope == "tr"
+    assert n.price_tl_kg.region == "Türkiye"
+
+
+def test_a_null_latest_year_walks_back_and_carries_that_year(tmp_path, monkeypatch):
+    payload = json.loads(json.dumps(GOOD))
+    payload["crops"]["domates"]["yield_kg_da"]["Manisa"] = [5900, 6300, None]
+    _write(tmp_path, monkeypatch, payload)
+    n = norms.lookup("domates", "Manisa")
+    assert n.yield_kg_da.amount == 6300.0
+    assert n.yield_kg_da.year == 2024
+
+
+def test_an_all_null_series_yields_no_norm_rather_than_zero(tmp_path, monkeypatch):
+    """The binding rule: a zero would flow into the budget arithmetic and come
+    out as a confident wrong answer."""
+    payload = json.loads(json.dumps(GOOD))
+    payload["crops"]["domates"]["price_tl_kg"]["TR"] = [None, None, None]
+    _write(tmp_path, monkeypatch, payload)
+    n = norms.lookup("domates", "Manisa")
+    assert n.price_tl_kg is None
+    assert n.yield_kg_da is not None
+
+
+def test_an_unknown_crop_has_no_norm(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    assert norms.lookup("kivi", "Manisa") is None
+
+
+def test_lookup_without_a_file_is_none(tmp_path, monkeypatch):
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.lookup("domates", "Manisa") is None
+
+
+def test_the_crop_label_is_carried(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    assert norms.lookup("domates", "Manisa").label == "Domates"
