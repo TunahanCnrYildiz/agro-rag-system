@@ -852,19 +852,26 @@ def _budget_result(payload: dict | None) -> ChatResult:
     labelled fields. When the payload is absent or incomplete we return the form
     instead of an answer; a payload that was never submitted gets a clean form
     rather than a list of "required" errors.
+
+    validate() and compute() share one guard: either raising returns
+    COMPUTE_FAILED with no form and no figures. validate() is documented never
+    to raise, but on the streaming path the 200 and headers are already sent by
+    the time this runs, so a raise here would break the connection mid-stream
+    rather than fail silently - guarding only compute() left that contract
+    unenforced.
     """
     # Deferred like the router import below: keep engine's import graph flat.
     from src import budget
 
     submitted = bool(payload)
-    inputs, errors = budget.validate(payload or {})
-    if inputs is not None:
-        try:
+    try:
+        inputs, errors = budget.validate(payload or {})
+        if inputs is not None:
             result = budget.compute(inputs)
-        except Exception:  # noqa: BLE001 - a broken sum must not become a guess
-            return ChatResult(answer=budget.COMPUTE_FAILED,
+            return ChatResult(answer=budget.render(inputs, result),
                               recommended_products=[], route="budget")
-        return ChatResult(answer=budget.render(inputs, result),
+    except Exception:  # noqa: BLE001 - a broken validation or sum must not become a guess
+        return ChatResult(answer=budget.COMPUTE_FAILED,
                           recommended_products=[], route="budget")
 
     return ChatResult(answer=budget.ASK_FOR_NUMBERS, recommended_products=[],

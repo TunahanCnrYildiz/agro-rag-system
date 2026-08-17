@@ -80,6 +80,19 @@ def test_a_failing_computation_goes_silent_rather_than_guessing(no_llm, monkeypa
     assert result.form is None
 
 
+def test_a_failing_validation_goes_silent_rather_than_crashing(no_llm, monkeypatch):
+    """validate() is documented never to raise, but the guard must not depend
+    on that holding: on the streaming path the 200 and headers are already
+    sent, so a raise here must not escape either."""
+    def boom(_raw):
+        raise ValueError("nope")
+
+    monkeypatch.setattr(budget, "validate", boom)
+    result = engine.answer(BUDGET_Q, None, _payload())
+    assert result.answer == budget.COMPUTE_FAILED
+    assert result.form is None
+
+
 def test_a_submitted_payload_is_computed_even_if_the_router_disagrees(no_llm):
     """Turn 2 must not bet on the router a second time. If a complete payload
     arrives, it is computed whatever the route says."""

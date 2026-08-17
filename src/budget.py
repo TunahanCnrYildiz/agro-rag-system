@@ -111,6 +111,13 @@ class BudgetInputs:
     yield_kg: Value
     price_tl_kg: Value
     cost_tl: Value | None
+    # Deliberately unwired: FIELDS has no crop entry and form_spec() never emits
+    # one, so nothing but a test calling validate()/render() directly ever sets
+    # this. It is not filled from the mobile profile either - profile.crops is
+    # free text that may name several crops, and folding that into one slot here
+    # would be exactly the kind of inference this whole route exists to remove.
+    # The next phase makes crop real: it becomes the key that selects a yield
+    # and price norm, and it arrives as an explicit selection, not a guess.
     crop: str | None = None
 
 

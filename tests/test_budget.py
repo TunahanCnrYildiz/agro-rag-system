@@ -324,6 +324,20 @@ def test_render_without_a_cost_reports_revenue_and_no_margin():
     assert "kâr marjınızı da hesaplayabilirim" in text
 
 
+def test_render_restates_a_non_default_unit_selection_in_canonical_units():
+    """A hektar area and a ton total must read back converted to the canonical
+    dönüm/kg units, not echoed in the unit the user picked - the restated line
+    is what proves the selection was honoured rather than guessed."""
+    inputs, result = _computed(area="2", area_unit="hektar",
+                               total="10", total_unit="ton")
+    text = budget.render(inputs, result)
+    assert "**20 dönüm**" in text
+    assert "toplam **10.000 kg**" in text
+    assert "dekara 500 kg" in text
+    assert "hektar" not in text
+    assert "ton" not in text
+
+
 def test_render_names_the_crop_when_one_was_selected():
     raw = _raw()
     raw["crop"] = "domates"

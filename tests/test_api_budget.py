@@ -78,6 +78,20 @@ def test_a_structurally_wrong_body_is_still_a_422(client):
     assert resp.status_code == 422
 
 
+def test_an_empty_submitted_form_reports_its_required_fields(client):
+    """`budget: {}` must read as a genuine empty submission, not an unopened
+    form. It reaches validate() as an all-None BudgetPayload.model_dump() -
+    an incidental fact of a different file that switching to
+    exclude_none=True someday would silently break."""
+    resp = client.post("/api/chat", json={
+        "message": BUDGET_Q, "history": [], "budget": {}})
+    assert resp.status_code == 200
+    errors = {f["id"]: f["error"] for f in resp.json()["form"]["fields"]}
+    assert errors["area"] is not None
+    assert errors["yield_total"] is not None
+    assert errors["price"] is not None
+
+
 def test_a_request_without_a_budget_field_still_works(client):
     """The deployed APK never sends one."""
     resp = client.post("/api/chat", json={"message": BUDGET_Q})
