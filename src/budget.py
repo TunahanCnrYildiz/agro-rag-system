@@ -210,3 +210,32 @@ def form_spec(errors: list[FieldError]) -> dict:
             for f in FIELDS
         ]
     }
+
+
+@dataclass(frozen=True)
+class BudgetResult:
+    yield_kg_da: float
+    revenue_tl: float
+    cost_tl: float | None
+    margin_tl: float | None
+    margin_pct: float | None
+
+
+def compute(inputs: BudgetInputs) -> BudgetResult:
+    """All arithmetic for this route lives here, in one place, on canonical units.
+
+    validate() has already rejected a zero area, so the per-dekar division is
+    safe; the revenue guard below is the one that is not implied by validation,
+    because a zero harvest or a zero price is legitimate.
+    """
+    revenue = inputs.yield_kg.amount * inputs.price_tl_kg.amount
+    cost = inputs.cost_tl.amount if inputs.cost_tl is not None else None
+    margin = None if cost is None else revenue - cost
+    pct = None if (margin is None or revenue <= 0) else margin / revenue * 100
+    return BudgetResult(
+        yield_kg_da=inputs.yield_kg.amount / inputs.area_da.amount,
+        revenue_tl=revenue,
+        cost_tl=cost,
+        margin_tl=margin,
+        margin_pct=pct,
+    )

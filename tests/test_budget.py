@@ -199,3 +199,68 @@ def test_form_spec_attaches_an_error_to_its_own_field_only():
     by_id = {f["id"]: f for f in spec["fields"]}
     assert by_id["price"]["error"] == "Geçersiz sayı."
     assert by_id["area"]["error"] is None
+
+
+def _computed(**kwargs):
+    inputs, errors = budget.validate(_raw(**kwargs))
+    assert errors == [], errors
+    return inputs, budget.compute(inputs)
+
+
+def test_the_critical_that_named_this_spec():
+    """The extraction module reported a margin of 95.000 for this exact case.
+    5 donum, 2 ton total, 10 TL/kg, 5.000 TL cost:
+    2.000 kg x 10 = 20.000 revenue, minus 5.000 = 15.000."""
+    _, result = _computed()
+    assert result.revenue_tl == 20000.0
+    assert result.margin_tl == 15000.0
+
+
+def test_the_critical_that_read_a_price_as_a_cost():
+    """'Kilosunu 12,5 TL, masrafim 20000 TL' put 12.5 in the cost slot. With
+    labelled fields the two cannot collide; the test stays as a guard against a
+    future design quietly removing that separation."""
+    _, result = _computed(price="12,5", cost="20000")
+    assert result.revenue_tl == 25000.0
+    assert result.cost_tl == 20000.0
+    assert result.margin_tl == 5000.0
+
+
+def test_per_dekar_yield_is_derived_not_asked_for():
+    inputs, result = _computed()
+    assert result.yield_kg_da == 400.0
+
+
+def test_hectares_convert_before_the_arithmetic():
+    _, result = _computed(area="1", area_unit="hektar", total="10", total_unit="ton")
+    assert result.yield_kg_da == 1000.0
+    assert result.revenue_tl == 100000.0
+
+
+def test_a_tonne_price_converts_before_the_arithmetic():
+    _, result = _computed(price="10000", price_unit="tl_ton")
+    assert result.revenue_tl == 20000.0
+
+
+def test_a_total_loss_gives_a_margin_of_minus_the_cost():
+    _, result = _computed(total="0")
+    assert result.revenue_tl == 0.0
+    assert result.margin_tl == -5000.0
+
+
+def test_zero_revenue_yields_no_percentage_rather_than_infinity():
+    _, result = _computed(total="0")
+    assert result.margin_pct is None
+
+
+def test_without_a_cost_only_revenue_is_reported():
+    _, result = _computed(cost=None)
+    assert result.revenue_tl == 20000.0
+    assert result.cost_tl is None
+    assert result.margin_tl is None
+    assert result.margin_pct is None
+
+
+def test_margin_percent_is_of_revenue():
+    _, result = _computed()
+    assert result.margin_pct == 75.0
