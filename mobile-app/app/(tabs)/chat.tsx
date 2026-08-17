@@ -264,7 +264,9 @@ export default function ChatScreen() {
               {m.form && (
                 <BudgetCard
                   form={m.form}
+                  disabled={loading}
                   onSubmit={(payload, summary) => {
+                    if (loading) return;
                     setMessages((prev) => [
                       // The card is consumed: replace it, so a stale form cannot
                       // be submitted twice.

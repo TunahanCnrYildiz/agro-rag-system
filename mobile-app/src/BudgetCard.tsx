@@ -14,9 +14,13 @@ interface Props {
   // request still carries the original question, but echoing it again would
   // read as the user asking twice.
   onSubmit: (payload: BudgetPayload, summary: string) => void;
+  // Mirrors the chat screen's `loading`: a stale card from an earlier turn
+  // stays rendered and tappable, so it needs the same submit gate as the
+  // text input/send button.
+  disabled: boolean;
 }
 
-export default function BudgetCard({ form, onSubmit }: Props) {
+export default function BudgetCard({ form, onSubmit, disabled }: Props) {
   // Seeded from the server's `value`, which is empty in P1 and prefilled by the
   // norm layer in P2 - so this card needs no change when that lands.
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -27,6 +31,7 @@ export default function BudgetCard({ form, onSubmit }: Props) {
   );
 
   function submit() {
+    if (disabled) return;
     const payload: Record<string, { value: string; unit: string }> = {};
     const parts: string[] = [];
     for (const f of form.fields) {
@@ -81,7 +86,11 @@ export default function BudgetCard({ form, onSubmit }: Props) {
           {f.error ? <Text style={styles.error}>{f.error}</Text> : null}
         </View>
       ))}
-      <Pressable style={styles.submit} onPress={submit}>
+      <Pressable
+        style={[styles.submit, disabled && styles.submitDisabled]}
+        onPress={submit}
+        disabled={disabled}
+      >
         <Text style={styles.submitText}>Hesapla</Text>
       </Pressable>
     </View>
@@ -128,5 +137,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     alignItems: "center",
   },
+  submitDisabled: { opacity: 0.5 },
   submitText: { color: "#fff", fontWeight: "700" },
 });
