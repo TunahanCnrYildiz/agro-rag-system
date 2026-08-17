@@ -934,19 +934,30 @@ def answer(message: str, history: list[dict] | None = None,
 
 
 def stream_answer(
-    message: str, history: list[dict] | None = None
+    message: str, history: list[dict] | None = None,
+    budget_payload: dict | None = None
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
     a final 'done' event closes the stream."""
     # Same deferred import as answer(): src/router.py imports _normalize_tr from
     # THIS module at load time, so a top-level import here is a real cycle.
-    # Behaviour-neutral in this task - Task 7 is what consumes the route.
     try:
         from src import router
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
         route, route_how = "", ""
+
+    # Must mirror answer() exactly, including the `or budget_payload` clause.
+    # Both clients stream, so a form wired only into answer() would reach no user
+    # at all - and the tests would still pass.
+    if route == "budget" or budget_payload:
+        result = _budget_result(budget_payload)
+        yield _sse({"type": "token", "content": result.answer})
+        if result.form is not None:
+            yield _sse({"type": "form", "form": result.form})
+        yield _sse({"type": "done"})
+        return
 
     context = retrieve_context(message, history=history)
     products = match_products(message, context)

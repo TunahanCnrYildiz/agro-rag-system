@@ -110,3 +110,63 @@ def test_budget_still_takes_zero_false_entries_in_the_frozen_routing_set():
                  if c["route"] != "budget"
                  and router.classify(c["query"], None)[0] == "budget"]
     assert intruders == []
+
+
+import json
+
+
+def _events(chunks):
+    """Parse the SSE lines the engine yields back into payload dicts."""
+    out = []
+    for chunk in chunks:
+        for line in chunk.split("\n"):
+            if line.startswith("data: "):
+                out.append(json.loads(line[6:]))
+    return out
+
+
+def test_the_stream_emits_the_sentence_the_form_and_done(no_llm):
+    events = _events(engine.stream_answer(BUDGET_Q))
+    assert [e["type"] for e in events] == ["token", "form", "done"]
+    assert events[0]["content"] == budget.ASK_FOR_NUMBERS
+    assert [f["id"] for f in events[1]["form"]["fields"]] == [
+        f.id for f in budget.FIELDS]
+
+
+def test_a_computed_answer_streams_without_a_form_event(no_llm):
+    events = _events(engine.stream_answer(BUDGET_Q, None, _payload()))
+    assert [e["type"] for e in events] == ["token", "done"]
+    assert "15.000,00 TL" in events[0]["content"]
+
+
+def test_the_stream_recommends_no_products(no_llm):
+    events = _events(engine.stream_answer(BUDGET_Q))
+    assert not any(e["type"] == "products" for e in events)
+
+
+def test_streaming_and_non_streaming_agree_without_inputs(no_llm):
+    """THE test. Wiring the form into answer() and forgetting stream_answer() is
+    the defect this project already shipped once, in this exact place."""
+    unified = engine.answer(BUDGET_Q)
+    events = _events(engine.stream_answer(BUDGET_Q))
+    streamed = "".join(e["content"] for e in events if e["type"] == "token")
+    form = next(e["form"] for e in events if e["type"] == "form")
+    assert streamed == unified.answer
+    assert form == unified.form
+
+
+def test_streaming_and_non_streaming_agree_on_a_computed_answer(no_llm):
+    unified = engine.answer(BUDGET_Q, None, _payload())
+    events = _events(engine.stream_answer(BUDGET_Q, None, _payload()))
+    streamed = "".join(e["content"] for e in events if e["type"] == "token")
+    assert streamed == unified.answer
+    assert not any(e["type"] == "form" for e in events)
+
+
+def test_an_old_client_that_skips_unknown_event_types_still_completes(no_llm):
+    """mobile-app/src/api.ts only branches on 'products' and 'token'; an
+    unknown type falls through. The deployed APK must still see its sentence
+    and a clean end of stream."""
+    events = _events(engine.stream_answer(BUDGET_Q))
+    known = [e for e in events if e["type"] in ("token", "products", "done")]
+    assert [e["type"] for e in known] == ["token", "done"]
