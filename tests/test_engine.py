@@ -1189,7 +1189,7 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
     r = engine.answer("Buğday ekmenin dekara maliyeti nedir?")
-    assert set(r.as_api()) == {"answer", "recommended_products"}
+    assert set(r.as_api()) == {"answer", "recommended_products", "form"}
 
 
 def test_router_failure_does_not_break_answering(monkeypatch):
