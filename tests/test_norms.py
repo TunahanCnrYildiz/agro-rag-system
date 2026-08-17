@@ -96,3 +96,18 @@ def test_a_bad_crop_does_not_take_the_good_ones_with_it(tmp_path, monkeypatch):
     payload["crops"]["bugday"] = {"label": "Buğday", "yield_kg_da": "nonsense"}
     _write(tmp_path, monkeypatch, payload)
     assert list(norms._load()["crops"]) == ["domates"]
+
+
+def test_a_non_finite_value_drops_its_crop(tmp_path, monkeypatch):
+    """json.loads accepts NaN/Infinity by default; non-finite values should be rejected."""
+    # Test NaN
+    payload = json.loads(json.dumps(GOOD))
+    payload["crops"]["domates"]["yield_kg_da"]["TR"][0] = float("nan")
+    _write(tmp_path, monkeypatch, payload)
+    assert norms._load().get("crops", {}) == {}
+
+    # Test infinity
+    payload = json.loads(json.dumps(GOOD))
+    payload["crops"]["domates"]["yield_kg_da"]["TR"][0] = float("inf")
+    _write(tmp_path, monkeypatch, payload)
+    assert norms._load().get("crops", {}) == {}

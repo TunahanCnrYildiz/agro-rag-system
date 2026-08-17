@@ -23,6 +23,7 @@ keeps: it is a file in, values out.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -43,7 +44,9 @@ def _valid_series(series: object, n_years: int) -> bool:
     would be attributed to the wrong year."""
     if not isinstance(series, list) or len(series) != n_years:
         return False
-    return all(v is None or (isinstance(v, (int, float)) and not isinstance(v, bool))
+    # json.loads accepts NaN/Infinity by default; reject them as a non-finite
+    # value would reach a money answer as nan.
+    return all(v is None or (isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v))
                for v in series)
 
 
