@@ -88,6 +88,44 @@ def _strip_emphasis(text: str) -> str:
         out = stripped
 
 
+# A per-unit dose has two notations and this corpus uses BOTH: `16 kg/da` and the
+# journals' house style `16 kg da-1`. The PDF extractor flattens the typeset
+# superscript, so the store holds the hyphen form far more often than `da⁻¹`.
+# Measured over all 81,426 chunks 2026-08-17: kg/da 1797 vs kg da-1 546, kg/ha 682
+# vs kg ha-1 344, and g da-1 (45) actually beats g/da (25). The model echoes
+# whichever notation it retrieved, so an anchor written one way cannot see a
+# correct answer written the other - quant_wheat_nitrogen_dose read ground=False
+# on samples that stated `16 kg da-1` and `16 kg da⁻¹`, the right value both times.
+# Third instance of the presentation-blind-spot class, after LaTeX and emphasis.
+#
+# BOTH sides must be a known unit, deliberately - the same narrowness the two
+# normalisers above keep. Turkish papers number their exhibits `Tablo-1` /
+# `Cizelge-1` / `Sekil-1`, so a general `word word-1` rule would rewrite ordinary
+# prose. Units taken from the scan, not guessed: the pairs that actually occur are
+# mg/kg (754), kg/da (549), kg/ha (346), mg/l (329), g/l (139), t|ton/ha (103),
+# g/kg (53), g/da (45). `^` exponents (`kg da^-1`) are NOT handled: zero occurrences.
+_UNIT_NUMERATOR = r"kg|mg|µg|μg|ng|g|ton|t|ml|l"
+_UNIT_DENOMINATOR = r"kg|ha|da|ml|l|g"
+_UNIT_EXPONENT = re.compile(
+    r"(?<!\w)(" + _UNIT_NUMERATOR + r")\s+(" + _UNIT_DENOMINATOR
+    + r")\s*[-⁻]\s*[1¹](?!\d)",
+    re.I,
+)
+
+
+def _normalize_units(text: str) -> str:
+    """Rewrite `kg da-1` / `kg da⁻¹` into the slash notation anchors are written in.
+
+    Applied to the TEXT being searched, never to the anchor - so anchors must use
+    the slash form, which `test_no_eval_anchor_is_written_in_the_exponent_notation`
+    pins rather than leaving to memory.
+
+    Runs BEFORE _matches' regex, so the left-boundary and trailing-digit guards
+    still apply to the result: `116 kg da-1` must not match the anchor `16 kg/da`.
+    """
+    return _UNIT_EXPONENT.sub(r"\1/\2", text)
+
+
 def _matches(term: str, text: str) -> bool:
     """Case-insensitive anchor match with a LEFT word boundary + a right
     digit-guard, so a short/numeric answer_any/context_any anchor cannot be a
@@ -106,7 +144,8 @@ def _matches(term: str, text: str) -> bool:
     chars on the left; re.escape keeps '/', '±', ',' literal.
     """
     pattern = r"(?<!\w)" + re.escape(term) + r"(?!\d)"
-    return re.search(pattern, _normalize_latex(_strip_emphasis(text))) is not None
+    searched = _normalize_units(_normalize_latex(_strip_emphasis(text)))
+    return re.search(pattern, searched) is not None
 
 
 def _retrieval_ok(case: dict, ctx: str) -> bool:
