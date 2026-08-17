@@ -42,8 +42,11 @@ def format_tr(value: float, decimals: int) -> str:
     Written out rather than delegated to a locale library, which needs the
     locale to be installed on the host and fails differently per platform.
     """
-    sign = "-" if value < 0 else ""
-    rounded = abs(round(value, decimals))
+    rounded = round(value, decimals)
+    # Derive sign from rounded value, not raw value: values that round to
+    # zero display as "0" not "-0", since -0.0 < 0 is False in Python
+    sign = "-" if rounded < 0 else ""
+    rounded = abs(rounded)
     whole = int(rounded)
     groups = f"{whole:,}".replace(",", ".")
     if decimals <= 0:

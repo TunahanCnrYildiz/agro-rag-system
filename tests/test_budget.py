@@ -46,3 +46,9 @@ def test_format_with_no_decimals_omits_the_comma():
 
 def test_format_keeps_the_sign_outside_the_grouping():
     assert budget.format_tr(-5000, 2) == "-5.000,00"
+
+
+def test_format_does_not_print_a_negative_zero():
+    """A value that rounds away to zero should format as zero, not -0."""
+    assert budget.format_tr(-0.001, 2) == "0,00"
+    assert budget.format_tr(-0.001, 0) == "0"
