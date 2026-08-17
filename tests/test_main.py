@@ -17,7 +17,11 @@ def test_health():
 def test_chat_unified(monkeypatch):
     fake = ChatResult(answer="cevap metni",
                       recommended_products=[RecommendedProduct("P", "url")])
-    monkeypatch.setattr(main.engine, "answer", lambda msg, hist: fake)
+    # Mirrors engine.answer's real signature, which grew an optional budget
+    # payload: a stub narrower than the code under test fails as a TypeError
+    # that reads like a routing bug rather than a stale double.
+    monkeypatch.setattr(main.engine, "answer",
+                        lambda msg, hist, budget=None: fake)
     r = client.post("/api/chat", json={"message": "soru", "stream": False})
     assert r.status_code == 200
     body = r.json()
@@ -32,7 +36,8 @@ def test_chat_rejects_empty_message():
 
 def test_chat_stream_sets_sse_content_type(monkeypatch):
     monkeypatch.setattr(main.engine, "stream_answer",
-                        lambda msg, hist: iter(['data: {"type": "done"}\n\n']))
+                        lambda msg, hist, budget=None:
+                        iter(['data: {"type": "done"}\n\n']))
     r = client.post("/api/chat", json={"message": "soru", "stream": True})
     assert r.status_code == 200
     assert "text/event-stream" in r.headers["content-type"]

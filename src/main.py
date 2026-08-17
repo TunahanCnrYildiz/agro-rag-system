@@ -37,11 +37,30 @@ class ChatTurn(BaseModel):
     content: str
 
 
+class BudgetField(BaseModel):
+    # Deliberately loose: a text input produces strings, and src/budget.py does
+    # the real checking. A bad value must come back as a field error inside a
+    # 200, not as a 422 in the middle of a conversation.
+    value: str | int | float = ""
+    unit: str = ""
+
+
+class BudgetPayload(BaseModel):
+    area: BudgetField | None = None
+    yield_total: BudgetField | None = None
+    price: BudgetField | None = None
+    cost: BudgetField | None = None
+    crop: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="The user query.")
     history: list[ChatTurn] = Field(default_factory=list)
     stream: bool = Field(
         default=False, description="If true, respond with an SSE token stream."
+    )
+    budget: BudgetPayload | None = Field(
+        default=None, description="Filled budget form, when the user submitted one."
     )
 
 
@@ -53,6 +72,8 @@ class ProductOut(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     recommended_products: list[ProductOut]
+    # Optional so an already-deployed client, which never reads it, is unaffected.
+    form: dict | None = None
 
 
 class CatalogProduct(BaseModel):
@@ -149,15 +170,16 @@ def chat(req: ChatRequest):
     """Primary endpoint. Returns unified JSON, or an SSE stream when
     ``stream=true``."""
     history = [t.model_dump() for t in req.history]
+    budget_payload = req.budget.model_dump() if req.budget else None
 
     if req.stream:
         return StreamingResponse(
-            engine.stream_answer(req.message, history),
+            engine.stream_answer(req.message, history, budget_payload),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    result = engine.answer(req.message, history)
+    result = engine.answer(req.message, history, budget_payload)
     return ChatResponse(**result.as_api())
 
 
