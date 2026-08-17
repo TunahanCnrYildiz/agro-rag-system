@@ -239,3 +239,59 @@ def compute(inputs: BudgetInputs) -> BudgetResult:
         margin_tl=margin,
         margin_pct=pct,
     )
+
+
+# Appended BY CODE, never asked of the model - the fertplan.FRAMING pattern.
+# This sentence is the line between a calculation and a forecast.
+FRAMING = (
+    "Bu hesap bir tahmindir ve tamamen sizin girdiğiniz rakamlara dayanır; "
+    "fiyat veya verim öngörüsü değildir."
+)
+
+# Written to stand alone: a deployed client that cannot draw the form shows only
+# this, so it names the figures it needs instead of pointing at a widget. The
+# wording also survives P2 - when norms arrive the fields come prefilled and the
+# sentence still reads correctly.
+ASK_FOR_NUMBERS = (
+    "Hesaplayabilmem için birkaç rakama ihtiyacım var: ektiğiniz alan, aldığınız "
+    "toplam ürün, ürünün satış fiyatı ve masrafınız. Bu rakamları verirseniz "
+    "gelirinizi ve kâr marjınızı hesaplayabilirim."
+)
+
+# The failure mode of this route is silence, never a guess: there is no fallback
+# to the model path, because an LLM answer about money is what this spec removes.
+COMPUTE_FAILED = (
+    "Hesaplamayı tamamlayamadım. Lütfen girdiğiniz değerleri kontrol edip "
+    "tekrar deneyin."
+)
+
+
+def render(inputs: BudgetInputs, result: BudgetResult) -> str:
+    """Code-written Turkish. Restates its inputs before stating its result."""
+    crop = f" {inputs.crop} için" if inputs.crop else ""
+    given = [
+        f"**{format_tr(inputs.area_da.amount, 0)} dönüm**",
+        f"toplam **{format_tr(inputs.yield_kg.amount, 0)} kg** "
+        f"(dekara {format_tr(result.yield_kg_da, 0)} kg)",
+        f"kilogram fiyatı **{format_tr(inputs.price_tl_kg.amount, 2)} TL**",
+    ]
+    if result.cost_tl is not None:
+        given.append(f"masraf **{format_tr(result.cost_tl, 2)} TL**")
+
+    lines = [f"Girdiğiniz değerlere göre{crop}: " + ", ".join(given) + ".", ""]
+
+    if result.margin_tl is None:
+        lines.append(f"Gelir **{format_tr(result.revenue_tl, 2)} TL**.")
+        lines.append(
+            "Masrafınızı da girerseniz kâr marjınızı da hesaplayabilirim.")
+    else:
+        pct = ("" if result.margin_pct is None
+               else f" (kâr marjı %{format_tr(result.margin_pct, 0)})")
+        lines.append(
+            f"Gelir **{format_tr(result.revenue_tl, 2)} TL** · "
+            f"Masraf **{format_tr(result.cost_tl, 2)} TL** · "
+            f"**Marj {format_tr(result.margin_tl, 2)} TL**{pct}"
+        )
+
+    lines.extend(["", FRAMING])
+    return "\n".join(lines)

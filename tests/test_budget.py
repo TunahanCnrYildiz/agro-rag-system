@@ -264,3 +264,64 @@ def test_without_a_cost_only_revenue_is_reported():
 def test_margin_percent_is_of_revenue():
     _, result = _computed()
     assert result.margin_pct == 75.0
+
+
+def test_render_restates_what_it_computed_from():
+    """This is what replaces an upper bound on the inputs. A user who meant 5
+    and typed 5000 reads '5.000 donum' in the first line, and a wrong unit
+    selection shows up in the derived per-dekar figure."""
+    inputs, result = _computed()
+    text = budget.render(inputs, result)
+    assert "5 dönüm" in text
+    assert "dekara 400 kg" in text
+
+
+def test_render_states_the_money_in_turkish_format():
+    inputs, result = _computed()
+    text = budget.render(inputs, result)
+    assert "20.000,00 TL" in text
+    assert "15.000,00 TL" in text
+
+
+def test_render_includes_the_margin_percentage():
+    inputs, result = _computed()
+    assert "%75" in budget.render(inputs, result)
+
+
+def test_render_omits_the_percentage_when_revenue_is_zero():
+    inputs, result = _computed(total="0")
+    assert "%" not in budget.render(inputs, result)
+
+
+def test_render_without_a_cost_reports_revenue_and_no_margin():
+    inputs, result = _computed(cost=None)
+    text = budget.render(inputs, result)
+    assert "20.000,00 TL" in text
+    assert "Marj" not in text
+
+
+def test_render_names_the_crop_when_one_was_selected():
+    raw = _raw()
+    raw["crop"] = "domates"
+    inputs, errors = budget.validate(raw)
+    assert errors == []
+    assert "domates" in budget.render(inputs, budget.compute(inputs))
+
+
+def test_framing_is_always_appended():
+    """Appended by code so no model can drop it - the fertplan.FRAMING pattern."""
+    inputs, result = _computed()
+    assert budget.render(inputs, result).endswith(budget.FRAMING)
+    inputs2, result2 = _computed(cost=None)
+    assert budget.render(inputs2, result2).endswith(budget.FRAMING)
+
+
+def test_framing_calls_the_figure_an_estimate_from_the_users_own_numbers():
+    assert "tahmin" in budget.FRAMING.lower()
+
+
+def test_the_ask_sentence_stands_on_its_own():
+    """An already-deployed client cannot draw the form and shows only this
+    sentence, so it has to be an honest answer rather than a widget caption."""
+    assert len(budget.ASK_FOR_NUMBERS) > 40
+    assert "form" not in budget.ASK_FOR_NUMBERS.lower()
