@@ -20,16 +20,23 @@ import { openExternalUrl } from "../../src/openExternalUrl";
 import { useAuth } from "../../src/auth";
 import { clearChat, loadChat, recentWithinBudget, saveChat } from "../../src/chatStore";
 import {
+  BudgetPayload,
   ChatTurn,
+  FormSpec,
   RecommendedProduct,
   sendChatMessageStream,
 } from "../../src/api";
+import BudgetCard from "../../src/BudgetCard";
 
 interface Message {
   id: string;
   role: "user" | "bot";
   text: string;
   products?: RecommendedProduct[];
+  form?: FormSpec;
+  // The question this form was a reply to. Turn 2 resends it so history stays
+  // coherent and the router still classifies the turn the same way.
+  question?: string;
 }
 
 let nextId = 1;
@@ -91,7 +98,10 @@ export default function ChatScreen() {
   // empty initial state would wipe the very history we are about to load.
   useEffect(() => {
     if (!restored) return;
-    saveChat({ messages: messages as never, history: historyRef.current });
+    saveChat({
+      messages: messages.map(({ form, ...rest }) => rest) as never,
+      history: historyRef.current,
+    });
   }, [messages, restored]);
 
   async function startNewChat() {
@@ -109,6 +119,13 @@ export default function ChatScreen() {
     if (!text || loading) return;
     setInput("");
     setMessages((prev) => [...prev, { id: newId(), role: "user", text }]);
+    sendTurn(text);
+  }
+
+  // The network half, shared by a typed message and a submitted budget form.
+  // The caller owns the user bubble: a form turn shows the values entered, not
+  // the question repeated.
+  function sendTurn(text: string, budget?: BudgetPayload) {
     // Prior turns only - the current message is sent separately as `text`,
     // so it must not also be the last entry in the history we send.
     //
@@ -161,6 +178,13 @@ export default function ChatScreen() {
           prev.map((m) => (m.id === botId ? { ...m, products: p } : m))
         );
       },
+      // `onForm` arrives after the first `onToken`, so the bot message already
+      // exists.
+      onForm: (form) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, form, question: text } : m))
+        );
+      },
       onDone: () => {
         historyRef.current.push({ role: "user", content: text });
         historyRef.current.push({ role: "assistant", content: accumulated });
@@ -181,7 +205,7 @@ export default function ChatScreen() {
         setStreamingId(null);
         scrollToEnd();
       },
-    });
+    }, budget);
   }
 
   return (
@@ -236,6 +260,28 @@ export default function ChatScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+              )}
+              {m.form && (
+                <BudgetCard
+                  form={m.form}
+                  disabled={loading}
+                  onSubmit={(payload, summary) => {
+                    if (loading) return;
+                    setMessages((prev) => [
+                      // The card is consumed: replace it, so a stale form cannot
+                      // be submitted twice.
+                      ...prev.map((x) =>
+                        x.id === m.id ? { ...x, form: undefined } : x
+                      ),
+                      { id: newId(), role: "user", text: summary },
+                    ]);
+                    // `question` is written in the same setState as `form`, so
+                    // it is always there; `summary` is the fallback only because
+                    // /api/chat requires a non-empty message. Either is safe -
+                    // turn 2 no longer depends on how the message routes.
+                    sendTurn(m.question ?? summary, payload);
+                  }}
+                />
               )}
             </View>
           ))}

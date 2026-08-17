@@ -47,9 +47,43 @@ export async function sendChatMessage(
   return resp.json();
 }
 
+export interface BudgetFieldValue {
+  value: string;
+  unit: string;
+}
+
+export interface BudgetPayload {
+  area?: BudgetFieldValue;
+  yield_total?: BudgetFieldValue;
+  price?: BudgetFieldValue;
+  cost?: BudgetFieldValue;
+  crop?: string | null;
+}
+
+export interface FormUnit {
+  id: string;
+  label: string;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  required: boolean;
+  units: FormUnit[];
+  // Empty in P1; P2 fills these from the norm layer without a wire change.
+  value: string;
+  source: "user" | "norm" | "empty";
+  error: string | null;
+}
+
+export interface FormSpec {
+  fields: FormField[];
+}
+
 export interface ChatStreamHandlers {
   onToken: (content: string) => void;
   onProducts: (products: RecommendedProduct[]) => void;
+  onForm?: (form: FormSpec) => void;
   onDone: () => void;
   onError: (err: Error) => void;
 }
@@ -59,7 +93,8 @@ export interface ChatStreamHandlers {
 export function sendChatMessageStream(
   message: string,
   history: ChatTurn[],
-  handlers: ChatStreamHandlers
+  handlers: ChatStreamHandlers,
+  budget?: BudgetPayload
 ): void {
   const xhr = new XMLHttpRequest();
   let processedEvents = 0;
@@ -80,6 +115,8 @@ export function sendChatMessageStream(
         handlers.onProducts(evt.recommended_products);
       } else if (evt.type === "token") {
         handlers.onToken(evt.content);
+      } else if (evt.type === "form") {
+        handlers.onForm?.(evt.form);
       }
     }
     processedEvents = complete.length;
@@ -97,7 +134,7 @@ export function sendChatMessageStream(
     }
   };
   xhr.onerror = () => handlers.onError(new Error("Network error"));
-  xhr.send(JSON.stringify({ message, history, stream: true }));
+  xhr.send(JSON.stringify({ message, history, stream: true, budget }));
 }
 
 export interface CatalogProduct {

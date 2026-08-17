@@ -53,11 +53,13 @@ class ChatResult:
     recommended_products: list[RecommendedProduct]
     route: str = ""
     route_how: str = ""
+    form: dict | None = None
 
     def as_api(self) -> dict:
         return {
             "answer": self.answer,
             "recommended_products": [p.as_api() for p in self.recommended_products],
+            "form": self.form,
         }
 
 
@@ -843,7 +845,42 @@ def _strip_markers(text: str) -> tuple[str, bool, bool]:
     return lead, off_scope, no_product
 
 
-def answer(message: str, history: list[dict] | None = None) -> ChatResult:
+def _budget_result(payload: dict | None) -> ChatResult:
+    """The budget route: no retrieval, no product match, no model call.
+
+    Every figure is computed in src/budget.py from values the user typed into
+    labelled fields. When the payload is absent or incomplete we return the form
+    instead of an answer; a payload that was never submitted gets a clean form
+    rather than a list of "required" errors.
+
+    validate() and compute() share one guard: either raising returns
+    COMPUTE_FAILED with no form and no figures. validate() is documented never
+    to raise, but on the streaming path the 200 and headers are already sent by
+    the time this runs, so a raise here would break the connection mid-stream
+    rather than fail silently - guarding only compute() left that contract
+    unenforced.
+    """
+    # Deferred like the router import below: keep engine's import graph flat.
+    from src import budget
+
+    submitted = bool(payload)
+    try:
+        inputs, errors = budget.validate(payload or {})
+        if inputs is not None:
+            result = budget.compute(inputs)
+            return ChatResult(answer=budget.render(inputs, result),
+                              recommended_products=[], route="budget")
+    except Exception:  # noqa: BLE001 - a broken validation or sum must not become a guess
+        return ChatResult(answer=budget.COMPUTE_FAILED,
+                          recommended_products=[], route="budget")
+
+    return ChatResult(answer=budget.ASK_FOR_NUMBERS, recommended_products=[],
+                      route="budget",
+                      form=budget.form_spec(errors if submitted else []))
+
+
+def answer(message: str, history: list[dict] | None = None,
+           budget_payload: dict | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
     # Routing is diagnostic in this release: every route still runs the corpus
     # path below. Wiring it now, with behaviour unchanged, is what lets the 55
@@ -856,6 +893,18 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
         route, route_how = "", ""
+
+    # The budget route short-circuits BEFORE retrieval: a money question was
+    # paying for a corpus search that cannot hold its answer. Safe to diverge
+    # because `budget` takes zero false entries in the frozen routing set.
+    #
+    # `or budget_payload`: turn 2 does not bet on the router a second time. A
+    # submitted form is computed whatever the classifier says about the question
+    # it was attached to.
+    if route == "budget" or budget_payload:
+        result = _budget_result(budget_payload)
+        result.route_how = route_how
+        return result
 
     context = retrieve_context(message, history=history)
     products = match_products(message, context)
@@ -892,19 +941,31 @@ def answer(message: str, history: list[dict] | None = None) -> ChatResult:
 
 
 def stream_answer(
-    message: str, history: list[dict] | None = None
+    message: str, history: list[dict] | None = None,
+    budget_payload: dict | None = None
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
-    a final 'done' event closes the stream."""
+    a final 'done' event closes the stream. A submitted budget form is served
+    from it without a model call."""
     # Same deferred import as answer(): src/router.py imports _normalize_tr from
     # THIS module at load time, so a top-level import here is a real cycle.
-    # Behaviour-neutral in this task - Task 7 is what consumes the route.
     try:
         from src import router
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
         route, route_how = "", ""
+
+    # Must mirror answer() exactly, including the `or budget_payload` clause.
+    # Both clients stream, so a form wired only into answer() would reach no user
+    # at all - and the tests would still pass.
+    if route == "budget" or budget_payload:
+        result = _budget_result(budget_payload)
+        yield _sse({"type": "token", "content": result.answer})
+        if result.form is not None:
+            yield _sse({"type": "form", "form": result.form})
+        yield _sse({"type": "done"})
+        return
 
     context = retrieve_context(message, history=history)
     products = match_products(message, context)

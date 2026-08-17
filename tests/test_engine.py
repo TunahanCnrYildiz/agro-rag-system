@@ -1188,8 +1188,10 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
     monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
-    r = engine.answer("Buğday ekmenin dekara maliyeti nedir?")
-    assert set(r.as_api()) == {"answer", "recommended_products"}
+    # Must be a non-budget question; the budget route short-circuits before the stubs above.
+    r = engine.answer("Elma ağacı ne zaman budanır?")
+    assert set(r.as_api()) == {"answer", "recommended_products", "form"}
+    assert "Kompost" in r.answer  # Corpus path exercises the stubs, not the budget route.
 
 
 def test_router_failure_does_not_break_answering(monkeypatch):
