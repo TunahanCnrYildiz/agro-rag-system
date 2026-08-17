@@ -277,11 +277,14 @@ def _format_qty(value: float) -> str:
     """
     if value == int(value):
         return format_tr(value, 0)
-    text = format_tr(value, 2)
-    # 2,5 formats to "2,50" at two decimals; a bare trailing zero is padding,
-    # not something the user typed, so drop it - 2,05 (no trailing zero) is
-    # left alone.
-    return text[:-1] if text.endswith("0") else text
+    # 2,5 formats to "2,50" at two decimals, and a value that rounds to a
+    # whole number at two decimals (e.g. 12.995052770448549) formats to
+    # "13,00" - both are padding, not something the user typed, so strip
+    # every trailing zero and then the now-bare comma. This branch only runs
+    # when value != int(value), so format_tr(value, 2) always contains a
+    # comma; rstrip("0") can only eat digits after it, never a whole
+    # number's own trailing zeros (those go through the branch above).
+    return format_tr(value, 2).rstrip("0").rstrip(",")
 
 
 def render(inputs: BudgetInputs, result: BudgetResult) -> str:
