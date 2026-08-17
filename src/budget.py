@@ -89,8 +89,8 @@ FIELDS: tuple[FieldSpec, ...] = (
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
     # Cost has no second plausible unit, so it carries one option rather than a
-    # selector. Optional: without it we report revenue and say nothing about
-    # margin, which is what "yillik ne kadar gelir beklerim" actually asks.
+    # selector. Optional: without it we compute no margin figure, though the
+    # answer still invites the user to supply one.
     FieldSpec("cost", "Masraf", False, 0.0, False,
               (UnitOption("tl", "TL", 1.0),)),
 )
@@ -266,13 +266,31 @@ COMPUTE_FAILED = (
 )
 
 
+def _format_qty(value: float) -> str:
+    """Format a quantity for the restated line without rounding it away.
+
+    The restated line exists so the user can check what the calculation was
+    made from; it stands in for an upper bound on input values, so it has to
+    echo what was typed rather than a rounded stand-in. format_tr(x, 0) would
+    turn 2,5 into "2", silently disagreeing with the arithmetic underneath it,
+    which still uses the true 2,5.
+    """
+    if value == int(value):
+        return format_tr(value, 0)
+    text = format_tr(value, 2)
+    # 2,5 formats to "2,50" at two decimals; a bare trailing zero is padding,
+    # not something the user typed, so drop it - 2,05 (no trailing zero) is
+    # left alone.
+    return text[:-1] if text.endswith("0") else text
+
+
 def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     """Code-written Turkish. Restates its inputs before stating its result."""
     crop = f" {inputs.crop} için" if inputs.crop else ""
     given = [
-        f"**{format_tr(inputs.area_da.amount, 0)} dönüm**",
-        f"toplam **{format_tr(inputs.yield_kg.amount, 0)} kg** "
-        f"(dekara {format_tr(result.yield_kg_da, 0)} kg)",
+        f"**{_format_qty(inputs.area_da.amount)} dönüm**",
+        f"toplam **{_format_qty(inputs.yield_kg.amount)} kg** "
+        f"(dekara {_format_qty(result.yield_kg_da)} kg)",
         f"kilogram fiyatı **{format_tr(inputs.price_tl_kg.amount, 2)} TL**",
     ]
     if result.cost_tl is not None:

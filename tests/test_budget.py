@@ -276,6 +276,16 @@ def test_render_restates_what_it_computed_from():
     assert "dekara 400 kg" in text
 
 
+def test_render_echoes_a_fractional_input_faithfully():
+    """2,5 donum must read back as 2,5, not round to 2 - the restated line is
+    what stands in for an upper bound on inputs, and the arithmetic below it
+    already uses the true 2,5."""
+    inputs, result = _computed(area="2,5")
+    text = budget.render(inputs, result)
+    assert "2,5 dönüm" in text
+    assert "2 dönüm" not in text
+
+
 def test_render_states_the_money_in_turkish_format():
     inputs, result = _computed()
     text = budget.render(inputs, result)
@@ -294,10 +304,15 @@ def test_render_omits_the_percentage_when_revenue_is_zero():
 
 
 def test_render_without_a_cost_reports_revenue_and_no_margin():
+    """The invitation sentence legitimately contains the word "marj" (lowercase,
+    inflected: "marjınızı") - that word is fine. What must be absent is the
+    margin FIGURE: the result line's "Marj " marker and any percentage."""
     inputs, result = _computed(cost=None)
     text = budget.render(inputs, result)
     assert "20.000,00 TL" in text
-    assert "Marj" not in text
+    assert "Marj " not in text
+    assert "%" not in text
+    assert "kâr marjınızı da hesaplayabilirim" in text
 
 
 def test_render_names_the_crop_when_one_was_selected():
