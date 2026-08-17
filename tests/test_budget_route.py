@@ -170,3 +170,11 @@ def test_an_old_client_that_skips_unknown_event_types_still_completes(no_llm):
     events = _events(engine.stream_answer(BUDGET_Q))
     known = [e for e in events if e["type"] in ("token", "products", "done")]
     assert [e["type"] for e in known] == ["token", "done"]
+
+
+def test_the_stream_computes_a_submitted_payload_even_if_the_router_disagrees(no_llm):
+    """Turn 2 must not bet on the router a second time. A complete payload
+    is computed on the streaming path whatever the route says."""
+    events = _events(engine.stream_answer("Elma ağacı ne zaman budanır?", None, _payload()))
+    assert [e["type"] for e in events] == ["token", "done"]
+    assert "15.000,00 TL" in events[0]["content"]

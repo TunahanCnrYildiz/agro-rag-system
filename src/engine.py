@@ -939,7 +939,8 @@ def stream_answer(
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
-    a final 'done' event closes the stream."""
+    a final 'done' event closes the stream. A submitted budget form is served
+    from it without a model call."""
     # Same deferred import as answer(): src/router.py imports _normalize_tr from
     # THIS module at load time, so a top-level import here is a real cycle.
     try:
