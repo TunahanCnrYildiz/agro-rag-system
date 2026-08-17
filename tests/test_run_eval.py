@@ -496,6 +496,84 @@ def test_markdown_normalisation_leaves_plain_text_alone():
     assert run_eval._matches("7 ay", "bitki 17 ay sonra") is False
 
 
+def test_matches_sees_through_the_hyphen_exponent_unit():
+    """Measured 2026-08-17 over the logged eval answers: quant_wheat_nitrogen_dose
+    read ground=False on 3 samples that all STATED the right value - two of them
+    wrote it `16 kg da-1` instead of `16 kg/da`. The corpus writes the per-area
+    unit that way 546 times (201 chunks) against 1797 slash-form ones, and the
+    model echoes whichever notation it retrieved. Third instance of the same
+    instrument-defect class as the LaTeX and markdown blind spots."""
+    expo = "her iki yilda bir 16 kg da-1 azot dozu ekonomik bulunmustur"
+    assert run_eval._matches("16 kg/da", expo) is True
+
+
+def test_unit_normalisation_handles_the_superscript_exponent():
+    """`kg da⁻¹` is the typeset form. It is RARE in the store (1 chunk - the PDF
+    extractor flattens superscripts to `-1`) but the MODEL produces it freely,
+    and it cost a real red on 2026-08-10."""
+    assert run_eval._matches("16 kg/da", "bu oran 16 kg da⁻¹ seviyesinde") is True
+
+
+def test_unit_normalisation_preserves_the_left_boundary_guard():
+    """The property most at risk: normalisation runs BEFORE _matches' regex, so
+    '116 kg da-1' must still not match the anchor '16 kg/da'."""
+    assert run_eval._matches("16 kg/da", "doz 116 kg da-1 olarak") is False
+
+
+def test_unit_normalisation_covers_the_denominators_the_corpus_uses():
+    """Scope taken from a scan of all 81,426 chunks, not guessed: kg/da (549),
+    kg/ha (346), mg/kg (754), mg/l (329), g/da (45), ton|t/ha (103)."""
+    assert run_eval._matches("40 kg/ha", "azot 40 kg ha-1 uygulandi") is True
+    assert run_eval._matches("12 mg/kg", "toprakta 12 mg kg-1 fosfor") is True
+    assert run_eval._matches("60 g/da", "humik asit 60 g da-1 dozunda") is True
+    assert run_eval._matches("3 ton/ha", "verim 3 ton ha-1 olmustur") is True
+
+
+def test_unit_normalisation_leaves_a_non_unit_hyphen_alone():
+    """Deliberately narrow, following both earlier normalisers: only a known
+    unit on BOTH sides is an exponent. Turkish papers number their exhibits
+    `Tablo-1` / `Cizelge-1` / `Sekil-1` everywhere, and a general
+    `word word-1` rule would rewrite those into nonsense."""
+    assert run_eval._matches("tablo-1", "sonuclar tablo-1 de verilmistir") is True
+    assert run_eval._matches("sekil-1", "bkz sekil-1 ve devami") is True
+
+
+def test_unit_normalisation_leaves_plain_text_alone():
+    """Ordinary answers must score exactly as before - the whole panel depends
+    on it."""
+    assert run_eval._matches("10 kg/da", "gubre 10 kg/da verildi") is True
+    assert run_eval._matches("16 kg saf azot", "dekara 16 kg saf azot") is True
+    assert run_eval._matches("azot", "kazot") is False
+    assert run_eval._matches("7 ay", "bitki 17 ay sonra") is False
+
+
+def test_answer_none_is_not_unit_normalised():
+    """Same call the guardrail already makes about _normalize_latex: unit
+    rewriting REMOVES characters, so it could in principle move a banned term
+    out of reach. Every answer_none term is a chemical or brand name with no
+    unit in it, so there is nothing to gain and a leak to lose."""
+    case = {"answer_none": ["confidor"]}
+    assert run_eval._answer_ok(case, "confidor onerilir")[1] is False
+
+
+def test_no_eval_anchor_is_written_in_the_exponent_notation():
+    """Normalisation goes ONE WAY - the searched text is rewritten, the anchor
+    never is. So an anchor written `16 kg da-1` would silently never match and
+    read as a corpus finding. This makes that a loud failure instead."""
+    from evals.eval_set import CASES
+
+    offenders = []
+    for case in CASES:
+        for key in ("answer_any", "answer_none", "context_any"):
+            for term in case.get(key) or []:
+                if run_eval._UNIT_EXPONENT.search(term):
+                    offenders.append(f"{case['id']}.{key}: {term!r}")
+    assert offenders == [], (
+        "anchors must use slash notation ('16 kg/da'), not the exponent form: "
+        + "; ".join(offenders)
+    )
+
+
 def test_answer_any_uses_boundary_matching():
     case = {"answer_any": ["7 ay"]}
     assert run_eval._answer_ok(case, "bitki 17 ay boyunca")[0] is False

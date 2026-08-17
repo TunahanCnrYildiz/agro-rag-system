@@ -842,7 +842,12 @@ CASES = [
      # azot dozu daha ekonomik" and again "16 kg/da azot dozunun ... bölge buğday
      # yetiştiriciligi için yeterli" - an unconditioned recommendation a natural
      # fertilization answer states, not a single results-table cell.
-     "answer_any": ["16 kg/da", "16 kg saf azot", "16 kg n"]},
+     # "16 kg azot" (no "/da", no "saf") added 2026-08-17: a logged sample read
+     # ground=False while answering "dekara 16 kg azot dozunun ekonomik oldugu",
+     # which is the SOURCE's own wording - "saf" is the model's addition, not the
+     # paper's. Same value, alternate phrasing, and the symmetric case of the
+     # mera case's "10 kg azot", which cites this case as its precedent.
+     "answer_any": ["16 kg/da", "16 kg saf azot", "16 kg n", "16 kg azot"]},
     # DROPPED 2026-07-18: quant_vetch_phosphorus, "Fiğ (yem bitkisi)
     # yetiştiriciliğinde dekara ne kadar fosforlu gübre (P2O5) önerilir?"
     # asserting dp_30458's "6 kg/da P2O5" figure. Code review found two defects
