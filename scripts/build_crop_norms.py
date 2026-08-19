@@ -48,12 +48,17 @@ _RENAME = {"Hakkari": "Hakkâri"}
 #   "Verim ve 01.11.31.00.01. (Arpa (Biralık)) - Kg/Dekar"
 # The name group is greedy so a nested parenthesis stays inside the name.
 _LABEL = re.compile(r"^(?P<measure>.+?) ve [\d.]+\s*\((?P<name>.+)\)(?: - (?P<unit>.+))?$")
+# The price topic's labels carry only the code, the name and the unit.
+_BARE_LABEL = re.compile(r"^[\d.]+\s*\((?P<name>.+)\)(?: - (?P<unit>.+))?$")
 
 _MEASURES = {
     "verim": "verim",
     "ekilen alan": "alan",
     "toplu meyveliklerin alani": "alan",
     "uretim miktari": "uretim",
+    # The price topic writes no measure into the row label - the measure IS the
+    # Olcum, which sits in column 0. So this name is matched there instead.
+    "bitkisel urun fiyatlari (tl)": "fiyat",
 }
 
 # The unit each measure must carry to be usable. Fruit `Verim` comes in TWO
@@ -62,7 +67,14 @@ _MEASURES = {
 # rest. A per-tree figure written into a per-dekar field would be silently wrong
 # by more than an order of magnitude, so it is refused here rather than scaled
 # by a tree count nobody supplied.
-_UNITS = {"verim": {"kg/dekar"}, "alan": {"dekar"}, "uretim": {"ton"}}
+_UNITS = {"verim": {"kg/dekar"}, "alan": {"dekar"}, "uretim": {"ton"},
+          "fiyat": {"kilogram"}}
+
+# How many decimals each measure keeps. A yield is tonnes over dekars, both
+# rounded at the source, so 0.1 kg/da is already finer than the data. A PRICE is
+# different: rounding 7.94 TL/kg to 7.9 puts a 0.5% error into every revenue
+# figure computed from it.
+_DECIMALS = {"verim": 1, "fiyat": 2}
 
 SOURCES = {
     "yield": {"name": "TÜİK Bitkisel Üretim İstatistikleri",
@@ -72,17 +84,25 @@ SOURCES = {
 }
 
 
-def parse_label(label: str) -> tuple[str, str, str] | None:
-    """('verim'|'alan'|'uretim', crop name, unit) or None when unusable.
+def parse_label(label: str, olcum: str = "") -> tuple[str, str, str] | None:
+    """(measure, crop name, unit) or None when unusable.
+
+    Two shapes, because the two topics disagree about where the measure lives:
+      "Verim ve 01.11.11.00.00. (Durum Bugdayi) - Kg/Dekar"   <- in the label
+      "01.11.11.00.00. (Durum Bugdayi) - Kilogram"            <- in the Olcum
+    The label wins when it carries its own measure, so a production row can
+    never be reinterpreted by whatever column 0 happens to say.
 
     Returns None both for a label this script does not recognise and for a
     recognised measure carried in a unit we cannot use - see _UNITS.
     """
     m = _LABEL.match(label.strip())
-    if not m:
-        return None
-    measure = _MEASURES.get(_normalize_tr(m.group("measure")))
-    if measure is None:
+    if m:
+        measure = _MEASURES.get(_normalize_tr(m.group("measure")))
+    else:
+        m = _BARE_LABEL.match(label.strip())
+        measure = _MEASURES.get(_normalize_tr(olcum)) if m else None
+    if m is None or measure is None:
         return None
     unit = (m.group("unit") or "").strip()
     if _normalize_tr(unit) not in _UNITS[measure]:
@@ -125,15 +145,18 @@ def read_export(path: Path):
     header = rows[1]
     provinces = [re.sub(r"-\d+$", "", c).strip() for c in header[3:]]
     label = None
+    olcum = ""          # column 0, sticky; carries the measure in the price topic
     unrecognised = set()
     for row in rows[2:]:
         if len(row) < 4:
             continue
+        if row[0].strip():
+            olcum = row[0].strip()
         if row[1].strip():
             label = row[1].strip()
         if not label or not row[2].strip().isdigit():
             continue
-        parsed = parse_label(label)
+        parsed = parse_label(label, olcum)
         if parsed is None:
             if label not in unrecognised:
                 unrecognised.add(label)
@@ -211,14 +234,25 @@ def build(rows) -> dict:
                     # One decimal: a derived yield is tonnes over dekars, both
                     # already rounded at the source, so thirteen significant
                     # digits would advertise a precision nobody has.
-                    series[i] = round(value, 1)
+                    series[i] = round(value, _DECIMALS["verim"])
             if any(v is not None for v in series):
                 yields[province] = series
+
+        prices: dict[str, list] = {}
+        for province, by_year in by_measure.get("fiyat", {}).items():
+            series = [None] * len(years)
+            for year, i in index.items():
+                value = by_year.get(year)
+                if value:      # a price of 0 is refused for the same reason
+                    series[i] = round(value, _DECIMALS["fiyat"])
+            if any(v is not None for v in series):
+                prices[province] = series
 
         # The exports are province-level only, so no national figure was
         # published. The row is required by src/norms.py and ships EMPTY rather
         # than averaged: a mean of the provinces is a number nobody published.
         yields.setdefault(NATIONAL, [None] * len(years))
+        prices.setdefault(NATIONAL, [None] * len(years))
 
         crops[crop_id] = {
             "label": labels[crop_id],
@@ -226,9 +260,10 @@ def build(rows) -> dict:
                 "scope": "il" if any(k != NATIONAL for k in yields) else "tr",
                 **yields,
             },
-            # No price export yet. An all-null series is honest and keeps the
-            # crop loadable; lookup() simply returns no price norm.
-            "price_tl_kg": {"scope": "tr", NATIONAL: [None] * len(years)},
+            "price_tl_kg": {
+                "scope": "il" if any(k != NATIONAL for k in prices) else "tr",
+                **prices,
+            },
         }
 
     return {"meta": {"generated": date.today().isoformat(),

@@ -89,14 +89,49 @@ big, silently. The converter must parse these as plain floats.
 ordinary - not every crop is grown in every province - and each blank becomes
 `null`, never 0.
 
+## Prices: a different topic, a different label shape
+
+Prices are NOT under `Bitkisel Üretim İstatistikleri`. They are their own Konu,
+**`Tarımsal Ürün Fiyatları ve Üretim Değerleri`**, and inside it the Ölçüm is
+`Bitkisel ürün fiyatları (TL)`. Two neighbours in the same list are traps:
+`Tarım Ürünleri Üretici Fiyat Endeksi` and `Tarımsal Girdi Fiyat Endeksi` are
+INDICES and cannot be multiplied by a yield.
+
+- The breakdown to pick is **`TAORBA`**, not `PRODTR`. They are mutually
+  exclusive. `PRODTR` is the industrial (PRODCOM-style) classification and holds
+  only two entries, both processed olive oil. `TAORBA` is the agricultural one:
+  171 products carrying the SAME codes and names as the production exports, so
+  price joins to yield without a mapping table.
+- `Ölçü Birimi` offers **`Kilogram`**, so prices are TL/kg - the unit the budget
+  form's arithmetic already uses. Confirmed by magnitude too: durum wheat reads
+  7.94 in 2023 and 9.25 in 2024.
+- **`Düzey` offers İBBS3**, so price is published per province. Both measures
+  therefore carry `scope: "il"`.
+- Size: 170 indicators x 81 provinces caps a report at 3 years, so the decade
+  takes four files.
+
+**The row label has a different shape.** Production rows carry the measure in the
+label; price rows do not, because there the measure is the Ölçüm, which sits in
+**column 0** and is sticky:
+
+```
+col0 "Tahıllar Ve Diğer Bitkisel Ürünler"  col1 "Verim ve 01.11.11.00.00. (Durum Buğdayı) - Kg/Dekar"
+col0 "Bitkisel Ürün Fiyatları (Tl)"        col1 "01.11.11.00.00. (Durum Buğdayı) - Kilogram"
+```
+
+The converter reads the measure from the label when it is there and from column 0
+when it is not - the label wins, so a production row can never be reinterpreted
+by whatever column 0 says.
+
 ## Still missing
 
-- `Sebzeler` — 2 files (2016-2020, 2021-2025)
-- `Meyveler içecek ve baharat bitkileri` — 2 files
-- `Tarımsal Ürün Fiyatları ve Üretim Değerleri` — the whole price side
-
-Without vegetables the budget form cannot prefill for tomato, which is the
-crop most likely to be asked about.
+Nothing, for yield and price. What remains is a design question rather than data:
+`lookup` takes the MOST RECENT year, and for an alternate-bearing, frost-prone
+crop the most recent year can be an outlier. Hazelnut in Ordu reads
+`[41.0, 94.0, 79.4, 95.6, 86.8, 73.7, 105.6, 87.5, 88.9, 28.4]` - a typical year
+is 74-106 kg/da and 2025 is 28.4. Prefilling 28.4 as "the norm" is defensible as
+"the latest published figure" and misleading as an expectation. P2b should decide
+between the latest year, a multi-year median, and showing the series.
 
 ## The three crop groups do NOT have the same shape
 

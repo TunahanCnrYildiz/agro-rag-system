@@ -187,3 +187,69 @@ def test_a_crop_whose_every_value_is_zero_is_dropped_entirely():
     rows = [R("Manisa", "Domates", 2025, "verim", 0.0)]
     out = bcn.build(rows)
     assert "Manisa" not in out["crops"]["domates"]["yield_kg_da"]
+
+
+def test_parse_label_takes_the_measure_from_the_olcum_when_the_label_omits_it():
+    """The price topic writes no measure into the row label - the measure is the
+    Olcum, in column 0. Production writes "Verim ve ..." into the label itself."""
+    assert bcn.parse_label(
+        "01.11.11.00.00. (Durum Buğdayı) - Kilogram",
+        "Bitkisel Ürün Fiyatları (Tl)") == ("fiyat", "Durum Buğdayı", "Kilogram")
+
+
+def test_a_price_in_the_wrong_unit_is_refused():
+    assert bcn.parse_label(
+        "01.11.11.00.00. (Durum Buğdayı) - Ton",
+        "Bitkisel Ürün Fiyatları (Tl)") is None
+
+
+def test_the_olcum_is_ignored_when_the_label_carries_its_own_measure():
+    """A production row must not be reinterpreted by whatever column 0 says."""
+    assert bcn.parse_label(
+        "Verim ve 01.11.11.00.00. (Durum Buğdayı) - Kg/Dekar",
+        "Tahıllar Ve Diğer Bitkisel Ürünler") == ("verim", "Durum Buğdayı", "Kg/Dekar")
+
+
+def test_price_lands_in_its_own_measure_with_a_province_scope():
+    rows = [
+        R("Adana", "Durum Buğdayı", 2024, "fiyat", 9.25),
+        R("Adana", "Durum Buğdayı", 2025, "fiyat", 11.4),
+    ]
+    out = bcn.build(rows)
+    price = out["crops"]["durum bugdayi"]["price_tl_kg"]
+    assert price["scope"] == "il"
+    assert price["Adana"] == [9.25, 11.4]
+    assert price["TR"] == [None, None]
+
+
+def test_a_price_of_zero_is_not_a_norm_either():
+    rows = [
+        R("Adana", "Durum Buğdayı", 2024, "fiyat", 0.0),
+        R("Adana", "Durum Buğdayı", 2025, "fiyat", 11.4),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["durum bugdayi"]["price_tl_kg"]["Adana"] == [None, 11.4]
+
+
+def test_price_keeps_more_decimals_than_a_yield():
+    """A yield is rounded to 0.1 kg/da; a price of 7.94 TL/kg must not become
+    7.9, which is a 0.5% error on every revenue figure computed from it."""
+    rows = [R("Adana", "Durum Buğdayı", 2025, "fiyat", 7.94)]
+    out = bcn.build(rows)
+    assert out["crops"]["durum bugdayi"]["price_tl_kg"]["Adana"] == [7.94]
+
+
+def test_a_crop_with_only_a_price_still_loads(tmp_path, monkeypatch):
+    """Both measures must exist for src/norms.py to keep the crop, even when one
+    of them is empty."""
+    import json
+    from src import norms
+    rows = [R("Adana", "Kivi", 2025, "fiyat", 30.0)]
+    path = tmp_path / "crop_norms.json"
+    path.write_text(json.dumps(bcn.build(rows), ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(norms, "_PATH", path)
+    norms._load.cache_clear()
+    n = norms.lookup("kivi", "Adana")
+    assert n is not None
+    assert n.yield_kg_da is None
+    assert n.price_tl_kg.amount == 30.0
