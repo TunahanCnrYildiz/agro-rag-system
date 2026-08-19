@@ -47,13 +47,22 @@ _RENAME = {"Hakkari": "Hakkâri"}
 # The row label carries the measure, the product code, the name and the unit:
 #   "Verim ve 01.11.31.00.01. (Arpa (Biralık)) - Kg/Dekar"
 # The name group is greedy so a nested parenthesis stays inside the name.
-_LABEL = re.compile(r"^(?P<measure>.+?) ve [\d.]+\s*\((?P<name>.+)\)(?: - .+)?$")
+_LABEL = re.compile(r"^(?P<measure>.+?) ve [\d.]+\s*\((?P<name>.+)\)(?: - (?P<unit>.+))?$")
 
 _MEASURES = {
     "verim": "verim",
     "ekilen alan": "alan",
+    "toplu meyveliklerin alani": "alan",
     "uretim miktari": "uretim",
 }
+
+# The unit each measure must carry to be usable. Fruit `Verim` comes in TWO
+# units: Kg/Dekar for vines and berries, and Kg/Meyve Veren Agac for orchard
+# trees - TUIK publishes no per-dekar yield for apple, walnut, citrus and the
+# rest. A per-tree figure written into a per-dekar field would be silently wrong
+# by more than an order of magnitude, so it is refused here rather than scaled
+# by a tree count nobody supplied.
+_UNITS = {"verim": {"kg/dekar"}, "alan": {"dekar"}, "uretim": {"ton"}}
 
 SOURCES = {
     "yield": {"name": "TÜİK Bitkisel Üretim İstatistikleri",
@@ -63,15 +72,22 @@ SOURCES = {
 }
 
 
-def parse_label(label: str) -> tuple[str, str] | None:
-    """('verim'|'alan'|'uretim', crop name) or None when the label is not one."""
+def parse_label(label: str) -> tuple[str, str, str] | None:
+    """('verim'|'alan'|'uretim', crop name, unit) or None when unusable.
+
+    Returns None both for a label this script does not recognise and for a
+    recognised measure carried in a unit we cannot use - see _UNITS.
+    """
     m = _LABEL.match(label.strip())
     if not m:
         return None
     measure = _MEASURES.get(_normalize_tr(m.group("measure")))
     if measure is None:
         return None
-    return measure, m.group("name").strip()
+    unit = (m.group("unit") or "").strip()
+    if _normalize_tr(unit) not in _UNITS[measure]:
+        return None
+    return measure, m.group("name").strip(), unit
 
 
 def _number(raw: str) -> float | None:
@@ -121,10 +137,10 @@ def read_export(path: Path):
         if parsed is None:
             if label not in unrecognised:
                 unrecognised.add(label)
-                print(f"skipped unrecognised label in {path.name}: {label!r}",
+                print(f"skipped unusable measure/unit in {path.name}: {label!r}",
                       file=sys.stderr)
             continue
-        measure, crop = parsed
+        measure, crop, _unit = parsed
         year = int(row[2].strip())
         for province, cell in zip(provinces, row[3:]):
             if not province:

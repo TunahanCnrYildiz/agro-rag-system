@@ -121,19 +121,35 @@ def test_the_output_passes_the_loader_that_will_read_it(tmp_path, monkeypatch):
     assert n.price_tl_kg is None
 
 
-def test_parse_label_reads_the_measure_and_the_name():
+def test_parse_label_reads_the_measure_the_name_and_the_unit():
     assert bcn.parse_label("Verim ve 01.11.11.00.00. (Durum Buğdayı) - Kg/Dekar") == (
-        "verim", "Durum Buğdayı")
+        "verim", "Durum Buğdayı", "Kg/Dekar")
     assert bcn.parse_label("Ekilen Alan ve 01.11.61.00.01. (Fasulye, Taze) - Dekar") == (
-        "alan", "Fasulye, Taze")
+        "alan", "Fasulye, Taze", "Dekar")
     assert bcn.parse_label("Üretim Miktarı ve 01.13.34.00.00. (Domates) - Ton") == (
-        "uretim", "Domates")
+        "uretim", "Domates", "Ton")
+
+
+def test_a_per_tree_yield_is_refused():
+    """TÜİK publishes orchard fruit yield only as Kg/Meyve Veren Ağaç. Written
+    into a per-dekar field an apple would read 80 instead of ~2500 - silently
+    wrong by more than an order of magnitude. It is refused, not scaled by a
+    tree count nobody supplied."""
+    assert bcn.parse_label(
+        "Verim ve 01.24.10.00.00. (Elma) - Kg/Meyve Veren Ağaç") is None
+
+
+def test_the_fruit_area_measure_is_recognised():
+    """Fruits call it `Toplu Meyveliklerin Alanı`, vegetables `Ekilen Alan`."""
+    assert bcn.parse_label(
+        "Toplu Meyveliklerin Alanı ve 01.24.10.00.00. (Elma) - Dekar") == (
+        "alan", "Elma", "Dekar")
 
 
 def test_parse_label_keeps_a_nested_parenthesis_in_the_name():
     """'Arpa (Biralık)' - a lazy regex would cut the name at the inner paren."""
     assert bcn.parse_label("Verim ve 01.11.31.00.01. (Arpa (Biralık)) - Kg/Dekar") == (
-        "verim", "Arpa (Biralık)")
+        "verim", "Arpa (Biralık)", "Kg/Dekar")
 
 
 def test_hakkari_is_renamed_to_the_spelling_the_province_table_uses():
