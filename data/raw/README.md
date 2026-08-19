@@ -56,3 +56,30 @@ Yoksa da tasarım bunu karşılıyor (`scope: "tr"`), ama bilinmesi gerekiyor.
 
 Dosyalar indirildikleri hâliyle commit'lenir. Girdisi repoda olmayan bir
 dönüştürücü ne yeniden çalıştırılabilir ne de incelenebilir.
+
+## ÇALIŞAN TARİF (2026-08-17'de ekranda doğrulandı)
+
+`Kırılımlar` panelinde üç sütun var ve isimleri yanıltıcı:
+  - `Ürün niteliği` = ÖLÇÜ: Ekilen Alan / Hasat Edilen Alan / **Verim** / Üretim Miktarı
+  - `Ürünler`       = ürün listesi (tahıllar grubunda 100 adet)
+  - `Ölçü birimi`   = BİRİM: **Kg/Dekar** / Ton / Dekar
+
+Seçim:
+  - Ürün niteliği -> yalnız **Verim**   (diğerleri bize gerekmiyor)
+  - Ürünler       -> `<Hepsi>`
+  - Ölçü birimi   -> yalnız **Kg/Dekar** (Verim ile eşleşen birim bu)
+  - Düzey         -> **İBBS3 (İl Düzeyi)**, 81 ilin hepsi
+  - Zaman         -> 5 yıl
+
+Aritmetik: 100 gösterge x 81 il x 5 yıl = 40.500, sınır 50.000 -> sığar.
+10 yıl 81.000 eder, sığmaz. **Yılı böl, ürünü değil** - 100 ürünü elle
+yarıya ayırmaktan çok daha az tıklama, ve şema ortak yıl ekseninde
+birleştirdiği için dönüştürücü açısından fark yok.
+
+Yani ürün grubu başına 2 dosya:
+  tahillar_2016_2020 / tahillar_2021_2025
+  sebzeler_2016_2020 / sebzeler_2021_2025
+  meyveler_2016_2020 / meyveler_2021_2025
+
+Kısmi il listesiyle indirme. Eksik il, veride "o ilde veri yok" gibi görünür;
+oysa sadece indirilmemiştir - sessizce yanlış cevaba dönüşen türden bir eksik.
