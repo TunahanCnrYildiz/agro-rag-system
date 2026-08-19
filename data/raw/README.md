@@ -83,3 +83,19 @@ Yani ürün grubu başına 2 dosya:
 
 Kısmi il listesiyle indirme. Eksik il, veride "o ilde veri yok" gibi görünür;
 oysa sadece indirilmemiştir - sessizce yanlış cevaba dönüşen türden bir eksik.
+
+## Rapor ekranında görülen sütun/satır biçimi (2026-08-17)
+
+Doğru ayarla üretilen rapor şöyle geliyor - dönüştürücü bunlara göre yazılacak:
+
+  - Satırlar: `Verim ve <ürün kodu>. (<ürün adı>)` + `Yıl`
+  - Sütunlar: iller, ve başlık **plaka kodu taşıyor**: `Adana-1`, `Adıyaman-2`,
+    `Afyonkarahisar-3`, `Aksaray-68` ... -> `-NN` eki AYRILACAK, yoksa
+    src/context/location.py:PROVINCES ile eşleşmez.
+  - Boş hücreler var (ör. Arpa-Bira'da Adana boş) -> bunlar **null**, sıfır DEĞİL.
+  - Değerler kg/dekar: durum buğdayı ~300, mısır ~1.000-1.200. Hektara çevirince
+    3 ve 10-12 ton; büyüklük mertebesi doğru.
+
+İndirme formatı: **CSV**. XLS eski OLE2 biçiminde ve xlrd gibi bir paket ister;
+plan yeni çalışma-zamanı bağımlılığı istemiyor, CSV stdlib ile okunur ve git'te
+okunabilir şekilde diff'lenir.
