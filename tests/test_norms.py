@@ -230,3 +230,20 @@ def test_a_shipped_yield_is_in_a_plausible_range():
     wheat = norms.lookup("durum bugdayi", "Konya")
     assert wheat is not None and wheat.yield_kg_da is not None
     assert 50 < wheat.yield_kg_da.amount < 1000
+
+
+def test_norms_does_not_import_the_engine():
+    """A data lookup has no business dragging the engine in - src/context/location
+    imports engine._normalize_tr, so importing it here would pull the whole chat
+    stack into a module that only reads a JSON file. Pinned because nothing else
+    would notice the day someone adds the import."""
+    import ast
+    import pathlib
+    tree = ast.parse(pathlib.Path("src/norms.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported |= {a.name for a in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            imported.add(node.module or "")
+    assert not any("engine" in m or "location" in m for m in imported), imported

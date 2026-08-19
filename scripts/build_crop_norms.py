@@ -80,7 +80,8 @@ SOURCES = {
     "yield": {"name": "TÜİK Bitkisel Üretim İstatistikleri",
               "level": "İBBS3 (İl Düzeyi)", "obtained": "2026-08-18"},
     "price": {"name": "TÜİK Tarımsal Ürün Fiyatları ve Üretim Değerleri",
-              "obtained": None},
+              "olcum": "Bitkisel ürün fiyatları (TL)", "kirilim": "TAORBA",
+              "level": "İBBS3 (İl Düzeyi)", "obtained": "2026-08-19"},
 }
 
 
