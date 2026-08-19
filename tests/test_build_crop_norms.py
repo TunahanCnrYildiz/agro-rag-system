@@ -169,3 +169,21 @@ def test_a_derived_yield_is_not_given_fake_precision():
     ]
     out = bcn.build(rows)
     assert out["crops"]["domates"]["yield_kg_da"]["Manisa"] == [33333.3]
+
+
+def test_a_zero_yield_is_not_a_norm():
+    """The exports carry zeros, and a true zero cannot be told from a missing
+    marker. Neither reading is a norm: prefilling 0 would tell a farmer to expect
+    no harvest and compute an income of zero."""
+    rows = [
+        R("Manisa", "Domates", 2024, "verim", 0.0),
+        R("Manisa", "Domates", 2025, "verim", 4200.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["domates"]["yield_kg_da"]["Manisa"] == [None, 4200.0]
+
+
+def test_a_crop_whose_every_value_is_zero_is_dropped_entirely():
+    rows = [R("Manisa", "Domates", 2025, "verim", 0.0)]
+    out = bcn.build(rows)
+    assert "Manisa" not in out["crops"]["domates"]["yield_kg_da"]

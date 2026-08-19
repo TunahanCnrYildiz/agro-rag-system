@@ -199,10 +199,18 @@ def build(rows) -> dict:
                     dekar = alan.get(province, {}).get(year)
                     if tons is not None and dekar:
                         value = tons * 1000.0 / dekar
-                if value is not None:
-                    # One decimal. A derived yield is tonnes over dekars, both
-                    # already rounded at the source, so carrying thirteen
-                    # significant digits would advertise a precision nobody has.
+                if value:
+                    # `if value` and not `is not None`: a yield of exactly 0 is
+                    # refused. The exports carry zeros in 0.4-12% of cells and
+                    # there is no way to tell a true zero from a missing marker -
+                    # but neither reading is a norm. Prefilling 0 would tell a
+                    # farmer to expect no harvest and compute an income of zero,
+                    # which is the confident-wrong-answer this whole route exists
+                    # to prevent. No norm is the honest outcome.
+                    #
+                    # One decimal: a derived yield is tonnes over dekars, both
+                    # already rounded at the source, so thirteen significant
+                    # digits would advertise a precision nobody has.
                     series[i] = round(value, 1)
             if any(v is not None for v in series):
                 yields[province] = series
