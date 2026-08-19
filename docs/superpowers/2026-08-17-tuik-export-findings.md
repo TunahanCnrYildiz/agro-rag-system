@@ -97,3 +97,35 @@ ordinary - not every crop is grown in every province - and each blank becomes
 
 Without vegetables the budget form cannot prefill for tomato, which is the
 crop most likely to be asked about.
+
+## The three crop groups do NOT have the same shape
+
+Observed on screen 2026-08-18. This is the single most consequential finding for
+the converter: it must handle two input shapes, not one.
+
+| group | `Ürün niteliği` offers | yield comes from | products |
+| --- | --- | --- | --- |
+| Tahıllar ve diğer bitkisel ürünler | Ekilen Alan · Hasat Edilen Alan · **Verim** · Üretim Miktarı | **`Verim` directly, in `Kg/Dekar`** | 100 |
+| Sebzeler | Ekilen Alan · Üretim Miktarı — **no Verim** | **DERIVED:** `Üretim (Ton) ÷ Ekilen Alan (Dekar) × 1000` | 59 |
+| Meyveler, içecek ve baharat bitkileri | Toplu Meyveliklerin Alanı · Meyve Veren Yaşta Ağaç Sayısı · Meyve Vermeyen Yaşta Ağaç Sayısı · **Verim** · Üretim Miktarı | **`Verim` directly**, unit `Kg/Dekar` | 82 |
+
+Notes that bind the converter:
+
+- **Vegetables need two files** (area and production), and the yield is computed
+  from them. The derivation is only valid where BOTH numbers exist for the same
+  crop, province and year — otherwise `null`, never 0.
+- **Fruits offer two yield units**, `Kg/Dekar` and `Kg/Meyve Veren Ağaç`. Only
+  `Kg/Dekar` is taken; the budget form is per-area, and per-tree yield would need
+  tree counts and different arithmetic. A fruit TÜİK only publishes per-tree will
+  simply have no norm — the honest outcome.
+
+Size budget per group (81 provinces, limit 50.000):
+
+| group | göstergeler | 10 years | 5 years |
+| --- | --- | --- | --- |
+| Tahıllar | 100 | 81.000 ✗ | 40.500 ✓ |
+| Sebzeler (one measure per file) | 59 | 47.790 ✓ | — |
+| Meyveler | 82 | 66.420 ✗ | 33.210 ✓ |
+
+So: cereals 2 files, vegetables 2 files (one per measure, 10 years each),
+fruits 2 files. Six in total.
