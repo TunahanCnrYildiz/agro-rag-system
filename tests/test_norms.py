@@ -198,3 +198,35 @@ def test_lookup_without_a_file_is_none(tmp_path, monkeypatch):
 def test_the_crop_label_is_carried(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, GOOD)
     assert norms.lookup("domates", "Manisa").label == "Domates"
+
+
+def test_the_shipped_file_uses_canonical_province_names():
+    """A misspelled province does not raise - it silently never matches, so this
+    test is the only thing that can see it. TUIK writes "Hakkari" where
+    location.py writes "Hakkâri"; the converter renames it."""
+    from src.context.location import PROVINCES
+    norms._load.cache_clear()
+    data = norms._load()
+    assert data, "data/crop_norms.json did not load - the shipped file is broken"
+    allowed = set(PROVINCES) | {norms.NATIONAL_KEY}
+    unknown = set()
+    for crop in data["crops"].values():
+        for measure in ("yield_kg_da", "price_tl_kg"):
+            unknown |= {k for k in crop[measure] if k != "scope"} - allowed
+    assert unknown == set(), f"unknown province keys: {sorted(unknown)}"
+
+
+def test_the_shipped_file_carries_crops_and_a_decade():
+    norms._load.cache_clear()
+    assert len(norms.available_crops()) > 100
+    assert len(norms._load()["years"]) == 10
+
+
+def test_a_shipped_yield_is_in_a_plausible_range():
+    """Guards the unit. Reading the export as Turkish-formatted would have made
+    every figure ten times too big; a wheat yield of 2840 kg/da would be absurd
+    and this is what would catch it."""
+    norms._load.cache_clear()
+    wheat = norms.lookup("durum bugdayi", "Konya")
+    assert wheat is not None and wheat.yield_kg_da is not None
+    assert 50 < wheat.yield_kg_da.amount < 1000
