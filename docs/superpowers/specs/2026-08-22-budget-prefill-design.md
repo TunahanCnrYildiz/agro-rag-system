@@ -126,7 +126,42 @@ therefore says nothing; excluding it reads `73,7–105,6` against a prefill of
 prefill simply sits inside the range and reads as confirmation.
 
 Fewer than two non-null values in that window yields no range rather than a
-degenerate one.
+degenerate one, and neither does a window whose values are all equal — a range
+of `63–63` dresses one observation as a spread.
+
+### What this reasoning got wrong about price, found by the final review
+
+Everything above reasons about **yield**, and it does not transfer. Two things
+break for a producer price:
+
+- **Lira is nominal.** A stale yield is a physical quantity that does not inflate;
+  a stale price is simply wrong money. Measured on the shipped file: in Ordu only
+  **25 of 61** price norms are from 2025 and **29 predate 2023**. `Arpa (Diğer)`
+  prefilled **1,10 TL/kg from 2018**, rendering `Gelir 423,50 TL` — roughly nine
+  times low, in bold, from a form whose entire reason for existing is that the
+  previous approach shipped plausible-looking wrong money figures.
+- **The range stops being a warning and becomes noise.** The prefill sits *above*
+  its own five-year band for 95 of 103 Manisa price cells and 45 of 48 in Ordu.
+  That is currency drift, not an anomaly, so a line designed to make an outlier
+  visible instead flags almost every crop.
+
+So the rule splits by measure:
+
+| | Prefill | Recent range |
+| --- | --- | --- |
+| Yield | the latest published year, however atypical | shown |
+| Price | **only when its year is the dataset's most recent**; otherwise no cell at all | **never shown** |
+
+Absence, not zero, and not a cell carrying an empty value: the field simply stays
+empty exactly as it did before this feature. When the dataset's latest year cannot
+be determined, no price is prefilled either — not knowing the cutoff is not a
+reason to serve a stale figure. Yield is untouched: 71 of 75 Ordu yield norms are
+already 2025.
+
+`norms.latest_year()` supplies the cutoff explicitly. It is threaded through
+`form_spec` as an argument rather than inferred from the cells, because inferring
+"the latest year" from whichever figures happen to be present is the kind of guess
+this route exists to remove.
 
 ## 4. The crop selection
 
@@ -160,6 +195,12 @@ error class P2 §3 itself names: present, well-formed, and wrong.
   value. A prefill is a default, never a lock. Unchanged.
 - **Provenance** (what the framing needs): the client sends a per-field `source` —
   `"norm"` when the field was prefilled and left untouched, `"user"` when typed.
+  A form re-served after a validation error **echoes that claim back** on the
+  field's existing `source` key. The card must not re-derive it by comparing the
+  echoed value to the norm: a farmer who typed a figure that happens to equal the
+  average would have it upgraded to `"norm"`, and the answer would then attribute
+  their own number to TÜİK — the honesty invariant broken from outside the
+  server's reach, since a `"user"` claim is never second-guessed.
 
 The server does not take the client's word for it. A field claiming `"norm"` whose
 submitted value does not match the norm the server itself resolves is **downgraded
