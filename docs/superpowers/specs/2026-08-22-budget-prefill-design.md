@@ -71,6 +71,15 @@ typed into keeps its value; only fields still marked `norm` are replaced. Wiping
 figure the farmer entered because they browsed the crop list is data loss, and
 silent.
 
+**A crop change also clears what the new crop cannot refill.** The wire carries
+exactly one `crop`, so a field's norm can only belong to the selected crop — a yield
+from one crop beside a price from another is not representable, and the server would
+downgrade the orphaned claim to the farmer's own. So when the crop changes, or the
+farmer answers "not in the list", any field still marked `norm` that the new crop
+cannot refill loses its value, its marking and its unit. Found by review after the
+card had already been driven in a browser: every golden path passed, and the failing
+state was reachable only by deselecting a crop after a prefill.
+
 **Turn 2 — submit.** The server validates, computes, and chooses the framing. No
 model call, no retrieval. The route is still verified entirely by `pytest`.
 

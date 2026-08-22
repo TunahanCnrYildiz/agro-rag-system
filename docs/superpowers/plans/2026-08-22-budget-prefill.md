@@ -1592,7 +1592,8 @@ Render the search above the fields, only when the server actually sent a table �
     ))}
     {matches.length > 0 && (
       // The explicit way out: a crop we do not carry, or one the farmer would
-      // rather fill in themselves. It selects nothing and prefills nothing.
+      // rather fill in themselves. It selects nothing, prefills nothing, and
+      // clears any field still holding the previous crop's average.
       <Pressable style={styles.match} onPress={() => { setCrop(undefined); setQuery(""); }}>
         <Text style={styles.matchText}>Diğer (listede yok)</Text>
       </Pressable>
@@ -1702,7 +1703,7 @@ Confirm, in order:
 2. Typing `findik` lists **Fındık**; selecting it fills the yield with `28,4` and moves the chip to **kg/dekar**, and fills the price with `202,26` under **TL/kg**.
 3. Under the yield: `TÜİK 2025, Ordu` and `önceki 5 yıl: 73,7–105,6 kg/da`.
 4. Typing over the yield clears its provenance lines. Then searching `mısır` and selecting it leaves that typed yield alone and still refills the price — the rule that a browse never eats a figure the farmer entered.
-5. Selecting `Diğer (listede yok)` clears the crop and leaves every field exactly as it stands.
+5. Selecting `Diğer (listede yok)` clears the crop, clears any field still holding a norm, and leaves fields the farmer typed exactly as they stand.
 6. Entering an area of `5` and submitting gives an answer whose last line is the **norm framing**, naming TÜİK and Ordu — not P1's sentence.
 7. Submitting with the yield in **kg/dekar** and the area left **empty** returns the form with a field error **and every other value still in place**, crop included.
 8. After a reload the conversation restores with **no interactive form**.
