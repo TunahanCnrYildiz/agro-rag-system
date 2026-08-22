@@ -1,0 +1,856 @@
+{
+ "meta": {
+  "generated": "2026-08-22",
+  "source": {
+   "fetched": "2026-08-22",
+   "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
+   "products_read": 48,
+   "panels_captured": 48,
+   "no_panel": []
+  },
+  "products_with_a_dose": 42,
+  "products_read": 48
+ },
+ "products": {
+  "A.P.P® COMBIFER": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.5,
+     "unit": "kg"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "kg"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   }
+  },
+  "FLY AZOT": {
+   "hepsi": {
+    "yaprak": {
+     "low": 200.0,
+     "high": 250.0,
+     "unit": "cc"
+    }
+   }
+  },
+  "HİGRO 8 ZN": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO BARF": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.5,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO COMBİ": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO COMBİSE": {
+   "sebze": {
+    "damlama": {
+     "low": 0.5,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "kg"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   }
+  },
+  "HİGRO EQUAJE": {
+   "sebze": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HİGRO FOSFO": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 5.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HIGRO FOSTER": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 5.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO FUBBY": {
+   "sebze": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HİGRO K-FORCE": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO MATEN": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO MATEN PLUS": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO N.K.FE": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 5.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO RİNO": {
+   "sebze": {
+    "damlama": {
+     "low": 0.5,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO ROOT LEGEND": {
+   "sebze": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HİGRO SÜPER ZİNC PHOS": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO ZİMOBOR": {
+   "sebze": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HİGRO ZİNCBOR": {
+   "sebze": {
+    "damlama": {
+     "low": 0.5,
+     "high": 0.5,
+     "unit": "kg"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 0.5,
+     "high": 0.5,
+     "unit": "kg"
+    }
+   }
+  },
+  "HİGRO® BLUE": {
+   "sebze": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   }
+  },
+  "HİGRO® FAST": {
+   "sebze": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   }
+  },
+  "HİGRO® SPEED": {
+   "sebze": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 100.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   }
+  },
+  "LOPİN": {
+   "sebze": {
+    "damlama": {
+     "low": 150.0,
+     "high": 200.0,
+     "unit": "cc"
+    }
+   }
+  },
+  "A.P.P – ORNE": {
+   "sebze": {
+    "damlama": {
+     "low": 3.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO 14 BOR": {
+   "sebze": {
+    "damlama": {
+     "low": 0.5,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 0.5,
+     "high": 1.0,
+     "unit": "kg"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 250.0,
+     "high": 500.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HIGRO 8 MN": {
+   "hepsi": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO BOROL": {
+   "sebze": {
+    "damlama": {
+     "low": 500.0,
+     "high": 500.0,
+     "unit": "cc"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO CUFİT": {
+   "sebze": {
+    "damlama": {
+     "low": 0.5,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO CUPPERS": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HIGRO FERFORCE": {
+   "sebze": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 500.0,
+     "high": 500.0,
+     "unit": "gr"
+    }
+   }
+  },
+  "HİGRO FERRY": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO RENGAL PLUS": {
+   "meyve": {
+    "damlama": {
+     "low": 1.5,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "BİNGO": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 2.0,
+     "high": 2.5,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO ALGİN": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO AMİN-L": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO ROOTİNG PLUS": {
+   "sebze": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 1.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "A.P.P. MAXİNİM": {
+   "sebze": {
+    "damlama": {
+     "low": 3.0,
+     "high": 5.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 5.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HIGRO DENGELİ": {
+   "sebze": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO FOSFORLU": {
+   "sebze": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO POTASYUMLU": {
+   "sebze": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.5,
+     "high": 4.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.0,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO WATER MASTER": {
+   "sebze": {
+    "damlama": {
+     "low": 1.5,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 1.5,
+     "high": 2.0,
+     "unit": "litre"
+    }
+   }
+  },
+  "HİGRO® CAPİLLE": {
+   "sebze": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "kg"
+    }
+   },
+   "meyve": {
+    "damlama": {
+     "low": 3.0,
+     "high": 4.0,
+     "unit": "kg"
+    }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 2.0,
+     "high": 3.0,
+     "unit": "kg"
+    }
+   }
+  }
+ }
+}
