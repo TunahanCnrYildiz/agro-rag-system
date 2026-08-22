@@ -85,9 +85,41 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
       ? (form.crops ?? []).filter((c) => fold(c.label).includes(fold(query))).slice(0, 8)
       : [];
 
+  // The wire carries exactly one `crop`, so a field's "norm" marking can only
+  // ever belong to the currently selected crop. The moment the farmer picks a
+  // different crop - or says theirs isn't in the list - the previous crop's
+  // regional average is meaningless. Leaving the number on screen would
+  // silently convert TÜİK's figure into the farmer's own, because once `crop`
+  // changes nothing downstream can still attribute it: the server fails
+  // closed and downgrades the field to "user", and the answer would then
+  // claim a TÜİK figure rests entirely on numbers the farmer typed. So any
+  // field still marked "norm" that `newCrop` cannot refill is cleared here -
+  // value, marking and unit all reset - before selection proceeds. Fields the
+  // farmer typed into (source "user", or never marked) are never touched.
+  function clearUnfillableNorms(newCrop: CropOption | undefined) {
+    const cellFor: Record<string, NormCell | null | undefined> = {
+      yield_total: newCrop?.yield,
+      price: newCrop?.price,
+    };
+    for (const [id, cell] of Object.entries(cellFor)) {
+      if (sources[id] !== "norm") continue;
+      if (cell) continue; // the new crop can refill it; the caller does that next
+      const field = form.fields.find((f) => f.id === id);
+      if (!field) continue;
+      setValues((p) => ({ ...p, [id]: "" }));
+      setUnits((p) => ({ ...p, [id]: field.units[0].id }));
+      setSources((p) => {
+        const next = { ...p };
+        delete next[id];
+        return next;
+      });
+    }
+  }
+
   function selectCrop(option: CropOption) {
     setCrop(option.id);
     setQuery(option.label);
+    clearUnfillableNorms(option);
     const cells: [string, NormCell | null][] = [
       ["yield_total", option.yield],
       ["price", option.price],
@@ -145,7 +177,14 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
             // The explicit way out: a crop we do not carry, or one the farmer
             // would rather fill in themselves. It selects nothing and prefills
             // nothing.
-            <Pressable style={styles.match} onPress={() => { setCrop(undefined); setQuery(""); }}>
+            <Pressable
+              style={styles.match}
+              onPress={() => {
+                clearUnfillableNorms(undefined);
+                setCrop(undefined);
+                setQuery("");
+              }}
+            >
               <Text style={styles.matchText}>Diğer (listede yok)</Text>
             </Pressable>
           )}
@@ -174,6 +213,9 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
                 <Pressable
                   key={u.id}
                   onPress={() => {
+                    // Pressing the already-active unit is a no-op click; it
+                    // must not discard a prefilled field's provenance.
+                    if (units[f.id] === u.id) return;
                     setUnits((p) => ({ ...p, [f.id]: u.id }));
                     setSources((p) => ({ ...p, [f.id]: "user" }));
                   }}
