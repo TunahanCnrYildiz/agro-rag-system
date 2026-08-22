@@ -31,7 +31,9 @@ _PATH = DATA_DIR / "product_doses.json"
 # reads it, and two spellings of "hepsi" that drift apart would make every
 # unqualified dose silently unfindable. src.dose_parse is a leaf module - it
 # imports only `re` - so this costs the runtime path nothing.
-from src.dose_parse import ALL_GROUPS
+from src.dose_parse import ALL_GROUPS, GROUP_KEYS
+
+KNOWN_GROUPS = frozenset(GROUP_KEYS) | {ALL_GROUPS}
 
 # Must list every method dose_parse can emit, in the order the answer should
 # print them. A method missing here is silently unreadable: the row is in the
@@ -114,6 +116,12 @@ def lookup(product: str, group: str) -> tuple[Dose, ...]:
     """
     groups = _load().get(product)
     if not groups:
+        return ()
+    if group not in KNOWN_GROUPS:
+        # A group we do not publish is not a question we can answer. Without
+        # this a typo falls straight through to the unqualified `hepsi` row for
+        # any product that has one, and the caller gets a real figure back for
+        # a group it never asked about.
         return ()
     methods = groups.get(group) or groups.get(ALL_GROUPS) or {}
     return tuple(

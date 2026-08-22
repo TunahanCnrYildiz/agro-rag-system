@@ -312,3 +312,11 @@ def test_a_reversed_pair_is_refused_not_reordered():
     first, so without this the refusal is unexercised and a future loosening of
     either guard reopens the defect with nothing failing."""
     assert parse_dose("Damlamadan 2,5 – 1 Litre/ 1000m² alana uygulanılır.") is None
+
+
+def test_a_turkish_thousands_dot_is_refused_not_read_as_a_decimal():
+    """"1.000 gr" reads as 1 gram here and as 1000 grams to a Turkish reader -
+    a 1000x error either way round. The pages do use the dot that way, in
+    "1.000 m²", so neither reading is safe to pick."""
+    assert parse_dose("Damlamadan 1.000 gr/ 1000m² alana uygulanılır.") is None
+    assert parse_dose("Damlamadan 250 gr/ 1000m² alana uygulanılır.") == (250.0, 250.0, "gr")

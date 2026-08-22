@@ -106,6 +106,18 @@ def _unit(spelling: str) -> str:
     return lowered
 
 
+# A dot followed by exactly three digits is a Turkish THOUSANDS separator, and
+# the pages use it - "1.000 m²". As an amount it is ambiguous with a decimal:
+# "1.000 gr" reads as 1 gram to this parser and as 1000 grams to a Turkish
+# reader, a 1000x error either way round. Neither reading is safe to pick, so
+# the figure is refused. The spec itself writes "1.250 gr" meaning 1250.
+_THOUSANDS = re.compile(rf"^\d+\.\d{{3}}$")
+
+
+def _ambiguous(*texts: str | None) -> bool:
+    return any(t and _THOUSANDS.match(t) for t in texts)
+
+
 def _read_amount(match: re.Match) -> tuple[float, float, str] | None:
     """A regex match of _AMOUNT as (low, high, unit), or None if it does not
     describe one coherent figure.
@@ -120,6 +132,8 @@ def _read_amount(match: re.Match) -> tuple[float, float, str] | None:
     the regex moved on). Reordering a reversed pair was tried and is exactly
     the bug: it turns a garbled sequence into a plausible-looking figure.
     """
+    if _ambiguous(match.group("low"), match.group("high")):
+        return None
     low = _number(match.group("low"))
     unit_text = match.group("unit") or match.group("solounit")
     high_text = match.group("high")
@@ -275,6 +289,11 @@ def _widen(existing, dose):
 # under every group would claim the page said something it did not; this key
 # says plainly that it applies to all.
 ALL_GROUPS = "hepsi"
+
+# The group keys this module can emit, for callers that need to enumerate or
+# validate them - a form's buttons, and lookup's rejection of a group nobody
+# publishes.
+GROUP_KEYS = tuple(key for key, _ in _GROUPS)
 
 
 def _method_of(clause: str, before: str = "") -> str:

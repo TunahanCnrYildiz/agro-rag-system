@@ -150,3 +150,11 @@ def test_the_shipped_file_loads_and_carries_products():
     empties the file would leave every fixture-based test above green."""
     doses._load.cache_clear()
     assert len(doses.available_products()) >= 35
+
+
+def test_a_group_nobody_publishes_is_not_answered(tmp_path, monkeypatch):
+    """Without this a typo falls through to the unqualified `hepsi` row and the
+    caller gets a real figure back for a group it never asked about."""
+    _write(tmp_path, monkeypatch, GOOD)
+    assert doses.lookup("HIGRO 8 MN", "muz") == ()
+    assert doses.lookup("HIGRO 8 MN", "tarla") != ()
