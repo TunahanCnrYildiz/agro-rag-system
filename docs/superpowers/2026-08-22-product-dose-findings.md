@@ -197,3 +197,37 @@ Four mechanisms came out of that:
 and it was blind to all five defects. It counted PRODUCTS, not slots, and compared nothing to the
 pages. A per-slot diff against the panels is the check that finds this class; a per-product count
 is not.
+
+
+## The re-review, and the one gap that is still open
+
+A second whole-branch review read **every** shipped row against its panel — all 103, not a sample —
+and confirmed every low/high/unit matches the page. It then found what the per-slot diff structurally
+cannot: a row that was never there to diff.
+
+Fixed in that round:
+
+- **`_TIGHT_GAP` was a net regression and was reverted.** It had been introduced to recover
+  `ZİMOBOR`/`EQUAJE`, but measurement showed it inert on the corpus (the suite passes identically
+  with it reverted) while letting `1000 litre suyla beraber 250 gr dekara` through as a
+  **1000-litre per-dekar dose**. The scan-resume alone was what recovered those two products.
+- **The chain guard was keyed to one dash character and looked only backwards.** An em dash, a
+  slash or the word `ve` each walked straight past it and re-shipped the invented `1 litre`. It now
+  refuses any run of three or more numbers joined by `-`, `–`, `—` or `ve`. The slash is
+  deliberately NOT a separator: the pages use it to mean *per* (`250 gr/ 1000m²`), and counting it
+  made the area's own `1000` the third member of every ordinary range — 23 products refused.
+- **A rejected pair is now skipped whole**, unlike a dilution. Resuming inside the match salvaged
+  the right-hand figure alone, which is how `2 – 2,5 – 1 Litre` shipped `1 litre` after the reorder
+  was removed — the same invented number by a different route.
+- **`HİGRO FERRY` was shipping a method its page contradicts.** The page writes `To praktan`
+  (Topraktan) and `Yapraktan` **in front of** the group heading, so `_segments` cut them into the
+  previous segment and `_method_of` fell through to its `damlama` default with nothing to collide
+  with. Soil is now a third method, and `_method_of` looks back at the text before the heading.
+  A test had **pinned the wrong value** here: a biting test can still enshrine a defect.
+
+**Still open, and written down rather than papered over:** `HİGRO FERRY` publishes one figure for
+two groups — `Tek yıllık tarla ve endüstri bitkileri ile sebzelerde 1000m² alana 1-2 litre`. Only
+`sebzelerde` opens a segment, so `doses.lookup("HİGRO FERRY", "tarla")` returns `()` and the product
+appears in neither `unparsed` nor `dropped_slots`. It is one figure on one page, and the general fix
+(a clause naming several groups) needs a design decision rather than a wider regex — widening the
+`tarla` pattern to span intervening words also swallows `Tarla sebzelerinde` in `HIGRO FERFORCE`.

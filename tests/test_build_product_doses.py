@@ -69,8 +69,8 @@ def test_the_shipped_file_is_what_the_converter_produces():
 def test_the_shipped_file_still_covers_most_of_the_catalog():
     """A guard on the real data. If a parser change or a site redesign empties
     the file, every other test here keeps passing on its fixtures. Measured
-    2026-08-22: 42 of 48 products publish a per-area dose, so the floor is set
-    well below that and still catches a collapse."""
+    2026-08-22: 40 of 48 products publish a per-area dose we can read, so the
+    floor is set well below that and still catches a collapse."""
     from src.config import DATA_DIR
     shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
     assert len(shipped["products"]) >= 35
@@ -99,3 +99,16 @@ def test_the_shipped_meta_records_both_kinds_of_failure():
     assert "HİGRO MATEN" in meta["unparsed"]
     assert meta["dropped_slots"]["HIGRO FERFORCE"] == [["sebze", "damlama"]]
     assert meta["products_with_a_dose"] == len(shipped["products"])
+
+
+def test_a_reversed_row_stops_the_converter_rather_than_shipping():
+    """The parser refuses these upstream, so this can only fire if that refusal
+    is loosened - which is precisely when a reversed row would otherwise go out
+    with the other 102 looking perfectly normal."""
+    import pytest
+
+    from unittest.mock import patch
+    with patch("scripts.build_product_doses.parse_panel",
+               return_value={"sebze": {"damlama": (3.0, 1.0, "litre")}}):
+        with pytest.raises(ValueError, match="do not belong together"):
+            build({"X": "irrelevant"})

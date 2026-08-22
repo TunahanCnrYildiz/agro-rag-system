@@ -256,10 +256,12 @@ def test_the_comma_boundary_decides_a_real_products_method():
     test claimed to cover this mechanism and did not: removing the comma left
     it passing."""
     parsed = parse_panel(FERRY)
-    assert parsed["sebze"] == {"damlama": (1.0, 2.0, "litre")}
-    assert parsed["meyve"] == {"damlama": (2.0, 3.0, "litre")}
-    assert "yaprak" not in parsed["sebze"]
-    assert "yaprak" not in parsed["meyve"]
+    # The page labels these "To praktan" (Topraktan) and "Yapraktan", and the
+    # label sits in front of the group heading rather than inside the clause.
+    # This test once asserted damlama for both - a biting test can still
+    # enshrine a defect, and this one did until a review read the page.
+    assert parsed["sebze"] == {"toprak": (1.0, 2.0, "litre")}
+    assert parsed["meyve"] == {"yaprak": (2.0, 3.0, "litre")}
 
 
 # Verbatim, HİGRO MATEN, fetched 2026-08-22. Three numbers chained by dashes
@@ -300,3 +302,13 @@ def test_a_dose_separated_from_its_dilution_by_nothing_is_still_read():
     text = ("Tarla bitkilerinde : Yapraktan 100 gr/ 100 Litre su ile "
             "uygulanılır Damlamadan 250 gr/ 1000m² alana uygulanılır.")
     assert parse_dose(text) == (250.0, 250.0, "gr")
+
+
+def test_a_reversed_pair_is_refused_not_reordered():
+    """The direct mechanism behind the MATEN defect, tested on its own.
+
+    Reordering a reversed pair turns two numbers that were never meant to go
+    together into a plausible range. The chain guard happens to catch MATEN
+    first, so without this the refusal is unexercised and a future loosening of
+    either guard reopens the defect with nothing failing."""
+    assert parse_dose("Damlamadan 2,5 – 1 Litre/ 1000m² alana uygulanılır.") is None

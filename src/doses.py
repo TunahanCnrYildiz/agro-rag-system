@@ -33,7 +33,10 @@ _PATH = DATA_DIR / "product_doses.json"
 # imports only `re` - so this costs the runtime path nothing.
 from src.dose_parse import ALL_GROUPS
 
-_METHODS = ("damlama", "yaprak")
+# Must list every method dose_parse can emit, in the order the answer should
+# print them. A method missing here is silently unreadable: the row is in the
+# file and lookup skips it.
+_METHODS = ("damlama", "yaprak", "toprak")
 
 
 @dataclass(frozen=True)

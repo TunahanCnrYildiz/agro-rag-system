@@ -45,11 +45,23 @@ def build(panels: dict[str, str]) -> tuple[dict, list[str], dict]:
         if not parsed:
             unparsed.append(name)
             continue
-        table[name] = {
+        rows = {
             group: {method: {"low": low, "high": high, "unit": unit}
                     for method, (low, high, unit) in methods.items()}
             for group, methods in parsed.items()
         }
+        # The spec asks the converter to fail LOUDLY on a reversed range rather
+        # than write one. The parser refuses them upstream, so this can only
+        # fire if that refusal is ever loosened - which is exactly when a
+        # silent reversed row would go out with everything else looking fine.
+        for group, methods in rows.items():
+            for method, dose in methods.items():
+                if dose["low"] > dose["high"]:
+                    raise ValueError(
+                        f"{name} / {group} / {method}: low {dose['low']} is "
+                        f"above high {dose['high']} - the parser paired two "
+                        f"numbers that do not belong together")
+        table[name] = rows
     return table, unparsed, dropped
 
 

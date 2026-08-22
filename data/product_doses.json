@@ -577,14 +577,14 @@
   },
   "HİGRO FERRY": {
    "sebze": {
-    "damlama": {
+    "toprak": {
      "low": 1.0,
      "high": 2.0,
      "unit": "litre"
     }
    },
    "meyve": {
-    "damlama": {
+    "yaprak": {
      "low": 2.0,
      "high": 3.0,
      "unit": "litre"

@@ -87,19 +87,8 @@ _GAP = r"[^.;:,]{0,40}?"
 _AMOUNT_THEN_AREA = re.compile(_AMOUNT + _GAP + _AREA, re.I)
 _AREA_THEN_AMOUNT = re.compile(_AREA + _GAP + _AMOUNT, re.I)
 
-# The WATER-then-AMOUNT direction of a dilution needs a much tighter gap than
-# the AMOUNT-then-WATER one above. Measured across all 48 panels: every real
-# "Xya <amount>" dilution ("100 litre suya 250 gram") has the amount 3
-# characters after "su" - the length of the "ya" suffix plus a space, since
-# _WATER's own match stops at "su". The two products that lost a real dose to
-# this guard (HİGRO ZİMOBOR, HİGRO EQUAJE) have no such suffix: their "su" is
-# the tail of an unrelated, already-matched dilution ("100 Litre su ile
-# uygulanılır Damlamadan 250 gr"), and the real per-dekar figure sits 27
-# characters further on, past "ile uygulanılır Damlamadan ". A bound of 6
-# comfortably covers every real case and stays far short of that 27.
-_TIGHT_GAP = r"[^.;:,]{0,6}?"
 _DILUTION = re.compile(
-    rf"(?:{_AMOUNT_BARE}{_GAP}{_WATER}|{_WATER}{_TIGHT_GAP}{_AMOUNT_BARE})", re.I)
+    rf"(?:{_AMOUNT_BARE}{_GAP}{_WATER}|{_WATER}{_GAP}{_AMOUNT_BARE})", re.I)
 
 
 def _number(text: str) -> float:
@@ -145,18 +134,24 @@ def _read_amount(match: re.Match) -> tuple[float, float, str] | None:
     return low, high, _unit(unit_text)
 
 
-# A number and a dash immediately before an amount mean the matcher has landed
-# in the MIDDLE of a longer chain. HİGRO MATEN publishes "Damlamadan 2 - 2,5 - 1
-# Litre// 1000m²": three numbers, and the page never says what they mean. The
-# matcher cannot start at "2" (a dash follows "2,5", not a unit) so it starts at
-# "2,5", and whatever it then salvages - a reversed pair, or just the trailing
-# "1 Litre" - is a figure the page does not state. Refuse the chain instead:
-# rescuing a fragment of an unreadable sequence is the same act as inventing one.
-# The unit may sit on the left figure too ("0,5kg - 1 litre"), so it is part of
-# what counts as a dangling chain head - otherwise a range whose two units
-# disagree gets refused and then the scan salvages its right-hand figure alone,
-# which is the same invented number by another route.
-_CHAIN_TAIL = re.compile(rf"{_NUMBER}\s*{_GLOSS}(?:{_UNIT_RE})?\s*[-–]\s*$", re.I)
+# Three or more numbers strung together by separators, with at most one unit
+# among them: the page is saying something we cannot read. HİGRO MATEN
+# publishes "Damlamadan 2 - 2,5 - 1 Litre// 1000m²" and never says what the
+# three mean. Whatever a matcher salvages from that - a reversed pair, the
+# trailing figure alone - is a number the page does not state, and this branch
+# shipped both of those in turn before refusing the chain outright.
+#
+# The separator set is deliberately wide. An earlier version keyed on the en
+# dash alone, and an em dash, a slash or the word "ve" each walked straight
+# past it on a site the firm edits by hand.
+# The slash is deliberately NOT a separator: the pages use it to mean "per"
+# ("250 gr/ 1000m²"), so counting it made the AREA's own 1000 the third member
+# of every ordinary range and refused 23 products.
+_SEP = r"(?:\s*[-–—]\s*|\s+ve\s+)"
+_CHAIN = re.compile(
+    rf"{_NUMBER}\s*{_GLOSS}(?:{_UNIT_RE})?{_SEP}"
+    rf"{_NUMBER}\s*{_GLOSS}(?:{_UNIT_RE})?{_SEP}"
+    rf"{_NUMBER}", re.I)
 
 
 def parse_dose(text: str) -> tuple[float, float, str] | None:
@@ -175,6 +170,7 @@ def parse_dose(text: str) -> tuple[float, float, str] | None:
     when both appear in the same breath.
     """
     diluted = [m.span() for m in _DILUTION.finditer(text)]
+    chains = [m.span() for m in _CHAIN.finditer(text)]
     for pattern in (_AMOUNT_THEN_AREA, _AREA_THEN_AMOUNT):
         pos = 0
         while (match := pattern.search(text, pos)) is not None:
@@ -190,10 +186,18 @@ def parse_dose(text: str) -> tuple[float, float, str] | None:
             pos = end
             if any(a <= start and end <= b for a, b in diluted):
                 continue
-            if _CHAIN_TAIL.search(text[:start]):
+            if any(a <= start and start < b for a, b in chains):
                 continue
             dose = _read_amount(match)
             if dose is None:
+                # A REJECTED PAIR IS SKIPPED WHOLE, unlike a dilution. The two
+                # numbers are unreadable TOGETHER - reversed, or spelling
+                # different units - so neither is a figure the page states, and
+                # resuming inside the match salvages the right-hand one alone.
+                # That salvage is how "2 - 2,5 - 1 Litre" shipped "1 litre"
+                # after the reorder was removed: the same invented number by a
+                # different route.
+                pos = max(pos, match.end())
                 continue
             return dose
     return None
@@ -211,7 +215,13 @@ _GROUP_RE = re.compile(
     r"(?P<head>" + "|".join(pattern for _, pattern in _GROUPS) + r")\s*(?:i[çc]in)?\s*:?",
     re.I)
 
-_METHODS = (("damlama", r"damlama\w*|damla\s+sulama"), ("yaprak", r"yaprak\w*"))
+# Soil application is a third published method, not a synonym for drip. HİGRO
+# FERRY states "Topraktan" (spelled "To praktan" on the page) for a per-dekar
+# figure; filing that under "damlama" puts a delivery method on a quoted number
+# that the manufacturer did not put there.
+_METHODS = (("damlama", r"damlama\w*|damla\s+sulama"),
+            ("yaprak", r"yaprak\w*"),
+            ("toprak", r"topraktan|to\s+praktan|tabandan"))
 
 # THE COMMA IS A CLAUSE BOUNDARY HERE. The panels write
 # "Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, Damlamadan 250 gr/ 1000m²"
@@ -267,7 +277,7 @@ def _widen(existing, dose):
 ALL_GROUPS = "hepsi"
 
 
-def _method_of(clause: str) -> str:
+def _method_of(clause: str, before: str = "") -> str:
     """Which application method this clause describes.
 
     Defaults to drip, and that is a DOCUMENTED DEFAULT rather than a reading of
@@ -292,6 +302,16 @@ def _method_of(clause: str) -> str:
     for key, pattern in _METHODS:
         if re.search(pattern, clause, re.I):
             return key
+    if before:
+        # The method can sit in front of the GROUP HEADING rather than inside
+        # the clause, because _segments cuts at the heading and _CLAUSE cuts
+        # after that: HİGRO FERRY writes "Yapraktan : Meyve Ağaçlarında 1000m²
+        # alana 2-3 litre", so the word lands in the previous segment and the
+        # clause is left with none. Falling through to the default then put
+        # "damlama" on a figure the page published as foliar.
+        for key, pattern in _METHODS:
+            if re.search(pattern, before, re.I):
+                return key
     return "damlama"
 
 
@@ -302,7 +322,7 @@ def _method_of(clause: str) -> str:
 _SUBQUALIFIER_RE = re.compile(r"tarla\s*$", re.I)
 
 
-def _segments(text: str) -> list[tuple[str, str, bool]]:
+def _segments(text: str) -> list[tuple[str, str, bool, str]]:
     """Split a panel into (group, text, subqualified) triples at its group
     headings.
 
@@ -317,16 +337,16 @@ def _segments(text: str) -> list[tuple[str, str, bool]]:
     """
     matches = list(_GROUP_RE.finditer(text))
     if not matches:
-        return [(ALL_GROUPS, text, False)]
+        return [(ALL_GROUPS, text, False, "")]
     out = []
     for i, match in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         head = match.group("head").lower()
         group = next(key for key, pattern in _GROUPS
                      if re.fullmatch(pattern, head, re.I))
-        preceding = text[max(0, match.start() - 10):match.start()]
+        preceding = text[max(0, match.start() - 60):match.start()]
         subqualified = group != "tarla" and bool(_SUBQUALIFIER_RE.search(preceding))
-        out.append((group, text[match.end():end], subqualified))
+        out.append((group, text[match.end():end], subqualified, preceding))
     return out
 
 
@@ -349,7 +369,7 @@ def _parse(text: str):
     """
     result: dict[str, dict[str, tuple[float, float, str]]] = {}
     ambiguous: set[str] = set()
-    for group, segment, subqualified in _segments(text):
+    for group, segment, subqualified, lead in _segments(text):
         if subqualified:
             ambiguous.add(group)
         for clause in _CLAUSE.split(segment):
@@ -357,7 +377,7 @@ def _parse(text: str):
             if dose is None:
                 continue
             slot = result.setdefault(group, {})
-            method = _method_of(clause)
+            method = _method_of(clause, lead)
             slot[method] = _widen(slot.get(method), dose)
 
     conflicts: list[tuple[str, str]] = []
