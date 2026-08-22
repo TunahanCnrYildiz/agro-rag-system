@@ -10,6 +10,11 @@ PANELS = {
                     "Damlamadan 250 gr/ 1000m² alana uygulanılır."),
     "HİGRO ABS": ("HİGRO ABS, etikette önerilen uygulama dozajlarına dikkat "
                   "edilmesi gerekmektedir."),
+    # Verbatim, HİGRO BARF. Carries a real RANGE, unlike the single figure
+    # above - without one, an ordering check can only ever compare a number
+    # with itself and passes whatever the code does.
+    "HİGRO BARF": ("Sebzelerde : Yapraktan uygulama ile 100 cc / 100 litre suya "
+                   "Damlama sulama ile 2-2,5 litre / 1000m² (da)"),
 }
 
 
@@ -34,12 +39,20 @@ def test_an_empty_input_yields_an_empty_table_not_an_error():
 
 def test_every_row_has_low_no_greater_than_high():
     """A reversed range would print '3 - 2 litre' and, worse, would mean the
-    parser paired two unrelated numbers."""
+    parser paired two unrelated numbers.
+
+    The fixture has to contain a real range for this to check anything: with
+    only single figures every row satisfies low <= high by construction, and
+    the assertion passes whatever the code does."""
     table, _ = build(PANELS)
+    spans = 0
     for groups in table.values():
         for methods in groups.values():
             for dose in methods.values():
                 assert dose["low"] <= dose["high"]
+                if dose["low"] < dose["high"]:
+                    spans += 1
+    assert spans, "no fixture row carries a range, so nothing was checked"
 
 
 def test_the_shipped_file_is_what_the_converter_produces():
