@@ -22,7 +22,7 @@
 - Shell is PowerShell: `&&` does not work; use `;` or separate calls. Use `python -m pytest`, never a bare `pytest`.
 - **Branch:** create `product-doses` off `main` before Task 1. Do not touch `demo`. `main` is shared — rebase, never force-push.
 - **`src/doses.py` imports nothing from `src/engine.py`.** It is a file in, values out — the boundary `src/norms.py` and `src/budget.py` both keep, and a test pins it.
-- **A missing dose is never 0.** Absence returns `None`, because a zero flows into the multiplication and answers "you need 0 litres" about a purchase.
+- **A missing dose is never 0.** `parse_dose` returns `None` and `doses.lookup` returns an empty tuple; neither ever returns a zero, because a zero flows into the multiplication and answers "you need 0 litres" about a purchase.
 - **Nothing is invented.** A panel that does not parse yields NO row. No defaulting to another group, no borrowing another product's figure, no midpoint standing in for a range.
 - **A dilution is never read as a per-area dose.** `100 litre suya 250 gram` is per 100 L of water; turning it into a per-dekar figure needs a spray volume the page does not give.
 - **`_load` never raises.** A missing, malformed or wrong-shaped file yields an empty table, exactly as `src/norms.py:_load` and `src/fertplan.py:_load` do.
@@ -41,7 +41,7 @@
 | `src/dose_parse.py` (create) | parse one clause, then one panel, into doses. No I/O, no network |
 | `scripts/build_product_doses.py` (create) | raw panels → `data/product_doses.json`, reporting failures by name |
 | `data/product_doses.json` (create, committed) | product → group → method → {low, high, unit} |
-| `src/doses.py` (create) | the runtime loader: validated, never raises, absence is `None` |
+| `src/doses.py` (create) | the runtime loader: validated, never raises, absence is an empty tuple |
 
 `src/dose_parse.py` is separate from `src/doses.py` on purpose: parsing free Turkish is the risky, iterated part and it must be unit-testable without any file; the loader is a small, boring validator. Keeping them apart means a parser change cannot break the load path and a reviewer can judge each on its own.
 
