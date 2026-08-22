@@ -99,3 +99,17 @@ Doğru ayarla üretilen rapor şöyle geliyor - dönüştürücü bunlara göre 
 İndirme formatı: **CSV**. XLS eski OLE2 biçiminde ve xlrd gibi bir paket ister;
 plan yeni çalışma-zamanı bağımlılığı istemiyor, CSV stdlib ile okunur ve git'te
 okunabilir şekilde diff'lenir.
+
+## TR satırları bugün tamamen boş
+
+`data/crop_norms.json`'daki her ürünün `TR` (Türkiye) satırı var ama HEPSİ
+null - bugüne kadarki export'ların tamamı İBBS3 (il) düzeyinde alındı,
+`Düzey = Türkiye` hiç seçilmedi. Sonuç: src/norms.py'deki ulusal fallback
+(il satırı eksik veya boş olduğunda TR'ye düşme) kodda çalışır durumda ama
+pratikte hiç tetiklenmiyor, çünkü düşecek dolu bir TR satırı yok.
+
+Düzeltmesi bir sonraki yenilemede ekstra bir iş: her ürün grubu için
+`Düzey = Türkiye` seçilerek bir export DAHA alınması (aynı tarif - Ürün
+niteliği -> Verim, Ölçü birimi -> Kg/Dekar), il export'larının yanına. Bunu
+buraya yazmamızın sebebi, gelecek yıl bu yenilemeyi yapacak kişinin aynı
+boşluğu sıfırdan keşfetmek zorunda kalmaması.
