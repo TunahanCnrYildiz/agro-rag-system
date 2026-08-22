@@ -26,32 +26,54 @@ _UNIT_RE = "|".join(spelling for spelling, _ in _UNITS)
 # parentheses ("3 (üç) litre"), so that gloss is tolerated but not captured.
 # The gloss excludes clause-breaking punctuation, same as _GAP below, so it
 # can never smuggle a clause boundary into the middle of an amount.
-#
-# _AMOUNT and _AMOUNT_BARE (below) MUST STAY IDENTICAL apart from the named
-# groups - see the note on _AMOUNT_BARE for why a divergence is dangerous.
 _NUMBER = r"\d+(?:[.,]\d+)?"
 _GLOSS = r"(?:\([^(),.;:]*\)\s*)?"
-_AMOUNT = (rf"(?P<low>{_NUMBER})\s*(?:[-–]\s*(?P<high>{_NUMBER}))?\s*"
-           rf"{_GLOSS}(?P<unit>{_UNIT_RE})\b")
+
+
+def _amount(named: bool) -> str:
+    """Build the number-or-range-with-unit grammar, named or bare.
+
+    _AMOUNT (named groups, used to read a value) and _AMOUNT_BARE (no groups,
+    used only to recognise a dilution's own amount so it can be excluded) used
+    to be two hand-typed copies of this pattern. That is exactly how the
+    dilution guard broke once already: the two drifted apart when the
+    parenthetical numeral gloss was added to one and not the other, a
+    dilution's own amount stopped being recognised as part of the dilution,
+    and "100 litre suya 250 (iki yuz elli) gram dekara uygulanir" came back as
+    (100.0, 100.0, "litre") - the WATER volume, read as a dose. One builder
+    toggled by whether groups are named cannot desync that way again.
+
+    The grammar is a single figure with a unit ("250 gr"), or a range where
+    the HIGH figure's unit is mandatory and the LOW figure's unit is optional
+    ("2 - 2,5 litre", or "0,5kg - 1kg" where both sides spell it). A pattern
+    cannot name the same group twice even across mutually-exclusive
+    alternatives (verified: re.compile raises "redefinition of group name"),
+    so the solo-figure unit and the range's low/high units get distinct names
+    even when named=False makes the distinction moot.
+    """
+    def g(name: str, pattern: str) -> str:
+        return rf"(?P<{name}>{pattern})" if named else rf"(?:{pattern})"
+
+    low = g("low", _NUMBER)
+    lowunit = g("lowunit", _UNIT_RE) + "?"
+    high = g("high", _NUMBER)
+    highunit = g("unit", _UNIT_RE)
+    solounit = g("solounit", _UNIT_RE)
+    range_branch = rf"{lowunit}\s*[-–]\s*{high}\s*{_GLOSS}{highunit}\b"
+    solo_branch = rf"{solounit}\b"
+    return rf"{low}\s*{_GLOSS}(?:{range_branch}|{solo_branch})"
+
+
+_AMOUNT = _amount(named=True)
 
 # One dekar, in every form the pages use. Hectares are deliberately EXCLUDED:
 # a per-hectare figure is ten times a per-dekar one, and reading one as the
 # other multiplies every answer by ten with nothing to show for it.
 _AREA = r"(?:dekar[ae]?|d[oö]n[uü]m[ae]?|1[.\s]?000\s*m\s*[²2])"
 
-# The same amount with NO named groups. A pattern may only name a group once,
-# so reusing _AMOUNT on both sides of the dilution alternation below raises
-# re.PatternError at import time - verified, not guessed.
-#
-# THIS MUST STAY IDENTICAL TO _AMOUNT APART FROM THE NAMED GROUPS. _DILUTION
-# is built from this pattern, and if it recognises less than _AMOUNT does -
-# the parenthetical numeral gloss, for instance - then a dilution's own
-# amount stops being seen as part of a dilution, the skip check in
-# parse_dose never fires for it, and a water volume gets read as a per-dekar
-# dose. Reproduced by execution when the two had drifted apart: "100 litre
-# suya 250 (iki yuz elli) gram dekara uygulanir" returned (100.0, 100.0,
-# "litre") - the WATER volume, as the dose.
-_AMOUNT_BARE = rf"{_NUMBER}\s*(?:[-–]\s*{_NUMBER})?\s*{_GLOSS}(?:{_UNIT_RE})\b"
+# The same grammar with no named groups, for the dilution guard below - see
+# _amount()'s docstring for why building both from one function matters.
+_AMOUNT_BARE = _amount(named=False)
 
 # Water, so a dilution can be recognised and refused.
 _WATER = r"\d+\s*(?:litre|lt|l)\s*su"
@@ -64,8 +86,20 @@ _WATER = r"\d+\s*(?:litre|lt|l)\s*su"
 _GAP = r"[^.;:,]{0,40}?"
 _AMOUNT_THEN_AREA = re.compile(_AMOUNT + _GAP + _AREA, re.I)
 _AREA_THEN_AMOUNT = re.compile(_AREA + _GAP + _AMOUNT, re.I)
+
+# The WATER-then-AMOUNT direction of a dilution needs a much tighter gap than
+# the AMOUNT-then-WATER one above. Measured across all 48 panels: every real
+# "Xya <amount>" dilution ("100 litre suya 250 gram") has the amount 3
+# characters after "su" - the length of the "ya" suffix plus a space, since
+# _WATER's own match stops at "su". The two products that lost a real dose to
+# this guard (HİGRO ZİMOBOR, HİGRO EQUAJE) have no such suffix: their "su" is
+# the tail of an unrelated, already-matched dilution ("100 Litre su ile
+# uygulanılır Damlamadan 250 gr"), and the real per-dekar figure sits 27
+# characters further on, past "ile uygulanılır Damlamadan ". A bound of 6
+# comfortably covers every real case and stays far short of that 27.
+_TIGHT_GAP = r"[^.;:,]{0,6}?"
 _DILUTION = re.compile(
-    rf"(?:{_AMOUNT_BARE}{_GAP}{_WATER}|{_WATER}{_GAP}{_AMOUNT_BARE})", re.I)
+    rf"(?:{_AMOUNT_BARE}{_GAP}{_WATER}|{_WATER}{_TIGHT_GAP}{_AMOUNT_BARE})", re.I)
 
 
 def _number(text: str) -> float:
@@ -81,6 +115,48 @@ def _unit(spelling: str) -> str:
         if lowered == written:
             return key
     return lowered
+
+
+def _read_amount(match: re.Match) -> tuple[float, float, str] | None:
+    """A regex match of _AMOUNT as (low, high, unit), or None if it does not
+    describe one coherent figure.
+
+    Two ways a match can fail to be coherent, both refused rather than
+    guessed at: the low and high bounds spelling DIFFERENT units ("0,5kg –
+    1 litre" is not a range of anything), and a low bound that is bigger than
+    the high one, which means the matcher paired two numbers that were never
+    meant to go together (HİGRO MATEN's "2 – 2,5 – 1 Litre" - a three-number
+    sequence with no stated meaning - matches "2,5" as low and "1" as high
+    only because the real first number, "2", could not pair with a unit and
+    the regex moved on). Reordering a reversed pair was tried and is exactly
+    the bug: it turns a garbled sequence into a plausible-looking figure.
+    """
+    low = _number(match.group("low"))
+    unit_text = match.group("unit") or match.group("solounit")
+    high_text = match.group("high")
+    if high_text is None:
+        return low, low, _unit(unit_text)
+    lowunit_text = match.group("lowunit")
+    if lowunit_text and _unit(lowunit_text) != _unit(unit_text):
+        return None
+    high = _number(high_text)
+    if high < low:
+        return None
+    return low, high, _unit(unit_text)
+
+
+# A number and a dash immediately before an amount mean the matcher has landed
+# in the MIDDLE of a longer chain. HİGRO MATEN publishes "Damlamadan 2 - 2,5 - 1
+# Litre// 1000m²": three numbers, and the page never says what they mean. The
+# matcher cannot start at "2" (a dash follows "2,5", not a unit) so it starts at
+# "2,5", and whatever it then salvages - a reversed pair, or just the trailing
+# "1 Litre" - is a figure the page does not state. Refuse the chain instead:
+# rescuing a fragment of an unreadable sequence is the same act as inventing one.
+# The unit may sit on the left figure too ("0,5kg - 1 litre"), so it is part of
+# what counts as a dangling chain head - otherwise a range whose two units
+# disagree gets refused and then the scan salvages its right-hand figure alone,
+# which is the same invented number by another route.
+_CHAIN_TAIL = re.compile(rf"{_NUMBER}\s*{_GLOSS}(?:{_UNIT_RE})?\s*[-–]\s*$", re.I)
 
 
 def parse_dose(text: str) -> tuple[float, float, str] | None:
@@ -100,15 +176,26 @@ def parse_dose(text: str) -> tuple[float, float, str] | None:
     """
     diluted = [m.span() for m in _DILUTION.finditer(text)]
     for pattern in (_AMOUNT_THEN_AREA, _AREA_THEN_AMOUNT):
-        for match in pattern.finditer(text):
+        pos = 0
+        while (match := pattern.search(text, pos)) is not None:
             start, end = match.span("low")
+            # RESUME JUST AFTER THE REJECTED AMOUNT, not after the whole match.
+            # finditer would skip past everything the match consumed, and a
+            # match rejected for being a dilution routinely SPANS the real
+            # dose: HİGRO EQUAJE's "100 Litre su ile uygulanılır Damlamadan
+            # 250 gr/ 1000m²" is one match whose amount is the water volume,
+            # and stepping past it swallowed the 250 gr as well. Two products
+            # lost a whole crop group that way, silently, because they still
+            # had rows for their other groups.
+            pos = end
             if any(a <= start and end <= b for a, b in diluted):
                 continue
-            low = _number(match.group("low"))
-            high = _number(match.group("high")) if match.group("high") else low
-            if high < low:
-                low, high = high, low
-            return low, high, _unit(match.group("unit"))
+            if _CHAIN_TAIL.search(text[:start]):
+                continue
+            dose = _read_amount(match)
+            if dose is None:
+                continue
+            return dose
     return None
 
 
@@ -208,18 +295,38 @@ def _method_of(clause: str) -> str:
     return "damlama"
 
 
-def _segments(text: str) -> list[tuple[str, str]]:
-    """Split a panel into (group, text) pairs at its group headings."""
+# A group heading immediately preceded by "tarla" - "Tarla sebzelerinde ve
+# Tarla bitkilerinde 500 gr" (HIGRO FERFORCE) - describes a sub-case of that
+# group ("field-grown vegetables") rather than reopening the panel's own
+# top-level heading for it. See _segments and _parse below.
+_SUBQUALIFIER_RE = re.compile(r"tarla\s*$", re.I)
+
+
+def _segments(text: str) -> list[tuple[str, str, bool]]:
+    """Split a panel into (group, text, subqualified) triples at its group
+    headings.
+
+    subqualified is True when the heading was reached via "Tarla <group>"
+    rather than a plain heading of its own. _GROUP_RE's sebze/meyve patterns
+    have no lookbehind for "tarla" - one already exists for the genuine "no
+    colon" headings (see _GROUP_RE's comment) and stacking another exception
+    onto it was rejected as too fragile - so "sebzelerinde" inside "Tarla
+    sebzelerinde" opens a same-named sebze segment same as a real heading
+    would. Measured across all 48 panels: HIGRO FERFORCE is the only place
+    this fires.
+    """
     matches = list(_GROUP_RE.finditer(text))
     if not matches:
-        return [(ALL_GROUPS, text)]
+        return [(ALL_GROUPS, text, False)]
     out = []
     for i, match in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         head = match.group("head").lower()
         group = next(key for key, pattern in _GROUPS
                      if re.fullmatch(pattern, head, re.I))
-        out.append((group, text[match.end():end]))
+        preceding = text[max(0, match.start() - 10):match.start()]
+        subqualified = group != "tarla" and bool(_SUBQUALIFIER_RE.search(preceding))
+        out.append((group, text[match.end():end], subqualified))
     return out
 
 
@@ -227,15 +334,24 @@ def _parse(text: str):
     """Shared body for parse_panel and conflicting_slots.
 
     Builds the {group: {method: (low, high, unit)}} mapping exactly as before,
-    then makes a second pass to pull out any slot _widen marked as _CONFLICT -
-    both which (group, method) pairs those were, and the mapping with those
-    slots (and any group left empty by their removal) taken back out. Doing
-    both passes here, once, is what lets parse_panel's return type stay
+    then makes a second pass to pull out any slot that must not ship: one
+    _widen marked as _CONFLICT (two figures for one slot disagreed in unit),
+    or one belonging to a group that _segments flagged as subqualified (two
+    figures for one slot came from differently-qualified sub-cases of the
+    page - HIGRO FERFORCE's "sebze", which is both a plain heading and a
+    "Tarla sebzelerinde" sub-case with a different figure). Both are the same
+    shape of problem - a slot with more than one published answer and no
+    principled way to choose - so both are surfaced the same way, through
+    conflicting_slots, rather than one shipping a silently partial figure.
+    Doing both passes here, once, is what lets parse_panel's return type stay
     untouched while still giving the converter somewhere to ask what got
     dropped and why.
     """
     result: dict[str, dict[str, tuple[float, float, str]]] = {}
-    for group, segment in _segments(text):
+    ambiguous: set[str] = set()
+    for group, segment, subqualified in _segments(text):
+        if subqualified:
+            ambiguous.add(group)
         for clause in _CLAUSE.split(segment):
             dose = parse_dose(clause)
             if dose is None:
@@ -247,7 +363,7 @@ def _parse(text: str):
     conflicts: list[tuple[str, str]] = []
     for group in list(result):
         for method in list(result[group]):
-            if result[group][method] is _CONFLICT:
+            if group in ambiguous or result[group][method] is _CONFLICT:
                 conflicts.append((group, method))
                 del result[group][method]
         if not result[group]:

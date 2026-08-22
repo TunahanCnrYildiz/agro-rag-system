@@ -159,3 +159,41 @@ that changed the plan:
 
 With all three applied, the per-area count over the committed panels is **42 of 48**, and the six
 left out are exactly the four dilution-only products and the two with no dose.
+
+
+## What the whole-branch review changed, 2026-08-22
+
+The recon's headline figure was **42 of 48**. After the final review it is **40**, and every step
+of the difference is a correction rather than a loss. The review compared shipped rows against the
+pages they came from — something no test did — and found three wrong numbers in the committed file:
+
+| Product | Page | Was shipped |
+| --- | --- | --- |
+| `HİGRO MATEN`, `HİGRO MATEN PLUS` | `Damlamadan 2 – 2,5 – 1 Litre// 1000m²` | `1,0 – 2,5 litre` (meyve: `1,0 – 4,0`) |
+| `HİGRO ZİNCBOR` | `0,5kg – 1kg/ 1000m²` | `0,5 – 0,5 kg` |
+| `HIGRO FERFORCE` sebze | greenhouse `250 gr` **and** open field `500 gr` | `250 gr` alone |
+
+And two products were silently losing a whole crop group: `HİGRO ZİMOBOR` and `HİGRO EQUAJE` write
+their `tarla` clause with no comma, and the dilution match spans the real dose, so stepping past the
+match swallowed it. They still had rows for their other groups, so nothing reported it.
+
+Four mechanisms came out of that:
+
+1. **An unreadable number chain is refused, never salvaged.** `2 – 2,5 – 1 Litre` cost a wrong
+   number **twice** — first by reordering a reversed pair into a range the page never states, then,
+   after the reorder became a refusal, by the scan resuming and rescuing the trailing `1 Litre` as
+   a single figure. Rescuing a fragment of an unreadable sequence is the same act as inventing one.
+   MATEN and MATEN PLUS are now refused outright: **42 → 40**.
+2. **A range may spell its unit on both sides.** Requiring it only after the second number
+   collapsed `0,5kg – 1kg` to `0,5 – 0,5`, and `low == high` is indistinguishable from a genuine
+   single figure.
+3. **A rejected match resumes the scan after the amount, not after the match.** A dilution match
+   routinely *contains* the real dose.
+4. **A sub-qualified group is dropped and surfaced**, not silently reduced to one of its figures.
+   `Sebzelerde : Seralarda: 250 gr … Tarla sebzelerinde … 500 gr` publishes two answers for one
+   slot; picking either is a guess.
+
+**The lesson under all of it:** the "42 of 48" invariant was used to prove every earlier fix safe,
+and it was blind to all five defects. It counted PRODUCTS, not slots, and compared nothing to the
+pages. A per-slot diff against the panels is the check that finds this class; a per-product count
+is not.

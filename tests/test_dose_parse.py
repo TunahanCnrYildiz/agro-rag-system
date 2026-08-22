@@ -178,10 +178,14 @@ def test_a_panel_with_no_group_headings_applies_to_all():
     assert "yaprak" not in parsed["hepsi"]
 
 
-def test_a_comma_separates_the_foliar_clause_from_the_drip_one():
-    """One sentence, two halves, a comma between them. Without splitting on the
-    comma the drip figure is credited to 'yaprak', because that word comes
-    first in the sentence."""
+def test_only_the_per_area_half_of_a_two_method_sentence_is_kept():
+    """FUBBY states a foliar DILUTION and a drip DOSE in one sentence. Only the
+    drip figure is a per-dekar dose, so only it survives.
+
+    This does NOT cover the comma boundary, despite once claiming to: remove
+    the comma from _CLAUSE and this still passes, because _GAP already refuses
+    to pair an amount with an area across one. The product that actually needs
+    the boundary is HİGRO FERRY - see the test named for it below."""
     parsed = parse_panel(FUBBY)
     assert parsed["sebze"]["damlama"] == (250.0, 250.0, "gr")
     assert "yaprak" not in parsed["sebze"]
@@ -256,3 +260,43 @@ def test_the_comma_boundary_decides_a_real_products_method():
     assert parsed["meyve"] == {"damlama": (2.0, 3.0, "litre")}
     assert "yaprak" not in parsed["sebze"]
     assert "yaprak" not in parsed["meyve"]
+
+
+# Verbatim, HİGRO MATEN, fetched 2026-08-22. Three numbers chained by dashes
+# and no statement anywhere on the page of what they mean.
+MATEN = ("Sebzelerde : Yapraktan 200 – 250 cc/ 100 Litre su ile uygulanılır, "
+         "Damlamadan 2 – 2,5 – 1 Litre// 1000m² alana uygulanılır.")
+
+
+def test_an_unreadable_number_chain_is_refused_not_salvaged():
+    """This shipped a wrong number twice before it was refused. First the
+    matcher paired 2,5 with 1, got low > high, and REORDERED them into
+    "1 - 2,5 litre" - a range the page never states, with a low bound the
+    reader cannot account for. Then, after the reorder was replaced by a
+    refusal, the scan resumed and salvaged the trailing "1 Litre" as a single
+    figure - the same invented number wearing different clothes. Rescuing a
+    fragment of an unreadable sequence is the same act as inventing one."""
+    assert parse_panel(MATEN) == {}
+
+
+def test_a_range_whose_unit_is_written_on_both_sides_keeps_its_high_bound():
+    """HİGRO ZİNCBOR writes "0,5kg - 1kg". Requiring the unit only after the
+    SECOND number matched just "0,5kg" and let _GAP swallow "- 1kg" on the way
+    to the area, so a published range shipped collapsed to its low endpoint -
+    and low == high is indistinguishable from a genuine single figure."""
+    text = "Damlamadan 0,5kg – 1kg/ 1000m² alana uygulanılır."
+    assert parse_dose(text) == (0.5, 1.0, "kg")
+
+
+def test_a_range_whose_two_units_disagree_is_not_a_range():
+    assert parse_dose("Damlamadan 0,5kg – 1 litre/ 1000m² alana uygulanılır.") is None
+
+
+def test_a_dose_separated_from_its_dilution_by_nothing_is_still_read():
+    """HİGRO ZİMOBOR and HİGRO EQUAJE write their tarla clause with no comma.
+    The dilution match SPANS the real dose, so stepping past the whole match
+    swallowed it and both products silently lost a whole crop group - while
+    still having rows for their other groups, so nothing reported it."""
+    text = ("Tarla bitkilerinde : Yapraktan 100 gr/ 100 Litre su ile "
+            "uygulanılır Damlamadan 250 gr/ 1000m² alana uygulanılır.")
+    assert parse_dose(text) == (250.0, 250.0, "gr")

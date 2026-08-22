@@ -19,7 +19,7 @@ PANELS = {
 
 
 def test_a_parsable_panel_becomes_a_row():
-    table, unparsed = build(PANELS)
+    table, unparsed, dropped = build(PANELS)
     assert table["HİGRO FUBBY"]["sebze"]["damlama"] == {
         "low": 250.0, "high": 250.0, "unit": "gr"}
 
@@ -27,14 +27,14 @@ def test_a_parsable_panel_becomes_a_row():
 def test_an_unparsable_panel_has_no_row_and_is_reported():
     """Absence, never a guessed figure - and never silent, because a silent
     skip is how a coverage collapse ships unnoticed."""
-    table, unparsed = build(PANELS)
+    table, unparsed, dropped = build(PANELS)
     assert "HİGRO ABS" not in table
     assert "HİGRO ABS" in unparsed
 
 
 def test_an_empty_input_yields_an_empty_table_not_an_error():
-    table, unparsed = build({})
-    assert table == {} and unparsed == []
+    table, unparsed, dropped = build({})
+    assert table == {} and unparsed == [] and dropped == {}
 
 
 def test_every_row_has_low_no_greater_than_high():
@@ -44,7 +44,7 @@ def test_every_row_has_low_no_greater_than_high():
     The fixture has to contain a real range for this to check anything: with
     only single figures every row satisfies low <= high by construction, and
     the assertion passes whatever the code does."""
-    table, _ = build(PANELS)
+    table, _, _ = build(PANELS)
     spans = 0
     for groups in table.values():
         for methods in groups.values():
@@ -62,7 +62,7 @@ def test_the_shipped_file_is_what_the_converter_produces():
     from src.config import DATA_DIR
     raw = json.loads((DATA_DIR / "raw" / "product_panels.json").read_text(encoding="utf-8"))
     shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
-    rebuilt, _ = build(raw["panels"])
+    rebuilt, _, _ = build(raw["panels"])
     assert rebuilt == shipped["products"]
 
 
@@ -74,3 +74,28 @@ def test_the_shipped_file_still_covers_most_of_the_catalog():
     from src.config import DATA_DIR
     shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
     assert len(shipped["products"]) >= 35
+
+
+def test_a_dropped_slot_is_returned_by_build_not_re_derived():
+    """main() used to walk every panel a SECOND time to collect the dropped
+    slots, so the report and the table came from two separate parses and could
+    disagree about the same panel. One parse, both answers."""
+    panels = {"X": ("Sebzelerde : Seralarda: 250 gr/ 1000m² uygulanılır. "
+                    "Tarla sebzelerinde ve Tarla bitkilerinde 500 gr / 1000m² "
+                    "uygulanılır.")}
+    table, unparsed, dropped = build(panels)
+    assert dropped == {"X": [["sebze", "damlama"]]}
+    assert "sebze" not in table["X"]
+    assert "X" not in unparsed
+
+
+def test_the_shipped_meta_records_both_kinds_of_failure():
+    """Without these two keys there is no committed way to tell "this product
+    publishes no drip figure" from "its drip figure was dropped as
+    unresolvable" - and the answer path needs that difference."""
+    from src.config import DATA_DIR
+    shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
+    meta = shipped["meta"]
+    assert "HİGRO MATEN" in meta["unparsed"]
+    assert meta["dropped_slots"]["HIGRO FERFORCE"] == [["sebze", "damlama"]]
+    assert meta["products_with_a_dose"] == len(shipped["products"])

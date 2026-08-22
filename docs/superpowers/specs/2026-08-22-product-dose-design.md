@@ -7,8 +7,10 @@ P2b `2026-08-22-budget-prefill-design.md`
 Recon: `docs/superpowers/2026-08-22-product-dose-findings.md`
 
 The stakeholder's pitch promises an answer to *"gübre ne kadar alacağım"*. Until 2026-08-22 that
-was recorded as blocked by a catalog data gap. It is not: **42 of the 48 product pages publish a
-dose per dekar**, and the only thing missing was a scraper that opened the tab.
+was recorded as blocked by a catalog data gap. It is not: **40 of the 48 product pages publish a
+per-dekar dose we can read**, and the only thing missing was a scraper that opened the tab. (The
+recon measured 42; the whole-branch review refused two more whose figures turned out to be an
+unreadable three-number chain — see the findings doc.)
 
 This spec turns that into an answer, and — just as importantly — decides what it refuses.
 

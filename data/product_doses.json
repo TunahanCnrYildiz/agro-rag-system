@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-08-22",
+  "generated": "2026-08-23",
   "source": {
    "fetched": "2026-08-22",
    "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
@@ -8,8 +8,32 @@
    "panels_captured": 48,
    "no_panel": []
   },
-  "products_with_a_dose": 42,
-  "products_read": 48
+  "products_with_a_dose": 40,
+  "products_read": 48,
+  "unparsed": [
+   "HIGRO WETT",
+   "A.P.P® VIROXYN",
+   "HİGRO ABS",
+   "HİGRO MATEN",
+   "HİGRO MATEN PLUS",
+   "HİGRO TRACO",
+   "HİGRO® PİNK",
+   "ZİNCER"
+  ],
+  "dropped_slots": {
+   "FLY AZOT": [
+    [
+     "hepsi",
+     "damlama"
+    ]
+   ],
+   "HIGRO FERFORCE": [
+    [
+     "sebze",
+     "damlama"
+    ]
+   ]
+  }
  },
  "products": {
   "A.P.P® COMBIFER": {
@@ -143,6 +167,13 @@
      "high": 250.0,
      "unit": "gr"
     }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
    }
   },
   "HİGRO FOSFO": {
@@ -233,52 +264,6 @@
     "damlama": {
      "low": 1.0,
      "high": 2.0,
-     "unit": "litre"
-    }
-   }
-  },
-  "HİGRO MATEN": {
-   "sebze": {
-    "damlama": {
-     "low": 1.0,
-     "high": 2.5,
-     "unit": "litre"
-    }
-   },
-   "meyve": {
-    "damlama": {
-     "low": 1.0,
-     "high": 4.0,
-     "unit": "litre"
-    }
-   },
-   "tarla": {
-    "damlama": {
-     "low": 1.0,
-     "high": 2.5,
-     "unit": "litre"
-    }
-   }
-  },
-  "HİGRO MATEN PLUS": {
-   "sebze": {
-    "damlama": {
-     "low": 1.0,
-     "high": 2.5,
-     "unit": "litre"
-    }
-   },
-   "meyve": {
-    "damlama": {
-     "low": 1.0,
-     "high": 4.0,
-     "unit": "litre"
-    }
-   },
-   "tarla": {
-    "damlama": {
-     "low": 1.0,
-     "high": 2.5,
      "unit": "litre"
     }
    }
@@ -375,27 +360,34 @@
      "high": 250.0,
      "unit": "gr"
     }
+   },
+   "tarla": {
+    "damlama": {
+     "low": 250.0,
+     "high": 250.0,
+     "unit": "gr"
+    }
    }
   },
   "HİGRO ZİNCBOR": {
    "sebze": {
     "damlama": {
      "low": 0.5,
-     "high": 0.5,
+     "high": 1.0,
      "unit": "kg"
     }
    },
    "meyve": {
     "damlama": {
      "low": 1.0,
-     "high": 1.0,
+     "high": 2.0,
      "unit": "kg"
     }
    },
    "tarla": {
     "damlama": {
      "low": 0.5,
-     "high": 0.5,
+     "high": 1.0,
      "unit": "kg"
     }
    }
@@ -575,13 +567,6 @@
    }
   },
   "HIGRO FERFORCE": {
-   "sebze": {
-    "damlama": {
-     "low": 250.0,
-     "high": 250.0,
-     "unit": "gr"
-    }
-   },
    "tarla": {
     "damlama": {
      "low": 500.0,
