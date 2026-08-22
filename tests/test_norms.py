@@ -309,3 +309,79 @@ def test_a_range_never_replaces_the_prefill(tmp_path, monkeypatch):
     norm = norms.lookup("findik", "Ordu").yield_kg_da
     assert norm.amount == 28.4
     assert norm.amount < norm.recent_min
+
+
+def test_the_province_table_matches_calling_lookup_for_every_crop(tmp_path, monkeypatch):
+    """One pass, same answers. If these ever diverge, the form and the
+    verification on submit would disagree about what the norm is."""
+    _write(tmp_path, monkeypatch, GOOD)
+    table = norms.province_table("Manisa")
+    one_by_one = tuple(norms.lookup(cid, "Manisa")
+                       for cid, _ in norms.available_crops())
+    assert table == one_by_one
+
+
+def test_the_province_table_is_sorted_by_label(tmp_path, monkeypatch):
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {
+            "zeytin": {"label": "Zeytin",
+                       "yield_kg_da": {"scope": "il", "TR": [1.0, 2.0]},
+                       "price_tl_kg": {"scope": "il", "TR": [1.0, 2.0]}},
+            "arpa": {"label": "Arpa",
+                     "yield_kg_da": {"scope": "il", "TR": [1.0, 2.0]},
+                     "price_tl_kg": {"scope": "il", "TR": [1.0, 2.0]}},
+        },
+    }
+    _write(tmp_path, monkeypatch, payload)
+    assert [r.label for r in norms.province_table(None)] == ["Arpa", "Zeytin"]
+
+
+def test_a_broken_file_gives_an_empty_table_not_an_exception(tmp_path, monkeypatch):
+    """A broken data file must not break answering - fertplan._load's rule."""
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.province_table("Manisa") == ()
+
+
+def test_a_national_scope_measure_reports_itself_as_national(tmp_path, monkeypatch):
+    """Pinned against a synthetic fixture on purpose: the shipped file carries no
+    populated TR rows today, so testing this against real data would assert
+    nothing. The path must stay covered for the day those rows land."""
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            "yield_kg_da": {"scope": "tr", "TR": [10.0, 11.0]},
+            "price_tl_kg": {"scope": "tr", "TR": [1.0, 2.0]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    row = norms.province_table("Manisa")[0]
+    assert row.yield_kg_da.scope == "tr"
+    assert row.yield_kg_da.region == "Türkiye"
+
+
+def test_the_shipped_file_still_carries_provincial_yields():
+    """A guard on the real data, not a fixture. If a converter change or a bad
+    refresh empties the file, every prefill silently disappears and every other
+    test here keeps passing on its fixtures. Measured on 2026-08-22: Manisa 142,
+    Konya 147, Ordu 75, Van 73 of 246 crops. The floor is deliberately far below
+    those, so an honest yearly refresh does not trip it."""
+    norms._load.cache_clear()
+    table = norms.province_table("Manisa")
+    provincial = [r for r in table
+                  if r.yield_kg_da is not None and r.yield_kg_da.scope == "il"]
+    assert len(table) > 200
+    assert len(provincial) > 100
+
+
+def test_the_shipped_file_keeps_the_two_tomatoes_apart():
+    """There is no single 'domates' norm - TUIK publishes Sofralik and Salcalik
+    separately, and they are different crops with different prices. The crop
+    list must offer both rather than one of them standing in for the other."""
+    norms._load.cache_clear()
+    labels = [label for _, label in norms.available_crops()]
+    assert "Domates (Sofralık)" in labels
+    assert "Domates (Salçalık)" in labels
+    assert "Domates" not in labels

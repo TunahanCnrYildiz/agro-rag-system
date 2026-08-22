@@ -173,3 +173,30 @@ def lookup(crop: str, province: str | None) -> CropNorm | None:
         yield_kg_da=_pick(entry["yield_kg_da"], years, province),
         price_tl_kg=_pick(entry["price_tl_kg"], years, province),
     )
+
+
+def province_table(province: str | None) -> tuple[CropNorm, ...]:
+    """Every crop the file carries, resolved for one province, sorted by label.
+
+    Identical to calling lookup() for each id in available_crops(), and pinned
+    that way by a test - the form is built from this and the verification on
+    submit is built from lookup(), so the two must never drift.
+
+    It exists because the whole table travels to the client with the form: the
+    crop is chosen there, so the server cannot know in advance which row will
+    be needed and sends all of them.
+    """
+    data = _load()
+    years = data.get("years")
+    if not years:
+        return ()
+    rows = tuple(
+        CropNorm(
+            crop=crop_id,
+            label=entry["label"],
+            yield_kg_da=_pick(entry["yield_kg_da"], years, province),
+            price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+        )
+        for crop_id, entry in data["crops"].items()
+    )
+    return tuple(sorted(rows, key=lambda row: row.label))
