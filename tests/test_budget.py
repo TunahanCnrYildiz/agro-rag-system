@@ -1,6 +1,7 @@
 """Unit tests for src/budget.py (no store, no model, no network)."""
 
 from src import budget
+from src.norms import CropNorm, NormValue
 
 
 def test_parse_accepts_a_turkish_decimal():
@@ -424,3 +425,83 @@ def test_the_original_units_are_untouched():
     assert errors == []
     assert inputs.yield_kg.amount == 2000.0
     assert budget.compute(inputs).margin_tl == 15000.0
+
+
+def _table():
+    return (
+        CropNorm("findik", "Fındık",
+                 NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
+                 NormValue(202.26, 2025, "il", "Ordu", None, None)),
+        CropNorm("misir", "Mısır",
+                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 None),
+    )
+
+
+def test_a_form_with_no_table_is_byte_identical_to_p1():
+    """An old deployed client reads this dict, so it is pinned as a LITERAL.
+
+    Rebuilding the expected value from budget.FIELDS with the same comprehension
+    form_spec uses would assert only that the function is itself - it would
+    follow any change to a label, a unit id or the key set rather than catch it.
+    A wire contract is pinned by writing it out."""
+    assert budget.form_spec([]) == {
+        "fields": [
+            {"id": "area", "label": "Alan", "required": True,
+             "units": [{"id": "donum", "label": "dönüm"},
+                       {"id": "hektar", "label": "hektar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "yield_total", "label": "Ürün miktarı", "required": True,
+             "units": [{"id": "kg", "label": "kg"},
+                       {"id": "ton", "label": "ton"},
+                       {"id": "kg_da", "label": "kg/dekar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "price", "label": "Fiyat", "required": True,
+             "units": [{"id": "tl_kg", "label": "TL/kg"},
+                       {"id": "tl_ton", "label": "TL/ton"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "cost", "label": "Masraf", "required": False,
+             "units": [{"id": "tl", "label": "TL"}],
+             "value": "", "source": "empty", "error": None},
+        ]
+    }
+
+
+def test_a_table_ships_every_crop_with_its_figures():
+    spec = budget.form_spec([], _table())
+    assert [c["id"] for c in spec["crops"]] == ["findik", "misir"]
+    cell = spec["crops"][0]["yield"]
+    assert cell["value"] == "28,4"
+    assert cell["unit"] == "kg_da"
+    assert cell["note"] == "TÜİK 2025, Ordu"
+    assert cell["recent"] == "önceki 5 yıl: 73,7–105,6 kg/da"
+
+
+def test_a_price_cell_carries_two_decimals_and_its_own_unit():
+    spec = budget.form_spec([], _table())
+    cell = spec["crops"][0]["price"]
+    assert cell["value"] == "202,26"
+    assert cell["unit"] == "tl_kg"
+    assert cell["recent"] is None
+
+
+def test_a_measure_with_no_norm_is_none_not_zero():
+    """The binding rule, on the wire this time: absence is absence."""
+    spec = budget.form_spec([], _table())
+    assert spec["crops"][1]["price"] is None
+
+
+def test_a_national_figure_names_turkiye_rather_than_looking_provincial():
+    spec = budget.form_spec([], _table())
+    assert spec["crops"][1]["yield"]["note"] == "TÜİK 2024, Türkiye"
+
+
+def test_no_raw_float_reaches_the_wire():
+    """Every figure is Turkish-formatted text. A float would arrive with a DOT
+    decimal and parse_tr_number refuses those, so 28.4 would come back as a
+    field error - or worse, as 284."""
+    spec = budget.form_spec([], _table())
+    for crop in spec["crops"]:
+        for key in ("yield", "price"):
+            if crop[key] is not None:
+                assert isinstance(crop[key]["value"], str)

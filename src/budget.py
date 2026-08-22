@@ -228,15 +228,61 @@ def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
     ), []
 
 
-def form_spec(errors: list[FieldError]) -> dict:
+# The unit each measure is published in, and how it is written when it appears
+# inside a sentence rather than on a chip.
+_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg")}
+
+
+def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None) -> dict | None:
+    """One prefillable figure, finished for display.
+
+    Everything the card shows for this figure is written HERE: the value in
+    Turkish notation, the unit to select alongside it, where it came from, and
+    the range of the years before it. The client renders strings and formats
+    nothing - a second Turkish number formatter over there is a second place
+    for a decimal comma to go wrong.
+    """
+    if norm is None:
+        return None
+    value = (_format_qty(norm.amount) if decimals is None
+             else format_tr(norm.amount, decimals))
+    recent = None
+    if norm.recent_min is not None and norm.recent_max is not None:
+        recent = (f"önceki 5 yıl: {_format_qty(norm.recent_min)}–"
+                  f"{_format_qty(norm.recent_max)} {unit_text}")
+    return {
+        "value": value,
+        # The unit travels WITH the value. Dropping 28,4 into a field still
+        # reading "kg" would claim a whole orchard yielded 28 kilos.
+        "unit": unit_id,
+        "note": f"TÜİK {norm.year}, {norm.region}",
+        "recent": recent,
+    }
+
+
+def _crop_rows(table) -> list[dict]:
+    """Every crop's figures, for a card that picks one of them client-side."""
+    rows = []
+    for row in table:
+        rows.append({
+            "id": row.crop,
+            "label": row.label,
+            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None),
+            "price": _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2),
+        })
+    return rows
+
+
+def form_spec(errors: list[FieldError], table=None) -> dict:
     """Serialise FIELDS for the client, attaching each error to its own field.
 
-    `value` and `source` ship EMPTY in P1 and are on the wire anyway. P2 fills
-    them from the norm layer, and when it does the wire format, the card and the
-    arithmetic all stay exactly as they are - only the contents change.
+    `table` is a province's worth of norms, from norms.province_table. When it
+    is absent - no province resolved, or a broken data file - the output is
+    byte-identical to P1's, because an already-deployed client reads this dict
+    and an unexpected key is a wire change wearing an addition's clothes.
     """
     by_field = {e.field: e.message for e in errors}
-    return {
+    spec = {
         "fields": [
             {
                 "id": f.id,
@@ -250,6 +296,9 @@ def form_spec(errors: list[FieldError]) -> dict:
             for f in FIELDS
         ]
     }
+    if table:
+        spec["crops"] = _crop_rows(table)
+    return spec
 
 
 @dataclass(frozen=True)
