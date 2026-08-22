@@ -63,6 +63,10 @@ class UnitOption:
     id: str
     label: str
     factor: float          # multiply by this to reach the canonical unit
+    # A per-area unit needs the area before it means anything. Kept a property
+    # of the UNIT rather than a second field, so the conversion stays one line
+    # and a new per-area unit needs no new branch.
+    per_area: bool = False
 
 
 @dataclass(frozen=True)
@@ -82,9 +86,14 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("area", "Alan", True, 0.0, True,
               (UnitOption("donum", "dönüm", 1.0),
                UnitOption("hektar", "hektar", 10.0))),
-    FieldSpec("yield_total", "Toplam ürün", True, 0.0, False,
+    # "Toplam" would be wrong under kg/dekar, so the label is neutral across all
+    # three units. The per-dekar unit exists because TUIK publishes yields that
+    # way and P2b prefills them; a farmer stating their own harvest still picks
+    # kg or ton and states a total, exactly as in P1.
+    FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
-               UnitOption("ton", "ton", 1000.0))),
+               UnitOption("ton", "ton", 1000.0),
+               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -101,7 +110,10 @@ _FIELDS_BY_ID = {f.id: f for f in FIELDS}
 @dataclass(frozen=True)
 class Value:
     amount: float
-    source: str            # "user" | "norm" | "empty"; nothing sets "norm" yet
+    source: str            # "user" | "norm" | "empty"
+    # Where the norm came from, for the framing sentence. Only ever set on a
+    # value the server itself confirmed against its own lookup.
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -111,14 +123,22 @@ class BudgetInputs:
     yield_kg: Value
     price_tl_kg: Value
     cost_tl: Value | None
-    # Deliberately unwired: FIELDS has no crop entry and form_spec() never emits
-    # one, so nothing but a test calling validate()/render() directly ever sets
-    # this. It is not filled from the mobile profile either - profile.crops is
-    # free text that may name several crops, and folding that into one slot here
-    # would be exactly the kind of inference this whole route exists to remove.
-    # The next phase makes crop real: it becomes the key that selects a yield
-    # and price norm, and it arrives as an explicit selection, not a guess.
+    # Which crop the farmer picked - an explicit client selection, never
+    # inferred. It is not part of FIELDS: form_spec() emits it as a bare id
+    # (the top-level "crop" key, and each row's own "id" under "crops"), the
+    # client echoes it back in the payload, and _verify() keys on it to find
+    # the one CropNorm row a "norm" claim could possibly be confirmed against.
+    # Being client-supplied, it is untrusted exactly like every other field
+    # here: _verify() looks it up in the table rather than believing it, so an
+    # unknown or mismatched id simply means no row is found and every "norm"
+    # claim on that submission downgrades to "user". render() prints the
+    # matching row's label (crop_label) when one was found, and this raw id
+    # otherwise.
     crop: str | None = None
+    # The crop's display label ("Fındık"), from the CropNorm row _verify already
+    # looked up. None when no table resolved the crop - render() then falls
+    # back to the raw id rather than printing nothing.
+    crop_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,7 +162,8 @@ def _coerce(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict) -> tuple[Value | None, FieldError | None]:
+def _read(spec: FieldSpec, raw: dict, area_da: float | None
+          ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
         if spec.required:
@@ -164,10 +185,63 @@ def _read(spec: FieldSpec, raw: dict) -> tuple[Value | None, FieldError | None]:
     if not spec.min_exclusive and amount < spec.min_value:
         return None, FieldError(spec.id, f"{spec.label} negatif olamaz.")
 
-    return Value(amount * unit.factor, "user"), None
+    if unit.per_area:
+        if area_da is None:
+            # Refused, never multiplied by a guessed area and never zeroed.
+            return None, FieldError(
+                spec.id,
+                f"{spec.label} için dekar başına değer girdiniz; "
+                f"önce alanı doldurun.")
+        amount = amount * area_da
+
+    claimed = "norm" if entry.get("source") == "norm" else "user"
+    return Value(amount * unit.factor, claimed), None
 
 
-def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
+# Which submitted field each norm measure prefills, and how that cell is built.
+_VERIFIED = (("yield_total", "yield_kg_da", "yield", None),
+             ("price", "price_tl_kg", "price", 2))
+
+
+def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, object | None]:
+    """Confirm or downgrade every "this came from a norm" claim.
+
+    A field claiming a norm whose submitted text does not match what we served
+    is the user's own figure wearing TUIK's name, and the framing would then
+    attribute a farmer's number to a statistical agency. Comparison is on the
+    served TEXT and unit rather than the parsed floats: it answers exactly the
+    question being asked - is this the figure we sent? - and has no rounding
+    tolerance to get wrong.
+
+    "user" is never second-guessed in the other direction. A value the user
+    typed is theirs even when it happens to equal the norm.
+
+    Returns the matched CropNorm row (or None) alongside the values, so
+    validate() can take the crop's display label from it without a second
+    lookup.
+    """
+    row = None
+    if crop is not None:
+        row = next((r for r in (table or ()) if r.crop == crop), None)
+
+    for field_id, measure, unit_key, decimals in _VERIFIED:
+        value = values.get(field_id)
+        if value is None or value.source != "norm":
+            continue
+        cell = (None if row is None
+                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals,
+                                 show_range=unit_key == "yield"))
+        entry = raw.get(field_id) or {}
+        if (cell is not None
+                and entry.get("value") == cell["value"]
+                and entry.get("unit") == cell["unit"]):
+            values[field_id] = Value(value.amount, "norm", cell["note"])
+        else:
+            values[field_id] = Value(value.amount, "user")
+    return values, row
+
+
+def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldError]]:
     """Read every field, collect every error. Never raises.
 
     Reports ALL errors rather than the first, so a user fixing a form is not
@@ -176,8 +250,22 @@ def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
     raw = raw if isinstance(raw, dict) else {}
     values: dict[str, Value | None] = {}
     errors: list[FieldError] = []
+
+    # The area is read before everything else because a per-area unit cannot be
+    # converted without it. Reading it out of FIELDS order rather than relying
+    # on the tuple happening to list it first: that order is a layout decision,
+    # not a contract, and a reorder would silently break every per-area field.
+    area_spec = _FIELDS_BY_ID["area"]
+    area_value, area_error = _read(area_spec, raw, None)
+    values[area_spec.id] = area_value
+    if area_error is not None:
+        errors.append(area_error)
+    area_da = area_value.amount if area_value is not None else None
+
     for spec in FIELDS:
-        value, error = _read(spec, raw)
+        if spec.id == area_spec.id:
+            continue
+        value, error = _read(spec, raw, area_da)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
@@ -186,24 +274,141 @@ def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
         return None, errors
 
     crop = raw.get("crop")
+    crop = crop if isinstance(crop, str) and crop.strip() else None
+    values, row = _verify(values, raw, crop, table)
+
     return BudgetInputs(
         area_da=values["area"],
         yield_kg=values["yield_total"],
         price_tl_kg=values["price"],
         cost_tl=values["cost"],
-        crop=crop if isinstance(crop, str) and crop.strip() else None,
+        crop=crop,
+        crop_label=row.label if row is not None else None,
     ), []
 
 
-def form_spec(errors: list[FieldError]) -> dict:
+# The unit each measure is published in, and how it is written when it appears
+# inside a sentence rather than on a chip.
+_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg")}
+
+
+def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
+               show_range: bool) -> dict | None:
+    """One prefillable figure, finished for display.
+
+    Everything the card shows for this figure is written HERE: the value in
+    Turkish notation, the unit to select alongside it, where it came from, and
+    (when `show_range`) the range of the years before it. The client renders
+    strings and formats nothing - a second Turkish number formatter over there
+    is a second place for a decimal comma to go wrong.
+
+    `show_range` is False for price. Measured on the shipped data: the price
+    prefill sits ABOVE its own five-year range for 95 of 103 Manisa price
+    cells and 45 of 48 in Ordu - that is lira inflation, not an anomaly, so
+    showing the range there would read as a false outlier warning on almost
+    every ordinary crop. Yield keeps its range: a stale yield is a physical
+    quantity that does not inflate, and that is where an outlier is real.
+    """
+    if norm is None:
+        return None
+    value = (_format_qty(norm.amount) if decimals is None
+             else format_tr(norm.amount, decimals))
+    recent = None
+    if show_range and norm.recent_min is not None and norm.recent_max is not None:
+        recent = (f"önceki 5 yıl: {_format_qty(norm.recent_min)}–"
+                  f"{_format_qty(norm.recent_max)} {unit_text}")
+    return {
+        "value": value,
+        # The unit travels WITH the value. Dropping 28,4 into a field still
+        # reading "kg" would claim a whole orchard yielded 28 kilos.
+        "unit": unit_id,
+        "note": f"TÜİK {norm.year}, {norm.region}",
+        "recent": recent,
+    }
+
+
+def _crop_rows(table, latest_year: int | None) -> list[dict]:
+    """Every crop's figures, for a card that picks one of them client-side.
+
+    A price cell is built ONLY when its year equals `latest_year`. Measured on
+    Ordu: 61 crops carry a price, but only 25 are from the latest year and 29
+    are older than 2023 - `Arpa (Diğer)` prefills 1,10 TL/kg from 2018, nine
+    times too low. Lira is nominal, so a stale price is not a meaningful
+    physical quantity the way a stale yield still is, and it silently
+    inflates the revenue this form computes. `latest_year=None` (the cutoff is
+    unknown) serves no price cell at all - absence, never a guess. Yield is
+    untouched: it keeps prefilling from whatever year it last has a value.
+    """
+    rows = []
+    for row in table:
+        price = row.price_tl_kg
+        if price is not None and (latest_year is None or price.year != latest_year):
+            price = None
+        rows.append({
+            "id": row.crop,
+            "label": row.label,
+            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
+                                 show_range=True),
+            "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
+        })
+    return rows
+
+
+def _echo(spec: FieldSpec, submitted: dict | None) -> dict:
+    """What the user typed, given back verbatim, and the raw claim about
+    where it came from.
+
+    Verbatim matters for `value`: this is the value the error message is
+    ABOUT, so reformatting it would show the user something other than what
+    was rejected. A number that arrived as JSON becomes text, because that is
+    what a text input holds and what parse_tr_number reads.
+
+    `source` is the raw claim being echoed back - "norm" exactly when the
+    submitted entry itself said "norm" - not a verdict re-derived by comparing
+    the echoed value and unit to the crop's cell. That comparison used to be
+    how the card marked a field "norm" on redisplay, and it upgraded a farmer's
+    own typed figure to "norm" the moment it happened to equal the published
+    one. _verify() still checks this claim at compute time, so a lying client
+    is caught there, not here.
+    """
+    entry = (submitted or {}).get(spec.id)
+    if not isinstance(entry, dict):
+        return {"value": "", "unit": spec.units[0].id}
+    value = entry.get("value")
+    unit = entry.get("unit")
+    return {
+        "value": "" if value is None else str(value),
+        # An unrecognised unit falls back to the first, or the card would render
+        # with no chip selected and no way to tell why.
+        "unit": unit if any(u.id == unit for u in spec.units) else spec.units[0].id,
+        "source": "norm" if entry.get("source") == "norm" else "user",
+    }
+
+
+def form_spec(errors: list[FieldError], table=None, submitted=None,
+              latest_year: int | None = None) -> dict:
     """Serialise FIELDS for the client, attaching each error to its own field.
 
-    `value` and `source` ship EMPTY in P1 and are on the wire anyway. P2 fills
-    them from the norm layer, and when it does the wire format, the card and the
-    arithmetic all stay exactly as they are - only the contents change.
+    `table` is a province's worth of norms, from norms.province_table. When it
+    is absent - no province resolved, or a broken data file - the output is
+    byte-identical to P1's, because an already-deployed client reads this dict
+    and an unexpected key is a wire change wearing an addition's clothes.
+
+    `submitted` is the payload that failed validation. Echoing it back is not a
+    nicety: the card seeds its state from `value`, so without it a single bad
+    field wipes the whole form, the crop selection and its prefill included.
+
+    `latest_year` is the norms dataset's most recent year (norms.latest_year());
+    it decides which crops get a price cell at all - see _crop_rows. It is an
+    int, not looked up here: this module imports nothing from src/norms.py.
     """
+    # Coerce non-dict submitted to {} before use, as validate() does for raw.
+    # submitted carries an untrusted payload that already failed validation, so
+    # it must be defended at the same trust boundary as validate()'s raw param.
+    submitted = submitted if isinstance(submitted, dict) else {}
+
     by_field = {e.field: e.message for e in errors}
-    return {
+    spec = {
         "fields": [
             {
                 "id": f.id,
@@ -217,6 +422,15 @@ def form_spec(errors: list[FieldError]) -> dict:
             for f in FIELDS
         ]
     }
+    if submitted:
+        for field in spec["fields"]:
+            field.update(_echo(_FIELDS_BY_ID[field["id"]], submitted))
+        crop = submitted.get("crop")
+        if isinstance(crop, str) and crop.strip():
+            spec["crop"] = crop
+    if table:
+        spec["crops"] = _crop_rows(table, latest_year)
+    return spec
 
 
 @dataclass(frozen=True)
@@ -254,6 +468,52 @@ FRAMING = (
     "Bu hesap bir tahmindir ve tamamen sizin girdiğiniz rakamlara dayanır; "
     "fiyat veya verim öngörüsü değildir."
 )
+
+
+def _norm_measures(inputs: BudgetInputs) -> list[tuple[str, Value]]:
+    """Which measures came from a published norm, and under what Turkish label.
+
+    The single place that decides whether any norm figure survived. render()
+    and framing() both read this list rather than each re-checking .source, so
+    the lead-in and the framing sentence can never disagree about it.
+    """
+    return [(label, value)
+            for label, value in (("verim", inputs.yield_kg),
+                                 ("fiyat", inputs.price_tl_kg))
+            if value.source == "norm"]
+
+
+# The second framing, for a calculation that used a published average. Both
+# sentences are appended BY CODE and neither is ever asked of a model - the
+# fertplan.FRAMING pattern. A provincial mean yield is a central tendency across
+# every holding in the province; printed without this it invites being read as a
+# forecast for one parcel.
+def framing(inputs: BudgetInputs) -> str:
+    """P1's sentence, or the one that names whose figures these are."""
+    used = _norm_measures(inputs)
+    if not used:
+        return FRAMING
+
+    plural = len(used) > 1
+    which = " ve ".join(label for label, _ in used)
+    noun = "rakamları" if plural else "rakamı"
+    ortalama = "ortalamalarıdır" if plural else "ortalamasıdır"
+    notes: list[str] = []
+    for _, value in used:
+        # Both measures normally share one note; printing it twice would read
+        # as two different sources.
+        if value.note and value.note not in notes:
+            notes.append(value.note)
+    source = " · ".join(notes)
+    # The provenance (TÜİK, year, region) lives in the parenthetical only - the
+    # sentence body says "yayımlanmış" (published) rather than naming TÜİK a
+    # second time in the same sentence.
+    return (
+        f"Bu hesaptaki {which} {noun} sizin değil, yayımlanmış bölge "
+        f"{ortalama} ({source}). Bölge ortalaması tek bir tarlanın verimi "
+        f"veya sizin alacağınız fiyat için bir öngörü değildir; kendi "
+        f"rakamınızı girerseniz hesap ona göre yapılır."
+    )
 
 # Written to stand alone: a deployed client that cannot draw the form shows only
 # this, so it names the figures it needs instead of pointing at a widget. The
@@ -296,7 +556,8 @@ def _format_qty(value: float) -> str:
 
 def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     """Code-written Turkish. Restates its inputs before stating its result."""
-    crop = f" {inputs.crop} için" if inputs.crop else ""
+    crop_name = inputs.crop_label or inputs.crop
+    crop = f" {crop_name} için" if crop_name else ""
     given = [
         f"**{_format_qty(inputs.area_da.amount)} dönüm**",
         f"toplam **{_format_qty(inputs.yield_kg.amount)} kg** "
@@ -306,7 +567,12 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     if result.cost_tl is not None:
         given.append(f"masraf **{format_tr(result.cost_tl, 2)} TL**")
 
-    lines = [f"Girdiğiniz değerlere göre{crop}: " + ", ".join(given) + ".", ""]
+    # Same lead-in P1 always used, unless a norm figure is standing in for
+    # something the user did not type - then "girdiğiniz" (what you entered)
+    # would be the same falsehood the framing sentence exists to remove.
+    lead_in = ("Şu değerlere göre" if _norm_measures(inputs)
+               else "Girdiğiniz değerlere göre")
+    lines = [f"{lead_in}{crop}: " + ", ".join(given) + ".", ""]
 
     if result.margin_tl is None:
         lines.append(f"Gelir **{format_tr(result.revenue_tl, 2)} TL**.")
@@ -321,5 +587,5 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
             f"**Marj {format_tr(result.margin_tl, 2)} TL**{pct}"
         )
 
-    lines.extend(["", FRAMING])
+    lines.extend(["", framing(inputs)])
     return "\n".join(lines)

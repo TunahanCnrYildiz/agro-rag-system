@@ -130,6 +130,20 @@ def test_available_crops_is_empty_without_a_file(tmp_path, monkeypatch):
     assert norms.available_crops() == ()
 
 
+def test_latest_year_is_the_last_year_of_the_axis(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    assert norms.latest_year() == 2025
+
+
+def test_latest_year_is_none_for_an_empty_table(tmp_path, monkeypatch):
+    """Not derived from any crop's cells - src/budget.py uses this as the
+    dataset's own cutoff to decide whether a price is fresh enough to prefill,
+    and an unreadable file must not silently look like a fresh one."""
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.latest_year() is None
+
+
 def test_a_province_row_is_used_and_reported_as_provincial(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, GOOD)
     n = norms.lookup("domates", "Manisa")
@@ -247,3 +261,173 @@ def test_norms_does_not_import_the_engine():
         elif isinstance(node, ast.ImportFrom):
             imported.add(node.module or "")
     assert not any("engine" in m or "location" in m for m in imported), imported
+
+
+ALTERNATE = {
+    "meta": {"generated": "2026-08-22", "years": [2020, 2021, 2022, 2023, 2024, 2025]},
+    "crops": {
+        "findik": {
+            "label": "Fındık",
+            # The prefilled year (28.4) is atypical; the five before it are not.
+            "yield_kg_da": {"scope": "il",
+                            "Ordu": [86.8, 73.7, 105.6, 87.5, 88.9, 28.4],
+                            "TR": [None, None, None, None, None, None]},
+            "price_tl_kg": {"scope": "il",
+                            "Ordu": [None, None, None, None, None, 202.26],
+                            "TR": [None, None, None, None, None, None]},
+        }
+    },
+}
+
+
+def test_the_recent_range_excludes_the_prefilled_year(tmp_path, monkeypatch):
+    """Including it would make the prefill its own lower bound, which says
+    nothing about whether the prefill is typical."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").yield_kg_da
+    assert norm.amount == 28.4
+    assert (norm.recent_min, norm.recent_max) == (73.7, 105.6)
+
+
+def test_a_single_prior_value_yields_no_range(tmp_path, monkeypatch):
+    """One number is not a range, and rendering '202,26-202,26' would dress a
+    single observation as a spread."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").price_tl_kg
+    assert norm.amount == 202.26
+    assert (norm.recent_min, norm.recent_max) == (None, None)
+
+
+def test_two_equal_prior_values_also_yield_no_range(tmp_path, monkeypatch):
+    """Two IDENTICAL values are not a spread either - '63-63 kg/da' would dress
+    a single observed level as a range just as much as one bare value would."""
+    payload = {
+        "meta": {"years": [2021, 2022, 2023, 2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            "yield_kg_da": {"scope": "il", "TR": [63.0, 63.0, None, None, 90.0]},
+            "price_tl_kg": {"scope": "il", "TR": [1.0, 1.0, 1.0, 1.0, 1.0]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    norm = norms.lookup("x", None).yield_kg_da
+    assert norm.amount == 90.0
+    assert (norm.recent_min, norm.recent_max) == (None, None)
+
+
+def test_the_range_window_is_the_five_years_before_the_hit(tmp_path, monkeypatch):
+    """Not the last five of the series: when the walk-back skips null years the
+    window moves with it."""
+    payload = {
+        "meta": {"years": [2019, 2020, 2021, 2022, 2023, 2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            # Latest non-null is 2022; the window is 2019-2021, and 2023-2025
+            # must not leak into it.
+            "yield_kg_da": {"scope": "il", "TR": [10.0, 20.0, 30.0, 44.0, None, None, None]},
+            "price_tl_kg": {"scope": "il", "TR": [1.0, 1.0, 1.0, 1.0, None, None, None]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    norm = norms.lookup("x", None).yield_kg_da
+    assert norm.year == 2022 and norm.amount == 44.0
+    assert (norm.recent_min, norm.recent_max) == (10.0, 30.0)
+
+
+def test_a_range_never_replaces_the_prefill(tmp_path, monkeypatch):
+    """The published figure is what prefills, however atypical it is."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").yield_kg_da
+    assert norm.amount == 28.4
+    assert norm.amount < norm.recent_min
+
+
+def test_the_province_table_matches_calling_lookup_for_every_crop(tmp_path, monkeypatch):
+    """One pass, same answers. If these ever diverge, the form and the
+    verification on submit would disagree about what the norm is."""
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {
+            "domates": {
+                "label": "Domates",
+                "yield_kg_da": {"scope": "il", "Manisa": [1.0, 2.0], "TR": [1.0, 2.0]},
+                "price_tl_kg": {"scope": "tr", "TR": [1.0, 2.0]},
+            },
+            "misir": {
+                "label": "Mısır",
+                "yield_kg_da": {"scope": "il", "Manisa": [3.0, 4.0], "TR": [3.0, 4.0]},
+                "price_tl_kg": {"scope": "tr", "TR": [3.0, 4.0]},
+            },
+        },
+    }
+    _write(tmp_path, monkeypatch, payload)
+    table = norms.province_table("Manisa")
+    one_by_one = tuple(norms.lookup(cid, "Manisa")
+                       for cid, _ in norms.available_crops())
+    assert table == one_by_one
+
+
+def test_the_province_table_is_sorted_by_label(tmp_path, monkeypatch):
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {
+            "zeytin": {"label": "Zeytin",
+                       "yield_kg_da": {"scope": "il", "TR": [1.0, 2.0]},
+                       "price_tl_kg": {"scope": "il", "TR": [1.0, 2.0]}},
+            "arpa": {"label": "Arpa",
+                     "yield_kg_da": {"scope": "il", "TR": [1.0, 2.0]},
+                     "price_tl_kg": {"scope": "il", "TR": [1.0, 2.0]}},
+        },
+    }
+    _write(tmp_path, monkeypatch, payload)
+    assert [r.label for r in norms.province_table(None)] == ["Arpa", "Zeytin"]
+
+
+def test_a_broken_file_gives_an_empty_table_not_an_exception(tmp_path, monkeypatch):
+    """A broken data file must not break answering - fertplan._load's rule."""
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.province_table("Manisa") == ()
+
+
+def test_a_national_scope_measure_reports_itself_as_national(tmp_path, monkeypatch):
+    """Pinned against a synthetic fixture on purpose: the shipped file carries no
+    populated TR rows today, so testing this against real data would assert
+    nothing. The path must stay covered for the day those rows land."""
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            "yield_kg_da": {"scope": "tr", "TR": [10.0, 11.0]},
+            "price_tl_kg": {"scope": "tr", "TR": [1.0, 2.0]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    row = norms.province_table("Manisa")[0]
+    assert row.yield_kg_da.scope == "tr"
+    assert row.yield_kg_da.region == "Türkiye"
+
+
+def test_the_shipped_file_still_carries_provincial_yields():
+    """A guard on the real data, not a fixture. If a converter change or a bad
+    refresh empties the file, every prefill silently disappears and every other
+    test here keeps passing on its fixtures. Measured on 2026-08-22: Manisa 142,
+    Konya 147, Ordu 75, Van 73 of 246 crops. The floor is deliberately far below
+    those, so an honest yearly refresh does not trip it."""
+    norms._load.cache_clear()
+    table = norms.province_table("Manisa")
+    provincial = [r for r in table
+                  if r.yield_kg_da is not None and r.yield_kg_da.scope == "il"]
+    assert len(table) > 200
+    assert len(provincial) > 100
+
+
+def test_the_shipped_file_keeps_the_two_tomatoes_apart():
+    """There is no single 'domates' norm - TUIK publishes Sofralik and Salcalik
+    separately, and they are different crops with different prices. The crop
+    list must offer both rather than one of them standing in for the other."""
+    norms._load.cache_clear()
+    labels = [label for _, label in norms.available_crops()]
+    assert "Domates (Sofralık)" in labels
+    assert "Domates (Salçalık)" in labels
+    assert "Domates" not in labels

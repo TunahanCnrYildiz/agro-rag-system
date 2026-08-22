@@ -1,6 +1,7 @@
 """Unit tests for src/budget.py (no store, no model, no network)."""
 
 from src import budget
+from src.norms import CropNorm, NormValue
 
 
 def test_parse_accepts_a_turkish_decimal():
@@ -346,6 +347,29 @@ def test_render_names_the_crop_when_one_was_selected():
     assert "domates" in budget.render(inputs, budget.compute(inputs))
 
 
+def test_render_prefers_the_crop_label_over_its_id():
+    """The id ('findik') is a lookup key, not a word - a farmer reads the label
+    ('Fındık'), and printing the id raw is what this test guards against."""
+    raw = _raw()
+    raw["crop"] = "findik"
+    table = (CropNorm("findik", "Fındık", None, None),)
+    inputs, errors = budget.validate(raw, table)
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert "Fındık için" in text
+    assert "findik için" not in text
+
+
+def test_render_falls_back_to_the_crop_id_when_no_table_resolves_it():
+    """No table, or a crop the table does not carry: still name something
+    rather than printing nothing, using the id as it always did in P1."""
+    raw = _raw()
+    raw["crop"] = "domates"
+    inputs, errors = budget.validate(raw)
+    assert errors == []
+    assert "domates için" in budget.render(inputs, budget.compute(inputs))
+
+
 def test_framing_is_always_appended():
     """Appended by code so no model can drop it - the fertplan.FRAMING pattern."""
     inputs, result = _computed()
@@ -363,3 +387,470 @@ def test_the_ask_sentence_stands_on_its_own():
     sentence, so it has to be an honest answer rather than a widget caption."""
     assert len(budget.ASK_FOR_NUMBERS) > 40
     assert "form" not in budget.ASK_FOR_NUMBERS.lower()
+
+
+def test_a_per_dekar_yield_equals_the_same_total_entered_directly():
+    per_area = {
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    }
+    total = {
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "500", "unit": "kg"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    }
+    a, errs_a = budget.validate(per_area)
+    b, errs_b = budget.validate(total)
+    assert errs_a == [] and errs_b == []
+    assert a.yield_kg.amount == b.yield_kg.amount == 500.0
+    assert budget.compute(a).revenue_tl == budget.compute(b).revenue_tl
+
+
+def test_a_per_dekar_yield_without_an_area_is_a_field_error_not_a_zero():
+    """The binding rule: a value we cannot convert is refused, never quietly
+    turned into 0 - a zero flows into the arithmetic and comes out confident."""
+    inputs, errors = budget.validate({
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    })
+    assert inputs is None
+    assert "yield_total" in {e.field for e in errors}
+
+
+def test_a_per_dekar_yield_with_an_unparseable_area_is_also_refused():
+    inputs, errors = budget.validate({
+        "area": {"value": "beş", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    })
+    assert inputs is None
+    assert {"area", "yield_total"} <= {e.field for e in errors}
+
+
+def test_the_yield_label_reads_correctly_under_every_unit_it_offers():
+    """'Toplam' is wrong for kg/dekar, and a label that contradicts the selected
+    unit is the mismatch the selector exists to prevent."""
+    spec = next(f for f in budget.FIELDS if f.id == "yield_total")
+    assert "toplam" not in spec.label.lower()
+    assert [u.id for u in spec.units] == ["kg", "ton", "kg_da"]
+    assert [u.per_area for u in spec.units] == [False, False, True]
+
+
+def test_the_original_units_are_untouched():
+    """P1 regression: 2 ton off 5 donum is still 2000 kg."""
+    inputs, errors = budget.validate({
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "2", "unit": "ton"},
+        "price": {"value": "10", "unit": "tl_kg"},
+        "cost": {"value": "5000", "unit": "tl"},
+    })
+    assert errors == []
+    assert inputs.yield_kg.amount == 2000.0
+    assert budget.compute(inputs).margin_tl == 15000.0
+
+
+def _table():
+    return (
+        CropNorm("findik", "Fındık",
+                 NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
+                 NormValue(202.26, 2025, "il", "Ordu", None, None)),
+        CropNorm("misir", "Mısır",
+                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 None),
+    )
+
+
+def test_a_form_with_no_table_is_byte_identical_to_p1():
+    """An old deployed client reads this dict, so it is pinned as a LITERAL.
+
+    Rebuilding the expected value from budget.FIELDS with the same comprehension
+    form_spec uses would assert only that the function is itself - it would
+    follow any change to a label, a unit id or the key set rather than catch it.
+    A wire contract is pinned by writing it out."""
+    assert budget.form_spec([]) == {
+        "fields": [
+            {"id": "area", "label": "Alan", "required": True,
+             "units": [{"id": "donum", "label": "dönüm"},
+                       {"id": "hektar", "label": "hektar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "yield_total", "label": "Ürün miktarı", "required": True,
+             "units": [{"id": "kg", "label": "kg"},
+                       {"id": "ton", "label": "ton"},
+                       {"id": "kg_da", "label": "kg/dekar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "price", "label": "Fiyat", "required": True,
+             "units": [{"id": "tl_kg", "label": "TL/kg"},
+                       {"id": "tl_ton", "label": "TL/ton"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "cost", "label": "Masraf", "required": False,
+             "units": [{"id": "tl", "label": "TL"}],
+             "value": "", "source": "empty", "error": None},
+        ]
+    }
+
+
+def test_a_table_ships_every_crop_with_its_figures():
+    spec = budget.form_spec([], _table())
+    assert [c["id"] for c in spec["crops"]] == ["findik", "misir"]
+    cell = spec["crops"][0]["yield"]
+    assert cell["value"] == "28,4"
+    assert cell["unit"] == "kg_da"
+    assert cell["note"] == "TÜİK 2025, Ordu"
+    assert cell["recent"] == "önceki 5 yıl: 73,7–105,6 kg/da"
+
+
+def test_a_price_cell_carries_two_decimals_and_its_own_unit():
+    spec = budget.form_spec([], _table(), latest_year=2025)
+    cell = spec["crops"][0]["price"]
+    assert cell["value"] == "202,26"
+    assert cell["unit"] == "tl_kg"
+    assert cell["recent"] is None
+
+
+def test_a_measure_with_no_norm_is_none_not_zero():
+    """The binding rule, on the wire this time: absence is absence."""
+    spec = budget.form_spec([], _table())
+    assert spec["crops"][1]["price"] is None
+
+
+def test_a_national_figure_names_turkiye_rather_than_looking_provincial():
+    spec = budget.form_spec([], _table())
+    assert spec["crops"][1]["yield"]["note"] == "TÜİK 2024, Türkiye"
+
+
+def test_a_price_from_the_latest_year_is_served():
+    """The dataset's cutoff year is 2025 here, and findik's price is from 2025
+    - it must prefill."""
+    spec = budget.form_spec([], _table(), latest_year=2025)
+    assert spec["crops"][0]["price"] is not None
+    assert spec["crops"][0]["price"]["value"] == "202,26"
+
+
+def test_a_price_older_than_the_latest_year_is_absent_not_zero():
+    """Measured on Ordu: Arpa (Diğer) prefills 1,10 TL/kg from 2018 - nine
+    times too low once rendered as revenue. Lira is nominal, so an old price
+    is not a meaningful quantity the way an old yield still is; it is dropped
+    entirely rather than shown stale."""
+    table = (CropNorm("arpa", "Arpa (Diğer)",
+                       NormValue(1500.0, 2025, "il", "Ordu", 1400.0, 1600.0),
+                       NormValue(1.10, 2018, "il", "Ordu", None, None)),)
+    spec = budget.form_spec([], table, latest_year=2025)
+    assert spec["crops"][0]["price"] is None
+    assert spec["crops"][0]["yield"] is not None
+
+
+def test_no_latest_year_serves_no_price_cell_at_all():
+    """Not knowing the dataset's cutoff is not a reason to guess a price is
+    fresh - absence beats risking a stale figure. Yield is untouched."""
+    spec = budget.form_spec([], _table(), latest_year=None)
+    assert all(c["price"] is None for c in spec["crops"])
+    assert spec["crops"][0]["yield"] is not None
+
+
+def test_a_price_range_is_never_shown_even_when_the_norm_carries_one():
+    """Currency is nominal: a fresh price sits ABOVE its own five-year window
+    for nearly every real crop (inflation, not an anomaly - measured 95 of 103
+    Manisa price cells, 45 of 48 in Ordu), so showing the range there would
+    read as a false outlier warning. Yield keeps its range, where a stale
+    figure really can be an outlier."""
+    table = (CropNorm("x", "X",
+                       NormValue(100.0, 2025, "tr", "Türkiye", 60.0, 90.0),
+                       NormValue(50.0, 2025, "tr", "Türkiye", 20.0, 40.0)),)
+    spec = budget.form_spec([], table, latest_year=2025)
+    assert spec["crops"][0]["yield"]["recent"] is not None
+    assert spec["crops"][0]["price"]["recent"] is None
+
+
+def test_no_raw_float_reaches_the_wire():
+    """Every figure is Turkish-formatted text. A float would arrive with a DOT
+    decimal and parse_tr_number refuses those, so 28.4 would come back as a
+    field error - or worse, as 284."""
+    spec = budget.form_spec([], _table())
+    for crop in spec["crops"]:
+        for key in ("yield", "price"):
+            if crop[key] is not None:
+                assert isinstance(crop[key]["value"], str)
+
+
+def test_a_rejected_form_carries_back_what_was_typed():
+    """Without this, the error Task 3 introduces - a per-dekar yield with no
+    area - throws away the crop and every other field the user filled."""
+    submitted = {
+        "crop": "findik",
+        "area": {"value": "", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "202,26", "unit": "tl_kg"},
+    }
+    _, errors = budget.validate(submitted)
+    spec = budget.form_spec(errors, _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["value"] == "100"
+    assert fields["yield_total"]["unit"] == "kg_da"
+    assert fields["price"]["value"] == "202,26"
+    assert spec["crop"] == "findik"
+    assert fields["area"]["error"]
+
+
+def test_a_rejected_form_echoes_the_raw_source_claim():
+    """The claim being echoed back, not a re-derived verdict - see the next
+    test for why re-deriving it from value/unit was the bug."""
+    submitted = {
+        "crop": "findik",
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "norm"},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "user"},
+    }
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["source"] == "norm"
+    assert fields["price"]["source"] == "user"
+
+
+def test_a_users_own_value_equal_to_the_norm_still_echoes_as_user():
+    """The bug this fixes: re-deriving source by comparing the echoed value
+    and unit to the crop's cell would mark this "norm" because the numbers
+    happen to match, attributing a figure the farmer typed to TUIK."""
+    submitted = {
+        "crop": "findik",
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "user"},
+    }
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["source"] == "user"
+
+
+def test_an_unsubmitted_form_still_has_empty_source_on_every_field():
+    """No submitted payload at all - the redisplay path never runs, so every
+    field keeps the "empty" default."""
+    spec = budget.form_spec([], _table())
+    assert all(f["source"] == "empty" for f in spec["fields"])
+
+
+def test_the_framing_joins_two_different_notes_with_a_middle_dot():
+    """Reachable on real data: Arpa (Diğer) in Ordu renders '(TÜİK 2025, Ordu ·
+    TÜİK 2018, Ordu)' when the yield and price norms come from different
+    years. Fix 1 changes which cases can still reach this (a stale price is
+    never offered as a norm cell), but a fresh yield and a fresh price from
+    different provinces or years still can, so the join stays reachable."""
+    table = (CropNorm("findik", "Fındık",
+                       NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
+                       NormValue(202.26, 2024, "il", "Ordu", None, None)),)
+    inputs, errors = budget.validate({
+        "crop": "findik",
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "norm"},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "norm"},
+    }, table)
+    assert errors == []
+    text = budget.framing(inputs)
+    assert "TÜİK 2025, Ordu · TÜİK 2024, Ordu" in text
+
+
+def test_an_unsubmitted_form_carries_no_values_and_no_unit_key():
+    """Nothing was submitted, so there is nothing to echo and P1's shape holds."""
+    spec = budget.form_spec([], _table())
+    for field in spec["fields"]:
+        assert field["value"] == ""
+        assert "unit" not in field
+    assert "crop" not in spec
+
+
+def test_an_unknown_unit_is_not_echoed_back():
+    """A unit the field does not offer would render as no chip selected at all."""
+    submitted = {"yield_total": {"value": "100", "unit": "furlong"}}
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["unit"] == "kg"
+
+
+def test_a_non_string_submitted_value_is_echoed_as_text():
+    """A JSON number is a legal submission; echoing it as a float would put a
+    dot decimal into a field parse_tr_number refuses."""
+    spec = budget.form_spec([], None, {"area": {"value": 5, "unit": "donum"}})
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["area"]["value"] == "5"
+
+
+def _submitted(value="28,4", unit="kg_da", source="norm"):
+    return {
+        "crop": "findik",
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": value, "unit": unit, "source": source},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "norm"},
+    }
+
+
+def _all_typed():
+    """Every figure the user's own. Note that overriding the YIELD alone is not
+    enough - _submitted() claims the price is a norm too, and the price claim
+    would still be confirmed."""
+    raw = _submitted(value="90")
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    return raw
+
+
+def test_a_form_of_the_users_own_figures_keeps_p1s_sentence_exactly():
+    inputs, _ = budget.validate(_all_typed(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.rstrip().endswith(budget.FRAMING)
+
+
+def test_a_norm_figure_replaces_that_sentence():
+    """Leaving it would state that the calculation rests entirely on the user's
+    own numbers while one of them came from TUIK."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert budget.FRAMING not in text
+    assert "verim ve fiyat" in text
+    assert "TÜİK 2025, Ordu" in text
+    assert "öngörü değildir" in text
+
+
+def test_the_lead_in_is_unchanged_when_every_figure_is_the_users_own():
+    """P1's exact lead-in, byte for byte - an already-pinned test elsewhere
+    depends on this string too, but the wording itself is the thing at risk
+    here."""
+    inputs, _ = budget.validate(_all_typed(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith("Girdiğiniz değerlere göre")
+
+
+def test_the_lead_in_changes_when_a_norm_figure_is_standing_in():
+    """'Girdiğiniz değerlere göre' (according to what you entered) is false
+    once a TUIK figure - not the farmer's own - fed the calculation."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith("Şu değerlere göre")
+    assert not text.startswith("Girdiğiniz değerlere göre")
+
+
+def test_the_framing_names_only_the_figures_that_are_not_the_users():
+    """A sentence that says 'verim ve fiyat' while the farmer typed the price
+    tells them their own number came from TUIK."""
+    raw = _submitted()
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    inputs, _ = budget.validate(raw, _table())
+    text = budget.framing(inputs)
+    assert text.startswith("Bu hesaptaki verim rakamı")
+    assert "verim ve fiyat" not in text
+
+
+def test_the_framing_uses_the_singular_for_one_norm_measure():
+    """'rakamı ... ortalamasıdır' agrees in number with a single figure; the
+    plural form here would read as a grammar error a farmer notices."""
+    raw = _submitted()
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    inputs, _ = budget.validate(raw, _table())
+    text = budget.framing(inputs)
+    assert "rakamı sizin değil" in text
+    assert "ortalamasıdır" in text
+    assert "rakamları" not in text
+    assert "ortalamalarıdır" not in text
+
+
+def test_the_framing_uses_the_plural_for_two_norm_measures():
+    """With both verim and fiyat from the norm, the noun and the verb both
+    have to take the plural - 'rakamı ... ortalamasıdır' would be wrong here."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.framing(inputs)
+    assert "rakamları sizin değil" in text
+    assert "ortalamalarıdır" in text
+
+
+def test_the_framing_names_tuik_only_in_the_parenthetical():
+    """The sentence body used to say 'TÜİK'in yayımladığı' and then repeat
+    TÜİK again in the parenthetical citation - the same agency named twice in
+    one sentence. It belongs in the citation only."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.framing(inputs)
+    assert text.count("TÜİK") == 1
+
+
+def test_the_framing_is_always_the_last_line():
+    """It is appended by code and never asked of a model; a figure after it
+    would read as a correction to it."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    lines = [l for l in budget.render(inputs, budget.compute(inputs)).split("\n") if l]
+    assert lines[-1] == budget.framing(inputs)
+
+
+def test_the_p1_constant_is_untouched():
+    assert budget.FRAMING == (
+        "Bu hesap bir tahmindir ve tamamen sizin girdiğiniz rakamlara dayanır; "
+        "fiyat veya verim öngörüsü değildir."
+    )
+
+
+def test_a_confirmed_claim_is_marked_as_a_norm():
+    inputs, errors = budget.validate(_submitted(), _table())
+    assert errors == []
+    assert inputs.yield_kg.source == "norm"
+    assert inputs.yield_kg.note == "TÜİK 2025, Ordu"
+
+
+def test_an_edited_value_claiming_to_be_a_norm_is_downgraded():
+    """The farmer's own figure must never be attributed to TUIK."""
+    inputs, _ = budget.validate(_submitted(value="90"), _table())
+    assert inputs.yield_kg.source == "user"
+    assert inputs.yield_kg.note is None
+
+
+def test_a_claim_under_a_different_unit_is_downgraded():
+    """28,4 kg is not 28,4 kg/dekar, and only one of them is what we served."""
+    inputs, _ = budget.validate(_submitted(unit="kg"), _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_claim_with_no_table_is_downgraded():
+    """Nothing to check it against is not the same as checking and agreeing."""
+    inputs, _ = budget.validate(_submitted())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_claim_for_a_crop_the_table_does_not_carry_is_downgraded():
+    raw = _submitted()
+    raw["crop"] = "yokolan"
+    inputs, _ = budget.validate(raw, _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_an_old_client_sending_no_source_gets_user():
+    """Defaulting to 'user' keeps a deployed build on P1's exact framing rather
+    than claiming a provenance it never asserted."""
+    raw = _submitted()
+    del raw["yield_total"]["source"]
+    inputs, _ = budget.validate(raw, _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_user_claim_is_never_upgraded():
+    """Even when the number happens to equal the norm: the user typed it."""
+    inputs, _ = budget.validate(_submitted(source="user"), _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_the_arithmetic_always_uses_the_submitted_value():
+    """Precedence is unchanged by any of this. A prefill is a default, never a
+    lock, and a downgrade changes only the label."""
+    inputs, _ = budget.validate(_submitted(value="90", unit="kg_da"), _table())
+    assert inputs.yield_kg.amount == 450.0    # 90 kg/da over 5 donum
+
+
+def test_a_non_dict_submitted_coerces_to_empty_rather_than_raising():
+    """Untrusted payloads that fail validation must not crash form_spec; they
+    degrade to an unsubmitted-shaped form instead."""
+    # A bare string should not raise AttributeError
+    spec = budget.form_spec([], None, "not-a-dict")
+    assert "fields" in spec
+    assert "crop" not in spec
+    assert all(f["value"] == "" for f in spec["fields"])
+
+    # A list should not raise AttributeError
+    spec = budget.form_spec([], None, ["item"])
+    assert "fields" in spec
+    assert "crop" not in spec
+
+    # An int should not raise AttributeError
+    spec = budget.form_spec([], None, 42)
+    assert "fields" in spec
+    assert "crop" not in spec

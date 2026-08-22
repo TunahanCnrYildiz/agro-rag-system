@@ -107,6 +107,21 @@ def test_the_streaming_endpoint_carries_the_form_event(client):
     assert types == ["token", "form", "done"]
 
 
+def test_a_payload_carrying_a_source_is_accepted(client):
+    payload = dict(PAYLOAD)
+    payload["yield_total"] = {"value": "2", "unit": "ton", "source": "norm"}
+    response = client.post("/api/chat",
+                           json={"message": BUDGET_Q, "budget": payload})
+    assert response.status_code == 200
+
+
+def test_a_payload_with_no_source_is_still_accepted(client):
+    """An already-deployed build sends none. It must not 422 mid-conversation."""
+    response = client.post("/api/chat",
+                           json={"message": BUDGET_Q, "budget": PAYLOAD})
+    assert response.status_code == 200
+
+
 def test_the_streaming_endpoint_forwards_a_submitted_payload(client):
     resp = client.post("/api/chat", json={
         "message": BUDGET_Q, "history": [], "stream": True, "budget": PAYLOAD})
@@ -114,3 +129,16 @@ def test_the_streaming_endpoint_forwards_a_submitted_payload(client):
                    for line in resp.text.split("\n")
                    if line.startswith("data: "))
     assert "15.000,00 TL" in text
+
+
+def test_the_streamed_form_event_carries_the_crops(client):
+    """Both clients stream. A table wired only into answer() reaches no user."""
+    response = client.post("/api/chat", json={
+        "message": BUDGET_Q, "stream": True,
+        "history": [{"role": "user", "content": "Ordu'dayım."}],
+    })
+    events = [json.loads(line[len("data: "):])
+              for line in response.text.splitlines()
+              if line.startswith("data: ")]
+    form = next(e["form"] for e in events if e["type"] == "form")
+    assert any(c["id"] == "findik" for c in form["crops"])

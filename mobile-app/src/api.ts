@@ -50,6 +50,23 @@ export async function sendChatMessage(
 export interface BudgetFieldValue {
   value: string;
   unit: string;
+  // Which figures came from the norm table and were left alone. The server
+  // verifies this against its own lookup before believing it.
+  source?: "norm" | "user";
+}
+
+export interface NormCell {
+  value: string;
+  unit: string;
+  note: string;
+  recent: string | null;
+}
+
+export interface CropOption {
+  id: string;
+  label: string;
+  yield: NormCell | null;
+  price: NormCell | null;
 }
 
 export interface BudgetPayload {
@@ -57,7 +74,7 @@ export interface BudgetPayload {
   yield_total?: BudgetFieldValue;
   price?: BudgetFieldValue;
   cost?: BudgetFieldValue;
-  crop?: string | null;
+  crop?: string;
 }
 
 export interface FormUnit {
@@ -74,10 +91,14 @@ export interface FormField {
   value: string;
   source: "user" | "norm" | "empty";
   error: string | null;
+  // Echoed on a rejected form: the unit the farmer had selected.
+  unit?: string;
 }
 
 export interface FormSpec {
   fields: FormField[];
+  crops?: CropOption[];
+  crop?: string;
 }
 
 export interface ChatStreamHandlers {

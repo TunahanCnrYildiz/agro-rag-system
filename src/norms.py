@@ -98,6 +98,12 @@ class NormValue:
     year: int
     scope: str          # "il" | "tr"
     region: str         # "Manisa" | "Türkiye"
+    # The spread of the five years BEFORE this one. Not the last five of the
+    # series: this figure is the one being prefilled, and a range that contains
+    # it cannot say whether it is typical. None when fewer than two of those
+    # years carry a value - one number is not a range.
+    recent_min: float | None = None
+    recent_max: float | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +121,22 @@ def available_crops() -> tuple[tuple[str, str], ...]:
                         key=lambda pair: pair[1]))
 
 
+_RECENT_YEARS = 5
+
+
+def _recent_range(series: list, index: int) -> tuple[float | None, float | None]:
+    """Min and max of the non-null values in the five years before `index`.
+
+    Two EQUAL values are not a range either: "63-63 kg/da" would dress a
+    single observed level as a spread just as much as one bare value would.
+    """
+    window = [v for v in series[max(0, index - _RECENT_YEARS):index] if v is not None]
+    if len(window) < 2:
+        return None, None
+    lo, hi = float(min(window)), float(max(window))
+    return (None, None) if lo == hi else (lo, hi)
+
+
 def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
     """The province's row when the measure has one, otherwise the national row,
     then the most recent non-null year in it."""
@@ -127,13 +149,35 @@ def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | 
         return None
     for i in range(len(series) - 1, -1, -1):
         if series[i] is not None:
+            low, high = _recent_range(series, i)
             return NormValue(
                 amount=float(series[i]),
                 year=years[i],
                 scope="il" if provincial else "tr",
                 region=key if provincial else NATIONAL_LABEL,
+                recent_min=low,
+                recent_max=high,
             )
     return None
+
+
+def _resolve(crop_id: str, entry: dict, years: list[int],
+             province: str | None) -> CropNorm:
+    """One crop's norms for one province.
+
+    Shared by lookup() and province_table() so the two cannot drift: the budget
+    form is built from province_table() and a submitted figure is verified
+    against the very row that table already served (src/budget.py's _verify
+    holds onto it rather than calling lookup() again) - so a difference
+    between the two functions could never surface as the server rejecting a
+    figure it had itself just sent.
+    """
+    return CropNorm(
+        crop=crop_id,
+        label=entry["label"],
+        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
+        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+    )
 
 
 def lookup(crop: str, province: str | None) -> CropNorm | None:
@@ -147,9 +191,40 @@ def lookup(crop: str, province: str | None) -> CropNorm | None:
     if entry is None:
         return None
     years = data["years"]
-    return CropNorm(
-        crop=crop,
-        label=entry["label"],
-        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
-        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+    return _resolve(crop, entry, years, province)
+
+
+def latest_year() -> int | None:
+    """The most recent year on the loaded axis, or None when the table is empty.
+
+    Read straight off `years` rather than derived from any crop's cells: this
+    is the DATASET's cutoff, used by src/budget.py to decide whether a PRICE
+    figure is fresh enough to prefill (see budget._crop_rows). Deriving it
+    from the cells instead would let one crop's late-published figure make an
+    older price elsewhere look current.
+    """
+    years = _load().get("years")
+    return years[-1] if years else None
+
+
+def province_table(province: str | None) -> tuple[CropNorm, ...]:
+    """Every crop the file carries, resolved for one province, sorted by label.
+
+    Identical to calling lookup() for each id in available_crops(), and pinned
+    that way by a test - the form is built from this table and a submitted
+    figure is verified against the same row, held over from here rather than
+    fetched again via lookup(), so the two must never drift.
+
+    It exists because the whole table travels to the client with the form: the
+    crop is chosen there, so the server cannot know in advance which row will
+    be needed and sends all of them.
+    """
+    data = _load()
+    years = data.get("years")
+    if not years:
+        return ()
+    rows = tuple(
+        _resolve(crop_id, entry, years, province)
+        for crop_id, entry in data["crops"].items()
     )
+    return tuple(sorted(rows, key=lambda row: row.label))
