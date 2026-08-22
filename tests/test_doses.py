@@ -88,6 +88,25 @@ def test_a_malformed_row_is_dropped_whole(tmp_path, monkeypatch, bad):
     assert doses.lookup("X", "sebze") == ()
 
 
+def test_a_products_GOOD_groups_go_down_with_its_bad_one(tmp_path, monkeypatch):
+    """The drop has to be WHOLE, and only a product with a good group ALONGSIDE
+    a bad one can tell that apart from dropping just the bad group.
+
+    Without this case every malformed fixture has exactly one group, so
+    "drop the product" and "drop the group" leave identical observable results
+    and a regression to per-group filtering passes the whole suite. That
+    regression is the failure the module exists to prevent: a product that
+    answers for one group and silently not for another is indistinguishable
+    from one that simply has no figure there."""
+    _write(tmp_path, monkeypatch, {"products": {"X": {
+        "sebze": {"damlama": {"low": 1.0, "high": 2.0, "unit": "litre"}},
+        "meyve": {"damlama": {"low": 3.0, "high": 1.0, "unit": "litre"}},
+    }}})
+    assert doses.lookup("X", "meyve") == ()
+    assert doses.lookup("X", "sebze") == ()
+    assert doses.available_products() == ()
+
+
 def test_a_non_finite_value_is_refused(tmp_path, monkeypatch):
     """json.loads accepts NaN and Infinity by default, and either would reach a
     purchase quantity as nan."""
