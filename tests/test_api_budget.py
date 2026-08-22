@@ -107,6 +107,21 @@ def test_the_streaming_endpoint_carries_the_form_event(client):
     assert types == ["token", "form", "done"]
 
 
+def test_a_payload_carrying_a_source_is_accepted(client):
+    payload = dict(PAYLOAD)
+    payload["yield_total"] = {"value": "2", "unit": "ton", "source": "norm"}
+    response = client.post("/api/chat",
+                           json={"message": BUDGET_Q, "budget": payload})
+    assert response.status_code == 200
+
+
+def test_a_payload_with_no_source_is_still_accepted(client):
+    """An already-deployed build sends none. It must not 422 mid-conversation."""
+    response = client.post("/api/chat",
+                           json={"message": BUDGET_Q, "budget": PAYLOAD})
+    assert response.status_code == 200
+
+
 def test_the_streaming_endpoint_forwards_a_submitted_payload(client):
     resp = client.post("/api/chat", json={
         "message": BUDGET_Q, "history": [], "stream": True, "budget": PAYLOAD})

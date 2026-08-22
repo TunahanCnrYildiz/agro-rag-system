@@ -110,7 +110,10 @@ _FIELDS_BY_ID = {f.id: f for f in FIELDS}
 @dataclass(frozen=True)
 class Value:
     amount: float
-    source: str            # "user" | "norm" | "empty"; nothing sets "norm" yet
+    source: str            # "user" | "norm" | "empty"
+    # Where the norm came from, for the framing sentence. Only ever set on a
+    # value the server itself confirmed against its own lookup.
+    note: str | None = None
 
 
 @dataclass(frozen=True)
@@ -183,10 +186,49 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None
                 f"önce alanı doldurun.")
         amount = amount * area_da
 
-    return Value(amount * unit.factor, "user"), None
+    claimed = "norm" if entry.get("source") == "norm" else "user"
+    return Value(amount * unit.factor, claimed), None
 
 
-def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
+# Which submitted field each norm measure prefills, and how that cell is built.
+_VERIFIED = (("yield_total", "yield_kg_da", "yield", None),
+             ("price", "price_tl_kg", "price", 2))
+
+
+def _verify(values: dict, raw: dict, crop: str | None, table) -> dict:
+    """Confirm or downgrade every "this came from a norm" claim.
+
+    A field claiming a norm whose submitted text does not match what we served
+    is the user's own figure wearing TUIK's name, and the framing would then
+    attribute a farmer's number to a statistical agency. Comparison is on the
+    served TEXT and unit rather than the parsed floats: it answers exactly the
+    question being asked - is this the figure we sent? - and has no rounding
+    tolerance to get wrong.
+
+    "user" is never second-guessed in the other direction. A value the user
+    typed is theirs even when it happens to equal the norm.
+    """
+    row = None
+    if crop is not None:
+        row = next((r for r in (table or ()) if r.crop == crop), None)
+
+    for field_id, measure, unit_key, decimals in _VERIFIED:
+        value = values.get(field_id)
+        if value is None or value.source != "norm":
+            continue
+        cell = (None if row is None
+                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals))
+        entry = raw.get(field_id) or {}
+        if (cell is not None
+                and entry.get("value") == cell["value"]
+                and entry.get("unit") == cell["unit"]):
+            values[field_id] = Value(value.amount, "norm", cell["note"])
+        else:
+            values[field_id] = Value(value.amount, "user")
+    return values
+
+
+def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldError]]:
     """Read every field, collect every error. Never raises.
 
     Reports ALL errors rather than the first, so a user fixing a form is not
@@ -219,12 +261,15 @@ def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
         return None, errors
 
     crop = raw.get("crop")
+    crop = crop if isinstance(crop, str) and crop.strip() else None
+    values = _verify(values, raw, crop, table)
+
     return BudgetInputs(
         area_da=values["area"],
         yield_kg=values["yield_total"],
         price_tl_kg=values["price"],
         cost_tl=values["cost"],
-        crop=crop if isinstance(crop, str) and crop.strip() else None,
+        crop=crop,
     ), []
 
 

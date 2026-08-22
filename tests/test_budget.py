@@ -551,6 +551,70 @@ def test_a_non_string_submitted_value_is_echoed_as_text():
     assert fields["area"]["value"] == "5"
 
 
+def _submitted(value="28,4", unit="kg_da", source="norm"):
+    return {
+        "crop": "findik",
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": value, "unit": unit, "source": source},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "norm"},
+    }
+
+
+def test_a_confirmed_claim_is_marked_as_a_norm():
+    inputs, errors = budget.validate(_submitted(), _table())
+    assert errors == []
+    assert inputs.yield_kg.source == "norm"
+    assert inputs.yield_kg.note == "TÜİK 2025, Ordu"
+
+
+def test_an_edited_value_claiming_to_be_a_norm_is_downgraded():
+    """The farmer's own figure must never be attributed to TUIK."""
+    inputs, _ = budget.validate(_submitted(value="90"), _table())
+    assert inputs.yield_kg.source == "user"
+    assert inputs.yield_kg.note is None
+
+
+def test_a_claim_under_a_different_unit_is_downgraded():
+    """28,4 kg is not 28,4 kg/dekar, and only one of them is what we served."""
+    inputs, _ = budget.validate(_submitted(unit="kg"), _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_claim_with_no_table_is_downgraded():
+    """Nothing to check it against is not the same as checking and agreeing."""
+    inputs, _ = budget.validate(_submitted())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_claim_for_a_crop_the_table_does_not_carry_is_downgraded():
+    raw = _submitted()
+    raw["crop"] = "yokolan"
+    inputs, _ = budget.validate(raw, _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_an_old_client_sending_no_source_gets_user():
+    """Defaulting to 'user' keeps a deployed build on P1's exact framing rather
+    than claiming a provenance it never asserted."""
+    raw = _submitted()
+    del raw["yield_total"]["source"]
+    inputs, _ = budget.validate(raw, _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_a_user_claim_is_never_upgraded():
+    """Even when the number happens to equal the norm: the user typed it."""
+    inputs, _ = budget.validate(_submitted(source="user"), _table())
+    assert inputs.yield_kg.source == "user"
+
+
+def test_the_arithmetic_always_uses_the_submitted_value():
+    """Precedence is unchanged by any of this. A prefill is a default, never a
+    lock, and a downgrade changes only the label."""
+    inputs, _ = budget.validate(_submitted(value="90", unit="kg_da"), _table())
+    assert inputs.yield_kg.amount == 450.0    # 90 kg/da over 5 donum
+
+
 def test_a_non_dict_submitted_coerces_to_empty_rather_than_raising():
     """Untrusted payloads that fail validation must not crash form_spec; they
     degrade to an unsubmitted-shaped form instead."""

@@ -47,6 +47,11 @@ class BudgetField(BaseModel):
     # value a bool so that guard can reject it as a field error instead.
     value: str | int | float | bool = ""
     unit: str = ""
+    # Which figures the client prefilled from the norm table and the user left
+    # alone. The server does not take this on trust - see budget._verify - but
+    # it cannot ask the client after the fact either. Defaulting to "user" keeps
+    # an already-deployed build, which sends nothing here, on P1's framing.
+    source: str = "user"
 
 
 class BudgetPayload(BaseModel):
