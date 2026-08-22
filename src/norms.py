@@ -125,11 +125,16 @@ _RECENT_YEARS = 5
 
 
 def _recent_range(series: list, index: int) -> tuple[float | None, float | None]:
-    """Min and max of the non-null values in the five years before `index`."""
+    """Min and max of the non-null values in the five years before `index`.
+
+    Two EQUAL values are not a range either: "63-63 kg/da" would dress a
+    single observed level as a spread just as much as one bare value would.
+    """
     window = [v for v in series[max(0, index - _RECENT_YEARS):index] if v is not None]
     if len(window) < 2:
         return None, None
-    return float(min(window)), float(max(window))
+    lo, hi = float(min(window)), float(max(window))
+    return (None, None) if lo == hi else (lo, hi)
 
 
 def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
@@ -161,9 +166,11 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
     """One crop's norms for one province.
 
     Shared by lookup() and province_table() so the two cannot drift: the budget
-    form is built from the table and a submitted figure is verified against
-    lookup(), and a difference between them would let the server reject a
-    figure it had itself served.
+    form is built from province_table() and a submitted figure is verified
+    against the very row that table already served (src/budget.py's _verify
+    holds onto it rather than calling lookup() again) - so a difference
+    between the two functions could never surface as the server rejecting a
+    figure it had itself just sent.
     """
     return CropNorm(
         crop=crop_id,
@@ -187,12 +194,26 @@ def lookup(crop: str, province: str | None) -> CropNorm | None:
     return _resolve(crop, entry, years, province)
 
 
+def latest_year() -> int | None:
+    """The most recent year on the loaded axis, or None when the table is empty.
+
+    Read straight off `years` rather than derived from any crop's cells: this
+    is the DATASET's cutoff, used by src/budget.py to decide whether a PRICE
+    figure is fresh enough to prefill (see budget._crop_rows). Deriving it
+    from the cells instead would let one crop's late-published figure make an
+    older price elsewhere look current.
+    """
+    years = _load().get("years")
+    return years[-1] if years else None
+
+
 def province_table(province: str | None) -> tuple[CropNorm, ...]:
     """Every crop the file carries, resolved for one province, sorted by label.
 
     Identical to calling lookup() for each id in available_crops(), and pinned
-    that way by a test - the form is built from this and the verification on
-    submit is built from lookup(), so the two must never drift.
+    that way by a test - the form is built from this table and a submitted
+    figure is verified against the same row, held over from here rather than
+    fetched again via lookup(), so the two must never drift.
 
     It exists because the whole table travels to the client with the form: the
     crop is chosen there, so the server cannot know in advance which row will

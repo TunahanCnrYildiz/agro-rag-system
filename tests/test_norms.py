@@ -130,6 +130,20 @@ def test_available_crops_is_empty_without_a_file(tmp_path, monkeypatch):
     assert norms.available_crops() == ()
 
 
+def test_latest_year_is_the_last_year_of_the_axis(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, GOOD)
+    assert norms.latest_year() == 2025
+
+
+def test_latest_year_is_none_for_an_empty_table(tmp_path, monkeypatch):
+    """Not derived from any crop's cells - src/budget.py uses this as the
+    dataset's own cutoff to decide whether a price is fresh enough to prefill,
+    and an unreadable file must not silently look like a fresh one."""
+    monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
+    norms._load.cache_clear()
+    assert norms.latest_year() is None
+
+
 def test_a_province_row_is_used_and_reported_as_provincial(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, GOOD)
     n = norms.lookup("domates", "Manisa")
@@ -281,6 +295,23 @@ def test_a_single_prior_value_yields_no_range(tmp_path, monkeypatch):
     _write(tmp_path, monkeypatch, ALTERNATE)
     norm = norms.lookup("findik", "Ordu").price_tl_kg
     assert norm.amount == 202.26
+    assert (norm.recent_min, norm.recent_max) == (None, None)
+
+
+def test_two_equal_prior_values_also_yield_no_range(tmp_path, monkeypatch):
+    """Two IDENTICAL values are not a spread either - '63-63 kg/da' would dress
+    a single observed level as a range just as much as one bare value would."""
+    payload = {
+        "meta": {"years": [2021, 2022, 2023, 2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            "yield_kg_da": {"scope": "il", "TR": [63.0, 63.0, None, None, 90.0]},
+            "price_tl_kg": {"scope": "il", "TR": [1.0, 1.0, 1.0, 1.0, 1.0]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    norm = norms.lookup("x", None).yield_kg_da
+    assert norm.amount == 90.0
     assert (norm.recent_min, norm.recent_max) == (None, None)
 
 
