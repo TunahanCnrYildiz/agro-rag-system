@@ -44,9 +44,36 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
   const [units, setUnits] = useState<Record<string, string>>(() =>
     Object.fromEntries(form.fields.map((f) => [f.id, f.unit ?? f.units[0].id]))
   );
-  const [query, setQuery] = useState("");
+  // Resolved once, from props, so both initializers below agree on which
+  // crop (if any) the rejected form was echoing back.
+  const echoedCrop = form.crop
+    ? (form.crops ?? []).find((c) => c.id === form.crop)
+    : undefined;
+  // A rejected form names its crop by id only; the search box needs the
+  // label to show something other than blank.
+  const [query, setQuery] = useState(() => echoedCrop?.label ?? "");
   const [crop, setCrop] = useState<string | undefined>(form.crop);
-  const [sources, setSources] = useState<Record<string, "norm" | "user">>({});
+  // Without this, a rejected form re-displays with every field unmarked, so
+  // the next submit sends source: "user" for a figure that is still TÜİK's -
+  // and the answer then claims the whole estimate rests on numbers the
+  // farmer typed, when one of them never was. A field is only "norm" when
+  // its echoed value AND unit match the selected crop's cell exactly (the
+  // same comparison the server makes, so client and server can't disagree
+  // about which figures are TÜİK's).
+  const [sources, setSources] = useState<Record<string, "norm" | "user">>(() => {
+    const cellFor: Record<string, NormCell | null | undefined> = {
+      yield_total: echoedCrop?.yield,
+      price: echoedCrop?.price,
+    };
+    const result: Record<string, "norm" | "user"> = {};
+    for (const [id, cell] of Object.entries(cellFor)) {
+      const field = form.fields.find((f) => f.id === id);
+      if (field && cell && field.value === cell.value && field.unit === cell.unit) {
+        result[id] = "norm";
+      }
+    }
+    return result;
+  });
 
   const selected = (form.crops ?? []).find((c) => c.id === crop);
   // The list closes when the box already reads as the chosen crop, and reopens
