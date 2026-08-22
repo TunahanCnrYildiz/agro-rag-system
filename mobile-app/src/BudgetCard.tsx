@@ -5,8 +5,19 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { BudgetPayload, FormSpec } from "./api";
+import { BudgetPayload, CropOption, FormSpec, NormCell } from "./api";
 import { colors } from "./theme";
+
+// Turkish lowercasing, so typing "findik" finds "Fındık". toLowerCase() alone
+// maps I to i but leaves I undotted, and the crops the user searches for most
+// are the ones with dotted capitals.
+function fold(text: string): string {
+  return text
+    .replace(/I/g, "ı")
+    .replace(/İ/g, "i")
+    .toLowerCase()
+    .replace(/[ışğüöç]/g, (c) => ({ ı: "i", ş: "s", ğ: "g", ü: "u", ö: "o", ç: "c" }[c] ?? c));
+}
 
 interface Props {
   form: FormSpec;
@@ -26,26 +37,93 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(form.fields.map((f) => [f.id, f.value]))
   );
+  // A rejected form echoes back the unit the farmer had selected; fall back to
+  // the field's first unit otherwise. Without this a rejection would snap
+  // every chip back to its default and silently contradict the value sitting
+  // next to it.
   const [units, setUnits] = useState<Record<string, string>>(() =>
-    Object.fromEntries(form.fields.map((f) => [f.id, f.units[0].id]))
+    Object.fromEntries(form.fields.map((f) => [f.id, f.unit ?? f.units[0].id]))
   );
+  const [query, setQuery] = useState("");
+  const [crop, setCrop] = useState<string | undefined>(form.crop);
+  const [sources, setSources] = useState<Record<string, "norm" | "user">>({});
+
+  const selected = (form.crops ?? []).find((c) => c.id === crop);
+  // The list closes when the box already reads as the chosen crop, and reopens
+  // the moment the text differs. Clearing `crop` on every keystroke instead
+  // would blank the provenance lines under fields that are still showing its
+  // figures.
+  const matches =
+    query.trim() && query !== selected?.label
+      ? (form.crops ?? []).filter((c) => fold(c.label).includes(fold(query))).slice(0, 8)
+      : [];
+
+  function selectCrop(option: CropOption) {
+    setCrop(option.id);
+    setQuery(option.label);
+    const cells: [string, NormCell | null][] = [
+      ["yield_total", option.yield],
+      ["price", option.price],
+    ];
+    for (const [id, cell] of cells) {
+      if (!cell) continue;
+      // Only fields still marked as a norm are replaced. A figure the farmer
+      // typed is not thrown away because they browsed the crop list.
+      if (sources[id] === "user") continue;
+      setValues((p) => ({ ...p, [id]: cell.value }));
+      // The unit travels with the value: 28,4 under a "kg" chip would claim a
+      // whole orchard yielded 28 kilos.
+      setUnits((p) => ({ ...p, [id]: cell.unit }));
+      setSources((p) => ({ ...p, [id]: "norm" }));
+    }
+  }
 
   function submit() {
     if (disabled) return;
-    const payload: Record<string, { value: string; unit: string }> = {};
+    const payload: Record<string, { value: string; unit: string; source: "norm" | "user" }> = {};
     const parts: string[] = [];
     for (const f of form.fields) {
       const v = (values[f.id] ?? "").trim();
       if (!v) continue;
-      payload[f.id] = { value: v, unit: units[f.id] };
+      payload[f.id] = { value: v, unit: units[f.id], source: sources[f.id] ?? "user" };
       const unit = f.units.find((u) => u.id === units[f.id]);
       parts.push(`${f.label}: ${v} ${unit ? unit.label : ""}`.trim());
     }
+    if (crop) (payload as Record<string, unknown>).crop = crop;
     onSubmit(payload as BudgetPayload, parts.join(" · "));
   }
 
   return (
     <View style={styles.card}>
+      {form.crops && form.crops.length > 0 && (
+        <View style={styles.row}>
+          <Text style={styles.label}>Ürün</Text>
+          <TextInput
+            style={styles.input}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Ürün arayın (örn. fındık)"
+            placeholderTextColor="#9aa"
+          />
+          {matches.map((option) => (
+            <Pressable
+              key={option.id}
+              style={styles.match}
+              onPress={() => selectCrop(option)}
+            >
+              <Text style={styles.matchText}>{option.label}</Text>
+            </Pressable>
+          ))}
+          {matches.length > 0 && (
+            // The explicit way out: a crop we do not carry, or one the farmer
+            // would rather fill in themselves. It selects nothing and prefills
+            // nothing.
+            <Pressable style={styles.match} onPress={() => { setCrop(undefined); setQuery(""); }}>
+              <Text style={styles.matchText}>Diğer (listede yok)</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       {form.fields.map((f) => (
         <View key={f.id} style={styles.row}>
           <Text style={styles.label}>
@@ -57,7 +135,10 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
               style={styles.input}
               keyboardType="numeric"
               value={values[f.id] ?? ""}
-              onChangeText={(t) => setValues((p) => ({ ...p, [f.id]: t }))}
+              onChangeText={(t) => {
+                setValues((p) => ({ ...p, [f.id]: t }));
+                setSources((p) => ({ ...p, [f.id]: "user" }));
+              }}
               placeholder="0"
               placeholderTextColor="#9aa"
             />
@@ -65,7 +146,10 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
               {f.units.map((u) => (
                 <Pressable
                   key={u.id}
-                  onPress={() => setUnits((p) => ({ ...p, [f.id]: u.id }))}
+                  onPress={() => {
+                    setUnits((p) => ({ ...p, [f.id]: u.id }));
+                    setSources((p) => ({ ...p, [f.id]: "user" }));
+                  }}
                   style={[
                     styles.unit,
                     units[f.id] === u.id && styles.unitActive,
@@ -83,7 +167,20 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
               ))}
             </View>
           </View>
-          {f.error ? <Text style={styles.error}>{f.error}</Text> : null}
+          {f.error ? (
+            <Text style={styles.error}>{f.error}</Text>
+          ) : (
+            sources[f.id] === "norm" && (() => {
+              const cell = f.id === "yield_total" ? selected?.yield : f.id === "price" ? selected?.price : null;
+              if (!cell) return null;
+              return (
+                <View>
+                  <Text style={styles.note}>{cell.note}</Text>
+                  {cell.recent ? <Text style={styles.note}>{cell.recent}</Text> : null}
+                </View>
+              );
+            })()
+          )}
         </View>
       ))}
       <Pressable
@@ -131,6 +228,15 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 12, color: colors.dark },
   unitTextActive: { color: "#fff", fontWeight: "600" },
   error: { fontSize: 12, color: "#c0392b" },
+  note: { fontSize: 11, color: "#6b7a6b" },
+  match: {
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8e2",
+  },
+  matchText: { fontSize: 13, color: colors.dark },
   submit: {
     backgroundColor: colors.green,
     borderRadius: 8,
