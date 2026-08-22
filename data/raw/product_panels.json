@@ -2,7 +2,9 @@
  "meta": {
   "fetched": "2026-08-22",
   "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
-  "products": 48
+  "products_read": 48,
+  "panels_captured": 48,
+  "no_panel": []
  },
  "panels": {
   "HIGRO WETT": "HIGRO WETT gübrelerle 100 litre suya 100cc karıştılarak kullanılır. HIGRO WETT ayrıca hasattan bir gün önce 100 litre suya 500 cc karıştırıp bolca pülverize edildiğinde meyveler üzerindeki her türlü kireçli su, gübre lekelerini temizleyerek meyvede parlak bir görünüm sağlar. HIGRO WETT aşırı sıcak ve güneşli havalarda Gölge Tozu ile birlikte seraların üzerine uygulanınca sıcaktan oluşabilecek sorunları uzun süre çözmeye yardımcı olur; 100 litre suya 1 litre HIGRO WETT gelecek şekilde eklenerek uygulama yapılmaktadır.",
