@@ -273,13 +273,38 @@ def _crop_rows(table) -> list[dict]:
     return rows
 
 
-def form_spec(errors: list[FieldError], table=None) -> dict:
+def _echo(spec: FieldSpec, submitted: dict | None) -> dict:
+    """What the user typed, given back verbatim.
+
+    Verbatim matters: this is the value the error message is ABOUT, so
+    reformatting it would show the user something other than what was rejected.
+    A number that arrived as JSON becomes text, because that is what a text
+    input holds and what parse_tr_number reads.
+    """
+    entry = (submitted or {}).get(spec.id)
+    if not isinstance(entry, dict):
+        return {"value": "", "unit": spec.units[0].id}
+    value = entry.get("value")
+    unit = entry.get("unit")
+    return {
+        "value": "" if value is None else str(value),
+        # An unrecognised unit falls back to the first, or the card would render
+        # with no chip selected and no way to tell why.
+        "unit": unit if any(u.id == unit for u in spec.units) else spec.units[0].id,
+    }
+
+
+def form_spec(errors: list[FieldError], table=None, submitted=None) -> dict:
     """Serialise FIELDS for the client, attaching each error to its own field.
 
     `table` is a province's worth of norms, from norms.province_table. When it
     is absent - no province resolved, or a broken data file - the output is
     byte-identical to P1's, because an already-deployed client reads this dict
     and an unexpected key is a wire change wearing an addition's clothes.
+
+    `submitted` is the payload that failed validation. Echoing it back is not a
+    nicety: the card seeds its state from `value`, so without it a single bad
+    field wipes the whole form, the crop selection and its prefill included.
     """
     by_field = {e.field: e.message for e in errors}
     spec = {
@@ -296,6 +321,12 @@ def form_spec(errors: list[FieldError], table=None) -> dict:
             for f in FIELDS
         ]
     }
+    if submitted:
+        for field in spec["fields"]:
+            field.update(_echo(_FIELDS_BY_ID[field["id"]], submitted))
+        crop = submitted.get("crop")
+        if isinstance(crop, str) and crop.strip():
+            spec["crop"] = crop
     if table:
         spec["crops"] = _crop_rows(table)
     return spec

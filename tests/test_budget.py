@@ -505,3 +505,47 @@ def test_no_raw_float_reaches_the_wire():
         for key in ("yield", "price"):
             if crop[key] is not None:
                 assert isinstance(crop[key]["value"], str)
+
+
+def test_a_rejected_form_carries_back_what_was_typed():
+    """Without this, the error Task 3 introduces - a per-dekar yield with no
+    area - throws away the crop and every other field the user filled."""
+    submitted = {
+        "crop": "findik",
+        "area": {"value": "", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "202,26", "unit": "tl_kg"},
+    }
+    _, errors = budget.validate(submitted)
+    spec = budget.form_spec(errors, _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["value"] == "100"
+    assert fields["yield_total"]["unit"] == "kg_da"
+    assert fields["price"]["value"] == "202,26"
+    assert spec["crop"] == "findik"
+    assert fields["area"]["error"]
+
+
+def test_an_unsubmitted_form_carries_no_values_and_no_unit_key():
+    """Nothing was submitted, so there is nothing to echo and P1's shape holds."""
+    spec = budget.form_spec([], _table())
+    for field in spec["fields"]:
+        assert field["value"] == ""
+        assert "unit" not in field
+    assert "crop" not in spec
+
+
+def test_an_unknown_unit_is_not_echoed_back():
+    """A unit the field does not offer would render as no chip selected at all."""
+    submitted = {"yield_total": {"value": "100", "unit": "furlong"}}
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["unit"] == "kg"
+
+
+def test_a_non_string_submitted_value_is_echoed_as_text():
+    """A JSON number is a legal submission; echoing it as a float would put a
+    dot decimal into a field parse_tr_number refuses."""
+    spec = budget.form_spec([], None, {"area": {"value": 5, "unit": "donum"}})
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["area"]["value"] == "5"
