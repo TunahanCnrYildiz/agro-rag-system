@@ -63,6 +63,10 @@ class UnitOption:
     id: str
     label: str
     factor: float          # multiply by this to reach the canonical unit
+    # A per-area unit needs the area before it means anything. Kept a property
+    # of the UNIT rather than a second field, so the conversion stays one line
+    # and a new per-area unit needs no new branch.
+    per_area: bool = False
 
 
 @dataclass(frozen=True)
@@ -82,9 +86,14 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("area", "Alan", True, 0.0, True,
               (UnitOption("donum", "dönüm", 1.0),
                UnitOption("hektar", "hektar", 10.0))),
-    FieldSpec("yield_total", "Toplam ürün", True, 0.0, False,
+    # "Toplam" would be wrong under kg/dekar, so the label is neutral across all
+    # three units. The per-dekar unit exists because TUIK publishes yields that
+    # way and P2b prefills them; a farmer stating their own harvest still picks
+    # kg or ton and states a total, exactly as in P1.
+    FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
-               UnitOption("ton", "ton", 1000.0))),
+               UnitOption("ton", "ton", 1000.0),
+               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -142,7 +151,8 @@ def _coerce(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict) -> tuple[Value | None, FieldError | None]:
+def _read(spec: FieldSpec, raw: dict, area_da: float | None
+          ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
         if spec.required:
@@ -164,6 +174,15 @@ def _read(spec: FieldSpec, raw: dict) -> tuple[Value | None, FieldError | None]:
     if not spec.min_exclusive and amount < spec.min_value:
         return None, FieldError(spec.id, f"{spec.label} negatif olamaz.")
 
+    if unit.per_area:
+        if area_da is None:
+            # Refused, never multiplied by a guessed area and never zeroed.
+            return None, FieldError(
+                spec.id,
+                f"{spec.label} için dekar başına değer girdiniz; "
+                f"önce alanı doldurun.")
+        amount = amount * area_da
+
     return Value(amount * unit.factor, "user"), None
 
 
@@ -176,8 +195,22 @@ def validate(raw: dict) -> tuple[BudgetInputs | None, list[FieldError]]:
     raw = raw if isinstance(raw, dict) else {}
     values: dict[str, Value | None] = {}
     errors: list[FieldError] = []
+
+    # The area is read before everything else because a per-area unit cannot be
+    # converted without it. Reading it out of FIELDS order rather than relying
+    # on the tuple happening to list it first: that order is a layout decision,
+    # not a contract, and a reorder would silently break every per-area field.
+    area_spec = _FIELDS_BY_ID["area"]
+    area_value, area_error = _read(area_spec, raw, None)
+    values[area_spec.id] = area_value
+    if area_error is not None:
+        errors.append(area_error)
+    area_da = area_value.amount if area_value is not None else None
+
     for spec in FIELDS:
-        value, error = _read(spec, raw)
+        if spec.id == area_spec.id:
+            continue
+        value, error = _read(spec, raw, area_da)
         values[spec.id] = value
         if error is not None:
             errors.append(error)

@@ -363,3 +363,64 @@ def test_the_ask_sentence_stands_on_its_own():
     sentence, so it has to be an honest answer rather than a widget caption."""
     assert len(budget.ASK_FOR_NUMBERS) > 40
     assert "form" not in budget.ASK_FOR_NUMBERS.lower()
+
+
+def test_a_per_dekar_yield_equals_the_same_total_entered_directly():
+    per_area = {
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    }
+    total = {
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "500", "unit": "kg"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    }
+    a, errs_a = budget.validate(per_area)
+    b, errs_b = budget.validate(total)
+    assert errs_a == [] and errs_b == []
+    assert a.yield_kg.amount == b.yield_kg.amount == 500.0
+    assert budget.compute(a).revenue_tl == budget.compute(b).revenue_tl
+
+
+def test_a_per_dekar_yield_without_an_area_is_a_field_error_not_a_zero():
+    """The binding rule: a value we cannot convert is refused, never quietly
+    turned into 0 - a zero flows into the arithmetic and comes out confident."""
+    inputs, errors = budget.validate({
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    })
+    assert inputs is None
+    assert "yield_total" in {e.field for e in errors}
+
+
+def test_a_per_dekar_yield_with_an_unparseable_area_is_also_refused():
+    inputs, errors = budget.validate({
+        "area": {"value": "beş", "unit": "donum"},
+        "yield_total": {"value": "100", "unit": "kg_da"},
+        "price": {"value": "10", "unit": "tl_kg"},
+    })
+    assert inputs is None
+    assert {"area", "yield_total"} <= {e.field for e in errors}
+
+
+def test_the_yield_label_reads_correctly_under_every_unit_it_offers():
+    """'Toplam' is wrong for kg/dekar, and a label that contradicts the selected
+    unit is the mismatch the selector exists to prevent."""
+    spec = next(f for f in budget.FIELDS if f.id == "yield_total")
+    assert "toplam" not in spec.label.lower()
+    assert [u.id for u in spec.units] == ["kg", "ton", "kg_da"]
+    assert [u.per_area for u in spec.units] == [False, False, True]
+
+
+def test_the_original_units_are_untouched():
+    """P1 regression: 2 ton off 5 donum is still 2000 kg."""
+    inputs, errors = budget.validate({
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "2", "unit": "ton"},
+        "price": {"value": "10", "unit": "tl_kg"},
+        "cost": {"value": "5000", "unit": "tl"},
+    })
+    assert errors == []
+    assert inputs.yield_kg.amount == 2000.0
+    assert budget.compute(inputs).margin_tl == 15000.0
