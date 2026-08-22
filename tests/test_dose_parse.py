@@ -5,6 +5,7 @@ a pattern are exactly the ones nobody invents."""
 import pytest
 
 from src.dose_parse import parse_dose
+from src.dose_parse import parse_panel
 
 
 @pytest.mark.parametrize("text, expected", [
@@ -94,3 +95,109 @@ def test_hectares_are_not_read_as_dekars():
     """A per-hectare figure is ten times a per-dekar one. Reading it as dekars
     would multiply every answer by ten, silently."""
     assert parse_dose("hektara 20 litre uygulanır") is None
+
+
+# Verbatim, HİGRO FUBBY, fetched 2026-08-22.
+FUBBY = ("Sebzelerde : Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, "
+         "Damlamadan 250 gr/ 1000m² alana uygulanılır. "
+         "Meyvelerde : Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, "
+         "Damlamadan 250 gr/ 1000m² alana uygulanılır. "
+         "Tarla bitkilerinde : Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, "
+         "Damlamadan 250 gr/ 1000m² alana uygulanılır.")
+
+# Verbatim, HİGRO BARF. Different figures per group - the case that makes
+# group segmentation load-bearing rather than decorative.
+BARF = ("Çiçek öncesi ve sonrası dönemlerde uygulama dozları : "
+        "Sebzelerde : Yapraktan uygulama ile 100 cc / 100 litre suya "
+        "Damlama sulama ile 2-2,5 litre / 1000m² (da) "
+        "Meyve Ağaçlarında: Yapraktan uygulama ile 200-250 cc / 100 litre suya "
+        "Damlama sulama ile 2,5-3 litre / 1000m²(da)")
+
+# Verbatim, BİNGO. Area first, and no method word at all.
+BINGO = ("Sebzeler İçin: 1000m² alan için damla sulama ile 2 – 2.5 litre uygulayın. "
+         "Meyve Ağaçları İçin: 1000m² alan için damla sulama ile 2 – 3 litre uygulayın. "
+         "Tarla Bitkileri İçin: 1000m² alan için damla sulama ile 2 – 2.5 litre uygulayın.")
+
+# Verbatim, HIGRO 8 MN, with the page furniture already cut by Task 1.
+MN = ("YAPRAKTAN: Mangan eksikliği görüldüğü her dönemde; 100 litre suya 200 – 250 cc "
+      "Higro 8 Mn ilave edilerek uygulama yapılabilir. DAMLAMA SULAMA: Mangan "
+      "eksikliğinde bir dekara (1.000 m²) 2 – 2,5 litre dozunda Higro 8 Mn "
+      "uygulaması yapılabilir.")
+
+# Verbatim, HİGRO ABS. No dose anywhere.
+ABS = ("HİGRO ABS, Kullanılacak çeşitlerde, etikette önerilen uygulama dozajlarına "
+       "dikkat edilmesi gerekmektedir. Sadece Topraktan uygulama yapılmalıdır, bu "
+       "uyarıya dikkat edilmelidir.")
+
+
+def test_each_group_gets_its_own_dose():
+    parsed = parse_panel(FUBBY)
+    assert set(parsed) == {"sebze", "meyve", "tarla"}
+    for group in parsed:
+        assert parsed[group]["damlama"] == (250.0, 250.0, "gr")
+
+
+def test_groups_with_different_figures_stay_different():
+    """If segmentation silently merged them, a fruit grower would be given the
+    vegetable dose - a wrong number that looks entirely plausible."""
+    parsed = parse_panel(BARF)
+    assert parsed["sebze"]["damlama"] == (2.0, 2.5, "litre")
+    assert parsed["meyve"]["damlama"] == (2.5, 3.0, "litre")
+
+
+def test_the_foliar_dilution_is_not_stored_as_a_dose():
+    """Both panels put a 100-litre dilution in the same sentence as the
+    per-dekar figure. Only the per-dekar one is a dose."""
+    parsed = parse_panel(FUBBY)
+    assert "yaprak" not in parsed["sebze"]
+
+
+def test_a_group_heading_without_a_colon_is_still_a_heading():
+    """HİGRO CUFİT and ZİNCER write 'Sebzelerde Yapraktan ...' with no colon;
+    a pattern that requires one loses both products."""
+    text = ("Sebzelerde Damlamadan 1 litre / 1000m² uygulanır. "
+            "Meyvelerde Damlamadan 2 litre / 1000m² uygulanır.")
+    parsed = parse_panel(text)
+    assert parsed["sebze"]["damlama"] == (1.0, 1.0, "litre")
+    assert parsed["meyve"]["damlama"] == (2.0, 2.0, "litre")
+
+
+def test_an_area_first_clause_is_read():
+    parsed = parse_panel(BINGO)
+    assert parsed["sebze"]["damlama"] == (2.0, 2.5, "litre")
+    assert parsed["meyve"]["damlama"] == (2.0, 3.0, "litre")
+
+
+def test_a_panel_with_no_group_headings_applies_to_all():
+    """HIGRO 8 MN names methods, not groups. With no group stated we must not
+    invent one, so the dose is recorded as applying to all of them."""
+    parsed = parse_panel(MN)
+    assert set(parsed) == {"hepsi"}
+    assert parsed["hepsi"]["damlama"] == (2.0, 2.5, "litre")
+    assert "yaprak" not in parsed["hepsi"]
+
+
+def test_a_comma_separates_the_foliar_clause_from_the_drip_one():
+    """One sentence, two halves, a comma between them. Without splitting on the
+    comma the drip figure is credited to 'yaprak', because that word comes
+    first in the sentence."""
+    parsed = parse_panel(FUBBY)
+    assert parsed["sebze"]["damlama"] == (250.0, 250.0, "gr")
+    assert "yaprak" not in parsed["sebze"]
+
+
+def test_two_figures_for_one_method_become_the_span_they_cover():
+    """FLY AZOT publishes 200 cc for dry farming and 250 cc for irrigated in one
+    unqualified block. Keeping the first would silently choose between two
+    published figures."""
+    text = ("kıraç üretimde dekara 200 cc yapraktan uygulanır. "
+            "Sulu üretimde dekara 250 cc yapraktan uygulanır.")
+    assert parse_panel(text)["hepsi"]["yaprak"] == (200.0, 250.0, "cc")
+
+
+def test_a_panel_with_no_dose_yields_nothing():
+    assert parse_panel(ABS) == {}
+
+
+def test_an_empty_panel_yields_nothing():
+    assert parse_panel("") == {}

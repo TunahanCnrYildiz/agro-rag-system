@@ -110,3 +110,99 @@ def parse_dose(text: str) -> tuple[float, float, str] | None:
                 low, high = high, low
             return low, high, _unit(match.group("unit"))
     return None
+
+
+# The three crop groups, as the panels head them. The colon is optional: two
+# products write "Sebzelerde Yapraktan ..." and a pattern that requires one
+# loses them both.
+_GROUPS = (
+    ("sebze", r"sebze\w*"),
+    ("meyve", r"meyve\s*a[ğg]a[çc]\w*|meyve\w*"),
+    ("tarla", r"tarla\s*bitki\w*"),
+)
+_GROUP_RE = re.compile(
+    r"(?P<head>" + "|".join(pattern for _, pattern in _GROUPS) + r")\s*(?:i[çc]in)?\s*:?",
+    re.I)
+
+_METHODS = (("damlama", r"damlama\w*|damla\s+sulama"), ("yaprak", r"yaprak\w*"))
+
+# THE COMMA IS A CLAUSE BOUNDARY HERE. The panels write
+# "Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, Damlamadan 250 gr/ 1000m²"
+# as one sentence, so splitting on . and ; alone leaves the dilution and the
+# dose in the same clause and the method attribution picks whichever word came
+# first. Measured: without the comma the drip figure is credited to "yaprak".
+_CLAUSE = re.compile(r"(?<=[.;,])\s+")
+
+
+def _widen(existing, dose):
+    """Several figures for one group and method: keep the span they cover.
+
+    One product does this - FLY AZOT publishes 200 cc for dry farming and
+    250 cc for irrigated in the same unqualified block. Keeping the first would
+    silently pick one of two published figures; the span the source's own
+    numbers cover states both, and invents nothing between them.
+
+    Units that disagree are NOT merged - there is no conversion from a gram to
+    a litre without a density the page never gives - so the first unit wins and
+    the other figure is dropped. No panel does this today; if one starts to, the
+    converter's coverage report is where it will show up.
+    """
+    if existing is None:
+        return dose
+    if existing[2] != dose[2]:
+        return existing
+    return (min(existing[0], dose[0]), max(existing[1], dose[1]), existing[2])
+
+# No group named anywhere means the dose is not qualified by one. Recording it
+# under every group would claim the page said something it did not; this key
+# says plainly that it applies to all.
+ALL_GROUPS = "hepsi"
+
+
+def _method_of(clause: str) -> str:
+    """Which application method this clause describes.
+
+    Defaults to drip, and that is a DOCUMENTED DEFAULT rather than a reading of
+    the text: of the 42 products publishing a per-area figure, 37 attach it to
+    drip only, and the three panels naming no method describe soil or drip
+    application. Foliar figures are almost always dilutions, which parse_dose
+    refuses anyway.
+    """
+    for key, pattern in _METHODS:
+        if re.search(pattern, clause, re.I):
+            return key
+    return "damlama"
+
+
+def _segments(text: str) -> list[tuple[str, str]]:
+    """Split a panel into (group, text) pairs at its group headings."""
+    matches = list(_GROUP_RE.finditer(text))
+    if not matches:
+        return [(ALL_GROUPS, text)]
+    out = []
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        head = match.group("head").lower()
+        group = next(key for key, pattern in _GROUPS
+                     if re.fullmatch(pattern, head, re.I))
+        out.append((group, text[match.end():end]))
+    return out
+
+
+def parse_panel(text: str) -> dict[str, dict[str, tuple[float, float, str]]]:
+    """A whole Uygulama panel as {group: {method: (low, high, unit)}}.
+
+    Only per-dekar figures survive; dilutions are dropped by parse_dose. A
+    panel yielding nothing returns an empty mapping, which is how the converter
+    learns to report it rather than write an empty row.
+    """
+    result: dict[str, dict[str, tuple[float, float, str]]] = {}
+    for group, segment in _segments(text):
+        for clause in _CLAUSE.split(segment):
+            dose = parse_dose(clause)
+            if dose is None:
+                continue
+            slot = result.setdefault(group, {})
+            method = _method_of(clause)
+            slot[method] = _widen(slot.get(method), dose)
+    return result
