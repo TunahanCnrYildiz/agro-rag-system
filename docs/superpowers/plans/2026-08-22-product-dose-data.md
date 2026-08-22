@@ -263,6 +263,10 @@ def main() -> None:
     for i, product in enumerate(products, 1):
         name = product["product_name"]
         soup = fetch(session, product["source_url"], "dose-panels")
+        # The delay is owed to the site whatever the outcome, so it is taken
+        # before any branch can skip it. A run of failures must not turn into
+        # a burst of requests.
+        time.sleep(REQUEST_DELAY_SECONDS)
         if soup is None:
             missing.append(name)
             print(f"[{i}/{len(products)}] FETCH FAILED {name}")
@@ -270,16 +274,25 @@ def main() -> None:
         tabs = extract_tab_panels(soup)
         text = next((v for k, v in tabs.items() if DOSE_TAB in k), "")
         if not text:
+            # An empty panel is a finding, and it must travel WITH the file.
+            # Writing it as an entry would leave a later run that silently lost
+            # two products looking complete: the count would still read 48.
             missing.append(name)
+            print(f"[{i}/{len(products)}] NO PANEL {name}")
+            continue
         panels[name] = text
         print(f"[{i}/{len(products)}] {name[:40]:40} {len(text):5} chars")
-        time.sleep(REQUEST_DELAY_SECONDS)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(
         {"meta": {"fetched": date.today().isoformat(),
                   "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
-                  "products": len(panels)},
+                  # Both numbers, so the file says on its face whether anything
+                  # was lost. A single count cannot distinguish "48 products,
+                  # all read" from "48 products, two of them empty".
+                  "products_read": len(products),
+                  "panels_captured": len(panels),
+                  "no_panel": missing},
          "panels": panels},
         ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\nwrote {len(panels)} panels -> {OUT}")
@@ -340,6 +353,20 @@ Commit them as fetched. A converter whose input is not in the repo cannot be re-
 
 And the trap in the other direction: **a dilution must never be read as a per-area dose.** `100 litre suya 250 gram` contains a number, a unit, and the word `litre`; it is per 100 L of water, not per dekar.
 
+**Two more defects surfaced while this task was executed — recorded so the code below is not
+re-read as finished.** The pages also write a numeral gloss between the figure and its unit
+(`bir dekara (1.000 m²) 3 (üç) litre`), so `_AMOUNT` needs to tolerate a parenthetical. Widening it
+WITHOUT widening `_AMOUNT_BARE` reopens the dilution hole: a dilution carrying the same gloss
+becomes invisible to `_DILUTION`, the skip never fires, and the parser returns the **water's own
+volume** as a per-dekar dose. The two patterns must stay in lock-step, and a comment on each should
+say so.
+
+And the sharper lesson: **none of this task's tests exercised the per-figure skip.** Deleting the
+whole mechanism left all of them passing, because `_GAP`'s comma bound was doing the work. A test
+that credits a mechanism has to fail when the mechanism is removed — verify that by disabling it
+and watching the test go red, or the coverage is decorative. That gap is exactly how the defect
+above survived a full task review.
+
 - [ ] **Step 1: Write the failing tests**
 
 Create `tests/test_dose_parse.py`:
@@ -395,6 +422,21 @@ def test_text_with_no_per_area_dose_returns_none(text):
     """None, never a guess and never a zero: a wrong number here is a wrong
     purchase."""
     assert parse_dose(text) is None
+
+
+def test_a_dose_survives_beside_a_dilution_in_the_same_sentence():
+    """HİGRO BARF writes both halves as one unpunctuated sentence. Refusing the
+    whole clause on sight of a dilution was measured and drops the catalog from
+    42 products to 10."""
+    text = ("Yapraktan uygulama ile 100 cc / 100 litre suya "
+            "Damlama sulama ile 2-2,5 litre / 1000m² (da)")
+    assert parse_dose(text) == (2.0, 2.5, "litre")
+
+
+def test_the_dilutions_own_amount_is_still_refused():
+    """The 100 cc belongs to the water, not to the dekar - and it is the figure
+    that appears FIRST, so a matcher that stops at the first amount takes it."""
+    assert parse_dose("Yapraktan uygulama ile 100 cc / 100 litre suya") is None
 
 
 def test_the_low_bound_is_never_above_the_high_bound():
@@ -458,17 +500,24 @@ _AMOUNT = rf"(?P<low>{_NUMBER})\s*(?:[-–]\s*(?P<high>{_NUMBER}))?\s*(?P<unit>{
 # other multiplies every answer by ten with nothing to show for it.
 _AREA = r"(?:dekar[ae]?|d[oö]n[uü]m[ae]?|1[.\s]?000\s*m\s*[²2]|1000\s*m\s*[²2])"
 
+# The same amount with NO named groups. A pattern may only name a group once,
+# so reusing _AMOUNT on both sides of the dilution alternation below raises
+# re.PatternError at import time - verified, not guessed.
+_AMOUNT_BARE = rf"{_NUMBER}\s*(?:[-–]\s*{_NUMBER})?\s*(?:{_UNIT_RE})"
+
 # Water, so a dilution can be recognised and refused.
 _WATER = r"\d+\s*(?:litre|lt|l)\s*su"
 
 # The amount sits on either side of the area, and up to ~40 characters away
-# ("1000m² alan için damla sulama ile 2 – 2.5 litre" is 26). Stop at sentence
-# punctuation so a dose cannot borrow a number from the next clause.
-_GAP = r"[^.;:]{0,40}?"
+# ("1000m² alan için damla sulama ile 2 – 2.5 litre" is 26). Stop at any clause
+# punctuation, THE COMMA INCLUDED, so a dose cannot borrow a number from the
+# next clause: the panels separate the foliar and drip halves of one sentence
+# with a comma and nothing else.
+_GAP = r"[^.;:,]{0,40}?"
 _AMOUNT_THEN_AREA = re.compile(_AMOUNT + _GAP + _AREA, re.I)
 _AREA_THEN_AMOUNT = re.compile(_AREA + _GAP + _AMOUNT, re.I)
 _DILUTION = re.compile(
-    rf"(?:{_AMOUNT}{_GAP}{_WATER}|{_WATER}{_GAP}{_AMOUNT})", re.I)
+    rf"(?:{_AMOUNT_BARE}{_GAP}{_WATER}|{_WATER}{_GAP}{_AMOUNT_BARE})", re.I)
 
 
 def _number(text: str) -> float:
@@ -489,21 +538,30 @@ def _unit(spelling: str) -> str:
 def parse_dose(text: str) -> tuple[float, float, str] | None:
     """One clause's per-dekar dose as (low, high, unit), or None.
 
-    A clause containing a dilution is refused outright rather than searched for
-    an area figure as well: the panels put both in one sentence, and a matcher
-    that keeps looking will eventually pair a dilution's amount with an area
-    that belongs to the other half.
+    A DILUTION DISQUALIFIES ITS OWN AMOUNT, NOT THE WHOLE CLAUSE. Refusing the
+    clause outright was tried and measured: it drops the count from 42 products
+    to 10, because panels like HİGRO BARF write
+
+        Yapraktan uygulama ile 100 cc / 100 litre suya
+        Damlama sulama ile 2-2,5 litre / 1000m² (da)
+
+    as ONE unpunctuated sentence. The dilution and the dose sit side by side, so
+    the test has to be per-figure: an amount that is bound to a volume of water
+    is not a per-area dose, and an amount that is bound to an area is - even
+    when both appear in the same breath.
     """
-    if _DILUTION.search(text):
-        return None
-    match = _AMOUNT_THEN_AREA.search(text) or _AREA_THEN_AMOUNT.search(text)
-    if match is None:
-        return None
-    low = _number(match.group("low"))
-    high = _number(match.group("high")) if match.group("high") else low
-    if high < low:
-        low, high = high, low
-    return low, high, _unit(match.group("unit"))
+    diluted = [m.span() for m in _DILUTION.finditer(text)]
+    for pattern in (_AMOUNT_THEN_AREA, _AREA_THEN_AMOUNT):
+        for match in pattern.finditer(text):
+            start, end = match.span("low")
+            if any(a <= start and end <= b for a, b in diluted):
+                continue
+            low = _number(match.group("low"))
+            high = _number(match.group("high")) if match.group("high") else low
+            if high < low:
+                low, high = high, low
+            return low, high, _unit(match.group("unit"))
+    return None
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -632,6 +690,24 @@ def test_a_panel_with_no_group_headings_applies_to_all():
     assert "yaprak" not in parsed["hepsi"]
 
 
+def test_a_comma_separates_the_foliar_clause_from_the_drip_one():
+    """One sentence, two halves, a comma between them. Without splitting on the
+    comma the drip figure is credited to 'yaprak', because that word comes
+    first in the sentence."""
+    parsed = parse_panel(FUBBY)
+    assert parsed["sebze"]["damlama"] == (250.0, 250.0, "gr")
+    assert "yaprak" not in parsed["sebze"]
+
+
+def test_two_figures_for_one_method_become_the_span_they_cover():
+    """FLY AZOT publishes 200 cc for dry farming and 250 cc for irrigated in one
+    unqualified block. Keeping the first would silently choose between two
+    published figures."""
+    text = ("kıraç üretimde dekara 200 cc yapraktan uygulanır. "
+            "Sulu üretimde dekara 250 cc yapraktan uygulanır.")
+    assert parse_panel(text)["hepsi"]["yaprak"] == (200.0, 250.0, "cc")
+
+
 def test_a_panel_with_no_dose_yields_nothing():
     assert parse_panel(ABS) == {}
 
@@ -666,6 +742,39 @@ _GROUP_RE = re.compile(
     re.I)
 
 _METHODS = (("damlama", r"damlama\w*|damla\s+sulama"), ("yaprak", r"yaprak\w*"))
+
+# THE COMMA IS A CLAUSE BOUNDARY HERE. The panels write
+# "Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, Damlamadan 250 gr/ 1000m²"
+# as one sentence, so splitting on . and ; alone leaves the dilution and the
+# dose in the same clause and the method attribution picks whichever word came
+# first. Measured: without the comma the drip figure is credited to "yaprak".
+_CLAUSE = re.compile(r"(?<=[.;,])\s+")
+
+
+def _widen(existing, dose):
+    """Several figures for one group and method: keep the span they cover.
+
+    One product does this - FLY AZOT publishes 200 cc for dry farming and
+    250 cc for irrigated in the same unqualified block. Keeping the first would
+    silently pick one of two published figures; the span the source's own
+    numbers cover states both, and invents nothing between them.
+
+    Units that disagree are NOT merged - there is no conversion from a gram to
+    a litre without a density the page never gives.
+
+    A PANEL DOES DO THIS, and keeping the first figure was measured to be wrong:
+    FLY AZOT's drip slot came out as 250 cc where the page publishes 1-1,5 litre,
+    four to six times low, about a quantity a farmer buys. The 250 cc is its
+    FOLIAR figure, landing in the drip slot because the clause that carries it
+    happens to contain the word "Damlama" further along. So a unit disagreement
+    drops the slot entirely and surfaces it, rather than choosing between two
+    published figures - absence, never a guess.
+    """
+    if existing is None:
+        return dose
+    if existing[2] != dose[2]:
+        return existing
+    return (min(existing[0], dose[0]), max(existing[1], dose[1]), existing[2])
 
 # No group named anywhere means the dose is not qualified by one. Recording it
 # under every group would claim the page said something it did not; this key
@@ -712,11 +821,13 @@ def parse_panel(text: str) -> dict[str, dict[str, tuple[float, float, str]]]:
     """
     result: dict[str, dict[str, tuple[float, float, str]]] = {}
     for group, segment in _segments(text):
-        for clause in re.split(r"(?<=[.;])\s+", segment):
+        for clause in _CLAUSE.split(segment):
             dose = parse_dose(clause)
             if dose is None:
                 continue
-            result.setdefault(group, {}).setdefault(_method_of(clause), dose)
+            slot = result.setdefault(group, {})
+            method = _method_of(clause)
+            slot[method] = _widen(slot.get(method), dose)
     return result
 ```
 
