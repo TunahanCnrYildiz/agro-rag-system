@@ -575,17 +575,32 @@ def _table():
 
 
 def test_a_form_with_no_table_is_byte_identical_to_p1():
-    """An old deployed client reads this dict. Adding a key it does not expect
-    is a wire change dressed as an addition."""
+    """An old deployed client reads this dict, so it is pinned as a LITERAL.
+
+    Rebuilding the expected value from budget.FIELDS with the same comprehension
+    form_spec uses would assert only that the function is itself - it would
+    follow any change to a label, a unit id or the key set rather than catch it.
+    A wire contract is pinned by writing it out."""
     assert budget.form_spec([]) == {
         "fields": [
-            {"id": f.id, "label": f.label, "required": f.required,
-             "units": [{"id": u.id, "label": u.label} for u in f.units],
-             "value": "", "source": "empty", "error": None}
-            for f in budget.FIELDS
+            {"id": "area", "label": "Alan", "required": True,
+             "units": [{"id": "donum", "label": "dönüm"},
+                       {"id": "hektar", "label": "hektar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "yield_total", "label": "Ürün miktarı", "required": True,
+             "units": [{"id": "kg", "label": "kg"},
+                       {"id": "ton", "label": "ton"},
+                       {"id": "kg_da", "label": "kg/dekar"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "price", "label": "Fiyat", "required": True,
+             "units": [{"id": "tl_kg", "label": "TL/kg"},
+                       {"id": "tl_ton", "label": "TL/ton"}],
+             "value": "", "source": "empty", "error": None},
+            {"id": "cost", "label": "Masraf", "required": False,
+             "units": [{"id": "tl", "label": "TL"}],
+             "value": "", "source": "empty", "error": None},
         ]
     }
-    assert "crops" not in budget.form_spec([])
 
 
 def test_a_table_ships_every_crop_with_its_figures():
