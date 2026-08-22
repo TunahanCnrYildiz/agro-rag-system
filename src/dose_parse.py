@@ -134,6 +134,16 @@ _METHODS = (("damlama", r"damlama\w*|damla\s+sulama"), ("yaprak", r"yaprak\w*"))
 _CLAUSE = re.compile(r"(?<=[.;,])\s+")
 
 
+
+# Sentinel meaning "two figures for this slot disagreed in unit and neither
+# is recorded". Never returned to a caller of parse_panel - _parse strips
+# these slots out before either parse_panel or conflicting_slots sees the
+# result - but it has to be distinguishable from every real dose and from
+# None (which means "no figure seen yet"), so a private object identity is
+# used rather than a value that could collide with parsed data.
+_CONFLICT = object()
+
+
 def _widen(existing, dose):
     """Several figures for one group and method: keep the span they cover.
 
@@ -142,15 +152,26 @@ def _widen(existing, dose):
     silently pick one of two published figures; the span the source's own
     numbers cover states both, and invents nothing between them.
 
-    Units that disagree are NOT merged - there is no conversion from a gram to
-    a litre without a density the page never gives - so the first unit wins and
-    the other figure is dropped. No panel does this today; if one starts to, the
-    converter's coverage report is where it will show up.
+    Units that disagree are NOT merged and NOT resolved by picking one - this
+    is not hypothetical, it is FLY AZOT again, a different clause of the same
+    panel. Its drip sentence reads "(Bir dekara 250 cc) Damlama ..." - a
+    FOLIAR figure that _method_of (see its docstring) attributes to drip
+    because "Damlama" is simply the next word in the sentence - and the real
+    drip figure, "1 – 1,5 litre", follows a few words later in the same
+    clause chain. There is no density on the page to convert a cc to a litre,
+    keeping the first published figure would silently prefer 250 cc over the
+    real 1-1.5 litre (roughly four to six times too low - a farmer buying
+    exactly the wrong amount), and widening to "250-1500 cc" would assert a
+    span the page never states. So a unit mismatch resolves to _CONFLICT: the
+    slot is dropped entirely, and conflicting_slots() below is how the caller
+    learns a slot went missing this way rather than never having a figure.
     """
+    if existing is _CONFLICT:
+        return _CONFLICT
     if existing is None:
         return dose
     if existing[2] != dose[2]:
-        return existing
+        return _CONFLICT
     return (min(existing[0], dose[0]), max(existing[1], dose[1]), existing[2])
 
 # No group named anywhere means the dose is not qualified by one. Recording it
@@ -189,12 +210,16 @@ def _segments(text: str) -> list[tuple[str, str]]:
     return out
 
 
-def parse_panel(text: str) -> dict[str, dict[str, tuple[float, float, str]]]:
-    """A whole Uygulama panel as {group: {method: (low, high, unit)}}.
+def _parse(text: str):
+    """Shared body for parse_panel and conflicting_slots.
 
-    Only per-dekar figures survive; dilutions are dropped by parse_dose. A
-    panel yielding nothing returns an empty mapping, which is how the converter
-    learns to report it rather than write an empty row.
+    Builds the {group: {method: (low, high, unit)}} mapping exactly as before,
+    then makes a second pass to pull out any slot _widen marked as _CONFLICT -
+    both which (group, method) pairs those were, and the mapping with those
+    slots (and any group left empty by their removal) taken back out. Doing
+    both passes here, once, is what lets parse_panel's return type stay
+    untouched while still giving the converter somewhere to ask what got
+    dropped and why.
     """
     result: dict[str, dict[str, tuple[float, float, str]]] = {}
     for group, segment in _segments(text):
@@ -205,4 +230,38 @@ def parse_panel(text: str) -> dict[str, dict[str, tuple[float, float, str]]]:
             slot = result.setdefault(group, {})
             method = _method_of(clause)
             slot[method] = _widen(slot.get(method), dose)
+
+    conflicts: list[tuple[str, str]] = []
+    for group in list(result):
+        for method in list(result[group]):
+            if result[group][method] is _CONFLICT:
+                conflicts.append((group, method))
+                del result[group][method]
+        if not result[group]:
+            del result[group]
+    return result, tuple(conflicts)
+
+
+def parse_panel(text: str) -> dict[str, dict[str, tuple[float, float, str]]]:
+    """A whole Uygulama panel as {group: {method: (low, high, unit)}}.
+
+    Only per-dekar figures survive; dilutions are dropped by parse_dose. A
+    panel yielding nothing returns an empty mapping, which is how the converter
+    learns to report it rather than write an empty row. A slot where two
+    figures disagreed in unit ALSO yields nothing for that slot - see
+    conflicting_slots() to tell that apart from a slot that was never filled.
+    """
+    result, _unused_conflicts = _parse(text)
     return result
+
+
+def conflicting_slots(text: str) -> tuple[tuple[str, str], ...]:
+    """(group, method) pairs dropped because two figures disagreed in unit.
+
+    parse_panel(text) cannot show this on its own: a dropped slot and a slot
+    that never had a figure both look like "not present" in its mapping, and
+    the converter's coverage report needs to tell those apart to name FLY
+    AZOT rather than silently count it as clean. Empty when nothing conflicted.
+    """
+    _unused_result, conflicts = _parse(text)
+    return conflicts

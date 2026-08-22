@@ -4,6 +4,7 @@ a pattern are exactly the ones nobody invents."""
 
 import pytest
 
+from src.dose_parse import conflicting_slots
 from src.dose_parse import parse_dose
 from src.dose_parse import parse_panel
 
@@ -201,3 +202,31 @@ def test_a_panel_with_no_dose_yields_nothing():
 
 def test_an_empty_panel_yields_nothing():
     assert parse_panel("") == {}
+
+
+# Verbatim, FLY AZOT, fetched 2026-08-22. _method_of attributes this whole
+# clause to drip because "Damlama" is simply the next method word in the
+# sentence, but the 250 cc figure it sits next to is actually a FOLIAR
+# amount; the real drip figure, "1 - 1,5 litre", follows a few words later
+# in the same clause chain, in a different unit.
+FLY_AZOT_DRIP_CLAUSE = (
+    "Mısır ve Ayçiçeği çıkış sonrası mısır boyu 10 cm civarındayken ot ilacı, "
+    "FOSTER ve FLY AZOT (Bir dekara 250 cc) Damlama çekildikten sonra "
+    "damlamadan 2 veya duruma göre 3 uygulama yapılır, "
+    "20 – 25 gün arayla dekara (1000m²) 1 – 1,5 litre.")
+
+
+def test_a_unit_mismatch_within_one_slot_yields_no_dose_for_it():
+    """A silently-chosen figure here would be a farmer buying four to six
+    times too little: 250 cc (actually a foliar figure, misattributed to
+    drip by _method_of) cannot be reconciled with the real drip figure,
+    1-1,5 litre, without inventing either a conversion or a choice between
+    two published numbers - so this slot records nothing at all."""
+    parsed = parse_panel(FLY_AZOT_DRIP_CLAUSE)
+    assert parsed == {}
+    assert conflicting_slots(FLY_AZOT_DRIP_CLAUSE) == (("hepsi", "damlama"),)
+
+
+def test_conflicting_slots_is_empty_when_nothing_conflicted():
+    assert conflicting_slots(BARF) == ()
+    assert conflicting_slots("") == ()
