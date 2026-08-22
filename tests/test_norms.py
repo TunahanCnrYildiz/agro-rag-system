@@ -314,7 +314,22 @@ def test_a_range_never_replaces_the_prefill(tmp_path, monkeypatch):
 def test_the_province_table_matches_calling_lookup_for_every_crop(tmp_path, monkeypatch):
     """One pass, same answers. If these ever diverge, the form and the
     verification on submit would disagree about what the norm is."""
-    _write(tmp_path, monkeypatch, GOOD)
+    payload = {
+        "meta": {"years": [2024, 2025]},
+        "crops": {
+            "domates": {
+                "label": "Domates",
+                "yield_kg_da": {"scope": "il", "Manisa": [1.0, 2.0], "TR": [1.0, 2.0]},
+                "price_tl_kg": {"scope": "tr", "TR": [1.0, 2.0]},
+            },
+            "misir": {
+                "label": "Mısır",
+                "yield_kg_da": {"scope": "il", "Manisa": [3.0, 4.0], "TR": [3.0, 4.0]},
+                "price_tl_kg": {"scope": "tr", "TR": [3.0, 4.0]},
+            },
+        },
+    }
+    _write(tmp_path, monkeypatch, payload)
     table = norms.province_table("Manisa")
     one_by_one = tuple(norms.lookup(cid, "Manisa")
                        for cid, _ in norms.available_crops())

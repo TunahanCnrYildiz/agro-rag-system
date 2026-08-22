@@ -156,6 +156,23 @@ def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | 
     return None
 
 
+def _resolve(crop_id: str, entry: dict, years: list[int],
+             province: str | None) -> CropNorm:
+    """One crop's norms for one province.
+
+    Shared by lookup() and province_table() so the two cannot drift: the budget
+    form is built from the table and a submitted figure is verified against
+    lookup(), and a difference between them would let the server reject a
+    figure it had itself served.
+    """
+    return CropNorm(
+        crop=crop_id,
+        label=entry["label"],
+        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
+        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+    )
+
+
 def lookup(crop: str, province: str | None) -> CropNorm | None:
     """Norms for a crop, or None when the file does not carry it.
 
@@ -167,12 +184,7 @@ def lookup(crop: str, province: str | None) -> CropNorm | None:
     if entry is None:
         return None
     years = data["years"]
-    return CropNorm(
-        crop=crop,
-        label=entry["label"],
-        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
-        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
-    )
+    return _resolve(crop, entry, years, province)
 
 
 def province_table(province: str | None) -> tuple[CropNorm, ...]:
@@ -191,12 +203,7 @@ def province_table(province: str | None) -> tuple[CropNorm, ...]:
     if not years:
         return ()
     rows = tuple(
-        CropNorm(
-            crop=crop_id,
-            label=entry["label"],
-            yield_kg_da=_pick(entry["yield_kg_da"], years, province),
-            price_tl_kg=_pick(entry["price_tl_kg"], years, province),
-        )
+        _resolve(crop_id, entry, years, province)
         for crop_id, entry in data["crops"].items()
     )
     return tuple(sorted(rows, key=lambda row: row.label))
