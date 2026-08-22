@@ -74,7 +74,7 @@ export interface BudgetPayload {
   yield_total?: BudgetFieldValue;
   price?: BudgetFieldValue;
   cost?: BudgetFieldValue;
-  crop?: string | null;
+  crop?: string;
 }
 
 export interface FormUnit {

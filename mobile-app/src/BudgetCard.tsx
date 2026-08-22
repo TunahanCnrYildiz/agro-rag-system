@@ -56,21 +56,15 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
   // Without this, a rejected form re-displays with every field unmarked, so
   // the next submit sends source: "user" for a figure that is still TÜİK's -
   // and the answer then claims the whole estimate rests on numbers the
-  // farmer typed, when one of them never was. A field is only "norm" when
-  // its echoed value AND unit match the selected crop's cell exactly (the
-  // same comparison the server makes, so client and server can't disagree
-  // about which figures are TÜİK's).
+  // farmer typed, when one of them never was. Seeded straight from the
+  // server's echoed `source`, not by comparing the echoed value and unit to
+  // the selected crop's cell: that comparison used to mark a field "norm"
+  // whenever a farmer's own typed number happened to equal the norm, which
+  // then had the next submit claim their own figure as TÜİK's.
   const [sources, setSources] = useState<Record<string, "norm" | "user">>(() => {
-    const cellFor: Record<string, NormCell | null | undefined> = {
-      yield_total: echoedCrop?.yield,
-      price: echoedCrop?.price,
-    };
     const result: Record<string, "norm" | "user"> = {};
-    for (const [id, cell] of Object.entries(cellFor)) {
-      const field = form.fields.find((f) => f.id === id);
-      if (field && cell && field.value === cell.value && field.unit === cell.unit) {
-        result[id] = "norm";
-      }
+    for (const f of form.fields) {
+      if (f.source === "norm") result[f.id] = "norm";
     }
     return result;
   });
@@ -80,10 +74,10 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
   // the moment the text differs. Clearing `crop` on every keystroke instead
   // would blank the provenance lines under fields that are still showing its
   // figures.
-  const matches =
-    query.trim() && query !== selected?.label
-      ? (form.crops ?? []).filter((c) => fold(c.label).includes(fold(query))).slice(0, 8)
-      : [];
+  const searchOpen = Boolean(query.trim() && query !== selected?.label);
+  const matches = searchOpen
+    ? (form.crops ?? []).filter((c) => fold(c.label).includes(fold(query))).slice(0, 8)
+    : [];
 
   // The wire carries exactly one `crop`, so a field's "norm" marking can only
   // ever belong to the currently selected crop. The moment the farmer picks a
@@ -139,7 +133,8 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
 
   function submit() {
     if (disabled) return;
-    const payload: Record<string, { value: string; unit: string; source: "norm" | "user" }> = {};
+    const payload: Record<string, { value: string; unit: string; source: "norm" | "user" }> &
+      Pick<BudgetPayload, "crop"> = {};
     const parts: string[] = [];
     for (const f of form.fields) {
       const v = (values[f.id] ?? "").trim();
@@ -148,8 +143,8 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
       const unit = f.units.find((u) => u.id === units[f.id]);
       parts.push(`${f.label}: ${v} ${unit ? unit.label : ""}`.trim());
     }
-    if (crop) (payload as Record<string, unknown>).crop = crop;
-    onSubmit(payload as BudgetPayload, parts.join(" · "));
+    if (crop) payload.crop = crop;
+    onSubmit(payload, parts.join(" · "));
   }
 
   return (
@@ -173,10 +168,12 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
               <Text style={styles.matchText}>{option.label}</Text>
             </Pressable>
           ))}
-          {matches.length > 0 && (
+          {searchOpen && (
             // The explicit way out: a crop we do not carry, or one the farmer
             // would rather fill in themselves. It selects nothing and prefills
-            // nothing.
+            // nothing. Shown whenever the box has text and the list is open -
+            // not only when something matched - or a search that finds
+            // nothing would leave no way out at all.
             <Pressable
               style={styles.match}
               onPress={() => {
