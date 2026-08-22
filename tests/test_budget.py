@@ -560,6 +560,58 @@ def _submitted(value="28,4", unit="kg_da", source="norm"):
     }
 
 
+def _all_typed():
+    """Every figure the user's own. Note that overriding the YIELD alone is not
+    enough - _submitted() claims the price is a norm too, and the price claim
+    would still be confirmed."""
+    raw = _submitted(value="90")
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    return raw
+
+
+def test_a_form_of_the_users_own_figures_keeps_p1s_sentence_exactly():
+    inputs, _ = budget.validate(_all_typed(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.rstrip().endswith(budget.FRAMING)
+
+
+def test_a_norm_figure_replaces_that_sentence():
+    """Leaving it would state that the calculation rests entirely on the user's
+    own numbers while one of them came from TUIK."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert budget.FRAMING not in text
+    assert "verim ve fiyat" in text
+    assert "TÜİK 2025, Ordu" in text
+    assert "öngörü değildir" in text
+
+
+def test_the_framing_names_only_the_figures_that_are_not_the_users():
+    """A sentence that says 'verim ve fiyat' while the farmer typed the price
+    tells them their own number came from TUIK."""
+    raw = _submitted()
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    inputs, _ = budget.validate(raw, _table())
+    text = budget.framing(inputs)
+    assert text.startswith("Bu hesaptaki verim rakamı")
+    assert "verim ve fiyat" not in text
+
+
+def test_the_framing_is_always_the_last_line():
+    """It is appended by code and never asked of a model; a figure after it
+    would read as a correction to it."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    lines = [l for l in budget.render(inputs, budget.compute(inputs)).split("\n") if l]
+    assert lines[-1] == budget.framing(inputs)
+
+
+def test_the_p1_constant_is_untouched():
+    assert budget.FRAMING == (
+        "Bu hesap bir tahmindir ve tamamen sizin girdiğiniz rakamlara dayanır; "
+        "fiyat veya verim öngörüsü değildir."
+    )
+
+
 def test_a_confirmed_claim_is_marked_as_a_norm():
     inputs, errors = budget.validate(_submitted(), _table())
     assert errors == []

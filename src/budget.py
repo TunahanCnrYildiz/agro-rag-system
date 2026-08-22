@@ -418,6 +418,36 @@ FRAMING = (
     "fiyat veya verim öngörüsü değildir."
 )
 
+
+# The second framing, for a calculation that used a published average. Both
+# sentences are appended BY CODE and neither is ever asked of a model - the
+# fertplan.FRAMING pattern. A provincial mean yield is a central tendency across
+# every holding in the province; printed without this it invites being read as a
+# forecast for one parcel.
+def framing(inputs: BudgetInputs) -> str:
+    """P1's sentence, or the one that names whose figures these are."""
+    used = [(label, value)
+            for label, value in (("verim", inputs.yield_kg),
+                                 ("fiyat", inputs.price_tl_kg))
+            if value.source == "norm"]
+    if not used:
+        return FRAMING
+
+    which = " ve ".join(label for label, _ in used)
+    notes: list[str] = []
+    for _, value in used:
+        # Both measures normally share one note; printing it twice would read
+        # as two different sources.
+        if value.note and value.note not in notes:
+            notes.append(value.note)
+    source = " · ".join(notes)
+    return (
+        f"Bu hesaptaki {which} rakamı sizin değil, TÜİK'in yayımladığı bölge "
+        f"ortalamasıdır ({source}). Bölge ortalaması tek bir tarlanın verimi "
+        f"veya sizin alacağınız fiyat için bir öngörü değildir; kendi "
+        f"rakamınızı girerseniz hesap ona göre yapılır."
+    )
+
 # Written to stand alone: a deployed client that cannot draw the form shows only
 # this, so it names the figures it needs instead of pointing at a widget. The
 # wording also survives P2 - when norms arrive the fields come prefilled and the
@@ -484,5 +514,5 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
             f"**Marj {format_tr(result.margin_tl, 2)} TL**{pct}"
         )
 
-    lines.extend(["", FRAMING])
+    lines.extend(["", framing(inputs)])
     return "\n".join(lines)
