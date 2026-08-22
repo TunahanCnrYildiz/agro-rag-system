@@ -188,6 +188,19 @@ def _method_of(clause: str) -> str:
     drip only, and the three panels naming no method describe soil or drip
     application. Foliar figures are almost always dilutions, which parse_dose
     refuses anyway.
+
+    KNOWN WEAKNESS, stated plainly because it was once argued away. This takes
+    the FIRST method word anywhere in the clause, wherever it sits relative to
+    the amount, so a clause that mentions one method while carrying the other's
+    figure is attributed wrongly - FLY AZOT does exactly that. Today every such
+    misattribution collides with the correct figure in a DIFFERENT unit, so
+    _widen's conflict rule catches it and drops the slot. That is an empirical
+    property of these 48 panels, NOT a structural guarantee: a misattributed
+    figure sharing the correct one's unit would merge into a silently wrong
+    span, with no conflict raised and nothing looking empty. Narrowing this to
+    the method word nearest the amount was considered and does not fix FLY AZOT
+    (its clause names no foliar word at all), so it was left rather than
+    changed for the appearance of rigour.
     """
     for key, pattern in _METHODS:
         if re.search(pattern, clause, re.I):

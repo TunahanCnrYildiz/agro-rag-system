@@ -230,3 +230,29 @@ def test_a_unit_mismatch_within_one_slot_yields_no_dose_for_it():
 def test_conflicting_slots_is_empty_when_nothing_conflicted():
     assert conflicting_slots(BARF) == ()
     assert conflicting_slots("") == ()
+
+
+# Verbatim, HİGRO FERRY, fetched 2026-08-22. Its foliar dilutions and its
+# per-area doses are separated by commas and nothing else, and it is the ONLY
+# product in the catalog whose method attribution depends on that boundary.
+FERRY = (
+    "Higro Ferry , Yapraktan : Tek yıllık tarla ve endüstri bitkileri ile "
+    "sebzelerde 250-300 cc/100 Litre su, Higro Ferry, Yapraktan : meyve "
+    "ağaçlarında : 300-400 cc/100 Litre su Higro Ferry , To praktan : Tek "
+    "yıllık tarla ve endüstri bitkileri ile sebzelerde 1000m² alana 1-2 litre, "
+    "Higro Ferry , Yapraktan : Meyve Ağaçlarında 1000m² alana 2-3 litre "
+    "ihtiyaç duyulan dönemlerde güvenle uygulanır."
+)
+
+
+def test_the_comma_boundary_decides_a_real_products_method():
+    """HİGRO FERRY is the product that needs the comma to be a clause boundary.
+    Drop the comma from _CLAUSE and its soil doses are credited to 'yaprak',
+    because a foliar word appears earlier in the same run of text. An earlier
+    test claimed to cover this mechanism and did not: removing the comma left
+    it passing."""
+    parsed = parse_panel(FERRY)
+    assert parsed["sebze"] == {"damlama": (1.0, 2.0, "litre")}
+    assert parsed["meyve"] == {"damlama": (2.0, 3.0, "litre")}
+    assert "yaprak" not in parsed["sebze"]
+    assert "yaprak" not in parsed["meyve"]
