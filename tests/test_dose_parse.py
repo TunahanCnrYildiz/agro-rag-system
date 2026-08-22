@@ -65,6 +65,21 @@ def test_the_dilutions_own_amount_is_still_refused():
     assert parse_dose("Yapraktan uygulama ile 100 cc / 100 litre suya") is None
 
 
+def test_a_comma_free_dilution_followed_by_an_area_word_is_still_refused():
+    """No comma separates the dilution's amount from "dekara", so _GAP's
+    comma boundary cannot be what refuses this - only the skip check that
+    disqualifies an amount bound to water can."""
+    assert parse_dose("100 litre suya 250 gram dekara uygulanir") is None
+
+
+def test_a_glossed_dilution_amount_is_still_refused():
+    """Same shape as above, but the amount carries the parenthetical numeral
+    gloss ("250 (iki yuz elli) gram"). _DILUTION must be able to see the
+    gloss too, or this amount is invisible to the skip check and gets read
+    as a per-dekar dose instead of the water volume it actually is."""
+    assert parse_dose("100 litre suya 250 (iki yuz elli) gram dekara uygulanir") is None
+
+
 def test_the_low_bound_is_never_above_the_high_bound():
     low, high, _ = parse_dose("Damlama sulama ile 2,5-3 litre / 1000m²(da)")
     assert low <= high

@@ -24,19 +24,34 @@ _UNIT_RE = "|".join(spelling for spelling, _ in _UNITS)
 # A figure or a range. The dash may be a hyphen or an en dash, spaced or not.
 # Between the figure and its unit a page sometimes spells the number out in
 # parentheses ("3 (üç) litre"), so that gloss is tolerated but not captured.
+# The gloss excludes clause-breaking punctuation, same as _GAP below, so it
+# can never smuggle a clause boundary into the middle of an amount.
+#
+# _AMOUNT and _AMOUNT_BARE (below) MUST STAY IDENTICAL apart from the named
+# groups - see the note on _AMOUNT_BARE for why a divergence is dangerous.
 _NUMBER = r"\d+(?:[.,]\d+)?"
+_GLOSS = r"(?:\([^(),.;:]*\)\s*)?"
 _AMOUNT = (rf"(?P<low>{_NUMBER})\s*(?:[-–]\s*(?P<high>{_NUMBER}))?\s*"
-           rf"(?:\([^)]*\)\s*)?(?P<unit>{_UNIT_RE})\b")
+           rf"{_GLOSS}(?P<unit>{_UNIT_RE})\b")
 
 # One dekar, in every form the pages use. Hectares are deliberately EXCLUDED:
 # a per-hectare figure is ten times a per-dekar one, and reading one as the
 # other multiplies every answer by ten with nothing to show for it.
-_AREA = r"(?:dekar[ae]?|d[oö]n[uü]m[ae]?|1[.\s]?000\s*m\s*[²2]|1000\s*m\s*[²2])"
+_AREA = r"(?:dekar[ae]?|d[oö]n[uü]m[ae]?|1[.\s]?000\s*m\s*[²2])"
 
 # The same amount with NO named groups. A pattern may only name a group once,
 # so reusing _AMOUNT on both sides of the dilution alternation below raises
 # re.PatternError at import time - verified, not guessed.
-_AMOUNT_BARE = rf"{_NUMBER}\s*(?:[-–]\s*{_NUMBER})?\s*(?:{_UNIT_RE})"
+#
+# THIS MUST STAY IDENTICAL TO _AMOUNT APART FROM THE NAMED GROUPS. _DILUTION
+# is built from this pattern, and if it recognises less than _AMOUNT does -
+# the parenthetical numeral gloss, for instance - then a dilution's own
+# amount stops being seen as part of a dilution, the skip check in
+# parse_dose never fires for it, and a water volume gets read as a per-dekar
+# dose. Reproduced by execution when the two had drifted apart: "100 litre
+# suya 250 (iki yuz elli) gram dekara uygulanir" returned (100.0, 100.0,
+# "litre") - the WATER volume, as the dose.
+_AMOUNT_BARE = rf"{_NUMBER}\s*(?:[-–]\s*{_NUMBER})?\s*{_GLOSS}(?:{_UNIT_RE})\b"
 
 # Water, so a dilution can be recognised and refused.
 _WATER = r"\d+\s*(?:litre|lt|l)\s*su"
