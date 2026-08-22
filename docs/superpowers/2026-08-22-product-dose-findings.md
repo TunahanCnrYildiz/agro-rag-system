@@ -109,3 +109,22 @@ The first task is no longer "find out whether the data exists". It is:
 The review gate from the earlier finding still binds and is unchanged by any of this: stating a
 dose that the manufacturer published for their own product is quoting a source, not us authoring
 an unconditioned recommendation for a farmer's field.
+
+## Task 2: the panels are committed, and their grammars
+
+All 48 `Uygulama` panels were fetched with `scripts/fetch_dose_panels.py` and committed unchanged
+to `data/raw/product_panels.json`. 48/48 succeeded, no `FETCH FAILED`, and every panel came back
+non-empty (173-1523 chars this run; the plan's earlier measurement said 173-1793, so the top end of
+the range has drifted a little on the live site since that measurement — not a layout change, just
+different content length, and nothing to work around).
+
+Reading the panels shows at least three grammars, and the converter in Task 4 is written against
+exactly this:
+
+| Grammar | Example | Count |
+| --- | --- | --- |
+| Group-first, method inline | `Sebzelerde : Yapraktan 60-70 gr/ 100 Litre su ile uygulanılır, Damlamadan 250 gr/ 1000m² alana uygulanılır.` | ~42 |
+| Method-first, uppercase, no group | `YAPRAKTAN: … DAMLAMA SULAMA: bir dekara (1.000 m²) 2 – 2,5 litre` | `HIGRO 8 MN` |
+| Crop-named prose, no group heading | `Tahıllarda ve Hububatlarda kıraç üretimde dekara 200 cc yapraktan 2 uygulama yapılır.` | `FLY AZOT` |
+
+**The colon after the group word is optional** — `HİGRO CUFİT` and `ZİNCER` write `Sebzelerde Yapraktan …` with no colon, and a pattern that requires one loses them.
