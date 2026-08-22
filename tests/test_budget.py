@@ -549,3 +549,23 @@ def test_a_non_string_submitted_value_is_echoed_as_text():
     spec = budget.form_spec([], None, {"area": {"value": 5, "unit": "donum"}})
     fields = {f["id"]: f for f in spec["fields"]}
     assert fields["area"]["value"] == "5"
+
+
+def test_a_non_dict_submitted_coerces_to_empty_rather_than_raising():
+    """Untrusted payloads that fail validation must not crash form_spec; they
+    degrade to an unsubmitted-shaped form instead."""
+    # A bare string should not raise AttributeError
+    spec = budget.form_spec([], None, "not-a-dict")
+    assert "fields" in spec
+    assert "crop" not in spec
+    assert all(f["value"] == "" for f in spec["fields"])
+
+    # A list should not raise AttributeError
+    spec = budget.form_spec([], None, ["item"])
+    assert "fields" in spec
+    assert "crop" not in spec
+
+    # An int should not raise AttributeError
+    spec = budget.form_spec([], None, 42)
+    assert "fields" in spec
+    assert "crop" not in spec

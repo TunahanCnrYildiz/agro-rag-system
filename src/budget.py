@@ -306,6 +306,11 @@ def form_spec(errors: list[FieldError], table=None, submitted=None) -> dict:
     nicety: the card seeds its state from `value`, so without it a single bad
     field wipes the whole form, the crop selection and its prefill included.
     """
+    # Coerce non-dict submitted to {} before use, as validate() does for raw.
+    # submitted carries an untrusted payload that already failed validation, so
+    # it must be defended at the same trust boundary as validate()'s raw param.
+    submitted = submitted if isinstance(submitted, dict) else {}
+
     by_field = {e.field: e.message for e in errors}
     spec = {
         "fields": [
