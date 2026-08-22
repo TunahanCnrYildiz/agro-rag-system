@@ -191,3 +191,56 @@ def test_the_stream_computes_a_submitted_payload_even_if_the_router_disagrees(no
     events = _events(engine.stream_answer("Elma ağacı ne zaman budanır?", None, _payload()))
     assert [e["type"] for e in events] == ["token", "done"]
     assert "15.000,00 TL" in events[0]["content"]
+
+
+ORDU_HISTORY = [{"role": "user", "content": "Adım Ayşe. Ordu'dayım. Fındık yetiştiriyorum."}]
+
+
+def test_the_form_carries_the_provinces_norms(no_llm):
+    result = engine.answer(BUDGET_Q, ORDU_HISTORY)
+    crops = {c["id"]: c for c in result.form["crops"]}
+    assert "findik" in crops
+    assert crops["findik"]["yield"]["note"].endswith("Ordu")
+
+
+def test_a_conversation_with_no_province_prefills_nothing(no_llm):
+    """The province is never guessed: no province means no provincial norm, not
+    a default one and not a neighbouring one.
+
+    Asserted by CONTRAST rather than by looping over cells that are all None
+    today - a loop like that passes whatever the data does, which is the vacuity
+    class. Measured 2026-08-22: with no province, 0 of 246 crops resolve either
+    measure, because P2a's exports were IBBS3-only and every TR row is null. If
+    the national rows are ever populated this test fails loudly and is the right
+    place to decide what a national prefill should say."""
+    with_province = engine.answer(BUDGET_Q, ORDU_HISTORY)
+    without = engine.answer(BUDGET_Q)
+    assert without.form is not None
+
+    def cell(result, crop_id, key):
+        crops = {c["id"]: c for c in result.form.get("crops", [])}
+        return crops[crop_id][key]
+
+    assert cell(with_province, "findik", "yield")["note"] == "TÜİK 2025, Ordu"
+    assert cell(without, "findik", "yield") is None
+    assert cell(without, "findik", "price") is None
+
+
+def test_a_broken_norm_layer_does_not_break_the_route(no_llm, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("norms exploded")
+
+    monkeypatch.setattr("src.norms.province_table", boom)
+    result = engine.answer(BUDGET_Q, ORDU_HISTORY)
+    assert result.answer == budget.ASK_FOR_NUMBERS
+    assert "crops" not in result.form
+
+
+def test_a_rejected_submission_comes_back_with_its_values(no_llm):
+    raw = {"crop": "findik",
+           "yield_total": {"value": "100", "unit": "kg_da"},
+           "price": {"value": "10", "unit": "tl_kg"}}
+    result = engine.answer(BUDGET_Q, ORDU_HISTORY, raw)
+    fields = {f["id"]: f for f in result.form["fields"]}
+    assert fields["yield_total"]["value"] == "100"
+    assert result.form["crop"] == "findik"

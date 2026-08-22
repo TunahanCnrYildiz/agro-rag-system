@@ -845,27 +845,42 @@ def _strip_markers(text: str) -> tuple[str, bool, bool]:
     return lead, off_scope, no_product
 
 
-def _budget_result(payload: dict | None) -> ChatResult:
+def _budget_result(payload: dict | None, message: str = "",
+                   history: list[dict] | None = None) -> ChatResult:
     """The budget route: no retrieval, no product match, no model call.
 
     Every figure is computed in src/budget.py from values the user typed into
-    labelled fields. When the payload is absent or incomplete we return the form
-    instead of an answer; a payload that was never submitted gets a clean form
-    rather than a list of "required" errors.
+    labelled fields, or from a norm they accepted. When the payload is absent or
+    incomplete we return the form instead of an answer; a payload that was never
+    submitted gets a clean form rather than a list of "required" errors.
+
+    The province is resolved from the conversation the same way weather and
+    fert_plan resolve it, and the whole province's norm table travels with the
+    form because the crop is selected on the client. A failure anywhere in that
+    lookup costs the prefill and nothing else: the form still serves, exactly as
+    it did in P1.
 
     validate() and compute() share one guard: either raising returns
     COMPUTE_FAILED with no form and no figures. validate() is documented never
     to raise, but on the streaming path the 200 and headers are already sent by
-    the time this runs, so a raise here would break the connection mid-stream
-    rather than fail silently - guarding only compute() left that contract
-    unenforced.
+    the time this runs, so a raise here would break the connection mid-stream.
     """
-    # Deferred like the router import below: keep engine's import graph flat.
+    # Deferred like the router import below: src/context/location.py imports
+    # _normalize_tr from THIS module at load time, so hoisting it makes the
+    # cycle real. Same reason _context_block imports it locally.
     from src import budget
+
+    table = ()
+    try:
+        from src import norms
+        from src.context import location
+        table = norms.province_table(location.extract_province(message, history))
+    except Exception:  # noqa: BLE001 - a prefill is a convenience, not the route
+        table = ()
 
     submitted = bool(payload)
     try:
-        inputs, errors = budget.validate(payload or {})
+        inputs, errors = budget.validate(payload or {}, table)
         if inputs is not None:
             result = budget.compute(inputs)
             return ChatResult(answer=budget.render(inputs, result),
@@ -876,7 +891,9 @@ def _budget_result(payload: dict | None) -> ChatResult:
 
     return ChatResult(answer=budget.ASK_FOR_NUMBERS, recommended_products=[],
                       route="budget",
-                      form=budget.form_spec(errors if submitted else []))
+                      form=budget.form_spec(errors if submitted else [],
+                                            table,
+                                            payload if submitted else None))
 
 
 def answer(message: str, history: list[dict] | None = None,
@@ -902,7 +919,7 @@ def answer(message: str, history: list[dict] | None = None,
     # submitted form is computed whatever the classifier says about the question
     # it was attached to.
     if route == "budget" or budget_payload:
-        result = _budget_result(budget_payload)
+        result = _budget_result(budget_payload, message, history)
         result.route_how = route_how
         return result
 
@@ -960,7 +977,7 @@ def stream_answer(
     # Both clients stream, so a form wired only into answer() would reach no user
     # at all - and the tests would still pass.
     if route == "budget" or budget_payload:
-        result = _budget_result(budget_payload)
+        result = _budget_result(budget_payload, message, history)
         yield _sse({"type": "token", "content": result.answer})
         if result.form is not None:
             yield _sse({"type": "form", "form": result.form})
