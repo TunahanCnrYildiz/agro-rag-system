@@ -108,8 +108,16 @@ farmer overrides it knowing what they are overriding. That is the same trade the
 whole budget route makes: the defect class here is a plausible-looking wrong
 number, and the fix is to make the figure legible, not to smooth it.
 
-`NormValue` gains `recent_min` and `recent_max` — the non-null values of the last
-five years. A single non-null value yields no range rather than a degenerate one.
+`NormValue` gains `recent_min` and `recent_max`, taken over the non-null values of
+**the five years preceding the prefilled one** — not the last five years of the
+series. The distinction decides the whole feature: including 2025, hazelnut in
+Ordu reads `28,4–105,6`, whose lower bound is the prefill itself and which
+therefore says nothing; excluding it reads `73,7–105,6` against a prefill of
+`28,4`, and the farmer sees the contrast at a glance. For an ordinary crop the
+prefill simply sits inside the range and reads as confirmation.
+
+Fewer than two non-null values in that window yields no range rather than a
+degenerate one.
 
 ## 4. The crop selection
 
@@ -186,6 +194,20 @@ Implements P2 §7, unchanged in intent:
   verbatim when no norm figure survived to submit; otherwise a sentence naming
   which figures are not the user's, their source and year, and stating that a
   provincial average is not a prediction for one parcel.
+- **A form re-served with validation errors echoes what was submitted** — each
+  field's raw value and unit, and the selected crop. In P1 an error returned an
+  empty form and the card, which seeds its state from the server's `value`, threw
+  away everything the user had typed. Four fields made that survivable. This spec
+  makes it worse in two ways: it adds a brand-new error (`kg/dekar` with no area),
+  and a wipe now also discards the crop selection and its prefill. Echoing is ten
+  lines and removes a defect this work would otherwise introduce.
+
+All Turkish shown in the card is written here, in `src/budget.py`, and travels the
+wire as finished text — the provenance note (`TÜİK 2025, Ordu`), the range line
+(`önceki 5 yıl: 73,7–105,6 kg/da`), and every prefilled figure, already formatted
+with `format_tr`. The client formats no numbers and composes no sentences: a
+second Turkish number formatter on the client is a second place for a decimal
+comma to go wrong.
 
 ## 8. Coverage, measured
 
@@ -224,6 +246,7 @@ P2 §9's table binds, with these rows amended or added:
 | Fewer than two non-null values in five years | No range shown; the prefill is unaffected |
 | Client sends `source: "norm"`, value ≠ the server's norm | Downgraded to `"user"`; P1's framing |
 | Client sends no `source` (old build) | `"user"`; P1's framing, byte for byte |
+| A submitted form fails validation | The re-served form echoes every submitted value, unit and the crop, alongside the errors |
 
 **The binding rule is P2's and is unchanged: a missing norm never becomes 0.**
 
@@ -234,7 +257,8 @@ P2 §10's table binds in full. Added:
 | Group | What it pins |
 | --- | --- |
 | `province_table` | identical to calling `lookup` for all 246 crops; one file read |
-| `recent` range | nulls dropped; a single value yields no range; the range never replaces the prefill |
+| `recent` range | taken over the five years BEFORE the prefilled one, never including it; nulls dropped; fewer than two values yields no range; the range never replaces the prefill |
+| Error echo | a form re-served with errors carries back every submitted value, its unit and the crop; a form never submitted still carries empty values and no errors |
 | Provenance downgrade | `"norm"` with a mismatched value → `"user"`; a missing `source` → `"user"`; `"user"` never upgraded |
 | Framing branch, end to end | a submitted form with an untouched prefill renders the norm sentence; the same form with that field edited renders P1's sentence verbatim |
 | Province wiring | `_budget_result` resolves the province from history; an unresolvable one prefills nothing and does not raise |
