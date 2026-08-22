@@ -760,9 +760,15 @@ def _widen(existing, dose):
     numbers cover states both, and invents nothing between them.
 
     Units that disagree are NOT merged - there is no conversion from a gram to
-    a litre without a density the page never gives - so the first unit wins and
-    the other figure is dropped. No panel does this today; if one starts to, the
-    converter's coverage report is where it will show up.
+    a litre without a density the page never gives.
+
+    A PANEL DOES DO THIS, and keeping the first figure was measured to be wrong:
+    FLY AZOT's drip slot came out as 250 cc where the page publishes 1-1,5 litre,
+    four to six times low, about a quantity a farmer buys. The 250 cc is its
+    FOLIAR figure, landing in the drip slot because the clause that carries it
+    happens to contain the word "Damlama" further along. So a unit disagreement
+    drops the slot entirely and surfaces it, rather than choosing between two
+    published figures - absence, never a guess.
     """
     if existing is None:
         return dose
