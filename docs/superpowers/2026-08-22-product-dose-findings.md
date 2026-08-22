@@ -114,9 +114,12 @@ an unconditioned recommendation for a farmer's field.
 
 All 48 `Uygulama` panels were fetched with `scripts/fetch_dose_panels.py` and committed unchanged
 to `data/raw/product_panels.json`. 48/48 succeeded, no `FETCH FAILED`, and every panel came back
-non-empty (173-1523 chars this run; the plan's earlier measurement said 173-1793, so the top end of
-the range has drifted a little on the live site since that measurement — not a layout change, just
-different content length, and nothing to work around).
+non-empty, 173-1523 chars.
+
+The earlier measurement said 173-**1793**, and the difference is not site drift: the 1793-character
+panel was `HIGRO 8 MN`, measured before the extractor learned to cut page furniture. Through
+`extract_tab_panels` the same panel is **241 characters** — the other 1552 were the related-products
+rail. The cut is working, and this is what it looks like from the outside.
 
 Reading the panels shows at least three grammars, and the converter in Task 4 is written against
 exactly this:
@@ -128,3 +131,31 @@ exactly this:
 | Crop-named prose, no group heading | `Tahıllarda ve Hububatlarda kıraç üretimde dekara 200 cc yapraktan 2 uygulama yapılır.` | `FLY AZOT` |
 
 **The colon after the group word is optional** — `HİGRO CUFİT` and `ZİNCER` write `Sebzelerde Yapraktan …` with no colon, and a pattern that requires one loses them.
+
+Three panels fit none of the three rows cleanly, and each names a trap the converter has to survive:
+
+- **`HİGRO FERRY`** puts the group word mid-sentence (`… ile sebzelerde 1000m² alana 1-2 litre`)
+  rather than as a heading, and carries a typo — `To praktan` for `Topraktan`.
+- **`HIGRO FERFORCE`** gives its fruit doses **per tree** (`ağaç başına 25-50 gr`), which is not a
+  per-area figure and must not be read as one; and it splits its vegetable dose into greenhouse
+  (`250 gr/ 1000m²`) and open field (`500 gr / 1000m²`).
+- **`HİGRO ZİMOBOR`** opens with a CMS placeholder the firm left in the page: `Buraya uygulama`.
+
+## Measured against the committed panels, before the converter was written
+
+Running the plan's intended patterns over `data/raw/product_panels.json` established three things
+that changed the plan:
+
+1. **The comma is a clause boundary.** The panels write `Yapraktan … , Damlamadan …` as one
+   sentence. Splitting on `.` and `;` alone leaves both halves in one clause and credits the drip
+   figure to foliar.
+2. **A dilution must disqualify its own figure, not the clause it sits in.** `HİGRO BARF` writes
+   `Yapraktan uygulama ile 100 cc / 100 litre suya Damlama sulama ile 2-2,5 litre / 1000m² (da)`
+   with no punctuation at all between the halves. Refusing the whole clause drops the catalog from
+   **42 products to 10**.
+3. **One product publishes two figures for one group and method** — `FLY AZOT`, 200 cc for dry
+   farming and 250 cc for irrigated. Keeping the first silently chooses between two published
+   numbers; the span they cover states both.
+
+With all three applied, the per-area count over the committed panels is **42 of 48**, and the six
+left out are exactly the four dilution-only products and the two with no dose.
