@@ -232,6 +232,20 @@ def test_a_broken_norm_layer_does_not_break_the_route(no_llm, monkeypatch):
     assert "crops" not in result.form
 
 
+def test_a_broken_norm_layer_says_so(no_llm, monkeypatch, capsys):
+    """Degrading silently is how this ships as 'the prefill quietly stopped
+    working': the route still serves a form, so nothing else looks wrong and
+    every test stays green."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("norms exploded")
+
+    monkeypatch.setattr("src.norms.province_table", boom)
+    engine.answer(BUDGET_Q, ORDU_HISTORY)
+    out = capsys.readouterr().out
+    assert "no norm prefill" in out
+    assert "norms exploded" in out
+
+
 def test_a_rejected_submission_comes_back_with_its_values(no_llm):
     raw = {"crop": "findik",
            "yield_total": {"value": "100", "unit": "kg_da"},

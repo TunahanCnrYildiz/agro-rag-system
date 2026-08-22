@@ -885,7 +885,11 @@ def _budget_result(payload: dict | None, message: str = "",
             # with no message explaining why. Treat it the same as a genuine
             # lookup failure: no table at all.
             table = ()
-    except Exception:  # noqa: BLE001 - a prefill is a convenience, not the route
+    except Exception as exc:  # noqa: BLE001 - a prefill is a convenience, not the route
+        # Say so. Swallowing this silently is how a broken norm layer ships as
+        # "the prefill quietly stopped working": the route still serves a form,
+        # so every test stays green and nothing else in the answer changes.
+        print(f"[engine] no norm prefill this turn: {type(exc).__name__}: {exc}")
         table = ()
         latest_year = None
 
