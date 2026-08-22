@@ -247,3 +247,65 @@ def test_norms_does_not_import_the_engine():
         elif isinstance(node, ast.ImportFrom):
             imported.add(node.module or "")
     assert not any("engine" in m or "location" in m for m in imported), imported
+
+
+ALTERNATE = {
+    "meta": {"generated": "2026-08-22", "years": [2020, 2021, 2022, 2023, 2024, 2025]},
+    "crops": {
+        "findik": {
+            "label": "Fındık",
+            # The prefilled year (28.4) is atypical; the five before it are not.
+            "yield_kg_da": {"scope": "il",
+                            "Ordu": [86.8, 73.7, 105.6, 87.5, 88.9, 28.4],
+                            "TR": [None, None, None, None, None, None]},
+            "price_tl_kg": {"scope": "il",
+                            "Ordu": [None, None, None, None, None, 202.26],
+                            "TR": [None, None, None, None, None, None]},
+        }
+    },
+}
+
+
+def test_the_recent_range_excludes_the_prefilled_year(tmp_path, monkeypatch):
+    """Including it would make the prefill its own lower bound, which says
+    nothing about whether the prefill is typical."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").yield_kg_da
+    assert norm.amount == 28.4
+    assert (norm.recent_min, norm.recent_max) == (73.7, 105.6)
+
+
+def test_a_single_prior_value_yields_no_range(tmp_path, monkeypatch):
+    """One number is not a range, and rendering '202,26-202,26' would dress a
+    single observation as a spread."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").price_tl_kg
+    assert norm.amount == 202.26
+    assert (norm.recent_min, norm.recent_max) == (None, None)
+
+
+def test_the_range_window_is_the_five_years_before_the_hit(tmp_path, monkeypatch):
+    """Not the last five of the series: when the walk-back skips null years the
+    window moves with it."""
+    payload = {
+        "meta": {"years": [2019, 2020, 2021, 2022, 2023, 2024, 2025]},
+        "crops": {"x": {
+            "label": "X",
+            # Latest non-null is 2022; the window is 2019-2021, and 2023-2025
+            # must not leak into it.
+            "yield_kg_da": {"scope": "il", "TR": [10.0, 20.0, 30.0, 44.0, None, None, None]},
+            "price_tl_kg": {"scope": "il", "TR": [1.0, 1.0, 1.0, 1.0, None, None, None]},
+        }},
+    }
+    _write(tmp_path, monkeypatch, payload)
+    norm = norms.lookup("x", None).yield_kg_da
+    assert norm.year == 2022 and norm.amount == 44.0
+    assert (norm.recent_min, norm.recent_max) == (10.0, 30.0)
+
+
+def test_a_range_never_replaces_the_prefill(tmp_path, monkeypatch):
+    """The published figure is what prefills, however atypical it is."""
+    _write(tmp_path, monkeypatch, ALTERNATE)
+    norm = norms.lookup("findik", "Ordu").yield_kg_da
+    assert norm.amount == 28.4
+    assert norm.amount < norm.recent_min

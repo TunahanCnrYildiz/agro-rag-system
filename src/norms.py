@@ -98,6 +98,12 @@ class NormValue:
     year: int
     scope: str          # "il" | "tr"
     region: str         # "Manisa" | "Türkiye"
+    # The spread of the five years BEFORE this one. Not the last five of the
+    # series: this figure is the one being prefilled, and a range that contains
+    # it cannot say whether it is typical. None when fewer than two of those
+    # years carry a value - one number is not a range.
+    recent_min: float | None = None
+    recent_max: float | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +121,17 @@ def available_crops() -> tuple[tuple[str, str], ...]:
                         key=lambda pair: pair[1]))
 
 
+_RECENT_YEARS = 5
+
+
+def _recent_range(series: list, index: int) -> tuple[float | None, float | None]:
+    """Min and max of the non-null values in the five years before `index`."""
+    window = [v for v in series[max(0, index - _RECENT_YEARS):index] if v is not None]
+    if len(window) < 2:
+        return None, None
+    return float(min(window)), float(max(window))
+
+
 def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
     """The province's row when the measure has one, otherwise the national row,
     then the most recent non-null year in it."""
@@ -127,11 +144,14 @@ def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | 
         return None
     for i in range(len(series) - 1, -1, -1):
         if series[i] is not None:
+            low, high = _recent_range(series, i)
             return NormValue(
                 amount=float(series[i]),
                 year=years[i],
                 scope="il" if provincial else "tr",
                 region=key if provincial else NATIONAL_LABEL,
+                recent_min=low,
+                recent_max=high,
             )
     return None
 
