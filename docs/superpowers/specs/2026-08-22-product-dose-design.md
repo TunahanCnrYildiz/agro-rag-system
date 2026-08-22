@@ -34,9 +34,9 @@ correction is the smaller half.
 
 ## 2. Purpose & success criteria
 
-1. A farmer who names a product, their crop group, the application method and their area gets the
-   amount they need **for one application**, as a range, computed from the manufacturer's own
-   published figure.
+1. A farmer who names a product, their crop group and their area gets the amount they need **for
+   one application**, as a range, computed from the manufacturer's own published figure, with the
+   application method the figure belongs to stated in the answer.
 2. The answer says whose number it is. The figure is the manufacturer's; we quote it.
 3. A range stays a range. `2–2,5 litre/da` over 5 dönüm is `10–12,5 litre`, never `11,25`.
 4. **The season total is refused by name**, and the refusal says what it would need.
@@ -72,8 +72,20 @@ treatment.
 | --- | --- | --- |
 | Ürün | searchable select over 48, the P2b crop-select control | 48 items, and a name matcher is a test surface for a convenience |
 | Grup | three buttons: Sebze / Meyve / Tarla bitkisi | 45 of 48 panels segment this way; the farmer knows their own field better than a 246-row mapping table would |
-| Uygulama | two buttons: Yapraktan / Damlamadan | 38 of 48 carry both, **and they differ**. There is no defensible default between two different application systems |
 | Alan | number + dönüm/hektar selector | P1's control, unchanged, including the unit-as-selection rule |
+
+**The application method is NOT an input — it is an attribute of the answer.** An earlier draft made
+it a third control, and measuring killed it: of the 42 products with a per-area dose, **37 attach it
+to drip irrigation only**, 1 to foliar only (`FLY AZOT`), 1 to both, and 3 name no method. Foliar
+figures are overwhelmingly dilutions (`60-70 gr / 100 litre su`), which are not per-area at all. A
+selector that offers two options where 37 products have one is a choice in appearance only, and
+pressing the wrong half would tell the farmer we have no figure for a method the product does not
+publish one for.
+
+So the card asks product, group and area; the answer reports **every** per-area figure that exists
+for that product and group, each labelled with the method it belongs to. That is one line for
+almost every product, two for the one that publishes both. The method is decided by the source, not
+by the farmer, and the answer says which it is.
 
 **The crop is deliberately not wired to the group.** P2 supplies 246 named crops, but mapping them
 onto three groups needs an authored, reviewed table, and a misclassification yields a wrong dose
@@ -157,7 +169,7 @@ plausible-looking-wrong-number class again.
 | --- | --- |
 | Product has no per-area dose (the 4 dilution-only, the 2 with none) | The route says it holds no per-dekar figure for that product and stops. It does not fall back to the dilution, which needs a spray volume the page does not give |
 | Selected group absent for that product | No figure for that combination, named as such |
-| Selected method absent for that product | Same |
+| Product has a per-area figure under a method the farmer did not expect | Not an error: the method is reported, not chosen. Every figure that exists for the product and group is printed, each labelled |
 | Area missing or unparseable | A field error, never a silent zero |
 | `data/product_doses.json` missing or malformed | Empty table; the route explains it has no dose data. Never an exception |
 | A panel that parsed to `low > high` | Rejected at load, and the converter fails loudly on it |
