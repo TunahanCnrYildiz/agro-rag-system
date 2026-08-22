@@ -353,6 +353,20 @@ Commit them as fetched. A converter whose input is not in the repo cannot be re-
 
 And the trap in the other direction: **a dilution must never be read as a per-area dose.** `100 litre suya 250 gram` contains a number, a unit, and the word `litre`; it is per 100 L of water, not per dekar.
 
+**Two more defects surfaced while this task was executed — recorded so the code below is not
+re-read as finished.** The pages also write a numeral gloss between the figure and its unit
+(`bir dekara (1.000 m²) 3 (üç) litre`), so `_AMOUNT` needs to tolerate a parenthetical. Widening it
+WITHOUT widening `_AMOUNT_BARE` reopens the dilution hole: a dilution carrying the same gloss
+becomes invisible to `_DILUTION`, the skip never fires, and the parser returns the **water's own
+volume** as a per-dekar dose. The two patterns must stay in lock-step, and a comment on each should
+say so.
+
+And the sharper lesson: **none of this task's tests exercised the per-figure skip.** Deleting the
+whole mechanism left all of them passing, because `_GAP`'s comma bound was doing the work. A test
+that credits a mechanism has to fail when the mechanism is removed — verify that by disabling it
+and watching the test go red, or the coverage is decorative. That gap is exactly how the defect
+above survived a full task review.
+
 - [ ] **Step 1: Write the failing tests**
 
 Create `tests/test_dose_parse.py`:
