@@ -207,23 +207,19 @@ def test_a_conversation_with_no_province_prefills_nothing(no_llm):
     """The province is never guessed: no province means no provincial norm, not
     a default one and not a neighbouring one.
 
-    Asserted by CONTRAST rather than by looping over cells that are all None
-    today - a loop like that passes whatever the data does, which is the vacuity
-    class. Measured 2026-08-22: with no province, 0 of 246 crops resolve either
-    measure, because P2a's exports were IBBS3-only and every TR row is null. If
-    the national rows are ever populated this test fails loudly and is the right
-    place to decide what a national prefill should say."""
+    Measured 2026-08-22: with no province, 0 of 246 crops resolve either
+    measure, because P2a's exports were IBBS3-only and every TR row is null -
+    every row is null, so the route sends no "crops" key at all rather than
+    246 dead rows that would draw a crop picker filling nothing when tapped.
+    If the national rows are ever populated this test fails loudly and is the
+    right place to decide what a national prefill should say."""
     with_province = engine.answer(BUDGET_Q, ORDU_HISTORY)
     without = engine.answer(BUDGET_Q)
     assert without.form is not None
 
-    def cell(result, crop_id, key):
-        crops = {c["id"]: c for c in result.form.get("crops", [])}
-        return crops[crop_id][key]
-
-    assert cell(with_province, "findik", "yield")["note"] == "TÜİK 2025, Ordu"
-    assert cell(without, "findik", "yield") is None
-    assert cell(without, "findik", "price") is None
+    crops = {c["id"]: c for c in with_province.form["crops"]}
+    assert crops["findik"]["yield"]["note"] == "TÜİK 2025, Ordu"
+    assert "crops" not in without.form
 
 
 def test_a_broken_norm_layer_does_not_break_the_route(no_llm, monkeypatch):

@@ -871,12 +871,23 @@ def _budget_result(payload: dict | None, message: str = "",
     from src import budget
 
     table = ()
+    latest_year = None
     try:
         from src import norms
         from src.context import location
         table = norms.province_table(location.extract_province(message, history))
+        latest_year = norms.latest_year()
+        if table and not any(row.yield_kg_da or row.price_tl_kg for row in table):
+            # No province resolved (or the resolved one, and the national
+            # fallback, both carry nothing): every row's yield and price is
+            # null. Serving that table anyway would put ~22 KB of dead rows on
+            # the wire and draw a crop picker that fills nothing when tapped,
+            # with no message explaining why. Treat it the same as a genuine
+            # lookup failure: no table at all.
+            table = ()
     except Exception:  # noqa: BLE001 - a prefill is a convenience, not the route
         table = ()
+        latest_year = None
 
     submitted = bool(payload)
     try:
@@ -893,7 +904,8 @@ def _budget_result(payload: dict | None, message: str = "",
                       route="budget",
                       form=budget.form_spec(errors if submitted else [],
                                             table,
-                                            payload if submitted else None))
+                                            payload if submitted else None,
+                                            latest_year))
 
 
 def answer(message: str, history: list[dict] | None = None,
