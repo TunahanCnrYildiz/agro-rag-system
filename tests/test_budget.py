@@ -501,7 +501,7 @@ def test_a_table_ships_every_crop_with_its_figures():
 
 
 def test_a_price_cell_carries_two_decimals_and_its_own_unit():
-    spec = budget.form_spec([], _table())
+    spec = budget.form_spec([], _table(), latest_year=2025)
     cell = spec["crops"][0]["price"]
     assert cell["value"] == "202,26"
     assert cell["unit"] == "tl_kg"
@@ -517,6 +517,49 @@ def test_a_measure_with_no_norm_is_none_not_zero():
 def test_a_national_figure_names_turkiye_rather_than_looking_provincial():
     spec = budget.form_spec([], _table())
     assert spec["crops"][1]["yield"]["note"] == "TÜİK 2024, Türkiye"
+
+
+def test_a_price_from_the_latest_year_is_served():
+    """The dataset's cutoff year is 2025 here, and findik's price is from 2025
+    - it must prefill."""
+    spec = budget.form_spec([], _table(), latest_year=2025)
+    assert spec["crops"][0]["price"] is not None
+    assert spec["crops"][0]["price"]["value"] == "202,26"
+
+
+def test_a_price_older_than_the_latest_year_is_absent_not_zero():
+    """Measured on Ordu: Arpa (Diğer) prefills 1,10 TL/kg from 2018 - nine
+    times too low once rendered as revenue. Lira is nominal, so an old price
+    is not a meaningful quantity the way an old yield still is; it is dropped
+    entirely rather than shown stale."""
+    table = (CropNorm("arpa", "Arpa (Diğer)",
+                       NormValue(1500.0, 2025, "il", "Ordu", 1400.0, 1600.0),
+                       NormValue(1.10, 2018, "il", "Ordu", None, None)),)
+    spec = budget.form_spec([], table, latest_year=2025)
+    assert spec["crops"][0]["price"] is None
+    assert spec["crops"][0]["yield"] is not None
+
+
+def test_no_latest_year_serves_no_price_cell_at_all():
+    """Not knowing the dataset's cutoff is not a reason to guess a price is
+    fresh - absence beats risking a stale figure. Yield is untouched."""
+    spec = budget.form_spec([], _table(), latest_year=None)
+    assert all(c["price"] is None for c in spec["crops"])
+    assert spec["crops"][0]["yield"] is not None
+
+
+def test_a_price_range_is_never_shown_even_when_the_norm_carries_one():
+    """Currency is nominal: a fresh price sits ABOVE its own five-year window
+    for nearly every real crop (inflation, not an anomaly - measured 95 of 103
+    Manisa price cells, 45 of 48 in Ordu), so showing the range there would
+    read as a false outlier warning. Yield keeps its range, where a stale
+    figure really can be an outlier."""
+    table = (CropNorm("x", "X",
+                       NormValue(100.0, 2025, "tr", "Türkiye", 60.0, 90.0),
+                       NormValue(50.0, 2025, "tr", "Türkiye", 20.0, 40.0)),)
+    spec = budget.form_spec([], table, latest_year=2025)
+    assert spec["crops"][0]["yield"]["recent"] is not None
+    assert spec["crops"][0]["price"]["recent"] is None
 
 
 def test_no_raw_float_reaches_the_wire():
@@ -547,6 +590,60 @@ def test_a_rejected_form_carries_back_what_was_typed():
     assert fields["price"]["value"] == "202,26"
     assert spec["crop"] == "findik"
     assert fields["area"]["error"]
+
+
+def test_a_rejected_form_echoes_the_raw_source_claim():
+    """The claim being echoed back, not a re-derived verdict - see the next
+    test for why re-deriving it from value/unit was the bug."""
+    submitted = {
+        "crop": "findik",
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "norm"},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "user"},
+    }
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["source"] == "norm"
+    assert fields["price"]["source"] == "user"
+
+
+def test_a_users_own_value_equal_to_the_norm_still_echoes_as_user():
+    """The bug this fixes: re-deriving source by comparing the echoed value
+    and unit to the crop's cell would mark this "norm" because the numbers
+    happen to match, attributing a figure the farmer typed to TUIK."""
+    submitted = {
+        "crop": "findik",
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "user"},
+    }
+    spec = budget.form_spec([], _table(), submitted)
+    fields = {f["id"]: f for f in spec["fields"]}
+    assert fields["yield_total"]["source"] == "user"
+
+
+def test_an_unsubmitted_form_still_has_empty_source_on_every_field():
+    """No submitted payload at all - the redisplay path never runs, so every
+    field keeps the "empty" default."""
+    spec = budget.form_spec([], _table())
+    assert all(f["source"] == "empty" for f in spec["fields"])
+
+
+def test_the_framing_joins_two_different_notes_with_a_middle_dot():
+    """Reachable on real data: Arpa (Diğer) in Ordu renders '(TÜİK 2025, Ordu ·
+    TÜİK 2018, Ordu)' when the yield and price norms come from different
+    years. Fix 1 changes which cases can still reach this (a stale price is
+    never offered as a norm cell), but a fresh yield and a fresh price from
+    different provinces or years still can, so the join stays reachable."""
+    table = (CropNorm("findik", "Fındık",
+                       NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
+                       NormValue(202.26, 2024, "il", "Ordu", None, None)),)
+    inputs, errors = budget.validate({
+        "crop": "findik",
+        "area": {"value": "5", "unit": "donum"},
+        "yield_total": {"value": "28,4", "unit": "kg_da", "source": "norm"},
+        "price": {"value": "202,26", "unit": "tl_kg", "source": "norm"},
+    }, table)
+    assert errors == []
+    text = budget.framing(inputs)
+    assert "TÜİK 2025, Ordu · TÜİK 2024, Ordu" in text
 
 
 def test_an_unsubmitted_form_carries_no_values_and_no_unit_key():

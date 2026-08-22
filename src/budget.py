@@ -123,13 +123,17 @@ class BudgetInputs:
     yield_kg: Value
     price_tl_kg: Value
     cost_tl: Value | None
-    # Deliberately unwired: FIELDS has no crop entry and form_spec() never emits
-    # one, so nothing but a test calling validate()/render() directly ever sets
-    # this. It is not filled from the mobile profile either - profile.crops is
-    # free text that may name several crops, and folding that into one slot here
-    # would be exactly the kind of inference this whole route exists to remove.
-    # The next phase makes crop real: it becomes the key that selects a yield
-    # and price norm, and it arrives as an explicit selection, not a guess.
+    # Which crop the farmer picked - an explicit client selection, never
+    # inferred. It is not part of FIELDS: form_spec() emits it as a bare id
+    # (the top-level "crop" key, and each row's own "id" under "crops"), the
+    # client echoes it back in the payload, and _verify() keys on it to find
+    # the one CropNorm row a "norm" claim could possibly be confirmed against.
+    # Being client-supplied, it is untrusted exactly like every other field
+    # here: _verify() looks it up in the table rather than believing it, so an
+    # unknown or mismatched id simply means no row is found and every "norm"
+    # claim on that submission downgrades to "user". render() prints the
+    # matching row's label (crop_label) when one was found, and this raw id
+    # otherwise.
     crop: str | None = None
     # The crop's display label ("Fındık"), from the CropNorm row _verify already
     # looked up. None when no table resolved the crop - render() then falls
@@ -225,7 +229,8 @@ def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, obj
         if value is None or value.source != "norm":
             continue
         cell = (None if row is None
-                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals))
+                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals,
+                                 show_range=unit_key == "yield"))
         entry = raw.get(field_id) or {}
         if (cell is not None
                 and entry.get("value") == cell["value"]
@@ -287,21 +292,29 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
 _NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg")}
 
 
-def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None) -> dict | None:
+def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
+               show_range: bool) -> dict | None:
     """One prefillable figure, finished for display.
 
     Everything the card shows for this figure is written HERE: the value in
     Turkish notation, the unit to select alongside it, where it came from, and
-    the range of the years before it. The client renders strings and formats
-    nothing - a second Turkish number formatter over there is a second place
-    for a decimal comma to go wrong.
+    (when `show_range`) the range of the years before it. The client renders
+    strings and formats nothing - a second Turkish number formatter over there
+    is a second place for a decimal comma to go wrong.
+
+    `show_range` is False for price. Measured on the shipped data: the price
+    prefill sits ABOVE its own five-year range for 95 of 103 Manisa price
+    cells and 45 of 48 in Ordu - that is lira inflation, not an anomaly, so
+    showing the range there would read as a false outlier warning on almost
+    every ordinary crop. Yield keeps its range: a stale yield is a physical
+    quantity that does not inflate, and that is where an outlier is real.
     """
     if norm is None:
         return None
     value = (_format_qty(norm.amount) if decimals is None
              else format_tr(norm.amount, decimals))
     recent = None
-    if norm.recent_min is not None and norm.recent_max is not None:
+    if show_range and norm.recent_min is not None and norm.recent_max is not None:
         recent = (f"önceki 5 yıl: {_format_qty(norm.recent_min)}–"
                   f"{_format_qty(norm.recent_max)} {unit_text}")
     return {
@@ -314,26 +327,49 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None) -> dict
     }
 
 
-def _crop_rows(table) -> list[dict]:
-    """Every crop's figures, for a card that picks one of them client-side."""
+def _crop_rows(table, latest_year: int | None) -> list[dict]:
+    """Every crop's figures, for a card that picks one of them client-side.
+
+    A price cell is built ONLY when its year equals `latest_year`. Measured on
+    Ordu: 61 crops carry a price, but only 25 are from the latest year and 29
+    are older than 2023 - `Arpa (Diğer)` prefills 1,10 TL/kg from 2018, nine
+    times too low. Lira is nominal, so a stale price is not a meaningful
+    physical quantity the way a stale yield still is, and it silently
+    inflates the revenue this form computes. `latest_year=None` (the cutoff is
+    unknown) serves no price cell at all - absence, never a guess. Yield is
+    untouched: it keeps prefilling from whatever year it last has a value.
+    """
     rows = []
     for row in table:
+        price = row.price_tl_kg
+        if price is not None and (latest_year is None or price.year != latest_year):
+            price = None
         rows.append({
             "id": row.crop,
             "label": row.label,
-            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None),
-            "price": _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2),
+            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
+                                 show_range=True),
+            "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
         })
     return rows
 
 
 def _echo(spec: FieldSpec, submitted: dict | None) -> dict:
-    """What the user typed, given back verbatim.
+    """What the user typed, given back verbatim, and the raw claim about
+    where it came from.
 
-    Verbatim matters: this is the value the error message is ABOUT, so
-    reformatting it would show the user something other than what was rejected.
-    A number that arrived as JSON becomes text, because that is what a text
-    input holds and what parse_tr_number reads.
+    Verbatim matters for `value`: this is the value the error message is
+    ABOUT, so reformatting it would show the user something other than what
+    was rejected. A number that arrived as JSON becomes text, because that is
+    what a text input holds and what parse_tr_number reads.
+
+    `source` is the raw claim being echoed back - "norm" exactly when the
+    submitted entry itself said "norm" - not a verdict re-derived by comparing
+    the echoed value and unit to the crop's cell. That comparison used to be
+    how the card marked a field "norm" on redisplay, and it upgraded a farmer's
+    own typed figure to "norm" the moment it happened to equal the published
+    one. _verify() still checks this claim at compute time, so a lying client
+    is caught there, not here.
     """
     entry = (submitted or {}).get(spec.id)
     if not isinstance(entry, dict):
@@ -345,10 +381,12 @@ def _echo(spec: FieldSpec, submitted: dict | None) -> dict:
         # An unrecognised unit falls back to the first, or the card would render
         # with no chip selected and no way to tell why.
         "unit": unit if any(u.id == unit for u in spec.units) else spec.units[0].id,
+        "source": "norm" if entry.get("source") == "norm" else "user",
     }
 
 
-def form_spec(errors: list[FieldError], table=None, submitted=None) -> dict:
+def form_spec(errors: list[FieldError], table=None, submitted=None,
+              latest_year: int | None = None) -> dict:
     """Serialise FIELDS for the client, attaching each error to its own field.
 
     `table` is a province's worth of norms, from norms.province_table. When it
@@ -359,6 +397,10 @@ def form_spec(errors: list[FieldError], table=None, submitted=None) -> dict:
     `submitted` is the payload that failed validation. Echoing it back is not a
     nicety: the card seeds its state from `value`, so without it a single bad
     field wipes the whole form, the crop selection and its prefill included.
+
+    `latest_year` is the norms dataset's most recent year (norms.latest_year());
+    it decides which crops get a price cell at all - see _crop_rows. It is an
+    int, not looked up here: this module imports nothing from src/norms.py.
     """
     # Coerce non-dict submitted to {} before use, as validate() does for raw.
     # submitted carries an untrusted payload that already failed validation, so
@@ -387,7 +429,7 @@ def form_spec(errors: list[FieldError], table=None, submitted=None) -> dict:
         if isinstance(crop, str) and crop.strip():
             spec["crop"] = crop
     if table:
-        spec["crops"] = _crop_rows(table)
+        spec["crops"] = _crop_rows(table, latest_year)
     return spec
 
 
