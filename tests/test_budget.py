@@ -347,6 +347,29 @@ def test_render_names_the_crop_when_one_was_selected():
     assert "domates" in budget.render(inputs, budget.compute(inputs))
 
 
+def test_render_prefers_the_crop_label_over_its_id():
+    """The id ('findik') is a lookup key, not a word - a farmer reads the label
+    ('Fındık'), and printing the id raw is what this test guards against."""
+    raw = _raw()
+    raw["crop"] = "findik"
+    table = (CropNorm("findik", "Fındık", None, None),)
+    inputs, errors = budget.validate(raw, table)
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert "Fındık için" in text
+    assert "findik için" not in text
+
+
+def test_render_falls_back_to_the_crop_id_when_no_table_resolves_it():
+    """No table, or a crop the table does not carry: still name something
+    rather than printing nothing, using the id as it always did in P1."""
+    raw = _raw()
+    raw["crop"] = "domates"
+    inputs, errors = budget.validate(raw)
+    assert errors == []
+    assert "domates için" in budget.render(inputs, budget.compute(inputs))
+
+
 def test_framing_is_always_appended():
     """Appended by code so no model can drop it - the fertplan.FRAMING pattern."""
     inputs, result = _computed()
@@ -586,6 +609,24 @@ def test_a_norm_figure_replaces_that_sentence():
     assert "öngörü değildir" in text
 
 
+def test_the_lead_in_is_unchanged_when_every_figure_is_the_users_own():
+    """P1's exact lead-in, byte for byte - an already-pinned test elsewhere
+    depends on this string too, but the wording itself is the thing at risk
+    here."""
+    inputs, _ = budget.validate(_all_typed(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith("Girdiğiniz değerlere göre")
+
+
+def test_the_lead_in_changes_when_a_norm_figure_is_standing_in():
+    """'Girdiğiniz değerlere göre' (according to what you entered) is false
+    once a TUIK figure - not the farmer's own - fed the calculation."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith("Şu değerlere göre")
+    assert not text.startswith("Girdiğiniz değerlere göre")
+
+
 def test_the_framing_names_only_the_figures_that_are_not_the_users():
     """A sentence that says 'verim ve fiyat' while the farmer typed the price
     tells them their own number came from TUIK."""
@@ -595,6 +636,37 @@ def test_the_framing_names_only_the_figures_that_are_not_the_users():
     text = budget.framing(inputs)
     assert text.startswith("Bu hesaptaki verim rakamı")
     assert "verim ve fiyat" not in text
+
+
+def test_the_framing_uses_the_singular_for_one_norm_measure():
+    """'rakamı ... ortalamasıdır' agrees in number with a single figure; the
+    plural form here would read as a grammar error a farmer notices."""
+    raw = _submitted()
+    raw["price"] = {"value": "15", "unit": "tl_kg", "source": "user"}
+    inputs, _ = budget.validate(raw, _table())
+    text = budget.framing(inputs)
+    assert "rakamı sizin değil" in text
+    assert "ortalamasıdır" in text
+    assert "rakamları" not in text
+    assert "ortalamalarıdır" not in text
+
+
+def test_the_framing_uses_the_plural_for_two_norm_measures():
+    """With both verim and fiyat from the norm, the noun and the verb both
+    have to take the plural - 'rakamı ... ortalamasıdır' would be wrong here."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.framing(inputs)
+    assert "rakamları sizin değil" in text
+    assert "ortalamalarıdır" in text
+
+
+def test_the_framing_names_tuik_only_in_the_parenthetical():
+    """The sentence body used to say 'TÜİK'in yayımladığı' and then repeat
+    TÜİK again in the parenthetical citation - the same agency named twice in
+    one sentence. It belongs in the citation only."""
+    inputs, _ = budget.validate(_submitted(), _table())
+    text = budget.framing(inputs)
+    assert text.count("TÜİK") == 1
 
 
 def test_the_framing_is_always_the_last_line():

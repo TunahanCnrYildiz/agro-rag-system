@@ -131,6 +131,10 @@ class BudgetInputs:
     # The next phase makes crop real: it becomes the key that selects a yield
     # and price norm, and it arrives as an explicit selection, not a guess.
     crop: str | None = None
+    # The crop's display label ("Fındık"), from the CropNorm row _verify already
+    # looked up. None when no table resolved the crop - render() then falls
+    # back to the raw id rather than printing nothing.
+    crop_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -195,7 +199,7 @@ _VERIFIED = (("yield_total", "yield_kg_da", "yield", None),
              ("price", "price_tl_kg", "price", 2))
 
 
-def _verify(values: dict, raw: dict, crop: str | None, table) -> dict:
+def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, object | None]:
     """Confirm or downgrade every "this came from a norm" claim.
 
     A field claiming a norm whose submitted text does not match what we served
@@ -207,6 +211,10 @@ def _verify(values: dict, raw: dict, crop: str | None, table) -> dict:
 
     "user" is never second-guessed in the other direction. A value the user
     typed is theirs even when it happens to equal the norm.
+
+    Returns the matched CropNorm row (or None) alongside the values, so
+    validate() can take the crop's display label from it without a second
+    lookup.
     """
     row = None
     if crop is not None:
@@ -225,7 +233,7 @@ def _verify(values: dict, raw: dict, crop: str | None, table) -> dict:
             values[field_id] = Value(value.amount, "norm", cell["note"])
         else:
             values[field_id] = Value(value.amount, "user")
-    return values
+    return values, row
 
 
 def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldError]]:
@@ -262,7 +270,7 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
 
     crop = raw.get("crop")
     crop = crop if isinstance(crop, str) and crop.strip() else None
-    values = _verify(values, raw, crop, table)
+    values, row = _verify(values, raw, crop, table)
 
     return BudgetInputs(
         area_da=values["area"],
@@ -270,6 +278,7 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
         price_tl_kg=values["price"],
         cost_tl=values["cost"],
         crop=crop,
+        crop_label=row.label if row is not None else None,
     ), []
 
 
@@ -419,6 +428,19 @@ FRAMING = (
 )
 
 
+def _norm_measures(inputs: BudgetInputs) -> list[tuple[str, Value]]:
+    """Which measures came from a published norm, and under what Turkish label.
+
+    The single place that decides whether any norm figure survived. render()
+    and framing() both read this list rather than each re-checking .source, so
+    the lead-in and the framing sentence can never disagree about it.
+    """
+    return [(label, value)
+            for label, value in (("verim", inputs.yield_kg),
+                                 ("fiyat", inputs.price_tl_kg))
+            if value.source == "norm"]
+
+
 # The second framing, for a calculation that used a published average. Both
 # sentences are appended BY CODE and neither is ever asked of a model - the
 # fertplan.FRAMING pattern. A provincial mean yield is a central tendency across
@@ -426,14 +448,14 @@ FRAMING = (
 # forecast for one parcel.
 def framing(inputs: BudgetInputs) -> str:
     """P1's sentence, or the one that names whose figures these are."""
-    used = [(label, value)
-            for label, value in (("verim", inputs.yield_kg),
-                                 ("fiyat", inputs.price_tl_kg))
-            if value.source == "norm"]
+    used = _norm_measures(inputs)
     if not used:
         return FRAMING
 
+    plural = len(used) > 1
     which = " ve ".join(label for label, _ in used)
+    noun = "rakamları" if plural else "rakamı"
+    ortalama = "ortalamalarıdır" if plural else "ortalamasıdır"
     notes: list[str] = []
     for _, value in used:
         # Both measures normally share one note; printing it twice would read
@@ -441,9 +463,12 @@ def framing(inputs: BudgetInputs) -> str:
         if value.note and value.note not in notes:
             notes.append(value.note)
     source = " · ".join(notes)
+    # The provenance (TÜİK, year, region) lives in the parenthetical only - the
+    # sentence body says "yayımlanmış" (published) rather than naming TÜİK a
+    # second time in the same sentence.
     return (
-        f"Bu hesaptaki {which} rakamı sizin değil, TÜİK'in yayımladığı bölge "
-        f"ortalamasıdır ({source}). Bölge ortalaması tek bir tarlanın verimi "
+        f"Bu hesaptaki {which} {noun} sizin değil, yayımlanmış bölge "
+        f"{ortalama} ({source}). Bölge ortalaması tek bir tarlanın verimi "
         f"veya sizin alacağınız fiyat için bir öngörü değildir; kendi "
         f"rakamınızı girerseniz hesap ona göre yapılır."
     )
@@ -489,7 +514,8 @@ def _format_qty(value: float) -> str:
 
 def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     """Code-written Turkish. Restates its inputs before stating its result."""
-    crop = f" {inputs.crop} için" if inputs.crop else ""
+    crop_name = inputs.crop_label or inputs.crop
+    crop = f" {crop_name} için" if crop_name else ""
     given = [
         f"**{_format_qty(inputs.area_da.amount)} dönüm**",
         f"toplam **{_format_qty(inputs.yield_kg.amount)} kg** "
@@ -499,7 +525,12 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     if result.cost_tl is not None:
         given.append(f"masraf **{format_tr(result.cost_tl, 2)} TL**")
 
-    lines = [f"Girdiğiniz değerlere göre{crop}: " + ", ".join(given) + ".", ""]
+    # Same lead-in P1 always used, unless a norm figure is standing in for
+    # something the user did not type - then "girdiğiniz" (what you entered)
+    # would be the same falsehood the framing sentence exists to remove.
+    lead_in = ("Şu değerlere göre" if _norm_measures(inputs)
+               else "Girdiğiniz değerlere göre")
+    lines = [f"{lead_in}{crop}: " + ", ".join(given) + ".", ""]
 
     if result.margin_tl is None:
         lines.append(f"Gelir **{format_tr(result.revenue_tl, 2)} TL**.")
