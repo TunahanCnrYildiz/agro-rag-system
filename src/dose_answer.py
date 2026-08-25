@@ -278,7 +278,7 @@ def no_dose_for_group(inputs: DoseInputs) -> str:
     return (
         f"**{inputs.product}** için {GROUP_IN_SENTENCE[inputs.group]} elimde "
         f"okunabilir bir dekar dozu yok. Bu ürünün sayfasında bu grup için bir "
-        f"rakamı okuyamadım, başka bir grubun rakamını da buraya taşımıyorum."
+        f"rakam okuyamadım, başka bir grubun rakamını da buraya taşımıyorum."
     )
 
 
