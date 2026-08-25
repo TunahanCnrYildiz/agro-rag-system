@@ -98,6 +98,8 @@ SOURCES = {
               "level": "İBBS3 (İl Düzeyi)", "obtained": "2026-08-19"},
 }
 
+REVIEW = DATA_DIR / "crop_area_review.json"
+
 
 def parse_label(label: str, olcum: str = "") -> tuple[str, str, str] | None:
     """(measure, crop name, unit) or None when unusable.
@@ -235,15 +237,22 @@ def _density_verdict(tons: float, dekar: float,
     return None
 
 
-def build(rows) -> dict:
+def build(rows, not_field_area=()) -> dict:
     """Group Row(...) into the schema src/norms.py validates.
 
     Format-independent on purpose: read_export does the parsing, this does the
     shaping, and only this half can be tested without a real export.
+
+    `not_field_area` is the REVIEWED answer to a question no published number
+    can settle: whether a crop's recorded area is the ground its production came
+    off. Mushroom's is a building's footprint. Those crops get no yield at all;
+    their prices are untouched. A reviewed crop that no longer appears in the
+    exports RAISES rather than sitting in the file looking like coverage.
     """
     known = set(PROVINCES)
     rows = list(rows)
     refused: list[dict] = []
+    excluded = {_normalize_tr(name): name for name in not_field_area}
     years = sorted({r.year for r in rows})
     index = {y: i for i, y in enumerate(years)}
 
@@ -263,6 +272,13 @@ def build(rows) -> dict:
         by_measure = seen.setdefault(crop_id, {})
         by_measure.setdefault(r.measure, {}).setdefault(province, {})[r.year] = r.value
 
+    stale = sorted(name for crop_id, name in excluded.items() if crop_id not in seen)
+    if stale:
+        raise ValueError(
+            f"data/crop_area_review.json reviews {stale}, which the exports do "
+            f"not carry - a review of nothing, sitting in the file looking like "
+            f"coverage")
+
     crops: dict[str, dict] = {}
     for crop_id, by_measure in seen.items():
         published = by_measure.get("verim", {})
@@ -274,6 +290,13 @@ def build(rows) -> dict:
         # publish one, so the gate below cannot touch them - and must not:
         # their denominator really is the whole crop's sown area.
         per_tree = by_measure.get("verim_agac", {})
+
+        # A reviewed crop yields nothing at all: not a gated figure, not a
+        # figure with a caveat. Its price survives - a mushroom price is a price.
+        if crop_id in excluded:
+            published, uretim, alan = {}, {}, {}
+            refused.append({"crop": labels[crop_id], "province": "*",
+                            "year": 0, "reason": "area_is_not_field"})
 
         yields: dict[str, list] = {}
         for province in sorted(set(published) | (set(uretim) & set(alan))):
@@ -356,7 +379,8 @@ def main() -> None:
         rows.extend(read_export(path))
         print(f"read {path.name}", file=sys.stderr)
     out = DATA_DIR / "crop_norms.json"
-    data = build(rows)
+    review = json.loads(REVIEW.read_text(encoding="utf-8"))
+    data = build(rows, not_field_area=review["not_field_area"])
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"wrote {out}: {len(data['crops'])} crops, years {data['meta']['years']}")
 

@@ -4,6 +4,8 @@ It runs by hand, about once a year, so its job is to fail loudly rather than to
 be convenient. Every row it cannot use must be reported, never quietly zeroed -
 a zero flows into the budget arithmetic and comes out as a confident wrong figure.
 """
+import pytest
+
 from scripts import build_crop_norms as bcn
 
 
@@ -378,3 +380,43 @@ def test_the_verdict_names_which_bound_was_crossed():
     assert bcn._density_verdict(6.0, 766.0, 27.0) == "density_below_floor"
     assert bcn._density_verdict(267.0, 3.0, None) == "no_per_tree_figure"
     assert bcn._density_verdict(182.0, 155.0, 31.0) is None
+
+
+def test_a_reviewed_crop_gets_no_yield_at_all():
+    """Mushroom's `ekilen alan` is a building's footprint and its beds are
+    stacked in tiers, so production over area is not a yield in any unit. No
+    published number says so - a person did."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+    ]
+    out = bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+    assert "Ordu" not in out["crops"]["mantar (kultur)"]["yield_kg_da"]
+
+
+def test_a_reviewed_crop_keeps_its_price():
+    """A mushroom price is a price. Only the area-based figure is unusable."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "fiyat", 132.18),
+    ]
+    out = bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+    assert out["crops"]["mantar (kultur)"]["price_tl_kg"]["Ordu"] == [132.18]
+
+
+def test_a_stale_review_entry_stops_the_build():
+    """A review of a crop that is no longer in the exports is a review of
+    nothing, sitting in the file looking like coverage."""
+    rows = [R("Ordu", "Ayva", 2025, "verim", 1200.0)]
+    with pytest.raises(ValueError, match="Mantar"):
+        bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+
+
+def test_no_review_means_no_exclusions():
+    """The default must be inert: an omitted argument may not silently gate."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+    ]
+    assert bcn.build(rows)["crops"]["mantar (kultur)"]["yield_kg_da"]["Ordu"] == [179000.0]
