@@ -11,9 +11,20 @@ remove.
 
 THE THREE CROP GROUPS DO NOT HAVE THE SAME SHAPE, which is why this reads
 measures first and derives second:
-  - Tahıllar and Meyveler publish `Verim` directly, in Kg/Dekar.
+  - Tahıllar publish `Verim` directly, in Kg/Dekar.
+  - Meyveler publish `Verim` too, but almost all of it is Kg/Meyve Veren AGAC -
+    per TREE, not per dekar. Measured 2026-08-25: 61 of the 81 fruit crops in
+    these exports publish only the per-tree figure, and 20 (vines, berries,
+    herbs) publish Kg/Dekar. So most fruit yield is DERIVED, like a vegetable's.
   - Sebzeler publish no Verim at all: only `Üretim Miktarı` (Ton) and
     `Ekilen Alan` (Dekar), so the yield is DERIVED from the pair.
+THE TWO DERIVATIONS ARE NOT EQUALLY SAFE, which is why build() gates one of
+them. A vegetable's denominator is `Ekilen Alan` - the whole crop's sown area.
+A fruit's is `Toplu Meyveliklerin Alani` - COMPACT ORCHARDS ONLY - while its
+numerator counts fruit from every tree in the province, scattered ones
+included. Where a fruit is grown as scattered trees the denominator is nearly
+empty: Turunc in Adana 2025 is 2.439 tons over 2 dekars, which divides out to
+1.219.500 kg/da.
 A published figure always wins over a derivable one - never recompute what the
 source already states.
 
@@ -63,12 +74,14 @@ _MEASURES = {
 }
 
 # The unit each measure must carry to be usable. Fruit `Verim` comes in TWO
-# units: Kg/Dekar for vines and berries, and Kg/Meyve Veren Agac for orchard
-# trees - TUIK publishes no per-dekar yield for apple, walnut, citrus and the
-# rest. A per-tree figure written into a per-dekar field would be silently wrong
-# by more than an order of magnitude, so it is refused here rather than scaled
-# by a tree count nobody supplied.
-_UNITS = {"verim": {"kg/dekar"}, "alan": {"dekar"}, "uretim": {"ton"},
+# units: Kg/Dekar for vines, berries and herbs, and Kg/Meyve Veren Agac for
+# every orchard tree - TUIK publishes NO per-dekar yield for apple, walnut,
+# citrus, quince and the rest. The per-tree figure is read under `verim_agac`,
+# a measure of its own: build() uses it as EVIDENCE for the density gate and
+# never writes it as a yield, because scaling it to a dekar needs a planting
+# density nobody published.
+_UNITS = {"verim": {"kg/dekar"}, "verim_agac": {"kg/meyve veren agac"},
+          "alan": {"dekar"}, "uretim": {"ton"},
           "fiyat": {"kilogram"}}
 
 # How many decimals each measure keeps. A yield is tonnes over dekars, both
@@ -84,6 +97,8 @@ SOURCES = {
               "olcum": "Bitkisel ürün fiyatları (TL)", "kirilim": "TAORBA",
               "level": "İBBS3 (İl Düzeyi)", "obtained": "2026-08-19"},
 }
+
+REVIEW = DATA_DIR / "crop_area_review.json"
 
 
 def parse_label(label: str, olcum: str = "") -> tuple[str, str, str] | None:
@@ -107,7 +122,13 @@ def parse_label(label: str, olcum: str = "") -> tuple[str, str, str] | None:
     if m is None or measure is None:
         return None
     unit = (m.group("unit") or "").strip()
-    if _normalize_tr(unit) not in _UNITS[measure]:
+    folded = _normalize_tr(unit)
+    # A `Verim` row in the per-tree unit is not an unusable row - it is a
+    # different measure wearing the same label, and the gate in build() cannot
+    # run without it.
+    if measure == "verim" and folded in _UNITS["verim_agac"]:
+        measure = "verim_agac"
+    if folded not in _UNITS[measure]:
         return None
     return measure, m.group("name").strip(), unit
 
@@ -179,14 +200,59 @@ def read_export(path: Path):
             yield Row(province, crop, year, measure, value)
 
 
-def build(rows) -> dict:
+# THE BAND IS ARGUED, NOT DISCOVERED. Measured over the 16.392 derived fruit
+# cells, the implied density is unimodal - median 40 trees/da, which is a
+# 5m x 5m orchard grid - with a long, smoothly decaying tail and NO natural cut
+# to read a threshold off. So the bounds rest on geometry, not on horticultural
+# judgement nobody here has:
+#   444 trees/da is a 1,5m x 1,5m grid, 2,25 m2 of ground per tree. A
+#   fruit-bearing tree does not stand at that spacing, so the recorded area
+#   cannot be the ground the production came from.
+#   Below 5 trees/da the area is recorded and almost nothing comes off it - an
+#   orchard not yet in bearing. That understates the yield rather than inflating
+#   it: safer, still wrong in a revenue line.
+# THIS RAISES THE FLOOR ON WRONGNESS, IT DOES NOT REMOVE IT. A mulberry cell
+# implying 200 trees/da is still mostly scattered trees and still passes.
+_MAX_TREES_PER_DA = 444
+_MIN_TREES_PER_DA = 5
+
+
+def _density_verdict(tons: float, dekar: float,
+                     per_tree: float | None) -> str | None:
+    """Why this derived cell must not be written, or None to write it.
+
+    All three numbers are TUIK's own. Nothing is assumed about the crop.
+    """
+    if not per_tree:
+        # This crop publishes per-tree yields, so the cell SHOULD have been
+        # judged - this province-year simply carries nothing to judge it with.
+        # Refused rather than written unchecked: an unjudged figure and a judged
+        # one must not look the same in the output.
+        return "no_per_tree_figure"
+    trees_per_da = (tons * 1000.0 / per_tree) / dekar
+    if trees_per_da > _MAX_TREES_PER_DA:
+        return "density_above_ceiling"
+    if trees_per_da < _MIN_TREES_PER_DA:
+        return "density_below_floor"
+    return None
+
+
+def build(rows, not_field_area=()) -> dict:
     """Group Row(...) into the schema src/norms.py validates.
 
     Format-independent on purpose: read_export does the parsing, this does the
     shaping, and only this half can be tested without a real export.
+
+    `not_field_area` is the REVIEWED answer to a question no published number
+    can settle: whether a crop's recorded area is the ground its production came
+    off. Mushroom's is a building's footprint. Those crops get no yield at all;
+    their prices are untouched. A reviewed crop that no longer appears in the
+    exports RAISES rather than sitting in the file looking like coverage.
     """
     known = set(PROVINCES)
     rows = list(rows)
+    refused: list[dict] = []
+    excluded = {_normalize_tr(name): name for name in not_field_area}
     years = sorted({r.year for r in rows})
     index = {y: i for i, y in enumerate(years)}
 
@@ -206,23 +272,54 @@ def build(rows) -> dict:
         by_measure = seen.setdefault(crop_id, {})
         by_measure.setdefault(r.measure, {}).setdefault(province, {})[r.year] = r.value
 
+    stale = sorted(name for crop_id, name in excluded.items() if crop_id not in seen)
+    if stale:
+        raise ValueError(
+            f"data/crop_area_review.json reviews {stale}, which the exports do "
+            f"not carry - a review of nothing, sitting in the file looking like "
+            f"coverage")
+
     crops: dict[str, dict] = {}
     for crop_id, by_measure in seen.items():
         published = by_measure.get("verim", {})
         uretim = by_measure.get("uretim", {})
         alan = by_measure.get("alan", {})
+        # A tree crop is one TUIK publishes a per-tree yield for ANYWHERE. That
+        # is a property of the CROP, not of the cell, and it is what says "this
+        # crop's area column is Toplu Meyveliklerin Alani". Vegetables never
+        # publish one, so the gate below cannot touch them - and must not:
+        # their denominator really is the whole crop's sown area.
+        per_tree = by_measure.get("verim_agac", {})
+
+        # A reviewed crop yields nothing at all: not a gated figure, not a
+        # figure with a caveat. Its price survives - a mushroom price is a price.
+        if crop_id in excluded:
+            published, uretim, alan = {}, {}, {}
+            refused.append({"crop": labels[crop_id], "province": "*",
+                            "year": 0, "reason": "area_is_not_field"})
 
         yields: dict[str, list] = {}
-        for province in set(published) | (set(uretim) & set(alan)):
+        for province in sorted(set(published) | (set(uretim) & set(alan))):
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
                 if value is None:
-                    # Vegetables publish no Verim; derive it from the pair, and
-                    # only where BOTH halves exist. Ton -> kg is the 1000.
+                    # Vegetables publish no Verim, and most fruits publish only
+                    # a per-tree one; derive from the pair, and only where BOTH
+                    # halves exist. Ton -> kg is the 1000.
                     tons = uretim.get(province, {}).get(year)
                     dekar = alan.get(province, {}).get(year)
                     if tons is not None and dekar:
+                        reason = (_density_verdict(
+                                      tons, dekar,
+                                      per_tree.get(province, {}).get(year))
+                                  if per_tree else None)
+                        if reason is not None:
+                            refused.append({"crop": labels[crop_id],
+                                            "province": province,
+                                            "year": year,
+                                            "reason": reason})
+                            continue
                         value = tons * 1000.0 / dekar
                 if value:
                     # `if value` and not `is not None`: a yield of exactly 0 is
@@ -268,8 +365,21 @@ def build(rows) -> dict:
             },
         }
 
+    refused.sort(key=lambda r: (r["crop"], r["province"], r["year"]))
+    counts: dict[str, int] = {}
+    for cell in refused:
+        counts[cell["reason"]] = counts.get(cell["reason"], 0) + 1
+    for cell in refused:
+        print(f"refused yield cell: {cell['crop']} / {cell['province']} / "
+              f"{cell['year']}: {cell['reason']}", file=sys.stderr)
+
     return {"meta": {"generated": date.today().isoformat(),
-                     "years": years, "sources": SOURCES},
+                     "years": years, "sources": SOURCES,
+                     # The finding travels WITH the file. Without this record
+                     # there is no committed way to tell a province that grows
+                     # none of a crop from one whose figure we threw out.
+                     "refused_yield_cells": {"counts": counts,
+                                             "cells": refused}},
             "crops": crops}
 
 
@@ -280,9 +390,16 @@ def main() -> None:
         rows.extend(read_export(path))
         print(f"read {path.name}", file=sys.stderr)
     out = DATA_DIR / "crop_norms.json"
-    data = build(rows)
+    review = json.loads(REVIEW.read_text(encoding="utf-8"))
+    data = build(rows, not_field_area=review["not_field_area"])
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    record = data["meta"]["refused_yield_cells"]
     print(f"wrote {out}: {len(data['crops'])} crops, years {data['meta']['years']}")
+    if record["counts"]:
+        total = sum(record["counts"].values())
+        print(f"refused {total} yield cell(s), reported here rather than silently:")
+        for reason, n in sorted(record["counts"].items()):
+            print(f"          {reason}: {n}")
 
 
 if __name__ == "__main__":

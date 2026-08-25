@@ -4,6 +4,8 @@ It runs by hand, about once a year, so its job is to fail loudly rather than to
 be convenient. Every row it cannot use must be reported, never quietly zeroed -
 a zero flows into the budget arithmetic and comes out as a confident wrong figure.
 """
+import pytest
+
 from scripts import build_crop_norms as bcn
 
 
@@ -130,13 +132,39 @@ def test_parse_label_reads_the_measure_the_name_and_the_unit():
         "uretim", "Domates", "Ton")
 
 
-def test_a_per_tree_yield_is_refused():
-    """TÜİK publishes orchard fruit yield only as Kg/Meyve Veren Ağaç. Written
-    into a per-dekar field an apple would read 80 instead of ~2500 - silently
-    wrong by more than an order of magnitude. It is refused, not scaled by a
-    tree count nobody supplied."""
+def test_a_per_tree_yield_is_read_under_its_own_measure():
+    """TÜİK publishes orchard fruit yield ONLY as Kg/Meyve Veren Ağaç. It is
+    read - the density gate needs it as evidence - but under a measure name of
+    its own, so no code path can mistake it for a per-dekar figure."""
     assert bcn.parse_label(
-        "Verim ve 01.24.10.00.00. (Elma) - Kg/Meyve Veren Ağaç") is None
+        "Verim ve 01.24.10.00.00. (Elma) - Kg/Meyve Veren Ağaç") == (
+        "verim_agac", "Elma", "Kg/Meyve Veren Ağaç")
+
+
+def test_a_per_tree_yield_never_becomes_a_yield():
+    """Written into a per-dekar field an apple would read 80 instead of ~2500 -
+    silently wrong by more than an order of magnitude. Evidence only.
+
+    The uretim/alan pair is what makes this test BITE, and it was missing when
+    the test was first written: without a derivable figure to compete with, the
+    assertion held whether or not `published` ever read the per-tree bucket.
+    Here 250 tons over 100 dekars derives 2500 kg/da at an implied 31 trees/da,
+    so the cell is written - and if anything ever taught `published` to read
+    `verim_agac`, this reads 80.0 instead."""
+    rows = [
+        R("Manisa", "Elma", 2025, "verim_agac", 80.0),
+        R("Manisa", "Elma", 2025, "uretim", 250.0),
+        R("Manisa", "Elma", 2025, "alan", 100.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["elma"]["yield_kg_da"]["Manisa"] == [2500.0]
+
+
+def test_a_per_dekar_verim_is_still_read_as_a_yield():
+    """The routing must not swallow the unit it was always meant to accept."""
+    assert bcn.parse_label(
+        "Verim ve 01.11.11.00.00. (Durum Buğdayı) - Kg/Dekar") == (
+        "verim", "Durum Buğdayı", "Kg/Dekar")
 
 
 def test_the_fruit_area_measure_is_recognised():
@@ -253,3 +281,278 @@ def test_a_crop_with_only_a_price_still_loads(tmp_path, monkeypatch):
     assert n is not None
     assert n.yield_kg_da is None
     assert n.price_tl_kg.amount == 30.0
+
+
+def test_a_tree_crop_cell_inside_the_band_is_written_unchanged():
+    """Ayva in Tokat 2025: 182 tons over 155 dekars, 31 kg per tree. That is
+    (182000/31)/155 = 38 trees/da - a 5m x 5m orchard, exactly what the
+    denominator claims to be. The gate must not touch a figure it accepts."""
+    rows = [
+        R("Tokat", "Ayva", 2025, "uretim", 182.0),
+        R("Tokat", "Ayva", 2025, "alan", 155.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Tokat"] == [1174.2]
+
+
+def test_a_cell_whose_area_cannot_hold_its_trees_is_refused():
+    """Ayva in Ordu 2025: 267 tons over 3 dekars, 31 kg per tree. That implies
+    (267000/31)/3 = 2871 trees on one dekar - 0,35 m2 each. The area is not the
+    ground the production came from, so 89.000 kg/da is not a yield."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
+
+
+def test_a_cell_with_an_area_but_almost_no_production_is_refused():
+    """The mirror error: 6 tons over 766 dekars at 27 kg per tree is 0,3
+    trees/da - an orchard planted but not yet bearing. It understates the yield
+    instead of inflating it, which is safer and still wrong in a revenue line."""
+    rows = [
+        R("Adana", "Avokado", 2021, "uretim", 6.0),
+        R("Adana", "Avokado", 2021, "alan", 766.0),
+        R("Adana", "Avokado", 2021, "verim_agac", 27.0),
+    ]
+    out = bcn.build(rows)
+    assert "Adana" not in out["crops"]["avokado"]["yield_kg_da"]
+
+
+def test_a_tree_crop_cell_with_no_per_tree_figure_is_refused():
+    """The crop publishes per-tree yields elsewhere, so it IS a tree crop and
+    this cell should have been judged - but this province-year carries no
+    figure to judge it with. An unjudged cell and a judged one must not be
+    indistinguishable in the output."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
+
+
+def test_a_vegetable_is_never_gated():
+    """THE MOST DANGEROUS MISTAKE THIS GATE CAN MAKE. Vegetables publish no
+    per-tree yield anywhere, and their denominator - Ekilen Alan - really is the
+    whole crop's sown area. A gate that judged them would find no evidence and
+    delete every vegetable yield in the file. 300 tons over 1 dekar is a strange
+    tomato figure, and it still ships, because nothing here can judge it."""
+    rows = [
+        R("Manisa", "Domates", 2025, "uretim", 300.0),
+        R("Manisa", "Domates", 2025, "alan", 1.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["domates"]["yield_kg_da"]["Manisa"] == [300000.0]
+
+
+def test_a_published_per_dekar_yield_is_never_gated():
+    """A published figure beats a derived one, so the gate never runs on it -
+    even for a crop that also publishes a per-tree figure."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "verim", 1200.0),
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Ordu"] == [1200.0]
+
+
+def test_the_province_order_does_not_depend_on_the_hash_seed():
+    """MEASURED 2026-08-25, and it predates this branch: build() iterates a SET
+    of provinces, so the key order inside every crop changes from run to run
+    (PYTHONHASHSEED=1 gives Tokat, Karabük, Düzce…; =7 gives Bolu, Mersin,
+    Sinop…). The committed file is supposed to be a reproducible output of the
+    committed builder; with a shuffling key order every regeneration is a
+    whole-file diff, and the one thing a reader needs to see - which cells this
+    gate removed - is buried in it."""
+    rows = [
+        R("Tokat", "Domates", 2025, "uretim", 300.0),
+        R("Tokat", "Domates", 2025, "alan", 100.0),
+        R("Adana", "Domates", 2025, "uretim", 300.0),
+        R("Adana", "Domates", 2025, "alan", 100.0),
+        R("Bolu", "Domates", 2025, "uretim", 300.0),
+        R("Bolu", "Domates", 2025, "alan", 100.0),
+    ]
+    keys = [k for k in bcn.build(rows)["crops"]["domates"]["yield_kg_da"]
+            if k not in ("scope", "TR")]
+    assert keys == ["Adana", "Bolu", "Tokat"]
+
+
+def test_the_verdict_names_which_bound_was_crossed():
+    """The report has to say WHY, and the three reasons are not interchangeable:
+    two are impossible figures, one is an unjudgeable one."""
+    assert bcn._density_verdict(267.0, 3.0, 31.0) == "density_above_ceiling"
+    assert bcn._density_verdict(6.0, 766.0, 27.0) == "density_below_floor"
+    assert bcn._density_verdict(267.0, 3.0, None) == "no_per_tree_figure"
+    assert bcn._density_verdict(182.0, 155.0, 31.0) is None
+
+
+def test_a_reviewed_crop_gets_no_yield_at_all():
+    """Mushroom's `ekilen alan` is a building's footprint and its beds are
+    stacked in tiers, so production over area is not a yield in any unit. No
+    published number says so - a person did."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+    ]
+    out = bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+    assert "Ordu" not in out["crops"]["mantar (kultur)"]["yield_kg_da"]
+
+
+def test_a_reviewed_crop_keeps_its_price():
+    """A mushroom price is a price. Only the area-based figure is unusable."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "fiyat", 132.18),
+    ]
+    out = bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+    assert out["crops"]["mantar (kultur)"]["price_tl_kg"]["Ordu"] == [132.18]
+
+
+def test_a_stale_review_entry_stops_the_build():
+    """A review of a crop that is no longer in the exports is a review of
+    nothing, sitting in the file looking like coverage."""
+    rows = [R("Ordu", "Ayva", 2025, "verim", 1200.0)]
+    with pytest.raises(ValueError, match="Mantar"):
+        bcn.build(rows, not_field_area=["Mantar (Kültür)"])
+
+
+def test_no_review_means_no_exclusions():
+    """The default must be inert: an omitted argument may not silently gate."""
+    rows = [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
+    ]
+    assert bcn.build(rows)["crops"]["mantar (kultur)"]["yield_kg_da"]["Ordu"] == [179000.0]
+
+
+def test_a_refusal_is_recorded_in_the_file_with_its_reason():
+    """The finding travels WITH the data: without this there is no committed
+    way to tell "this province grows no quince" from "we threw its figure out"."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["counts"] == {"density_above_ceiling": 1}
+    assert record["cells"] == [{"crop": "Ayva", "province": "Ordu",
+                                "year": 2025, "reason": "density_above_ceiling"}]
+
+
+def test_the_refusal_record_is_empty_when_nothing_was_refused():
+    record = bcn.build(_rows())["meta"]["refused_yield_cells"]
+    assert record == {"counts": {}, "cells": []}
+
+
+def test_refusals_are_sorted_so_the_committed_file_is_stable():
+    """The file must be a reproducible output of the builder; a set-ordered list
+    would diff differently on every run for no reason."""
+    rows = [
+        R("Tokat", "Erik", 2025, "uretim", 500.0),
+        R("Tokat", "Erik", 2025, "alan", 1.0),
+        R("Tokat", "Erik", 2025, "verim_agac", 16.0),
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    cells = bcn.build(rows)["meta"]["refused_yield_cells"]["cells"]
+    assert [c["crop"] for c in cells] == ["Ayva", "Erik"]
+
+
+def test_the_build_names_every_refusal_on_the_console(capsys):
+    """It runs by hand once a year; its job is to fail loudly."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    bcn.build(rows)
+    printed = capsys.readouterr()
+    assert "Ayva" in printed.err and "Ordu" in printed.err
+
+
+def test_the_shipped_file_is_what_the_builder_produces():
+    """Proves the data file was generated, not hand-edited."""
+    import json as _json
+    from src.config import DATA_DIR
+    rows = []
+    for path in sorted((DATA_DIR / "raw").glob("*.csv")):
+        rows.extend(bcn.read_export(path))
+    review = _json.loads((DATA_DIR / "crop_area_review.json").read_text(encoding="utf-8"))
+    rebuilt = bcn.build(rows, not_field_area=review["not_field_area"])
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    assert rebuilt["crops"] == shipped["crops"]
+    assert rebuilt["meta"]["refused_yield_cells"] == shipped["meta"]["refused_yield_cells"]
+
+
+def test_the_shipped_file_still_carries_most_of_its_yields():
+    """A guard on the real data: if the gate ever starts refusing everything,
+    every fixture test above keeps passing while the feature quietly empties."""
+    import json as _json
+    from src.config import DATA_DIR
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    cells = sum(1 for crop in shipped["crops"].values()
+                for province, series in crop["yield_kg_da"].items()
+                if province not in ("scope", "TR")
+                for v in series if v is not None)
+    assert cells >= 45000, cells
+    # 45.000 is a deliberate floor, not the measured count. Measured 67.535
+    # cells when this test was written; the floor sits at roughly two thirds
+    # of that: an order-of-magnitude collapse trips it, normal year-to-year
+    # drift in the TÜİK exports does not.
+
+
+def test_the_shipped_file_carries_no_cell_the_gate_should_have_refused():
+    """The file stores a yield, not a density, so this check runs the density
+    test again over the committed exports rather than reading the file alone."""
+    import json as _json
+    from src.config import DATA_DIR
+    rows = []
+    for path in sorted((DATA_DIR / "raw").glob("*.csv")):
+        rows.extend(bcn.read_export(path))
+    per_tree, uretim, alan = {}, {}, {}
+    for r in rows:
+        key = (bcn._normalize_tr(r.crop), r.province, r.year)
+        if r.measure == "verim_agac":
+            per_tree[key] = r.value
+        elif r.measure == "uretim":
+            uretim[key] = r.value
+        elif r.measure == "alan":
+            alan[key] = r.value
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    years = shipped["meta"]["years"]
+    bad = []
+    for crop_id, crop in shipped["crops"].items():
+        for province, series in crop["yield_kg_da"].items():
+            if province in ("scope", "TR"):
+                continue
+            for i, value in enumerate(series):
+                if value is None:
+                    continue
+                key = (crop_id, province, years[i])
+                if key not in per_tree or key not in uretim or key not in alan:
+                    continue
+                if bcn._density_verdict(uretim[key], alan[key], per_tree[key]):
+                    bad.append(key)
+    assert bad == [], bad[:5]
+
+
+def test_the_shipped_file_refused_the_cells_the_spec_names():
+    """The three worked examples from the design doc, on the real data."""
+    import json as _json
+    from src.config import DATA_DIR
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    refused = {(c["crop"], c["province"]) for c in
+               shipped["meta"]["refused_yield_cells"]["cells"]}
+    assert ("Ayva", "Ordu") in refused
+    assert ("Turunç", "Adana") in refused
+    assert ("Mantar (Kültür)", "*") in refused
+    assert ("Ayva", "Tokat") not in refused

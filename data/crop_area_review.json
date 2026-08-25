@@ -1,0 +1,13 @@
+{
+ "meta": {
+  "reviewed": "2026-08-25",
+  "reviewed_by": "Tunahan Yıldız",
+  "why": "The density gate in scripts/build_crop_norms.py judges a derived yield by the tree density its own numbers imply. That test cannot see a crop whose recorded area is not field area at all - there is nothing in the published numbers that says so. A person reads the crop and records it here; the builder then writes no yield for it."
+ },
+ "not_field_area": {
+  "Mantar (Kültür)": {
+   "evidence": "Ordu 2025: 179 ton üretim / 1 dekar ekilen alan = 179.000 kg/da. Manisa 2025: 100 ton / 4 dekar = 25.000 kg/da. Mantar çok katlı yastıklarda yetişiyor, yani 'ekilen alan' binanın taban alanı - üretimin geldiği yüzey değil. Türetilen rakam her ilin verim x fiyat sıralamasının tepesine çıkıyor.",
+   "note": "The price series is untouched: a mushroom price is a price."
+  }
+ }
+}
