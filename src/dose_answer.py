@@ -142,3 +142,59 @@ def form_spec(errors: list[FieldError], submitted: object = None) -> dict:
                    "group": by_field.get("group"),
                    "area": by_field.get("area")},
     }
+
+
+@dataclass(frozen=True)
+class DoseTotal:
+    """One published figure and what it comes to over the farmer's area.
+
+    The published figure travels alongside the total because the answer quotes
+    it: "dekara 250 gr" is the manufacturer's sentence, "1,25 kg" is ours.
+    """
+    method: str
+    dose_low: float
+    dose_high: float
+    dose_unit: str
+    total_low: float
+    total_high: float
+    total_unit: str
+
+
+# The only conversion this route performs, and it is a pure one: 1000 of a
+# sub-unit is the unit above it, on any page, with no density involved. A gram
+# figure is NEVER turned into a litre one - that needs a density the pages do
+# not give.
+_PROMOTE = {"gr": ("kg", 1000.0), "cc": ("litre", 1000.0)}
+
+
+def _promote(low: float, high: float, unit: str) -> tuple[float, float, str]:
+    """Promote BOTH ends or neither, decided by the larger one.
+
+    Deciding per end would print "1000 cc - 1,25 litre" for a single range,
+    which reads as two different figures rather than one span.
+    """
+    target = _PROMOTE.get(unit)
+    if target is None:
+        return low, high, unit
+    name, factor = target
+    if max(low, high) < factor:
+        return low, high, unit
+    return low / factor, high / factor, name
+
+
+def compute(inputs: DoseInputs) -> tuple[DoseTotal, ...]:
+    """All arithmetic for this route lives here: two multiplications per figure.
+
+    Empty when the product publishes nothing for that group - which is an
+    answer ("we hold no figure"), not a zero. A zero would flow into a purchase
+    quantity and say "you need 0 litres".
+    """
+    out = []
+    for dose in doses.lookup(inputs.product, inputs.group):
+        low, high, unit = _promote(dose.low * inputs.area_da,
+                                   dose.high * inputs.area_da, dose.unit)
+        out.append(DoseTotal(method=dose.method,
+                             dose_low=dose.low, dose_high=dose.high,
+                             dose_unit=dose.unit,
+                             total_low=low, total_high=high, total_unit=unit))
+    return tuple(out)

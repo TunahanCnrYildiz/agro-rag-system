@@ -133,3 +133,55 @@ def test_dose_answer_does_not_import_the_engine():
         elif isinstance(node, ast.Import):
             imported.update(a.name for a in node.names)
     assert not any("engine" in name for name in imported), imported
+
+
+def test_a_single_figure_times_an_area():
+    inputs, _ = dose_answer.validate(_raw(group="meyve", value="5"))
+    totals = dose_answer.compute(inputs)
+    assert len(totals) == 1
+    assert (totals[0].total_low, totals[0].total_high, totals[0].total_unit) == (
+        5.0, 7.5, "litre")
+
+
+def test_a_range_stays_a_range():
+    """Never a midpoint: collapsing invents a precision the source does not
+    have, and the single number reads more authoritative than the range."""
+    inputs, _ = dose_answer.validate(_raw(product="FLY AZOT", group="tarla", value="2"))
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].total_low, totals[0].total_high) == (400.0, 500.0)
+
+
+def test_a_thousand_grams_is_promoted_to_kilos():
+    """A farmer buying fertilizer thinks in kilos. This is a pure unit
+    conversion and invents nothing."""
+    inputs, _ = dose_answer.validate(_raw(value="5"))     # 250 gr/da x 5 da
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].total_low, totals[0].total_unit) == (1.25, "kg")
+
+
+def test_under_a_thousand_stays_in_the_published_unit():
+    inputs, _ = dose_answer.validate(_raw(value="2"))     # 250 gr/da x 2 da
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].total_low, totals[0].total_unit) == (500.0, "gr")
+
+
+def test_a_range_is_promoted_as_one_unit():
+    """Printing '1000 cc – 1,25 litre' would read as two different figures."""
+    inputs, _ = dose_answer.validate(_raw(product="FLY AZOT", group="sebze", value="5"))
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].total_low, totals[0].total_high, totals[0].total_unit) == (
+        1.0, 1.25, "litre")
+
+
+def test_the_published_dose_survives_the_promotion():
+    """The answer quotes the maker's own per-dekar figure alongside the total,
+    so it must stay in the unit the page used."""
+    inputs, _ = dose_answer.validate(_raw(value="5"))
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].dose_low, totals[0].dose_unit) == (250.0, "gr")
+
+
+def test_a_group_the_product_does_not_publish_computes_nothing():
+    """Never another group's figure, and never zero."""
+    inputs, _ = dose_answer.validate(_raw(group="tarla"))
+    assert dose_answer.compute(inputs) == ()
