@@ -41,6 +41,20 @@ TABLE = {
             "price_tl_kg": {"scope": "il", "Konya": [6.0, 7.0, 8.0, 9.5],
                             "TR": [None, None, None, None]},
         },
+        "bugday, durum bugdayi haric": {
+            "label": "Buğday, Durum Buğdayı Hariç",
+            "yield_kg_da": {"scope": "il", "Konya": [430.0, 445.0, 460.0, 470.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [7.0, 8.0, 9.0, 10.5],
+                            "TR": [None, None, None, None]},
+        },
+        "kara bugday": {
+            "label": "Kara Buğday",
+            "yield_kg_da": {"scope": "il", "Konya": [280.0, 290.0, 300.0, 310.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [11.0, 12.0, 13.0, 14.5],
+                            "TR": [None, None, None, None]},
+        },
     },
 }
 
@@ -99,3 +113,18 @@ def test_a_crop_the_table_does_not_carry_is_not_found():
 def test_detection_never_raises_on_junk():
     for junk in ("", None, "?!.", "12345"):
         assert crop_compare.named_crops(junk) == ()
+
+
+def test_a_shorter_crop_named_separately_is_not_swallowed():
+    """The dedup is about POSITION, not spelling: `buğday` here is its own
+    mention, not part of `kara buğday`. Dropping it meant the comparison card
+    never appeared for a natural two-crop question."""
+    assert crop_compare.named_crops(
+        "Buğday mı kara buğday mı ekmeliyim?") == ("Buğday", "Kara Buğday")
+
+
+def test_a_crop_covered_once_and_free_once_is_still_named():
+    """`buğday` occurs twice - inside `kara buğday`, and alone. One free
+    occurrence is enough."""
+    assert crop_compare.named_crops(
+        "Kara buğday mı buğday mı?") == ("Kara Buğday", "Buğday")
