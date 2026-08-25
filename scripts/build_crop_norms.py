@@ -198,6 +198,43 @@ def read_export(path: Path):
             yield Row(province, crop, year, measure, value)
 
 
+# THE BAND IS ARGUED, NOT DISCOVERED. Measured over the 16.392 derived fruit
+# cells, the implied density is unimodal - median 40 trees/da, which is a
+# 5m x 5m orchard grid - with a long, smoothly decaying tail and NO natural cut
+# to read a threshold off. So the bounds rest on geometry, not on horticultural
+# judgement nobody here has:
+#   444 trees/da is a 1,5m x 1,5m grid, 2,25 m2 of ground per tree. A
+#   fruit-bearing tree does not stand at that spacing, so the recorded area
+#   cannot be the ground the production came from.
+#   Below 5 trees/da the area is recorded and almost nothing comes off it - an
+#   orchard not yet in bearing. That understates the yield rather than inflating
+#   it: safer, still wrong in a revenue line.
+# THIS RAISES THE FLOOR ON WRONGNESS, IT DOES NOT REMOVE IT. A mulberry cell
+# implying 200 trees/da is still mostly scattered trees and still passes.
+_MAX_TREES_PER_DA = 444
+_MIN_TREES_PER_DA = 5
+
+
+def _density_verdict(tons: float, dekar: float,
+                     per_tree: float | None) -> str | None:
+    """Why this derived cell must not be written, or None to write it.
+
+    All three numbers are TUIK's own. Nothing is assumed about the crop.
+    """
+    if not per_tree:
+        # This crop publishes per-tree yields, so the cell SHOULD have been
+        # judged - this province-year simply carries nothing to judge it with.
+        # Refused rather than written unchecked: an unjudged figure and a judged
+        # one must not look the same in the output.
+        return "no_per_tree_figure"
+    trees_per_da = (tons * 1000.0 / per_tree) / dekar
+    if trees_per_da > _MAX_TREES_PER_DA:
+        return "density_above_ceiling"
+    if trees_per_da < _MIN_TREES_PER_DA:
+        return "density_below_floor"
+    return None
+
+
 def build(rows) -> dict:
     """Group Row(...) into the schema src/norms.py validates.
 
@@ -206,6 +243,7 @@ def build(rows) -> dict:
     """
     known = set(PROVINCES)
     rows = list(rows)
+    refused: list[dict] = []
     years = sorted({r.year for r in rows})
     index = {y: i for i, y in enumerate(years)}
 
@@ -230,18 +268,35 @@ def build(rows) -> dict:
         published = by_measure.get("verim", {})
         uretim = by_measure.get("uretim", {})
         alan = by_measure.get("alan", {})
+        # A tree crop is one TUIK publishes a per-tree yield for ANYWHERE. That
+        # is a property of the CROP, not of the cell, and it is what says "this
+        # crop's area column is Toplu Meyveliklerin Alani". Vegetables never
+        # publish one, so the gate below cannot touch them - and must not:
+        # their denominator really is the whole crop's sown area.
+        per_tree = by_measure.get("verim_agac", {})
 
         yields: dict[str, list] = {}
-        for province in set(published) | (set(uretim) & set(alan)):
+        for province in sorted(set(published) | (set(uretim) & set(alan))):
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
                 if value is None:
-                    # Vegetables publish no Verim; derive it from the pair, and
-                    # only where BOTH halves exist. Ton -> kg is the 1000.
+                    # Vegetables publish no Verim, and most fruits publish only
+                    # a per-tree one; derive from the pair, and only where BOTH
+                    # halves exist. Ton -> kg is the 1000.
                     tons = uretim.get(province, {}).get(year)
                     dekar = alan.get(province, {}).get(year)
                     if tons is not None and dekar:
+                        reason = (_density_verdict(
+                                      tons, dekar,
+                                      per_tree.get(province, {}).get(year))
+                                  if per_tree else None)
+                        if reason is not None:
+                            refused.append({"crop": labels[crop_id],
+                                            "province": province,
+                                            "year": year,
+                                            "reason": reason})
+                            continue
                         value = tons * 1000.0 / dekar
                 if value:
                     # `if value` and not `is not None`: a yield of exactly 0 is
@@ -286,6 +341,8 @@ def build(rows) -> dict:
                 **prices,
             },
         }
+
+    refused.sort(key=lambda r: (r["crop"], r["province"], r["year"]))
 
     return {"meta": {"generated": date.today().isoformat(),
                      "years": years, "sources": SOURCES},

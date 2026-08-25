@@ -268,3 +268,113 @@ def test_a_crop_with_only_a_price_still_loads(tmp_path, monkeypatch):
     assert n is not None
     assert n.yield_kg_da is None
     assert n.price_tl_kg.amount == 30.0
+
+
+def test_a_tree_crop_cell_inside_the_band_is_written_unchanged():
+    """Ayva in Tokat 2025: 182 tons over 155 dekars, 31 kg per tree. That is
+    (182000/31)/155 = 38 trees/da - a 5m x 5m orchard, exactly what the
+    denominator claims to be. The gate must not touch a figure it accepts."""
+    rows = [
+        R("Tokat", "Ayva", 2025, "uretim", 182.0),
+        R("Tokat", "Ayva", 2025, "alan", 155.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Tokat"] == [1174.2]
+
+
+def test_a_cell_whose_area_cannot_hold_its_trees_is_refused():
+    """Ayva in Ordu 2025: 267 tons over 3 dekars, 31 kg per tree. That implies
+    (267000/31)/3 = 2871 trees on one dekar - 0,35 m2 each. The area is not the
+    ground the production came from, so 89.000 kg/da is not a yield."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
+
+
+def test_a_cell_with_an_area_but_almost_no_production_is_refused():
+    """The mirror error: 6 tons over 766 dekars at 27 kg per tree is 0,3
+    trees/da - an orchard planted but not yet bearing. It understates the yield
+    instead of inflating it, which is safer and still wrong in a revenue line."""
+    rows = [
+        R("Adana", "Avokado", 2021, "uretim", 6.0),
+        R("Adana", "Avokado", 2021, "alan", 766.0),
+        R("Adana", "Avokado", 2021, "verim_agac", 27.0),
+    ]
+    out = bcn.build(rows)
+    assert "Adana" not in out["crops"]["avokado"]["yield_kg_da"]
+
+
+def test_a_tree_crop_cell_with_no_per_tree_figure_is_refused():
+    """The crop publishes per-tree yields elsewhere, so it IS a tree crop and
+    this cell should have been judged - but this province-year carries no
+    figure to judge it with. An unjudged cell and a judged one must not be
+    indistinguishable in the output."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
+
+
+def test_a_vegetable_is_never_gated():
+    """THE MOST DANGEROUS MISTAKE THIS GATE CAN MAKE. Vegetables publish no
+    per-tree yield anywhere, and their denominator - Ekilen Alan - really is the
+    whole crop's sown area. A gate that judged them would find no evidence and
+    delete every vegetable yield in the file. 300 tons over 1 dekar is a strange
+    tomato figure, and it still ships, because nothing here can judge it."""
+    rows = [
+        R("Manisa", "Domates", 2025, "uretim", 300.0),
+        R("Manisa", "Domates", 2025, "alan", 1.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["domates"]["yield_kg_da"]["Manisa"] == [300000.0]
+
+
+def test_a_published_per_dekar_yield_is_never_gated():
+    """A published figure beats a derived one, so the gate never runs on it -
+    even for a crop that also publishes a per-tree figure."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "verim", 1200.0),
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Ordu"] == [1200.0]
+
+
+def test_the_province_order_does_not_depend_on_the_hash_seed():
+    """MEASURED 2026-08-25, and it predates this branch: build() iterates a SET
+    of provinces, so the key order inside every crop changes from run to run
+    (PYTHONHASHSEED=1 gives Tokat, Karabük, Düzce…; =7 gives Bolu, Mersin,
+    Sinop…). The committed file is supposed to be a reproducible output of the
+    committed builder; with a shuffling key order every regeneration is a
+    whole-file diff, and the one thing a reader needs to see - which cells this
+    gate removed - is buried in it."""
+    rows = [
+        R("Tokat", "Domates", 2025, "uretim", 300.0),
+        R("Tokat", "Domates", 2025, "alan", 100.0),
+        R("Adana", "Domates", 2025, "uretim", 300.0),
+        R("Adana", "Domates", 2025, "alan", 100.0),
+        R("Bolu", "Domates", 2025, "uretim", 300.0),
+        R("Bolu", "Domates", 2025, "alan", 100.0),
+    ]
+    keys = [k for k in bcn.build(rows)["crops"]["domates"]["yield_kg_da"]
+            if k not in ("scope", "TR")]
+    assert keys == ["Adana", "Bolu", "Tokat"]
+
+
+def test_the_verdict_names_which_bound_was_crossed():
+    """The report has to say WHY, and the three reasons are not interchangeable:
+    two are impossible figures, one is an unjudgeable one."""
+    assert bcn._density_verdict(267.0, 3.0, 31.0) == "density_above_ceiling"
+    assert bcn._density_verdict(6.0, 766.0, 27.0) == "density_below_floor"
+    assert bcn._density_verdict(267.0, 3.0, None) == "no_per_tree_figure"
+    assert bcn._density_verdict(182.0, 155.0, 31.0) is None
