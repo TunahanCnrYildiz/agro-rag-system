@@ -59,6 +59,10 @@ class ChatResult:
     # it dose fields would render a money form over a dose question and submit
     # the answer back under the wrong payload.
     dose_form: dict | None = None
+    # The comparison card travels on its own key for the same reason the dose
+    # card does: an already-deployed APK reads `form` and draws a BUDGET card
+    # from whatever arrives there.
+    compare_form: dict | None = None
 
     def as_api(self) -> dict:
         return {
@@ -66,6 +70,7 @@ class ChatResult:
             "recommended_products": [p.as_api() for p in self.recommended_products],
             "form": self.form,
             "dose_form": self.dose_form,
+            "compare_form": self.compare_form,
         }
 
 
@@ -918,6 +923,58 @@ def _budget_result(payload: dict | None, message: str = "",
                                             latest_year))
 
 
+def _named_crops(message: str) -> tuple[str, ...]:
+    """Which crops this message names. Never raises: a detector failure must
+    cost the card, not the answer."""
+    try:
+        from src import crop_compare
+        return crop_compare.named_crops(message)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] crop detection failed, no comparison this turn: {exc}")
+        return ()
+
+
+def _compare_result(payload: dict | None, message: str = "",
+                    history: list[dict] | None = None) -> ChatResult:
+    """The crop-comparison route: no retrieval, no product match, no model call.
+
+    One multiplication per crop in src/crop_compare.py, over figures TUIK
+    published. The province is resolved from the conversation the same way
+    weather, fert_plan and the budget prefill resolve it - and when it cannot
+    be resolved the route ASKS, because a provincial figure from the wrong
+    province is a wrong answer that reads perfectly right.
+
+    Deferred imports for the cycle src/router.py documents: crop_compare
+    imports _normalize_tr from THIS module at load time.
+    """
+    from src import crop_compare, norms
+    from src.context import location
+
+    province = location.extract_province(message, history)
+    if not province:
+        return ChatResult(answer=crop_compare.NO_PROVINCE,
+                          recommended_products=[], route="crop_choice")
+
+    table = norms.province_table(province)
+    submitted = bool(payload)
+    try:
+        inputs, errors = crop_compare.validate(payload or {}, table)
+        if inputs is not None:
+            inputs = crop_compare.CompareInputs(inputs.first, inputs.second, province)
+            figures = crop_compare.compute(inputs, table, norms.latest_year())
+            return ChatResult(answer=crop_compare.render(inputs, figures),
+                              recommended_products=[], route="crop_choice")
+    except Exception:  # noqa: BLE001 - a broken validation or sum must not become a guess
+        return ChatResult(answer=crop_compare.COMPUTE_FAILED,
+                          recommended_products=[], route="crop_choice")
+
+    return ChatResult(answer=crop_compare.ASK_FOR_CROPS, recommended_products=[],
+                      route="crop_choice",
+                      compare_form=crop_compare.form_spec(
+                          errors if submitted else [], table,
+                          payload if submitted else None, province))
+
+
 def _dose_result(payload: dict | None) -> ChatResult:
     """The dose route: no retrieval, no product match, no model call.
 
@@ -958,7 +1015,8 @@ def _dose_result(payload: dict | None) -> ChatResult:
 
 def answer(message: str, history: list[dict] | None = None,
            budget_payload: dict | None = None,
-           dose_payload: dict | None = None) -> ChatResult:
+           dose_payload: dict | None = None,
+           compare_payload: dict | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
     # Routing is diagnostic in this release: every route still runs the corpus
     # path below. Wiring it now, with behaviour unchanged, is what lets the 55
@@ -978,6 +1036,18 @@ def answer(message: str, history: list[dict] | None = None,
     # the dose card is the one the user just pressed.
     if dose_payload or route == "product_dose":
         result = _dose_result(dose_payload)
+        result.route_how = route_how
+        return result
+
+    # The comparison fork lives INSIDE crop_choice rather than in the router:
+    # `crop_choice` already routes these questions correctly, and a new routing
+    # rule would put the pre-registered frozen set at risk for nothing. An open
+    # "ne eksem?" question names no crop, falls through this branch, and keeps
+    # the factors answer it has today - which is a measured decision, not an
+    # oversight.
+    if compare_payload or (route == "crop_choice"
+                           and len(_named_crops(message)) >= 2):
+        result = _compare_result(compare_payload, message, history)
         result.route_how = route_how
         return result
 
@@ -1030,7 +1100,8 @@ def answer(message: str, history: list[dict] | None = None,
 def stream_answer(
     message: str, history: list[dict] | None = None,
     budget_payload: dict | None = None,
-    dose_payload: dict | None = None
+    dose_payload: dict | None = None,
+    compare_payload: dict | None = None
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
@@ -1055,6 +1126,18 @@ def stream_answer(
             # `type` (see mobile-app/src/api.ts), so it shows the sentence and
             # no card rather than drawing a budget form out of dose fields.
             yield _sse({"type": "dose_form", "form": result.dose_form})
+        yield _sse({"type": "done"})
+        return
+
+    # Must mirror answer() exactly, including the compare_payload clause and
+    # its order. Both clients stream, so a card wired only into answer() would
+    # reach no user at all - and the tests would still pass.
+    if compare_payload or (route == "crop_choice"
+                           and len(_named_crops(message)) >= 2):
+        result = _compare_result(compare_payload, message, history)
+        yield _sse({"type": "token", "content": result.answer})
+        if result.compare_form is not None:
+            yield _sse({"type": "compare_form", "form": result.compare_form})
         yield _sse({"type": "done"})
         return
 

@@ -21,7 +21,7 @@ def test_chat_unified(monkeypatch):
     # payload: a stub narrower than the code under test fails as a TypeError
     # that reads like a routing bug rather than a stale double.
     monkeypatch.setattr(main.engine, "answer",
-                        lambda msg, hist, budget=None, dose=None: fake)
+                        lambda msg, hist, budget=None, dose=None, compare=None: fake)
     r = client.post("/api/chat", json={"message": "soru", "stream": False})
     assert r.status_code == 200
     body = r.json()
@@ -36,7 +36,7 @@ def test_chat_rejects_empty_message():
 
 def test_chat_stream_sets_sse_content_type(monkeypatch):
     monkeypatch.setattr(main.engine, "stream_answer",
-                        lambda msg, hist, budget=None, dose=None:
+                        lambda msg, hist, budget=None, dose=None, compare=None:
                         iter(['data: {"type": "done"}\n\n']))
     r = client.post("/api/chat", json={"message": "soru", "stream": True})
     assert r.status_code == 200
@@ -104,7 +104,7 @@ def test_warn_if_open_cors_silent_when_narrowed(capsys):
 def test_a_dose_card_reaches_the_json_transport(monkeypatch):
     monkeypatch.setattr(
         main.engine, "answer",
-        lambda msg, hist, budget=None, dose=None:
+        lambda msg, hist, budget=None, dose=None, compare=None:
             ChatResult(answer="x", recommended_products=[],
                        dose_form={"kind": "product_dose"}))
     body = client.post("/api/chat", json={"message": "doz"}).json()
@@ -114,7 +114,7 @@ def test_a_dose_card_reaches_the_json_transport(monkeypatch):
 def test_a_submitted_dose_payload_reaches_the_engine(monkeypatch):
     seen = {}
 
-    def fake(msg, hist, budget=None, dose=None):
+    def fake(msg, hist, budget=None, dose=None, compare=None):
         seen["dose"] = dose
         return ChatResult(answer="x", recommended_products=[])
 
@@ -133,7 +133,7 @@ def test_a_boolean_area_survives_the_wire_as_a_boolean(monkeypatch):
     into the int 1 before src/dose_answer.py ever saw it."""
     seen = {}
 
-    def fake(msg, hist, budget=None, dose=None):
+    def fake(msg, hist, budget=None, dose=None, compare=None):
         seen["dose"] = dose
         return ChatResult(answer="x", recommended_products=[])
 
@@ -143,3 +143,27 @@ def test_a_boolean_area_survives_the_wire_as_a_boolean(monkeypatch):
         "dose": {"product": "X", "group": "sebze",
                  "area": {"value": True, "unit": "donum"}}})
     assert seen["dose"]["area"]["value"] is True
+
+
+def test_a_comparison_card_reaches_the_json_transport(monkeypatch):
+    monkeypatch.setattr(
+        main.engine, "answer",
+        lambda msg, hist, budget=None, dose=None, compare=None:
+            ChatResult(answer="x", recommended_products=[],
+                       compare_form={"kind": "crop_compare"}))
+    body = client.post("/api/chat", json={"message": "karşılaştır"}).json()
+    assert body["compare_form"] == {"kind": "crop_compare"}
+
+
+def test_a_submitted_comparison_payload_reaches_the_engine(monkeypatch):
+    seen = {}
+
+    def fake(msg, hist, budget=None, dose=None, compare=None):
+        seen["compare"] = compare
+        return ChatResult(answer="x", recommended_products=[])
+
+    monkeypatch.setattr(main.engine, "answer", fake)
+    client.post("/api/chat", json={
+        "message": "karşılaştır",
+        "compare": {"first": "domates (sofralik)", "second": "arpa (biralik)"}})
+    assert seen["compare"]["first"] == "domates (sofralik)"

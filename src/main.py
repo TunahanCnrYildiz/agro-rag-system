@@ -76,6 +76,11 @@ class DosePayload(BaseModel):
     area: DoseField | None = None
 
 
+class ComparePayload(BaseModel):
+    first: str | None = None
+    second: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="The user query.")
     history: list[ChatTurn] = Field(default_factory=list)
@@ -87,6 +92,9 @@ class ChatRequest(BaseModel):
     )
     dose: DosePayload | None = Field(
         default=None, description="Filled product-dose card, when the user submitted one."
+    )
+    compare: ComparePayload | None = Field(
+        default=None, description="Filled crop-comparison card, when the user submitted one."
     )
 
 
@@ -102,6 +110,8 @@ class ChatResponse(BaseModel):
     form: dict | None = None
     # Optional so an already-deployed client, which never reads it, is unaffected.
     dose_form: dict | None = None
+    # Optional so an already-deployed client, which never reads it, is unaffected.
+    compare_form: dict | None = None
 
 
 class CatalogProduct(BaseModel):
@@ -200,15 +210,18 @@ def chat(req: ChatRequest):
     history = [t.model_dump() for t in req.history]
     budget_payload = req.budget.model_dump() if req.budget else None
     dose_payload = req.dose.model_dump() if req.dose else None
+    compare_payload = req.compare.model_dump() if req.compare else None
 
     if req.stream:
         return StreamingResponse(
-            engine.stream_answer(req.message, history, budget_payload, dose_payload),
+            engine.stream_answer(req.message, history, budget_payload,
+                                 dose_payload, compare_payload),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    result = engine.answer(req.message, history, budget_payload, dose_payload)
+    result = engine.answer(req.message, history, budget_payload, dose_payload,
+                           compare_payload)
     return ChatResponse(**result.as_api())
 
 

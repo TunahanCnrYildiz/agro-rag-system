@@ -1190,7 +1190,8 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     monkeypatch.setattr(engine, "_complete_text", lambda m: "Kompost kullanabilirsiniz.")
     # Must be a non-budget question; the budget route short-circuits before the stubs above.
     r = engine.answer("Elma ağacı ne zaman budanır?")
-    assert set(r.as_api()) == {"answer", "recommended_products", "form", "dose_form"}
+    assert set(r.as_api()) == {"answer", "recommended_products", "form", "dose_form",
+                               "compare_form"}
     assert "Kompost" in r.answer  # Corpus path exercises the stubs, not the budget route.
 
 
