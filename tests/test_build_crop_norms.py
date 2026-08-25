@@ -466,3 +466,82 @@ def test_the_build_names_every_refusal_on_the_console(capsys):
     bcn.build(rows)
     printed = capsys.readouterr()
     assert "Ayva" in printed.err and "Ordu" in printed.err
+
+
+def test_the_shipped_file_is_what_the_builder_produces():
+    """Proves the data file was generated, not hand-edited."""
+    import json as _json
+    from src.config import DATA_DIR
+    rows = []
+    for path in sorted((DATA_DIR / "raw").glob("*.csv")):
+        rows.extend(bcn.read_export(path))
+    review = _json.loads((DATA_DIR / "crop_area_review.json").read_text(encoding="utf-8"))
+    rebuilt = bcn.build(rows, not_field_area=review["not_field_area"])
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    assert rebuilt["crops"] == shipped["crops"]
+    assert rebuilt["meta"]["refused_yield_cells"] == shipped["meta"]["refused_yield_cells"]
+
+
+def test_the_shipped_file_still_carries_most_of_its_yields():
+    """A guard on the real data: if the gate ever starts refusing everything,
+    every fixture test above keeps passing while the feature quietly empties."""
+    import json as _json
+    from src.config import DATA_DIR
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    cells = sum(1 for crop in shipped["crops"].values()
+                for province, series in crop["yield_kg_da"].items()
+                if province not in ("scope", "TR")
+                for v in series if v is not None)
+    assert cells >= 45000, cells
+    # 45.000 is a deliberate floor, not the measured count. Measured 67.535
+    # cells when this test was written; the floor sits at roughly two thirds
+    # of that: an order-of-magnitude collapse trips it, normal year-to-year
+    # drift in the TÜİK exports does not.
+
+
+def test_the_shipped_file_carries_no_cell_the_gate_should_have_refused():
+    """The file stores a yield, not a density, so this check runs the density
+    test again over the committed exports rather than reading the file alone."""
+    import json as _json
+    from src.config import DATA_DIR
+    rows = []
+    for path in sorted((DATA_DIR / "raw").glob("*.csv")):
+        rows.extend(bcn.read_export(path))
+    per_tree, uretim, alan = {}, {}, {}
+    for r in rows:
+        key = (bcn._normalize_tr(r.crop), r.province, r.year)
+        if r.measure == "verim_agac":
+            per_tree[key] = r.value
+        elif r.measure == "uretim":
+            uretim[key] = r.value
+        elif r.measure == "alan":
+            alan[key] = r.value
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    years = shipped["meta"]["years"]
+    bad = []
+    for crop_id, crop in shipped["crops"].items():
+        for province, series in crop["yield_kg_da"].items():
+            if province in ("scope", "TR"):
+                continue
+            for i, value in enumerate(series):
+                if value is None:
+                    continue
+                key = (crop_id, province, years[i])
+                if key not in per_tree or key not in uretim or key not in alan:
+                    continue
+                if bcn._density_verdict(uretim[key], alan[key], per_tree[key]):
+                    bad.append(key)
+    assert bad == [], bad[:5]
+
+
+def test_the_shipped_file_refused_the_cells_the_spec_names():
+    """The three worked examples from the design doc, on the real data."""
+    import json as _json
+    from src.config import DATA_DIR
+    shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
+    refused = {(c["crop"], c["province"]) for c in
+               shipped["meta"]["refused_yield_cells"]["cells"]}
+    assert ("Ayva", "Ordu") in refused
+    assert ("Turunç", "Adana") in refused
+    assert ("Mantar (Kültür)", "*") in refused
+    assert ("Ayva", "Tokat") not in refused

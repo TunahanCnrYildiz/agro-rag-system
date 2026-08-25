@@ -212,13 +212,17 @@ def test_a_conversation_with_no_province_prefills_nothing(no_llm):
     every row is null, so the route sends no "crops" key at all rather than
     246 dead rows that would draw a crop picker filling nothing when tapped.
     If the national rows are ever populated this test fails loudly and is the
-    right place to decide what a national prefill should say."""
+    right place to decide what a national prefill should say.
+
+    Re-measured 2026-08-25 after the fruit-yield density gate: Fındık/Ordu's
+    2025 cell has no per-tree figure yet, so the gate refuses it and the
+    provincial note falls back to the most recent year it does trust."""
     with_province = engine.answer(BUDGET_Q, ORDU_HISTORY)
     without = engine.answer(BUDGET_Q)
     assert without.form is not None
 
     crops = {c["id"]: c for c in with_province.form["crops"]}
-    assert crops["findik"]["yield"]["note"] == "TÜİK 2025, Ordu"
+    assert crops["findik"]["yield"]["note"] == "TÜİK 2024, Ordu"
     assert "crops" not in without.form
 
 
