@@ -192,7 +192,7 @@ def test_the_answer_restates_what_it_computed_from():
     text = dose_answer.render(inputs, dose_answer.compute(inputs))
     assert "HİGRO FUBBY" in text
     assert "5 dönüm" in text
-    assert "meyve" in text
+    assert "Meyve" in text
 
 
 def test_the_answer_names_the_method_the_figure_belongs_to():
@@ -239,6 +239,17 @@ def test_a_missing_figure_is_named_not_guessed():
     assert "HİGRO FUBBY" in text
     assert "tarla bitki" in text
     assert "250" not in text and "1,5" not in text
+
+
+def test_a_missing_figure_does_not_point_at_a_figure():
+    """no_dose_for_group() says no figure exists, then must not turn around and
+    say "Bu rakam..." ("this figure...") - ATTRIBUTION opens with exactly that
+    demonstrative, so appending it here would have the answer point at a number
+    in the same breath it just said does not exist."""
+    inputs, _ = dose_answer.validate(_raw(product="FLY AZOT", group="meyve"))
+    text = dose_answer.no_dose_for_group(inputs)
+    assert dose_answer.ATTRIBUTION not in text
+    assert "Bu rakam" not in text
 
 
 def test_every_method_the_parser_can_emit_has_a_turkish_label():

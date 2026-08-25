@@ -258,18 +258,24 @@ def no_dose_for_group(inputs: DoseInputs) -> str:
 
     Deliberately prints no figure at all: the temptation this message exists to
     refuse is showing the group next door's number "for reference".
+
+    ATTRIBUTION is NOT appended here, unlike in render(). ATTRIBUTION opens "Bu
+    rakam..." - "this figure" - a demonstrative that points at a number. This
+    message's whole point is that no number was printed. Appending it would
+    have the answer point at a figure in the same breath it just said does not
+    exist.
     """
     return (
         f"**{inputs.product}** için {GROUP_IN_SENTENCE[inputs.group]} dekara bir "
         f"doz yayımlanmamış. Bu ürünün sayfasında bu gruba ait bir rakam yok, "
-        f"başka bir grubun rakamını da buraya taşımıyorum.\n\n{ATTRIBUTION}"
+        f"başka bir grubun rakamını da buraya taşımıyorum."
     )
 
 
 def render(inputs: DoseInputs, totals: tuple[DoseTotal, ...]) -> str:
     """Code-written Turkish. Restates its inputs before stating its result."""
     lines = [
-        f"**{inputs.product}** · {GROUP_IN_SENTENCE[inputs.group]} · "
+        f"**{inputs.product}** · {_GROUP_LABELS[inputs.group]} · "
         f"**{format_qty(inputs.area_da)} dönüm**",
         "",
     ]
