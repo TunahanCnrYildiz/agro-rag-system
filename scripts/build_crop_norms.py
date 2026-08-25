@@ -11,9 +11,20 @@ remove.
 
 THE THREE CROP GROUPS DO NOT HAVE THE SAME SHAPE, which is why this reads
 measures first and derives second:
-  - Tahıllar and Meyveler publish `Verim` directly, in Kg/Dekar.
+  - Tahıllar publish `Verim` directly, in Kg/Dekar.
+  - Meyveler publish `Verim` too, but almost all of it is Kg/Meyve Veren AGAC -
+    per TREE, not per dekar. Measured 2026-08-25: 61 of the 81 fruit crops in
+    these exports publish only the per-tree figure, and 20 (vines, berries,
+    herbs) publish Kg/Dekar. So most fruit yield is DERIVED, like a vegetable's.
   - Sebzeler publish no Verim at all: only `Üretim Miktarı` (Ton) and
     `Ekilen Alan` (Dekar), so the yield is DERIVED from the pair.
+THE TWO DERIVATIONS ARE NOT EQUALLY SAFE, which is why build() gates one of
+them. A vegetable's denominator is `Ekilen Alan` - the whole crop's sown area.
+A fruit's is `Toplu Meyveliklerin Alani` - COMPACT ORCHARDS ONLY - while its
+numerator counts fruit from every tree in the province, scattered ones
+included. Where a fruit is grown as scattered trees the denominator is nearly
+empty: Turunc in Adana 2025 is 2.439 tons over 2 dekars, which divides out to
+1.219.500 kg/da.
 A published figure always wins over a derivable one - never recompute what the
 source already states.
 
@@ -63,12 +74,14 @@ _MEASURES = {
 }
 
 # The unit each measure must carry to be usable. Fruit `Verim` comes in TWO
-# units: Kg/Dekar for vines and berries, and Kg/Meyve Veren Agac for orchard
-# trees - TUIK publishes no per-dekar yield for apple, walnut, citrus and the
-# rest. A per-tree figure written into a per-dekar field would be silently wrong
-# by more than an order of magnitude, so it is refused here rather than scaled
-# by a tree count nobody supplied.
-_UNITS = {"verim": {"kg/dekar"}, "alan": {"dekar"}, "uretim": {"ton"},
+# units: Kg/Dekar for vines, berries and herbs, and Kg/Meyve Veren Agac for
+# every orchard tree - TUIK publishes NO per-dekar yield for apple, walnut,
+# citrus, quince and the rest. The per-tree figure is read under `verim_agac`,
+# a measure of its own: build() uses it as EVIDENCE for the density gate and
+# never writes it as a yield, because scaling it to a dekar needs a planting
+# density nobody published.
+_UNITS = {"verim": {"kg/dekar"}, "verim_agac": {"kg/meyve veren agac"},
+          "alan": {"dekar"}, "uretim": {"ton"},
           "fiyat": {"kilogram"}}
 
 # How many decimals each measure keeps. A yield is tonnes over dekars, both
@@ -107,7 +120,13 @@ def parse_label(label: str, olcum: str = "") -> tuple[str, str, str] | None:
     if m is None or measure is None:
         return None
     unit = (m.group("unit") or "").strip()
-    if _normalize_tr(unit) not in _UNITS[measure]:
+    folded = _normalize_tr(unit)
+    # A `Verim` row in the per-tree unit is not an unusable row - it is a
+    # different measure wearing the same label, and the gate in build() cannot
+    # run without it.
+    if measure == "verim" and folded in _UNITS["verim_agac"]:
+        measure = "verim_agac"
+    if folded not in _UNITS[measure]:
         return None
     return measure, m.group("name").strip(), unit
 

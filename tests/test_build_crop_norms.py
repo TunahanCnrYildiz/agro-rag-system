@@ -130,13 +130,28 @@ def test_parse_label_reads_the_measure_the_name_and_the_unit():
         "uretim", "Domates", "Ton")
 
 
-def test_a_per_tree_yield_is_refused():
-    """TÜİK publishes orchard fruit yield only as Kg/Meyve Veren Ağaç. Written
-    into a per-dekar field an apple would read 80 instead of ~2500 - silently
-    wrong by more than an order of magnitude. It is refused, not scaled by a
-    tree count nobody supplied."""
+def test_a_per_tree_yield_is_read_under_its_own_measure():
+    """TÜİK publishes orchard fruit yield ONLY as Kg/Meyve Veren Ağaç. It is
+    read - the density gate needs it as evidence - but under a measure name of
+    its own, so no code path can mistake it for a per-dekar figure."""
     assert bcn.parse_label(
-        "Verim ve 01.24.10.00.00. (Elma) - Kg/Meyve Veren Ağaç") is None
+        "Verim ve 01.24.10.00.00. (Elma) - Kg/Meyve Veren Ağaç") == (
+        "verim_agac", "Elma", "Kg/Meyve Veren Ağaç")
+
+
+def test_a_per_tree_yield_never_becomes_a_yield():
+    """Written into a per-dekar field an apple would read 80 instead of ~2500 -
+    silently wrong by more than an order of magnitude. Evidence only."""
+    rows = [R("Manisa", "Elma", 2025, "verim_agac", 80.0)]
+    out = bcn.build(rows)
+    assert out["crops"]["elma"]["yield_kg_da"] == {"scope": "tr", "TR": [None]}
+
+
+def test_a_per_dekar_verim_is_still_read_as_a_yield():
+    """The routing must not swallow the unit it was always meant to accept."""
+    assert bcn.parse_label(
+        "Verim ve 01.11.11.00.00. (Durum Buğdayı) - Kg/Dekar") == (
+        "verim", "Durum Buğdayı", "Kg/Dekar")
 
 
 def test_the_fruit_area_measure_is_recognised():
