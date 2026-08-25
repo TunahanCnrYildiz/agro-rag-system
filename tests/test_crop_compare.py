@@ -202,3 +202,78 @@ def test_the_card_names_the_province_it_was_built_for():
     about to be shown - a wrong province is a wrong answer that reads right."""
     spec = crop_compare.form_spec([], _table(), None, "Konya")
     assert spec["province"] == "Konya"
+
+
+def test_gross_revenue_is_yield_times_price():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    first, second = crop_compare.compute(inputs, _table(), 2025)
+    assert round(first.revenue_tl_da) == 115664      # 5492,1 x 21,06
+    assert round(second.revenue_tl_da) == 125841     # 3154,7 x 39,89
+
+
+def test_a_price_older_than_the_latest_year_yields_no_revenue():
+    """Lira is nominal: P2b measured a 2018 price prefilling nine times too
+    low. An older price is not a smaller figure, it is a different currency."""
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    first, _second = crop_compare.compute(inputs, _table(), 2026)
+    assert first.revenue_tl_da is None
+    assert first.missing == "fiyat"
+
+
+def test_a_missing_half_is_never_zero():
+    """Absence, not 0: a zero flows into a revenue line as "this crop earns
+    nothing", which is a claim we never measured."""
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    first, _second = crop_compare.compute(inputs, _table(), 2026)
+    assert first.revenue_tl_da is None
+
+
+def test_each_figure_keeps_its_year_and_region():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    first, _second = crop_compare.compute(inputs, _table(), 2025)
+    assert (first.yield_value.year, first.yield_value.region) == (2025, "Konya")
+
+
+def test_the_answer_prints_both_crops_with_their_figures():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
+    assert "Domates (Sofralık)" in text and "Biber (Salçalık, Kapya)" in text
+    assert "115.664 TL" in text and "125.841 TL" in text
+
+
+def test_the_answer_says_whose_figures_these_are():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
+    assert crop_compare.ATTRIBUTION in text
+    assert "TÜİK" in text and "2025" in text
+
+
+def test_every_answer_refuses_the_profit_comparison():
+    """The binding one. Two gross figures side by side read as a ranking, and
+    the cost that would decide it is not in this project at all."""
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
+    assert crop_compare.NOT_PROFIT in text
+    assert "masraf" in text
+
+
+def test_the_answer_never_names_a_winner():
+    """No sentence may recommend one of the two. The figures are the answer."""
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
+    for verdict in ("öneririm", "tercih edin", "daha kârlı", "daha iyi",
+                    "tavsiye ederim", "seçin"):
+        assert verdict not in text.lower(), verdict
+
+
+def test_a_crop_with_a_missing_half_says_which_half():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2026))
+    assert "fiyat" in text
+    assert "115.663" not in text and "115.664" not in text
+
+
+def test_the_five_year_range_reaches_the_answer():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
+    assert "önceki" in text

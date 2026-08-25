@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from src import norms
-from src.budget import FieldError
+from src.budget import FieldError, format_qty, format_tr
 from src.engine import _TR_SUFFIXES, _normalize_tr
 
 
@@ -168,3 +168,134 @@ def form_spec(errors: list[FieldError], table, submitted: object = None,
         "errors": {"first": by_field.get("first"),
                    "second": by_field.get("second")},
     }
+
+
+@dataclass(frozen=True)
+class CropFigures:
+    """One crop's published figures, and what they come to per dekar.
+
+    `missing` names the half we do not hold - "verim" or "fiyat" - so the
+    answer can say which one rather than printing a blank.
+    """
+    label: str
+    yield_value: object | None       # norms.NormValue
+    price_value: object | None       # norms.NormValue
+    revenue_tl_da: float | None
+    missing: str | None
+
+
+def _figures(row, latest_year: int | None) -> CropFigures:
+    yield_value = row.yield_kg_da
+    price = row.price_tl_kg
+    # A price from an older year is not a smaller number, it is a different
+    # currency: P2b measured Ordu's `Arpa (Diğer)` prefilling a 2018 price nine
+    # times too low into a bold revenue figure. Yield is left alone - it does
+    # not inflate, and its five-year range is where an outlier shows.
+    if price is not None and (latest_year is None or price.year != latest_year):
+        price = None
+    missing = None
+    if yield_value is None:
+        missing = "verim"
+    elif price is None:
+        missing = "fiyat"
+    revenue = (None if missing is not None
+               else yield_value.amount * price.amount)
+    return CropFigures(label=row.label, yield_value=yield_value,
+                       price_value=price, revenue_tl_da=revenue,
+                       missing=missing)
+
+
+def compute(inputs: CompareInputs, table,
+            latest_year: int | None) -> tuple[CropFigures, CropFigures]:
+    """All arithmetic for this route: one multiplication per crop.
+
+    Never a comparison, a ratio or a difference. The two figures sit beside
+    each other and the reader draws their own conclusion - which is the whole
+    design, because the cost that would decide it is not in this project.
+    """
+    rows = {row.crop: row for row in (table or ())}
+    return tuple(_figures(rows[crop_id], latest_year)
+                 for crop_id in (inputs.first, inputs.second))
+
+
+# Appended BY CODE on every computed answer, never asked of a model - the
+# fertplan.FRAMING pattern.
+ATTRIBUTION = (
+    "Rakamlar TÜİK'in yayımladığı il ortalamalarıdır; tek bir tarlanın verimi "
+    "veya sizin alacağınız fiyat için öngörü değildir."
+)
+
+# THE SENTENCE THIS ROUTE EXISTS FOR. Two gross figures side by side read as a
+# ranking, and the number that would decide it - what each crop COSTS to grow -
+# is not in this project at all. Measured on Konya 2025: domates 115.664 TL/da
+# against biber 125.841 TL/da, nine percent apart, which tells a farmer nothing
+# about which one pays better.
+NOT_PROFIT = (
+    "Bu rakamlar dekara BRÜT gelirdir, masraf içermez. İki ürünün girdi ve "
+    "işçilik masrafı aradaki farktan çok daha fazla ayrışabilir, bu yüzden "
+    "kârlılık sıralamasını bu tablodan söyleyemem. Kendi masrafınızı "
+    "girerek bütçe hesabı yaptırırsanız kâr karşılaştırmasını yapabilirsiniz."
+)
+
+ASK_FOR_CROPS = (
+    "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
+    "ilinizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
+)
+
+# Written to stand alone: without a province there is no provincial figure to
+# print, and guessing one produces confidently wrong numbers.
+NO_PROVINCE = (
+    "Karşılaştırma yapabilmem için hangi ilde olduğunuzu bilmem gerekiyor; "
+    "verim ve fiyat rakamları ilden ile değişiyor. İlinizi yazarsanız o ilin "
+    "yayımlanmış rakamlarını yan yana koyarım."
+)
+
+# The failure mode of this route is silence, never a guess.
+COMPUTE_FAILED = (
+    "Karşılaştırmayı tamamlayamadım. Lütfen seçimlerinizi kontrol edip tekrar "
+    "deneyin."
+)
+
+
+def _crop_block(figures: CropFigures) -> list[str]:
+    """One crop's lines. Says what is missing rather than printing a blank."""
+    if figures.missing == "verim":
+        return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
+    if figures.missing == "fiyat":
+        return [f"**{figures.label}**: verim {format_qty(figures.yield_value.amount)} "
+                f"kg/da ({figures.yield_value.year}), ancak güncel yıl için "
+                f"yayımlanmış fiyat yok, bu yüzden gelir hesaplamıyorum."]
+
+    y, p = figures.yield_value, figures.price_value
+    lines = [
+        # Whole lira: a gross revenue per dekar in the hundred-thousands does
+        # not gain anything from kurus, and the extra digits read as precision
+        # a provincial average does not have.
+        f"**{figures.label}** · dekara brüt gelir "
+        f"**{format_tr(figures.revenue_tl_da, 0)} TL**",
+        f"   verim {format_qty(y.amount)} kg/da (TÜİK {y.year}, {y.region}) × "
+        f"fiyat {format_tr(p.amount, 2)} TL/kg (TÜİK {p.year})",
+    ]
+    if y.recent_min is not None and y.recent_max is not None:
+        lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
+                     f"{format_qty(y.recent_max)} kg/da")
+    return lines
+
+
+def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> str:
+    """Code-written Turkish. Both crops, no verdict.
+
+    NOT_PROFIT opens with "these figures ARE gross revenue" - true only when a
+    revenue figure was actually printed above it. When both crops are missing
+    their revenue (e.g. every price on hand is older than the latest year),
+    appending it anyway would refer to numbers that are not on the page.
+    """
+    where = f" ({inputs.province})" if inputs.province else ""
+    lines = [f"İki ürünün yayımlanmış rakamları{where}:", ""]
+    for crop in figures:
+        lines.extend(_crop_block(crop))
+        lines.append("")
+    lines.append(ATTRIBUTION)
+    if any(crop.revenue_tl_da is not None for crop in figures):
+        lines.extend(["", NOT_PROFIT])
+    return "\n".join(lines)
