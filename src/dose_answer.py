@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src import doses
-from src.budget import FieldError, UnitOption, coerce_number
+from src.budget import FieldError, UnitOption, coerce_number, format_qty
 from src.dose_parse import GROUP_KEYS
 
 # The three groups the panels segment by, with the label the card prints. The
@@ -198,3 +198,88 @@ def compute(inputs: DoseInputs) -> tuple[DoseTotal, ...]:
                              dose_unit=dose.unit,
                              total_low=low, total_high=high, total_unit=unit))
     return tuple(out)
+
+
+# Written out rather than derived by .capitalize()/.lower() at runtime: Turkish
+# casing has a dotted/dotless I trap, and these strings appear inside sentences
+# where the right form is not the one a case function would produce.
+METHOD_LABELS = {"damlama": "Damlamadan",
+                 "yaprak": "Yapraktan",
+                 "toprak": "Topraktan"}
+
+GROUP_IN_SENTENCE = {"sebze": "sebzede",
+                     "meyve": "meyvede",
+                     "tarla": "tarla bitkisinde"}
+
+# Appended BY CODE, never asked of the model - the fertplan.FRAMING pattern.
+# This sentence is the line between quoting a maker's dose and authoring one.
+ATTRIBUTION = (
+    "Bu rakam ürünün kendi sayfasında üreticinin yayımladığı dozdur; bizim "
+    "önerimiz değildir."
+)
+
+# The refusal is a feature, not a shortfall. Only 8 of 48 panels state an
+# interval or a number of applications, so for the other 40 the season total is
+# simply not in the source; supplying one would mean authoring a programme and
+# presenting it as the manufacturer's. It is unconditional rather than triggered
+# by the question, because deciding "did they ask for a season total?" would put
+# a Turkish text matcher back on the path this route exists to keep clear of one.
+SEASON_REFUSAL = (
+    "Doz TEK bir uygulama içindir. Sayfa kaç uygulama yapılacağını yazmadığı "
+    "için sezon boyunca gereken toplam miktarı hesaplayamıyorum; onu söylemek "
+    "üreticinin yazmadığı bir programı ona mal etmek olurdu."
+)
+
+# Written to stand alone: a deployed client that cannot draw the card shows only
+# this, so it names what it needs instead of pointing at a widget.
+ASK_FOR_INPUTS = (
+    "Hangi üründen ne kadar almanız gerektiğini hesaplayabilirim. Üç şeye "
+    "ihtiyacım var: ürün, tarlanızın grubu (sebze, meyve veya tarla bitkisi) ve "
+    "alanı. Bunları verirseniz üreticinin dekara yayımladığı dozu alanınızla "
+    "çarpar, bir uygulamada gereken miktarı söylerim."
+)
+
+# The failure mode of this route is silence, never a guess: there is no fallback
+# to the model path, because an invented purchase quantity is what it removes.
+COMPUTE_FAILED = (
+    "Hesaplamayı tamamlayamadım. Lütfen seçimlerinizi kontrol edip tekrar deneyin."
+)
+
+
+def _amount(low: float, high: float, unit: str) -> str:
+    """A range as a range; a single figure as one number."""
+    if low == high:
+        return f"{format_qty(low)} {unit}"
+    return f"{format_qty(low)}–{format_qty(high)} {unit}"
+
+
+def no_dose_for_group(inputs: DoseInputs) -> str:
+    """Said, not guessed - and it names both halves of the combination.
+
+    Deliberately prints no figure at all: the temptation this message exists to
+    refuse is showing the group next door's number "for reference".
+    """
+    return (
+        f"**{inputs.product}** için {GROUP_IN_SENTENCE[inputs.group]} dekara bir "
+        f"doz yayımlanmamış. Bu ürünün sayfasında bu gruba ait bir rakam yok, "
+        f"başka bir grubun rakamını da buraya taşımıyorum.\n\n{ATTRIBUTION}"
+    )
+
+
+def render(inputs: DoseInputs, totals: tuple[DoseTotal, ...]) -> str:
+    """Code-written Turkish. Restates its inputs before stating its result."""
+    lines = [
+        f"**{inputs.product}** · {GROUP_IN_SENTENCE[inputs.group]} · "
+        f"**{format_qty(inputs.area_da)} dönüm**",
+        "",
+    ]
+    for total in totals:
+        dose = _amount(total.dose_low, total.dose_high, total.dose_unit)
+        whole = _amount(total.total_low, total.total_high, total.total_unit)
+        lines.append(
+            f"{METHOD_LABELS[total.method]} dekara **{dose}**: "
+            f"{format_qty(inputs.area_da)} dönüm için bir uygulamada "
+            f"**{whole}**."
+        )
+    lines.extend(["", ATTRIBUTION, "", SEASON_REFUSAL])
+    return "\n".join(lines)

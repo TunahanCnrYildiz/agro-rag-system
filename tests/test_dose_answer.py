@@ -185,3 +185,70 @@ def test_a_group_the_product_does_not_publish_computes_nothing():
     """Never another group's figure, and never zero."""
     inputs, _ = dose_answer.validate(_raw(group="tarla"))
     assert dose_answer.compute(inputs) == ()
+
+
+def test_the_answer_restates_what_it_computed_from():
+    inputs, _ = dose_answer.validate(_raw(group="meyve", value="5"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert "HİGRO FUBBY" in text
+    assert "5 dönüm" in text
+    assert "meyve" in text
+
+
+def test_the_answer_names_the_method_the_figure_belongs_to():
+    """The source decides the method, not the farmer - so the answer says which
+    one it is showing."""
+    inputs, _ = dose_answer.validate(_raw(group="meyve", value="5"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert "Damlamadan" in text
+
+
+def test_the_answer_prints_the_published_dose_and_the_total():
+    inputs, _ = dose_answer.validate(_raw(group="meyve", value="5"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert "1–1,5 litre" in text     # the maker's per-dekar figure
+    assert "5–7,5 litre" in text     # over 5 donum
+
+
+def test_a_single_figure_prints_one_number_not_a_range():
+    inputs, _ = dose_answer.validate(_raw(value="2"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert "500 gr" in text
+    assert "500–500" not in text
+
+
+def test_every_answer_says_whose_figure_it_is():
+    inputs, _ = dose_answer.validate(_raw(value="2"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert dose_answer.ATTRIBUTION in text
+
+
+def test_every_answer_refuses_the_season_total_by_name():
+    """A dose is per application, and only 8 of 48 panels state an interval or
+    a count. Supplying one would mean authoring our own programme and
+    presenting it as the manufacturer's."""
+    inputs, _ = dose_answer.validate(_raw(value="2"))
+    text = dose_answer.render(inputs, dose_answer.compute(inputs))
+    assert dose_answer.SEASON_REFUSAL in text
+    assert "sezon" in text.lower()
+
+
+def test_a_missing_figure_is_named_not_guessed():
+    inputs, _ = dose_answer.validate(_raw(group="tarla"))
+    text = dose_answer.no_dose_for_group(inputs)
+    assert "HİGRO FUBBY" in text
+    assert "tarla bitki" in text
+    assert "250" not in text and "1,5" not in text
+
+
+def test_every_method_the_parser_can_emit_has_a_turkish_label():
+    """A method with no label is a KeyError inside a rendered answer - and it
+    reaches a user, not a test, because the shipped data has one of them once."""
+    from src import dose_parse
+    for method, _pattern in dose_parse._METHODS:
+        assert method in dose_answer.METHOD_LABELS
+
+
+def test_every_group_has_a_sentence_form():
+    for key, _label in dose_answer.GROUPS:
+        assert key in dose_answer.GROUP_IN_SENTENCE
