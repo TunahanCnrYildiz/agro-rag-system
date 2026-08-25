@@ -54,12 +54,18 @@ class ChatResult:
     route: str = ""
     route_how: str = ""
     form: dict | None = None
+    # The dose card travels on its own key, never inside `form`. An
+    # already-deployed APK reads `form` and draws a BUDGET card from it; handing
+    # it dose fields would render a money form over a dose question and submit
+    # the answer back under the wrong payload.
+    dose_form: dict | None = None
 
     def as_api(self) -> dict:
         return {
             "answer": self.answer,
             "recommended_products": [p.as_api() for p in self.recommended_products],
             "form": self.form,
+            "dose_form": self.dose_form,
         }
 
 
@@ -912,8 +918,47 @@ def _budget_result(payload: dict | None, message: str = "",
                                             latest_year))
 
 
+def _dose_result(payload: dict | None) -> ChatResult:
+    """The dose route: no retrieval, no product match, no model call.
+
+    Two multiplications in src/dose_answer.py over a figure the manufacturer
+    published and an area the user selected. When the payload is absent or
+    incomplete we return the card instead of an answer; a payload that was
+    never submitted gets a clean card rather than a list of "required" errors.
+
+    validate()/compute()/render() share one guard: any of them raising returns
+    COMPUTE_FAILED with no card and no figures. They are documented never to
+    raise, but on the streaming path the 200 and headers are already sent by
+    the time this runs, so a raise here would break the connection mid-stream.
+    """
+    # Deferred like the router import: keeping engine's module-level imports
+    # free of route modules is what stops the cycles the rest of this file
+    # documents.
+    from src import dose_answer
+
+    submitted = bool(payload)
+    try:
+        inputs, errors = dose_answer.validate(payload or {})
+        if inputs is not None:
+            totals = dose_answer.compute(inputs)
+            text = (dose_answer.render(inputs, totals) if totals
+                    else dose_answer.no_dose_for_group(inputs))
+            return ChatResult(answer=text, recommended_products=[],
+                              route="product_dose")
+    except Exception:  # noqa: BLE001 - a broken validation or sum must not become a guess
+        return ChatResult(answer=dose_answer.COMPUTE_FAILED,
+                          recommended_products=[], route="product_dose")
+
+    return ChatResult(answer=dose_answer.ASK_FOR_INPUTS, recommended_products=[],
+                      route="product_dose",
+                      dose_form=dose_answer.form_spec(
+                          errors if submitted else [],
+                          payload if submitted else None))
+
+
 def answer(message: str, history: list[dict] | None = None,
-           budget_payload: dict | None = None) -> ChatResult:
+           budget_payload: dict | None = None,
+           dose_payload: dict | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
     # Routing is diagnostic in this release: every route still runs the corpus
     # path below. Wiring it now, with behaviour unchanged, is what lets the 55
@@ -926,6 +971,15 @@ def answer(message: str, history: list[dict] | None = None,
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
         route, route_how = "", ""
+
+    # Checked before budget: a submitted dose card is answered as a dose
+    # question whatever the message it rode in on classifies as. The two
+    # payloads are mutually exclusive in both clients; if one ever sends both,
+    # the dose card is the one the user just pressed.
+    if dose_payload or route == "product_dose":
+        result = _dose_result(dose_payload)
+        result.route_how = route_how
+        return result
 
     # The budget route short-circuits BEFORE retrieval: a money question was
     # paying for a corpus search that cannot hold its answer. Safe to diverge
@@ -975,7 +1029,8 @@ def answer(message: str, history: list[dict] | None = None,
 
 def stream_answer(
     message: str, history: list[dict] | None = None,
-    budget_payload: dict | None = None
+    budget_payload: dict | None = None,
+    dose_payload: dict | None = None
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
@@ -988,6 +1043,20 @@ def stream_answer(
         route, route_how = router.classify(message, history)
     except Exception:  # noqa: BLE001 - routing must never break answering
         route, route_how = "", ""
+
+    # Must mirror answer() exactly, including the payload clause and its order.
+    # Both clients stream, so a card wired only into answer() would reach no
+    # user at all - and the tests would still pass.
+    if dose_payload or route == "product_dose":
+        result = _dose_result(dose_payload)
+        yield _sse({"type": "token", "content": result.answer})
+        if result.dose_form is not None:
+            # A NEW event type: an already-deployed client ignores an unknown
+            # `type` (see mobile-app/src/api.ts), so it shows the sentence and
+            # no card rather than drawing a budget form out of dose fields.
+            yield _sse({"type": "dose_form", "form": result.dose_form})
+        yield _sse({"type": "done"})
+        return
 
     # Must mirror answer() exactly, including the `or budget_payload` clause.
     # Both clients stream, so a form wired only into answer() would reach no user

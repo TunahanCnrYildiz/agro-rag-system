@@ -180,3 +180,25 @@ def test_history_argument_is_accepted_and_ignored_for_now():
     history = [{"role": "user", "content": "Manisa'dayım"}]
     assert router.classify("Asmada budama ne zaman yapılır?", history) == \
         router.classify("Asmada budama ne zaman yapılır?")
+
+
+def test_a_named_product_with_a_how_much_question_is_a_dose_question():
+    assert router.classify_by_rules("HİGRO BARF dekara ne kadar kullanmalıyım?") == "product_dose"
+
+
+def test_a_dose_phrase_with_a_fertilizer_stem_is_a_dose_question():
+    assert router.classify_by_rules("Gübreyi dekara kaç litre vermeliyim?") == "product_dose"
+
+
+def test_money_still_wins_over_a_named_product():
+    """'HİGRO BARF kaç para?' is a price question, not a dose question - budget
+    is checked first and stays first."""
+    assert router.classify_by_rules("HİGRO BARF kaç para tutar?") == "budget"
+
+
+def test_a_timing_question_is_still_a_plan_not_a_dose():
+    assert router.classify_by_rules("Domatese ne zaman gübre vermeliyim?") == "fert_plan"
+
+
+def test_a_plain_nutrition_question_is_not_a_dose_question():
+    assert router.classify_by_rules("Buğday tarlamda nasıl gübreleme yapmalıyım?") == "nutrition"

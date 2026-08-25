@@ -14,12 +14,13 @@ and can be unit-tested without a network.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Literal
 
 from src.engine import _normalize_tr
 
 Route = Literal["plant_info", "nutrition", "fert_plan", "budget",
-                "crop_choice", "offscope"]
+                "crop_choice", "product_dose", "offscope"]
 
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
@@ -70,6 +71,39 @@ _OFFSCOPE_STEMS = ("inek", "buzagi", "koyun", "tavuk", "hayvancilik",
 # a real forage legume. Same trap as 'kar'/'karar' above.
 _OFFSCOPE_WORDS = ("mac", "maci", "maclar")
 
+# "How much per dekar" phrasings. Deliberately narrow: every one of these names
+# an AMOUNT PER AREA or asks for a dose outright, so none of them fires on a
+# timing question ("ne zaman", "hangi ay") or on a price one - and budget is
+# checked first anyway, which keeps "dekara maliyeti nedir" money.
+_DOSE_PHRASES = ("dekara ne kadar", "dekara kac", "donume ne kadar",
+                 "donume kac", "ne kadar atmali", "ne kadar atarim",
+                 "kac litre", "kac kilo", "kac kg", "dozu nedir",
+                 "dozu ne kadar", "dozu ne")
+
+
+@lru_cache(maxsize=1)
+def _product_pattern():
+    """One regex over every product carrying a published dose, folded.
+
+    Data-driven rather than a hand-kept list: a product that leaves the dose
+    table stops triggering the route on the same day, and a new one starts.
+    Both boundaries are anchored - 'FLY AZOT' must not fire on 'azotlu gubre'.
+    """
+    from src import doses
+    names = [_normalize_tr(name) for name in doses.available_products()]
+    if not names:
+        return None
+    names.sort(key=len, reverse=True)
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names) + r")(?!\w)")
+
+
+def _names_a_dose_product(folded: str) -> bool:
+    try:
+        pattern = _product_pattern()
+    except Exception:  # noqa: BLE001 - routing must never break answering
+        return False
+    return bool(pattern and pattern.search(folded))
+
 
 def _has_stem(folded: str, stems: tuple[str, ...]) -> bool:
     """Left-boundary match, so a stem may run into its own suffix."""
@@ -93,6 +127,14 @@ def classify_by_rules(message: str) -> Route | None:
             or _has_word(folded, _BUDGET_WORDS)
             or _has_stem(folded, _BUDGET_PHRASES)):
         return "budget"
+
+    # A named product, or an explicit per-area amount question. Checked after
+    # budget (a price question about a product is still money) and before
+    # fert_plan/nutrition, which would otherwise swallow every "gubre" in it.
+    if _names_a_dose_product(folded) or (
+            _has_stem(folded, _DOSE_PHRASES)
+            and _has_stem(folded, _PLANT_NUTRITION_STEMS)):
+        return "product_dose"
 
     if _has_stem(folded, _CROP_CHOICE_PHRASES):
         return "crop_choice"
