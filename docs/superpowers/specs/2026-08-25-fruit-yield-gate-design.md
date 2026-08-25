@@ -1,6 +1,6 @@
 # Fruit yield: refuse the cells whose denominator is not the orchard
 
-Status: proposed
+Status: done, `16445fc`
 Date: 2026-08-25
 Follows: P2a `2026-08-17-numeric-data-layer-design.md`, P2b `2026-08-22-budget-prefill-design.md`
 Blocks: P4 (`crop_choice` naming a crop)
@@ -202,5 +202,5 @@ Everything is `pytest`, no network.
 | P2a | crop norms data layer | done, `b7415a2` |
 | P2b | budget prefill | done, `6b5d831` |
 | P3 | product dose | done, `14d93fb` |
-| **this** | **fruit yield gate** | **proposed** |
-| P4 | `crop_choice` naming a crop | blocked on this |
+| this | fruit yield gate | done, `16445fc` |
+| P4 | `crop_choice` naming a crop | unblocked; needs its own brainstorm |
