@@ -1,6 +1,7 @@
 """Unit tests for src/crop_compare.py (no network, no store, no model)."""
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -257,6 +258,26 @@ def test_every_answer_refuses_the_profit_comparison():
     assert "masraf" in text
 
 
+def test_not_profit_is_absent_when_neither_crop_shows_revenue():
+    """NOT_PROFIT opens by saying "these figures ARE gross revenue" - a claim
+    that is only true when a revenue figure was actually printed above it.
+    With year 2099 no price on hand carries that year, so both crop blocks
+    print no revenue at all; appending NOT_PROFIT then would point at gross
+    revenue figures the answer never printed - the very self-contradiction
+    the gate exists to prevent."""
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2099))
+    assert crop_compare.NOT_PROFIT not in text
+
+
+def test_not_profit_is_present_when_exactly_one_crop_shows_revenue():
+    inputs, _ = crop_compare.validate(_raw(), _table())
+    first, second = crop_compare.compute(inputs, _table(), 2025)
+    second = replace(second, revenue_tl_da=None, missing="fiyat")
+    text = crop_compare.render(inputs, (first, second))
+    assert crop_compare.NOT_PROFIT in text
+
+
 def test_the_answer_never_names_a_winner():
     """No sentence may recommend one of the two. The figures are the answer."""
     inputs, _ = crop_compare.validate(_raw(), _table())
@@ -267,10 +288,14 @@ def test_the_answer_never_names_a_winner():
 
 
 def test_a_crop_with_a_missing_half_says_which_half():
+    """Every figure prints its year AND region, even the yield printed here
+    while the price is missing - the same attribution style as the full
+    branch a few lines below it."""
     inputs, _ = crop_compare.validate(_raw(), _table())
     text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2026))
     assert "fiyat" in text
     assert "115.663" not in text and "115.664" not in text
+    assert "(TÜİK 2025, Konya)" in text
 
 
 def test_the_five_year_range_reaches_the_answer():

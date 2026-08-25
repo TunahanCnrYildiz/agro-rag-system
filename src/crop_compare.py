@@ -263,8 +263,9 @@ def _crop_block(figures: CropFigures) -> list[str]:
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
     if figures.missing == "fiyat":
         return [f"**{figures.label}**: verim {format_qty(figures.yield_value.amount)} "
-                f"kg/da ({figures.yield_value.year}), ancak güncel yıl için "
-                f"yayımlanmış fiyat yok, bu yüzden gelir hesaplamıyorum."]
+                f"kg/da (TÜİK {figures.yield_value.year}, {figures.yield_value.region}), "
+                f"ancak güncel yıl için yayımlanmış fiyat yok, bu yüzden gelir "
+                f"hesaplamıyorum."]
 
     y, p = figures.yield_value, figures.price_value
     lines = [
