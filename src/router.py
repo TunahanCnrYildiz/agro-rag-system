@@ -14,17 +14,18 @@ and can be unit-tested without a network.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Literal
 
 from src.engine import _normalize_tr
 
 Route = Literal["plant_info", "nutrition", "fert_plan", "budget",
-                "crop_choice", "offscope"]
+                "crop_choice", "product_dose", "offscope"]
 
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
 _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
-                 "ciro", "yatirim")
+                 "ciro", "yatirim", "fiyat")
 # 'geri donus' was dropped: it is a left-boundary prefix of 'geri dönüşüm'
 # (recycling), and misrouted plant-waste/composting questions to budget. The
 # one frozen case that used it ("Bu yatırımın geri dönüşü ne kadar sürer?")
@@ -70,6 +71,74 @@ _OFFSCOPE_STEMS = ("inek", "buzagi", "koyun", "tavuk", "hayvancilik",
 # a real forage legume. Same trap as 'kar'/'karar' above.
 _OFFSCOPE_WORDS = ("mac", "maci", "maclar")
 
+# "How much per dekar" phrasings. Deliberately narrow: every one of these names
+# an AMOUNT PER AREA or asks for a dose outright, so none of them fires on a
+# timing question ("ne zaman", "hangi ay") or on a price one - and budget is
+# checked first anyway, which keeps "dekara maliyeti nedir" money.
+_DOSE_PHRASES = ("dekara ne kadar", "dekara kac", "donume ne kadar",
+                 "donume kac", "ne kadar atmali", "ne kadar atarim",
+                 "kac litre", "kac kilo", "kac kg", "dozu nedir",
+                 "dozu ne kadar", "dozu ne")
+
+# A bare amount ask, generic enough to fire even when none of the phrases above
+# does - but only alongside a named product (see classify_by_rules), never on
+# its own: "ne kadar" and "kaç" are far too common in Turkish to gate a route
+# by themselves. 'kac' is matched by WORD, not stem: folded 'kac' is a
+# left-boundary prefix of 'kaçınmak', 'kaçak' and others that have nothing to
+# do with amount. 'ne miktar', 'miktari' and 'orani' were added 2026-08-25
+# (post-fix review): natural Turkish amount words that real dose questions
+# ("HİGRO BARF'ı dekara ne miktarda vermeliyim?", "...kullanım miktarı nedir?",
+# "...oranı dekara nedir?") were falling through without.
+_AMOUNT_PHRASES = ("ne kadar", "ne miktar", "miktari", "orani")
+_AMOUNT_WORDS = ("kac",)
+
+# The generic amount signal above ("ne kadar"/"kaç") also fires on questions
+# that are not about quantity at all: a duration ("kaç günde bir uygulanır?"),
+# a price ("kaç lira?", "ne kadar sürede" aside, "fiyatı ne kadar?" is caught
+# separately by 'fiyat' in _BUDGET_STEMS, checked before this rule) or a count
+# of kinds ("kaç çeşit var?"). Measured 2026-08-25 (post-fix review), all still
+# routing product_dose on the strength of a named product plus a bare amount
+# word: "HİGRO BARF kaç günde bir uygulanır?", "...ne kadar sürede etki eder?",
+# "...raf ömrü kaç ay?", "...kaç lira?", "...kaç çeşit var?". None of these asks
+# how much to apply, so the generic amount signal must not fire on them.
+_NON_DOSE_AMOUNT_PHRASES = ("kac gun", "kac gunde", "gunde bir", "kac ay",
+                            "kac hafta", "kac yil", "kac saat", "surede",
+                            "kac lira", "kac tl", "kac cesit", "kac tur")
+
+# Fertilizer as a PRODUCT, for the no-product-named half of the dose rule.
+# Deliberately just this one stem, not the wider _PLANT_NUTRITION_STEMS: 'azot',
+# 'fosfor', 'potasyum', 'npk' and 'kompost' are ELEMENTAL/generic terms, and a
+# question like "Dekara kaç kilo azot gerekir?" asks about the element, not a
+# branded product - converting an elemental amount into a product mass is out
+# of scope (design spec, out-of-scope §10) and answering it with a card of 40
+# products would be a guess wearing a helpful shape. See routing review
+# (2026-08-25), finding 1.
+_FERTILIZER_PRODUCT_STEM = ("gubre",)
+
+
+@lru_cache(maxsize=1)
+def _product_pattern():
+    """One regex over every product carrying a published dose, folded.
+
+    Data-driven rather than a hand-kept list: a product that leaves the dose
+    table stops triggering the route on the same day, and a new one starts.
+    Both boundaries are anchored - 'FLY AZOT' must not fire on 'azotlu gubre'.
+    """
+    from src import doses
+    names = [_normalize_tr(name) for name in doses.available_products()]
+    if not names:
+        return None
+    names.sort(key=len, reverse=True)
+    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names) + r")(?!\w)")
+
+
+def _names_a_dose_product(folded: str) -> bool:
+    try:
+        pattern = _product_pattern()
+    except Exception:  # noqa: BLE001 - routing must never break answering
+        return False
+    return bool(pattern and pattern.search(folded))
+
 
 def _has_stem(folded: str, stems: tuple[str, ...]) -> bool:
     """Left-boundary match, so a stem may run into its own suffix."""
@@ -93,6 +162,34 @@ def classify_by_rules(message: str) -> Route | None:
             or _has_word(folded, _BUDGET_WORDS)
             or _has_stem(folded, _BUDGET_PHRASES)):
         return "budget"
+
+    # A named product asking an amount, or a fertilizer-as-product amount
+    # question with no product named. Checked after budget (a price question
+    # about a product is still money) and before fert_plan/nutrition, which
+    # would otherwise swallow every "gubre" in it.
+    #
+    # Naming a product is not asking how much of it - "HİGRO BARF nedir?" and
+    # "BİNGO ürününü domateste kullanabilir miyim?" both name a product without
+    # asking an amount, and used to hijack the route for every question that
+    # merely mentions one. So clause A requires an amount signal alongside the
+    # name; because the name is already present, that signal may be generic
+    # (_DOSE_PHRASES, or a bare "ne kadar"/"kaç"), not just the narrow phrases
+    # clause B needs to earn the route on its own. See routing review
+    # (2026-08-25), finding 1.
+    product_named = _names_a_dose_product(folded)
+    # The exclusion is checked before the generic amount words count, so a
+    # duration/price/count-of-kinds question loses the generic signal outright
+    # rather than being decided by a later, harder-to-audit clause. It does
+    # NOT gate _DOSE_PHRASES: "kaç litre", "dozu nedir" and the like already
+    # name a quantity unambiguously and need no such guard.
+    generic_amount = not _has_stem(folded, _NON_DOSE_AMOUNT_PHRASES) and (
+        _has_stem(folded, _AMOUNT_PHRASES) or _has_word(folded, _AMOUNT_WORDS))
+    if product_named and (_has_stem(folded, _DOSE_PHRASES) or generic_amount):
+        return "product_dose"
+    if not product_named and (
+            _has_stem(folded, _DOSE_PHRASES)
+            and _has_stem(folded, _FERTILIZER_PRODUCT_STEM)):
+        return "product_dose"
 
     if _has_stem(folded, _CROP_CHOICE_PHRASES):
         return "crop_choice"

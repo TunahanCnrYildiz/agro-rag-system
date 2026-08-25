@@ -62,6 +62,20 @@ class BudgetPayload(BaseModel):
     crop: str | None = None
 
 
+class DoseField(BaseModel):
+    # Loose at the wire for the same reason BudgetField is, bool included: it
+    # must reach src/dose_answer.py as a bool so the guard there can reject it,
+    # rather than being smart-unioned into the int 1 on the way.
+    value: str | int | float | bool = ""
+    unit: str = ""
+
+
+class DosePayload(BaseModel):
+    product: str | None = None
+    group: str | None = None
+    area: DoseField | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="The user query.")
     history: list[ChatTurn] = Field(default_factory=list)
@@ -70,6 +84,9 @@ class ChatRequest(BaseModel):
     )
     budget: BudgetPayload | None = Field(
         default=None, description="Filled budget form, when the user submitted one."
+    )
+    dose: DosePayload | None = Field(
+        default=None, description="Filled product-dose card, when the user submitted one."
     )
 
 
@@ -83,6 +100,8 @@ class ChatResponse(BaseModel):
     recommended_products: list[ProductOut]
     # Optional so an already-deployed client, which never reads it, is unaffected.
     form: dict | None = None
+    # Optional so an already-deployed client, which never reads it, is unaffected.
+    dose_form: dict | None = None
 
 
 class CatalogProduct(BaseModel):
@@ -180,15 +199,16 @@ def chat(req: ChatRequest):
     ``stream=true``."""
     history = [t.model_dump() for t in req.history]
     budget_payload = req.budget.model_dump() if req.budget else None
+    dose_payload = req.dose.model_dump() if req.dose else None
 
     if req.stream:
         return StreamingResponse(
-            engine.stream_answer(req.message, history, budget_payload),
+            engine.stream_answer(req.message, history, budget_payload, dose_payload),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    result = engine.answer(req.message, history, budget_payload)
+    result = engine.answer(req.message, history, budget_payload, dose_payload)
     return ChatResponse(**result.as_api())
 
 

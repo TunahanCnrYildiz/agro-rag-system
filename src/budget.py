@@ -147,8 +147,12 @@ class FieldError:
     message: str
 
 
-def _coerce(value: object) -> float | None:
+def coerce_number(value: object) -> float | None:
     """Accept a JSON number as readily as the string a text input produces.
+
+    Public because src/dose_answer.py reads the same kind of field from the
+    same kind of client. A second copy of this is a second place for the bool
+    guard below to be forgotten.
 
     bool is checked first because it is a subclass of int in Python: without
     the guard, True would silently become 1 dekar.
@@ -170,7 +174,7 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None
             return None, FieldError(spec.id, f"{spec.label} alanını doldurun.")
         return None, None
 
-    amount = _coerce(entry.get("value"))
+    amount = coerce_number(entry.get("value"))
     if amount is None:
         return None, FieldError(
             spec.id, f"{spec.label} bir sayı olmalı. Ondalık için virgül kullanın.")
@@ -311,12 +315,12 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     """
     if norm is None:
         return None
-    value = (_format_qty(norm.amount) if decimals is None
+    value = (format_qty(norm.amount) if decimals is None
              else format_tr(norm.amount, decimals))
     recent = None
     if show_range and norm.recent_min is not None and norm.recent_max is not None:
-        recent = (f"önceki 5 yıl: {_format_qty(norm.recent_min)}–"
-                  f"{_format_qty(norm.recent_max)} {unit_text}")
+        recent = (f"önceki 5 yıl: {format_qty(norm.recent_min)}–"
+                  f"{format_qty(norm.recent_max)} {unit_text}")
     return {
         "value": value,
         # The unit travels WITH the value. Dropping 28,4 into a field still
@@ -533,8 +537,11 @@ COMPUTE_FAILED = (
 )
 
 
-def _format_qty(value: float) -> str:
+def format_qty(value: float) -> str:
     """Format a quantity for the restated line without rounding it away.
+
+    Public for the same reason as coerce_number: the dose route prints the same
+    kind of quantity and must not grow a second Turkish formatter.
 
     The restated line exists so the user can check what the calculation was
     made from; it stands in for an upper bound on input values, so it has to
@@ -559,9 +566,9 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     crop_name = inputs.crop_label or inputs.crop
     crop = f" {crop_name} için" if crop_name else ""
     given = [
-        f"**{_format_qty(inputs.area_da.amount)} dönüm**",
-        f"toplam **{_format_qty(inputs.yield_kg.amount)} kg** "
-        f"(dekara {_format_qty(result.yield_kg_da)} kg)",
+        f"**{format_qty(inputs.area_da.amount)} dönüm**",
+        f"toplam **{format_qty(inputs.yield_kg.amount)} kg** "
+        f"(dekara {format_qty(result.yield_kg_da)} kg)",
         f"kilogram fiyatı **{format_tr(inputs.price_tl_kg.amount, 2)} TL**",
     ]
     if result.cost_tl is not None:

@@ -180,3 +180,85 @@ def test_history_argument_is_accepted_and_ignored_for_now():
     history = [{"role": "user", "content": "Manisa'dayım"}]
     assert router.classify("Asmada budama ne zaman yapılır?", history) == \
         router.classify("Asmada budama ne zaman yapılır?")
+
+
+def test_a_named_product_with_a_how_much_question_is_a_dose_question():
+    assert router.classify_by_rules("HİGRO BARF dekara ne kadar kullanmalıyım?") == "product_dose"
+
+
+def test_a_dose_phrase_with_a_fertilizer_stem_is_a_dose_question():
+    assert router.classify_by_rules("Gübreyi dekara kaç litre vermeliyim?") == "product_dose"
+
+
+def test_money_still_wins_over_a_named_product():
+    """'HİGRO BARF kaç para?' is a price question, not a dose question - budget
+    is checked first and stays first."""
+    assert router.classify_by_rules("HİGRO BARF kaç para tutar?") == "budget"
+
+
+def test_a_timing_question_is_still_a_plan_not_a_dose():
+    assert router.classify_by_rules("Domatese ne zaman gübre vermeliyim?") == "fert_plan"
+
+
+def test_a_plain_nutrition_question_is_not_a_dose_question():
+    assert router.classify_by_rules("Buğday tarlamda nasıl gübreleme yapmalıyım?") == "nutrition"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF nedir?",
+    "HİGRO BARF ne zaman uygulanır?",
+    "BİNGO ürününü domateste kullanabilir miyim?",
+])
+def test_naming_a_product_is_not_asking_its_amount(query):
+    # Naming a product used to hijack the route for any question that
+    # mentions one, including ones with no amount ask at all - a dead end for
+    # a deployed client that cannot draw the card. See routing review
+    # (2026-08-25), finding 1.
+    assert router.classify_by_rules(query) != "product_dose"
+
+
+def test_an_elemental_amount_question_is_not_a_dose_question():
+    # "azot" is an element, not a branded product; converting an elemental
+    # amount into a product mass is out of scope (design spec §10), and
+    # answering it with a card of 40 products is a guess wearing a helpful
+    # shape.
+    assert router.classify_by_rules("Dekara kaç kilo azot gerekir?") != "product_dose"
+
+
+def test_a_named_product_with_a_bare_ne_kadar_is_still_a_dose_question():
+    # No _DOSE_PHRASES hit here - the generic "ne kadar" alongside a named
+    # product must still carry the route.
+    assert router.classify_by_rules(
+        "5 dönümlük tarlama FLY AZOT'tan ne kadar lazım?") == "product_dose"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF kaç günde bir uygulanır?",
+    "HİGRO BARF ne kadar sürede etki eder?",
+    "HİGRO BARF'ın raf ömrü kaç ay?",
+    "HİGRO BARF kaç lira?",
+    "HİGRO BARF kaç çeşit var?",
+])
+def test_a_named_product_with_a_duration_question_is_not_a_dose_question(query):
+    # A product name plus a bare "kaç" used to be enough on its own - but
+    # "kaç günde", "kaç ay" and "kaç çeşit" ask about timing, shelf life or
+    # variety, never a quantity. Measured 2026-08-25 (post-fix review).
+    assert router.classify_by_rules(query) != "product_dose"
+
+
+def test_a_named_product_with_a_price_question_is_budget_not_dose():
+    # 'fiyat' was missing from _BUDGET_STEMS, so this fell through the money
+    # rule and reached the dose rule on its bare "ne kadar" instead.
+    assert router.classify_by_rules("HİGRO BARF fiyatı ne kadar?") == "budget"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF'ı dekara ne miktarda vermeliyim?",
+    "Buğdayda HİGRO BARF kullanım miktarı nedir?",
+    "HİGRO BARF oranı dekara nedir?",
+])
+def test_ne_miktarda_and_orani_are_dose_questions(query):
+    # "ne miktar", "miktarı" and "oranı" are natural Turkish amount words that
+    # were missing from the amount signal, so real dose questions fell through
+    # to the default corpus route. Measured 2026-08-25 (post-fix review).
+    assert router.classify_by_rules(query) == "product_dose"

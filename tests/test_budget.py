@@ -58,10 +58,10 @@ def test_format_does_not_print_a_negative_zero():
 def test_format_qty_does_not_leave_a_half_formatted_decimal():
     """A value that rounds to a whole number at two decimals must not keep
     a bare trailing zero, e.g. "13,0" - it should drop the comma entirely."""
-    assert budget._format_qty(12.995052770448549) == "13"
-    assert budget._format_qty(400.0000000001) == "400"
-    assert budget._format_qty(2.5) == "2,5"
-    assert budget._format_qty(10.05) == "10,05"
+    assert budget.format_qty(12.995052770448549) == "13"
+    assert budget.format_qty(400.0000000001) == "400"
+    assert budget.format_qty(2.5) == "2,5"
+    assert budget.format_qty(10.05) == "10,05"
 
 
 def _raw(area="5", area_unit="donum", total="2", total_unit="ton",

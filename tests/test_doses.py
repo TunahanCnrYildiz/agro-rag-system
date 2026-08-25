@@ -23,7 +23,10 @@ GOOD = {
         "HİGRO FUBBY": {"sebze": {"damlama": {"low": 250.0, "high": 250.0, "unit": "gr"}},
                         "meyve": {"damlama": {"low": 250.0, "high": 250.0, "unit": "gr"}}},
         "HIGRO 8 MN": {"hepsi": {"damlama": {"low": 2.0, "high": 2.5, "unit": "litre"}}},
+        "FLY AZOT": {"hepsi": {"yaprak": {"low": 200.0, "high": 250.0, "unit": "cc"}}},
     },
+    "all_groups_scope": {"HIGRO 8 MN": ["sebze", "meyve", "tarla"],
+                         "FLY AZOT": ["tarla", "sebze"]},
 }
 
 
@@ -42,13 +45,32 @@ def test_a_group_the_product_does_not_cover_returns_nothing(tmp_path, monkeypatc
     assert doses.lookup("HİGRO FUBBY", "tarla") == ()
 
 
-def test_an_unqualified_dose_answers_every_group(tmp_path, monkeypatch):
-    """'hepsi' means the page named no crop group, so the figure is not
-    qualified by one - it is the answer for whichever group is asked."""
+def test_an_unqualified_dose_answers_every_group_it_was_reviewed_for(tmp_path, monkeypatch):
+    """'hepsi' means the parser saw no group heading. When a reviewer confirmed
+    the page names no crop either, the figure is the answer for any group."""
     _write(tmp_path, monkeypatch, GOOD)
     for group in ("sebze", "meyve", "tarla"):
         found = doses.lookup("HIGRO 8 MN", group)
         assert len(found) == 1 and found[0].high == 2.5
+
+
+def test_a_reviewed_row_stays_out_of_the_groups_its_page_never_named(tmp_path, monkeypatch):
+    """FLY AZOT's page qualifies every figure by crop and names no fruit. The
+    fallback used to hand a fruit grower a cereal figure."""
+    _write(tmp_path, monkeypatch, GOOD)
+    assert doses.lookup("FLY AZOT", "meyve") == ()
+    assert len(doses.lookup("FLY AZOT", "tarla")) == 1
+    assert len(doses.lookup("FLY AZOT", "sebze")) == 1
+
+
+def test_an_unreviewed_unqualified_row_answers_nothing(tmp_path, monkeypatch):
+    """No review, no fallback. A row nobody read must not answer three groups
+    on the strength of a missing heading."""
+    payload = {"products": {"YENİ ÜRÜN": {"hepsi": {"damlama": {"low": 1.0, "high": 2.0, "unit": "litre"}}}},
+               "all_groups_scope": {}}
+    _write(tmp_path, monkeypatch, payload)
+    for group in ("sebze", "meyve", "tarla"):
+        assert doses.lookup("YENİ ÜRÜN", group) == ()
 
 
 def test_an_unknown_product_returns_nothing(tmp_path, monkeypatch):
@@ -60,7 +82,7 @@ def test_a_missing_file_is_an_empty_table(tmp_path, monkeypatch):
     """A broken data file must never break answering - fertplan._load's rule."""
     monkeypatch.setattr(doses, "_PATH", tmp_path / "nope.json")
     doses._load.cache_clear()
-    assert doses._load() == {}
+    assert doses._load() == ({}, {})
     assert doses.available_products() == ()
     assert doses.lookup("HİGRO FUBBY", "sebze") == ()
 
@@ -70,7 +92,7 @@ def test_malformed_json_is_an_empty_table(tmp_path, monkeypatch):
     path.write_text("{not json", encoding="utf-8")
     monkeypatch.setattr(doses, "_PATH", path)
     doses._load.cache_clear()
-    assert doses._load() == {}
+    assert doses._load() == ({}, {})
 
 
 @pytest.mark.parametrize("bad", [
@@ -150,6 +172,16 @@ def test_the_shipped_file_loads_and_carries_products():
     empties the file would leave every fixture-based test above green."""
     doses._load.cache_clear()
     assert len(doses.available_products()) >= 35
+
+
+def test_every_method_the_parser_can_emit_is_readable_by_lookup():
+    """doses._METHODS lists the methods lookup() will read out of the file - a
+    method missing here is silently unreadable: the row is in the file and
+    lookup skips it (see its own module docstring). The analogous pin for
+    dose_answer.METHOD_LABELS already lives in test_dose_answer.py."""
+    from src import dose_parse
+    for method, _pattern in dose_parse._METHODS:
+        assert method in doses._METHODS
 
 
 def test_a_group_nobody_publishes_is_not_answered(tmp_path, monkeypatch):

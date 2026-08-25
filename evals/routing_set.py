@@ -6,7 +6,8 @@ requirement. Do not edit a case to make the router pass - fix the router, or
 record why the expectation was wrong.
 """
 
-ROUTES = ("plant_info", "nutrition", "fert_plan", "budget", "crop_choice", "offscope")
+ROUTES = ("plant_info", "nutrition", "fert_plan", "budget", "crop_choice",
+          "product_dose", "offscope")
 
 ROUTING_CASES = [
     # --- plant_info: growing practice, plant health, physiology --------------
@@ -46,6 +47,24 @@ ROUTING_CASES = [
     {"query": "Serada domates yetiştirmek kârlı mı?", "route": "budget"},
     {"query": "Girdi masraflarım ne kadar olur?", "route": "budget"},
     {"query": "Bu yatırımın geri dönüşü ne kadar sürer?", "route": "budget"},
+
+    # --- product_dose: how much of a fertilizer for this field ---------------
+    # Authored 2026-08-25, BEFORE src/router.py knew this route existed.
+    {"query": "HİGRO BARF dekara ne kadar kullanmalıyım?", "route": "product_dose"},
+    {"query": "5 dönümlük tarlama FLY AZOT'tan ne kadar lazım?", "route": "product_dose"},
+    {"query": "HİGRO FUBBY'nin dekara dozu nedir?", "route": "product_dose"},
+    {"query": "Gübreyi dekara kaç litre vermeliyim?", "route": "product_dose"},
+    {"query": "Domates için gübreden dekara ne kadar atmalıyım?", "route": "product_dose"},
+    {"query": "Bir dönüme kaç kilo gübre gider?", "route": "product_dose"},
+
+    # --- product_dose: naming a product is not asking its amount ------------
+    # Authored 2026-08-25, in response to the whole-branch review. None of the
+    # six cases above names a product in a question that is not about
+    # quantity, so none of them could catch the rule hijacking every message
+    # that merely names a product.
+    {"query": "HİGRO BARF nedir?", "route": "plant_info"},
+    {"query": "HİGRO BARF ne zaman uygulanır?", "route": "plant_info"},
+    {"query": "Dekara kaç kilo azot gerekir?", "route": "nutrition"},
 
     # --- crop_choice: what to plant -----------------------------------------
     {"query": "Bu yıl tarlama ne eksem iyi olur?", "route": "crop_choice"},
