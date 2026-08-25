@@ -7,17 +7,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { BudgetPayload, CropOption, FormSpec, NormCell } from "./api";
 import { colors } from "./theme";
-
-// Turkish lowercasing, so typing "findik" finds "Fındık". toLowerCase() alone
-// maps I to i but leaves I undotted, and the crops the user searches for most
-// are the ones with dotted capitals.
-function fold(text: string): string {
-  return text
-    .replace(/I/g, "ı")
-    .replace(/İ/g, "i")
-    .toLowerCase()
-    .replace(/[ışğüöç]/g, (c) => ({ ı: "i", ş: "s", ğ: "g", ü: "u", ö: "o", ç: "c" }[c] ?? c));
-}
+import { fold } from "./turkish";
 
 interface Props {
   form: FormSpec;

@@ -101,10 +101,43 @@ export interface FormSpec {
   crop?: string;
 }
 
+export interface DoseFieldValue {
+  value: string;
+  unit: string;
+}
+
+export interface DosePayload {
+  product?: string;
+  group?: string;
+  area?: DoseFieldValue;
+}
+
+export interface DoseGroup {
+  id: string;
+  label: string;
+}
+
+export interface DoseFormSpec {
+  kind: "product_dose";
+  products: string[];
+  groups: DoseGroup[];
+  // Echoed back on a rejected card, so one bad field does not wipe the rest.
+  product: string;
+  group: string;
+  area: {
+    label: string;
+    value: string;
+    unit: string;
+    units: FormUnit[];
+  };
+  errors: { product: string | null; group: string | null; area: string | null };
+}
+
 export interface ChatStreamHandlers {
   onToken: (content: string) => void;
   onProducts: (products: RecommendedProduct[]) => void;
   onForm?: (form: FormSpec) => void;
+  onDoseForm?: (form: DoseFormSpec) => void;
   onDone: () => void;
   onError: (err: Error) => void;
 }
@@ -115,7 +148,8 @@ export function sendChatMessageStream(
   message: string,
   history: ChatTurn[],
   handlers: ChatStreamHandlers,
-  budget?: BudgetPayload
+  budget?: BudgetPayload,
+  dose?: DosePayload
 ): void {
   const xhr = new XMLHttpRequest();
   let processedEvents = 0;
@@ -138,6 +172,8 @@ export function sendChatMessageStream(
         handlers.onToken(evt.content);
       } else if (evt.type === "form") {
         handlers.onForm?.(evt.form);
+      } else if (evt.type === "dose_form") {
+        handlers.onDoseForm?.(evt.form);
       }
     }
     processedEvents = complete.length;
@@ -155,7 +191,7 @@ export function sendChatMessageStream(
     }
   };
   xhr.onerror = () => handlers.onError(new Error("Network error"));
-  xhr.send(JSON.stringify({ message, history, stream: true, budget }));
+  xhr.send(JSON.stringify({ message, history, stream: true, budget, dose }));
 }
 
 export interface CatalogProduct {
