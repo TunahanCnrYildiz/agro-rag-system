@@ -1,12 +1,17 @@
 {
  "meta": {
-  "generated": "2026-08-23",
+  "generated": "2026-08-25",
   "source": {
    "fetched": "2026-08-22",
    "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
    "products_read": 48,
    "panels_captured": 48,
    "no_panel": []
+  },
+  "reviewed_scope": {
+   "reviewed": "2026-08-25",
+   "reviewed_by": "Tunahan Yıldız",
+   "why": "A `hepsi` row means the parser found no group heading. That is two different facts: the page named no crop at all, or it named crops we do not map to groups. Only the first may answer every group, and no regex can tell them apart, so a person reads the panel and records the answer here."
   },
   "products_with_a_dose": 40,
   "products_read": 48,
@@ -837,5 +842,16 @@
     }
    }
   }
+ },
+ "all_groups_scope": {
+  "FLY AZOT": [
+   "tarla",
+   "sebze"
+  ],
+  "HIGRO 8 MN": [
+   "sebze",
+   "meyve",
+   "tarla"
+  ]
  }
 }

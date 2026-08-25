@@ -1,0 +1,17 @@
+{
+ "meta": {
+  "reviewed": "2026-08-25",
+  "reviewed_by": "Tunahan Yıldız",
+  "why": "A `hepsi` row means the parser found no group heading. That is two different facts: the page named no crop at all, or it named crops we do not map to groups. Only the first may answer every group, and no regex can tell them apart, so a person reads the panel and records the answer here."
+ },
+ "scope": {
+  "FLY AZOT": {
+   "groups": ["tarla", "sebze"],
+   "evidence": "Panel her rakamı ürün adıyla niteliyor: 'Tahıllarda ve Hububatlarda kıraç üretimde dekara 200 cc yapraktan', 'Mısır ve Ayçiçeği', 'Pancar, patates, soğan, havuç gibi toprak altı yumrulu bitkilerde ... yapraktan 250 cc', 'Yeşil yapraklıların (marul, maydanoz, tere, roka, vb.)'. Sayfada tek bir meyve türü geçmiyor."
+  },
+  "HIGRO 8 MN": {
+   "groups": ["sebze", "meyve", "tarla"],
+   "evidence": "Panel hiçbir bitki adı vermiyor: 'DAMLAMA SULAMA: Mangan eksikliğinde bir dekara (1.000 m²) 2 – 2,5 litre dozunda'. Rakam bir gruba bağlı değil."
+  }
+ }
+}
