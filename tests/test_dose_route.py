@@ -62,7 +62,7 @@ def test_a_rejected_payload_comes_back_as_a_card_with_errors(no_llm):
 def test_a_group_with_no_figure_is_said_not_guessed(no_llm):
     result = engine.answer(DOSE_Q, None, None, _payload(product="FLY AZOT", group="meyve"))
     assert result.dose_form is None
-    assert "yayımlanmamış" in result.answer
+    assert "okuyamadım" in result.answer
 
 
 def test_a_submitted_payload_is_computed_whatever_the_router_says(no_llm):

@@ -21,13 +21,24 @@ TABLE = {
 @pytest.fixture(autouse=True)
 def table(tmp_path, monkeypatch):
     """Every test here runs against a fixture table, never the shipped file:
-    a real product's figures changing must not turn these red."""
+    a real product's figures changing must not turn these red.
+
+    src.router._product_pattern() is an lru_cache built from
+    doses.available_products(), so it must be cleared alongside doses._load -
+    otherwise a test that runs after this fixture and touches the router
+    keeps seeing whichever table was loaded first. Imported lazily to avoid a
+    load-time import cycle (src/dose_answer.py deliberately does not import
+    the router - see test_dose_answer_does_not_import_the_engine)."""
+    from src import router
+
     path = tmp_path / "product_doses.json"
     path.write_text(json.dumps(TABLE, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(doses, "_PATH", path)
     doses._load.cache_clear()
+    router._product_pattern.cache_clear()
     yield
     doses._load.cache_clear()
+    router._product_pattern.cache_clear()
 
 
 def _raw(product="HİGRO FUBBY", group="sebze", value="5", unit="donum"):
@@ -125,7 +136,11 @@ def test_dose_answer_does_not_import_the_engine():
     import ast
     from pathlib import Path
 
-    tree = ast.parse(Path("src/dose_answer.py").read_text(encoding="utf-8"))
+    # Resolved from this test file's own location, not the cwd: a cwd-relative
+    # path dies with FileNotFoundError instead of asserting anything the
+    # moment the suite runs from somewhere other than the repo root.
+    src_path = Path(__file__).resolve().parent.parent / "src" / "dose_answer.py"
+    tree = ast.parse(src_path.read_text(encoding="utf-8"))
     imported = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
@@ -171,6 +186,20 @@ def test_a_range_is_promoted_as_one_unit():
     totals = dose_answer.compute(inputs)
     assert (totals[0].total_low, totals[0].total_high, totals[0].total_unit) == (
         1.0, 1.25, "litre")
+
+
+def test_a_straddling_range_is_still_promoted_as_one_unit():
+    """200-250 cc/da over 4,5 dönüm is 900-1125 cc: the LOW end alone stays
+    under 1000 and would not promote on its own. _promote decides by the
+    larger end for exactly this case, so the pair must still come out as one
+    litre figure - '0,9-1,12 litre', never '900 cc-1,12 litre'."""
+    inputs, _ = dose_answer.validate(_raw(product="FLY AZOT", group="sebze", value="4,5"))
+    totals = dose_answer.compute(inputs)
+    assert (totals[0].total_low, totals[0].total_high, totals[0].total_unit) == (
+        0.9, 1.125, "litre")
+    text = dose_answer.render(inputs, totals)
+    assert "0,9–1,12 litre" in text
+    assert "900" not in text
 
 
 def test_the_published_dose_survives_the_promotion():
@@ -234,11 +263,17 @@ def test_every_answer_refuses_the_season_total_by_name():
 
 
 def test_a_missing_figure_is_named_not_guessed():
+    """Says what WE hold, not what the manufacturer published: for at least
+    one real product the source page does carry a per-dekar figure for the
+    group asked about that our parser simply could not read - so the message
+    must claim only that we have no readable number, never that none exists."""
     inputs, _ = dose_answer.validate(_raw(group="tarla"))
     text = dose_answer.no_dose_for_group(inputs)
     assert "HİGRO FUBBY" in text
     assert "tarla bitki" in text
-    assert "250" not in text and "1,5" not in text
+    assert "okunabilir" in text or "okuyamadım" in text
+    assert "yayımlanmamış" not in text
+    assert not any(ch.isdigit() for ch in text)
 
 
 def test_a_missing_figure_does_not_point_at_a_figure():

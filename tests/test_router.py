@@ -202,3 +202,31 @@ def test_a_timing_question_is_still_a_plan_not_a_dose():
 
 def test_a_plain_nutrition_question_is_not_a_dose_question():
     assert router.classify_by_rules("Buğday tarlamda nasıl gübreleme yapmalıyım?") == "nutrition"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF nedir?",
+    "HİGRO BARF ne zaman uygulanır?",
+    "BİNGO ürününü domateste kullanabilir miyim?",
+])
+def test_naming_a_product_is_not_asking_its_amount(query):
+    # Naming a product used to hijack the route for any question that
+    # mentions one, including ones with no amount ask at all - a dead end for
+    # a deployed client that cannot draw the card. See routing review
+    # (2026-08-25), finding 1.
+    assert router.classify_by_rules(query) != "product_dose"
+
+
+def test_an_elemental_amount_question_is_not_a_dose_question():
+    # "azot" is an element, not a branded product; converting an elemental
+    # amount into a product mass is out of scope (design spec §10), and
+    # answering it with a card of 40 products is a guess wearing a helpful
+    # shape.
+    assert router.classify_by_rules("Dekara kaç kilo azot gerekir?") != "product_dose"
+
+
+def test_a_named_product_with_a_bare_ne_kadar_is_still_a_dose_question():
+    # No _DOSE_PHRASES hit here - the generic "ne kadar" alongside a named
+    # product must still carry the route.
+    assert router.classify_by_rules(
+        "5 dönümlük tarlama FLY AZOT'tan ne kadar lazım?") == "product_dose"

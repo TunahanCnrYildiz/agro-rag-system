@@ -174,6 +174,16 @@ def test_the_shipped_file_loads_and_carries_products():
     assert len(doses.available_products()) >= 35
 
 
+def test_every_method_the_parser_can_emit_is_readable_by_lookup():
+    """doses._METHODS lists the methods lookup() will read out of the file - a
+    method missing here is silently unreadable: the row is in the file and
+    lookup skips it (see its own module docstring). The analogous pin for
+    dose_answer.METHOD_LABELS already lives in test_dose_answer.py."""
+    from src import dose_parse
+    for method, _pattern in dose_parse._METHODS:
+        assert method in doses._METHODS
+
+
 def test_a_group_nobody_publishes_is_not_answered(tmp_path, monkeypatch):
     """Without this a typo falls through to the unqualified `hepsi` row and the
     caller gets a real figure back for a group it never asked about."""

@@ -57,6 +57,15 @@ ROUTING_CASES = [
     {"query": "Domates için gübreden dekara ne kadar atmalıyım?", "route": "product_dose"},
     {"query": "Bir dönüme kaç kilo gübre gider?", "route": "product_dose"},
 
+    # --- product_dose: naming a product is not asking its amount ------------
+    # Authored 2026-08-25, in response to the whole-branch review. None of the
+    # six cases above names a product in a question that is not about
+    # quantity, so none of them could catch the rule hijacking every message
+    # that merely names a product.
+    {"query": "HİGRO BARF nedir?", "route": "plant_info"},
+    {"query": "HİGRO BARF ne zaman uygulanır?", "route": "plant_info"},
+    {"query": "Dekara kaç kilo azot gerekir?", "route": "nutrition"},
+
     # --- crop_choice: what to plant -----------------------------------------
     {"query": "Bu yıl tarlama ne eksem iyi olur?", "route": "crop_choice"},
     {"query": "Hangi ürünü yetiştirmeliyim?", "route": "crop_choice"},

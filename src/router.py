@@ -80,6 +80,25 @@ _DOSE_PHRASES = ("dekara ne kadar", "dekara kac", "donume ne kadar",
                  "kac litre", "kac kilo", "kac kg", "dozu nedir",
                  "dozu ne kadar", "dozu ne")
 
+# A bare amount ask, generic enough to fire even when none of the phrases above
+# does - but only alongside a named product (see classify_by_rules), never on
+# its own: "ne kadar" and "kaç" are far too common in Turkish to gate a route
+# by themselves. 'kac' is matched by WORD, not stem: folded 'kac' is a
+# left-boundary prefix of 'kaçınmak', 'kaçak' and others that have nothing to
+# do with amount.
+_AMOUNT_PHRASES = ("ne kadar",)
+_AMOUNT_WORDS = ("kac",)
+
+# Fertilizer as a PRODUCT, for the no-product-named half of the dose rule.
+# Deliberately just this one stem, not the wider _PLANT_NUTRITION_STEMS: 'azot',
+# 'fosfor', 'potasyum', 'npk' and 'kompost' are ELEMENTAL/generic terms, and a
+# question like "Dekara kaç kilo azot gerekir?" asks about the element, not a
+# branded product - converting an elemental amount into a product mass is out
+# of scope (design spec, out-of-scope §10) and answering it with a card of 40
+# products would be a guess wearing a helpful shape. See routing review
+# (2026-08-25), finding 1.
+_FERTILIZER_PRODUCT_STEM = ("gubre",)
+
 
 @lru_cache(maxsize=1)
 def _product_pattern():
@@ -128,12 +147,28 @@ def classify_by_rules(message: str) -> Route | None:
             or _has_stem(folded, _BUDGET_PHRASES)):
         return "budget"
 
-    # A named product, or an explicit per-area amount question. Checked after
-    # budget (a price question about a product is still money) and before
-    # fert_plan/nutrition, which would otherwise swallow every "gubre" in it.
-    if _names_a_dose_product(folded) or (
+    # A named product asking an amount, or a fertilizer-as-product amount
+    # question with no product named. Checked after budget (a price question
+    # about a product is still money) and before fert_plan/nutrition, which
+    # would otherwise swallow every "gubre" in it.
+    #
+    # Naming a product is not asking how much of it - "HİGRO BARF nedir?" and
+    # "BİNGO ürününü domateste kullanabilir miyim?" both name a product without
+    # asking an amount, and used to hijack the route for every question that
+    # merely mentions one. So clause A requires an amount signal alongside the
+    # name; because the name is already present, that signal may be generic
+    # (_DOSE_PHRASES, or a bare "ne kadar"/"kaç"), not just the narrow phrases
+    # clause B needs to earn the route on its own. See routing review
+    # (2026-08-25), finding 1.
+    product_named = _names_a_dose_product(folded)
+    if product_named and (
             _has_stem(folded, _DOSE_PHRASES)
-            and _has_stem(folded, _PLANT_NUTRITION_STEMS)):
+            or _has_stem(folded, _AMOUNT_PHRASES)
+            or _has_word(folded, _AMOUNT_WORDS)):
+        return "product_dose"
+    if not product_named and (
+            _has_stem(folded, _DOSE_PHRASES)
+            and _has_stem(folded, _FERTILIZER_PRODUCT_STEM)):
         return "product_dose"
 
     if _has_stem(folded, _CROP_CHOICE_PHRASES):

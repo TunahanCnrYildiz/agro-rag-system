@@ -256,6 +256,16 @@ def _amount(low: float, high: float, unit: str) -> str:
 def no_dose_for_group(inputs: DoseInputs) -> str:
     """Said, not guessed - and it names both halves of the combination.
 
+    A statement about OUR DATA, never about the world: for at least one
+    product (HİGRO FERRY + tarla) the source page does publish a per-dekar
+    figure for the group asked about, but our parser could not read it out of
+    the free-text panel - the earlier wording ("bir doz yayımlanmamış", "a
+    dose has not been published") claimed the manufacturer published nothing,
+    which is simply false for that page. The same lesson this project already
+    learned once about `products.json`'s description field (see the P3 design
+    spec, section 1): a statement about our data had been filed as a
+    statement about the world.
+
     Deliberately prints no figure at all: the temptation this message exists to
     refuse is showing the group next door's number "for reference".
 
@@ -266,9 +276,9 @@ def no_dose_for_group(inputs: DoseInputs) -> str:
     exist.
     """
     return (
-        f"**{inputs.product}** için {GROUP_IN_SENTENCE[inputs.group]} dekara bir "
-        f"doz yayımlanmamış. Bu ürünün sayfasında bu gruba ait bir rakam yok, "
-        f"başka bir grubun rakamını da buraya taşımıyorum."
+        f"**{inputs.product}** için {GROUP_IN_SENTENCE[inputs.group]} elimde "
+        f"okunabilir bir dekar dozu yok. Bu ürünün sayfasında bu grup için bir "
+        f"rakamı okuyamadım, başka bir grubun rakamını da buraya taşımıyorum."
     )
 
 
