@@ -366,9 +366,20 @@ def build(rows, not_field_area=()) -> dict:
         }
 
     refused.sort(key=lambda r: (r["crop"], r["province"], r["year"]))
+    counts: dict[str, int] = {}
+    for cell in refused:
+        counts[cell["reason"]] = counts.get(cell["reason"], 0) + 1
+    for cell in refused:
+        print(f"refused yield cell: {cell['crop']} / {cell['province']} / "
+              f"{cell['year']}: {cell['reason']}", file=sys.stderr)
 
     return {"meta": {"generated": date.today().isoformat(),
-                     "years": years, "sources": SOURCES},
+                     "years": years, "sources": SOURCES,
+                     # The finding travels WITH the file. Without this record
+                     # there is no committed way to tell a province that grows
+                     # none of a crop from one whose figure we threw out.
+                     "refused_yield_cells": {"counts": counts,
+                                             "cells": refused}},
             "crops": crops}
 
 
@@ -382,7 +393,13 @@ def main() -> None:
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
     data = build(rows, not_field_area=review["not_field_area"])
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    record = data["meta"]["refused_yield_cells"]
     print(f"wrote {out}: {len(data['crops'])} crops, years {data['meta']['years']}")
+    if record["counts"]:
+        total = sum(record["counts"].values())
+        print(f"refused {total} yield cell(s), reported here rather than silently:")
+        for reason, n in sorted(record["counts"].items()):
+            print(f"          {reason}: {n}")
 
 
 if __name__ == "__main__":

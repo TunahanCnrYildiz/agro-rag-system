@@ -420,3 +420,49 @@ def test_no_review_means_no_exclusions():
         R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0),
     ]
     assert bcn.build(rows)["crops"]["mantar (kultur)"]["yield_kg_da"]["Ordu"] == [179000.0]
+
+
+def test_a_refusal_is_recorded_in_the_file_with_its_reason():
+    """The finding travels WITH the data: without this there is no committed
+    way to tell "this province grows no quince" from "we threw its figure out"."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["counts"] == {"density_above_ceiling": 1}
+    assert record["cells"] == [{"crop": "Ayva", "province": "Ordu",
+                                "year": 2025, "reason": "density_above_ceiling"}]
+
+
+def test_the_refusal_record_is_empty_when_nothing_was_refused():
+    record = bcn.build(_rows())["meta"]["refused_yield_cells"]
+    assert record == {"counts": {}, "cells": []}
+
+
+def test_refusals_are_sorted_so_the_committed_file_is_stable():
+    """The file must be a reproducible output of the builder; a set-ordered list
+    would diff differently on every run for no reason."""
+    rows = [
+        R("Tokat", "Erik", 2025, "uretim", 500.0),
+        R("Tokat", "Erik", 2025, "alan", 1.0),
+        R("Tokat", "Erik", 2025, "verim_agac", 16.0),
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    cells = bcn.build(rows)["meta"]["refused_yield_cells"]["cells"]
+    assert [c["crop"] for c in cells] == ["Ayva", "Erik"]
+
+
+def test_the_build_names_every_refusal_on_the_console(capsys):
+    """It runs by hand once a year; its job is to fail loudly."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    bcn.build(rows)
+    printed = capsys.readouterr()
+    assert "Ayva" in printed.err and "Ordu" in printed.err
