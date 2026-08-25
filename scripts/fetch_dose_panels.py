@@ -12,6 +12,7 @@ import json
 import time
 from datetime import date
 
+from scripts._console import use_utf8_console
 from src.config import DATA_DIR, PRODUCTS_JSON
 from src.scrape_utils import REQUEST_DELAY_SECONDS, extract_tab_panels, fetch, make_session
 
@@ -20,6 +21,7 @@ DOSE_TAB = "Uygulama"
 
 
 def main() -> None:
+    use_utf8_console()
     products = json.loads(PRODUCTS_JSON.read_text(encoding="utf-8"))
     session = make_session()
     panels: dict[str, str] = {}

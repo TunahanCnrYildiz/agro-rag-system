@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from datetime import date
 
+from scripts._console import use_utf8_console
 from src.config import DATA_DIR
 from src.dose_parse import ALL_GROUPS, GROUP_KEYS, conflicting_slots, parse_panel
 
@@ -95,6 +96,7 @@ def build(panels: dict[str, str], scope: dict[str, list[str]]
 
 
 def main() -> None:
+    use_utf8_console()
     raw = json.loads(RAW.read_text(encoding="utf-8"))
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
     scope = {name: entry["groups"] for name, entry in review["scope"].items()}

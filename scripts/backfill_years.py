@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from scripts._console import use_utf8_console  # noqa: E402
 from src import ingest  # noqa: E402
 from src.config import BOOKS_DIR  # noqa: E402
 
@@ -47,6 +48,7 @@ def _make_year_of(missing: set):
 
 
 def main() -> None:
+    use_utf8_console()
     store = ingest.get_vector_store()
     col = store._collection
     total = col.count()

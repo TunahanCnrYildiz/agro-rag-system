@@ -32,6 +32,7 @@ from collections import namedtuple
 from datetime import date
 from pathlib import Path
 
+from scripts._console import use_utf8_console
 from src.config import DATA_DIR
 from src.context.location import PROVINCES
 from src.engine import _normalize_tr
@@ -273,6 +274,7 @@ def build(rows) -> dict:
 
 
 def main() -> None:
+    use_utf8_console()
     rows = []
     for path in sorted((DATA_DIR / "raw").glob("*.csv")):
         rows.extend(read_export(path))
