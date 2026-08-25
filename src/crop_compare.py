@@ -23,9 +23,11 @@ module lazily, inside the function that uses it, so the cycle is never real.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 
 from src import norms
+from src.budget import FieldError
 from src.engine import _TR_SUFFIXES, _normalize_tr
 
 
@@ -98,3 +100,71 @@ def named_crops(message: str) -> tuple[str, ...]:
 
     order = sorted(earliest_free_start, key=earliest_free_start.__getitem__)
     return tuple(displays[family] for family in order)
+
+
+@dataclass(frozen=True)
+class CompareInputs:
+    """Two crop ids the farmer chose, and the province their figures come from."""
+    first: str
+    second: str
+    province: str | None = None
+
+
+def _known(table) -> dict[str, str]:
+    """crop id -> label, for the crops this province actually carries."""
+    return {row.crop: row.label for row in (table or ())}
+
+
+def validate(raw: object, table) -> tuple[CompareInputs | None, list[FieldError]]:
+    """Read both selections, collect every error. Never raises.
+
+    The ids are checked against the table rather than believed: they arrive
+    from a client, and a crop we hold no row for must become a field error
+    rather than an empty answer with no explanation.
+    """
+    raw = raw if isinstance(raw, dict) else {}
+    known = _known(table)
+    errors: list[FieldError] = []
+    chosen: list[str] = []
+
+    for field, label in (("first", "Birinci ürün"), ("second", "İkinci ürün")):
+        value = raw.get(field)
+        value = value.strip() if isinstance(value, str) else ""
+        if not value:
+            errors.append(FieldError(field, f"{label} seçin."))
+        elif value not in known:
+            errors.append(FieldError(
+                field, f"{label} için bu ilde yayımlanmış bir rakam yok."))
+        else:
+            chosen.append(value)
+
+    if len(chosen) == 2 and chosen[0] == chosen[1]:
+        errors.append(FieldError(
+            "second", "Karşılaştırma için iki farklı ürün seçin."))
+
+    if errors:
+        return None, errors
+    return CompareInputs(first=chosen[0], second=chosen[1]), []
+
+
+def form_spec(errors: list[FieldError], table, submitted: object = None,
+              province: str | None = None) -> dict:
+    """Serialise the card for the client, attaching each error to its field.
+
+    Only ids and labels travel. The budget card ships a province of prefill
+    cells because it prefills two fields from them; this card fills two selects
+    and nothing else, and 246 rows of figures would be dead weight on the wire.
+    """
+    submitted = submitted if isinstance(submitted, dict) else {}
+    by_field = {e.field: e.message for e in errors}
+    first = submitted.get("first")
+    second = submitted.get("second")
+    return {
+        "kind": "crop_compare",
+        "province": province,
+        "crops": [{"id": row.crop, "label": row.label} for row in (table or ())],
+        "first": first if isinstance(first, str) else "",
+        "second": second if isinstance(second, str) else "",
+        "errors": {"first": by_field.get("first"),
+                   "second": by_field.get("second")},
+    }

@@ -128,3 +128,77 @@ def test_a_crop_covered_once_and_free_once_is_still_named():
     occurrence is enough."""
     assert crop_compare.named_crops(
         "Kara buğday mı buğday mı?") == ("Kara Buğday", "Buğday")
+
+
+def _table():
+    return norms.province_table("Konya")
+
+
+def _raw(first="domates (sofralik)", second="biber (salcalik, kapya)"):
+    return {"first": first, "second": second}
+
+
+def test_two_chosen_crops_validate():
+    inputs, errors = crop_compare.validate(_raw(), _table())
+    assert errors == []
+    assert (inputs.first, inputs.second) == (
+        "domates (sofralik)", "biber (salcalik, kapya)")
+
+
+def test_both_crops_are_required():
+    inputs, errors = crop_compare.validate({}, _table())
+    assert inputs is None
+    assert {e.field for e in errors} == {"first", "second"}
+
+
+def test_the_same_crop_twice_is_refused():
+    """A comparison needs two different crops; the same row twice is a form
+    the user filled wrong, not a question we can answer."""
+    inputs, errors = crop_compare.validate(
+        _raw(second="domates (sofralik)"), _table())
+    assert inputs is None
+    assert [e.field for e in errors] == ["second"]
+
+
+def test_a_crop_the_province_does_not_carry_is_a_field_error():
+    inputs, errors = crop_compare.validate(_raw(first="yok bir urun"), _table())
+    assert inputs is None
+    assert [e.field for e in errors] == ["first"]
+
+
+def test_validate_never_raises_on_junk():
+    for junk in (None, [], "domates", {"first": 7, "second": None}):
+        inputs, errors = crop_compare.validate(junk, _table())
+        assert inputs is None and errors
+
+
+def test_a_fresh_card_lists_every_crop_the_province_carries():
+    spec = crop_compare.form_spec([], _table())
+    assert spec["kind"] == "crop_compare"
+    labels = [c["label"] for c in spec["crops"]]
+    assert "Domates (Sofralık)" in labels and "Biber (Salçalık, Kapya)" in labels
+    assert spec["first"] == "" and spec["second"] == ""
+    assert all(v is None for v in spec["errors"].values())
+
+
+def test_the_card_carries_only_ids_and_labels():
+    """The budget card ships a whole province of prefill cells because it
+    prefills; this one only fills two selects, and 246 rows of figures on the
+    wire would be dead weight."""
+    spec = crop_compare.form_spec([], _table())
+    assert all(set(c) == {"id", "label"} for c in spec["crops"])
+
+
+def test_a_rejected_card_echoes_what_was_chosen():
+    raw = _raw(second="domates (sofralik)")
+    _inputs, errors = crop_compare.validate(raw, _table())
+    spec = crop_compare.form_spec(errors, _table(), raw)
+    assert spec["first"] == "domates (sofralik)"
+    assert spec["errors"]["second"]
+
+
+def test_the_card_names_the_province_it_was_built_for():
+    """The farmer has to be able to see which province's figures they are
+    about to be shown - a wrong province is a wrong answer that reads right."""
+    spec = crop_compare.form_spec([], _table(), None, "Konya")
+    assert spec["province"] == "Konya"
