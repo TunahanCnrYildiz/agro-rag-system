@@ -71,6 +71,17 @@ def test_a_product_we_hold_no_dose_for_is_a_field_error():
     assert [e.field for e in errors] == ["product"]
 
 
+def test_the_product_error_claims_only_what_we_hold():
+    """Two of the eight catalog products outside available_products() (HİGRO
+    MATEN, HİGRO MATEN PLUS) do publish a per-dekar figure on their panel that
+    our parser simply could not read - so the message must claim only that we
+    have no readable number, never that the manufacturer published none."""
+    _, errors = dose_answer.validate(_raw(product="YOK BÖYLE BİR ÜRÜN"))
+    text = errors[0].message
+    assert "elimde" in text and "okunabilir" in text
+    assert "yayımlanmamış" not in text
+
+
 def test_an_unknown_group_is_a_field_error():
     inputs, errors = dose_answer.validate(_raw(group="hububat"))
     assert inputs is None

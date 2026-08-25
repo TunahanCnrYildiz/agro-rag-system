@@ -230,3 +230,35 @@ def test_a_named_product_with_a_bare_ne_kadar_is_still_a_dose_question():
     # product must still carry the route.
     assert router.classify_by_rules(
         "5 dönümlük tarlama FLY AZOT'tan ne kadar lazım?") == "product_dose"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF kaç günde bir uygulanır?",
+    "HİGRO BARF ne kadar sürede etki eder?",
+    "HİGRO BARF'ın raf ömrü kaç ay?",
+    "HİGRO BARF kaç lira?",
+    "HİGRO BARF kaç çeşit var?",
+])
+def test_a_named_product_with_a_duration_question_is_not_a_dose_question(query):
+    # A product name plus a bare "kaç" used to be enough on its own - but
+    # "kaç günde", "kaç ay" and "kaç çeşit" ask about timing, shelf life or
+    # variety, never a quantity. Measured 2026-08-25 (post-fix review).
+    assert router.classify_by_rules(query) != "product_dose"
+
+
+def test_a_named_product_with_a_price_question_is_budget_not_dose():
+    # 'fiyat' was missing from _BUDGET_STEMS, so this fell through the money
+    # rule and reached the dose rule on its bare "ne kadar" instead.
+    assert router.classify_by_rules("HİGRO BARF fiyatı ne kadar?") == "budget"
+
+
+@pytest.mark.parametrize("query", [
+    "HİGRO BARF'ı dekara ne miktarda vermeliyim?",
+    "Buğdayda HİGRO BARF kullanım miktarı nedir?",
+    "HİGRO BARF oranı dekara nedir?",
+])
+def test_ne_miktarda_and_orani_are_dose_questions(query):
+    # "ne miktar", "miktarı" and "oranı" are natural Turkish amount words that
+    # were missing from the amount signal, so real dose questions fell through
+    # to the default corpus route. Measured 2026-08-25 (post-fix review).
+    assert router.classify_by_rules(query) == "product_dose"

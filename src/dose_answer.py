@@ -85,7 +85,7 @@ def validate(raw: object) -> tuple[DoseInputs | None, list[FieldError]]:
     elif product not in doses.available_products():
         errors.append(FieldError(
             "product",
-            "Bu ürünün sayfasında dekara doz yayımlanmamış; elimde bir rakam yok."))
+            "Bu ürün için elimde okunabilir bir dekar dozu yok."))
 
     group = raw.get("group")
     if not isinstance(group, str) or group not in _GROUP_IDS:
