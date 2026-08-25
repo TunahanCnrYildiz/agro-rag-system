@@ -276,6 +276,27 @@ def test_a_published_per_dekar_yield_is_never_gated():
     assert out["crops"]["ayva"]["yield_kg_da"]["Ordu"] == [1200.0]
 
 
+def test_the_province_order_does_not_depend_on_the_hash_seed():
+    """MEASURED 2026-08-25, and it predates this branch: build() iterates a SET
+    of provinces, so the key order inside every crop changes from run to run
+    (PYTHONHASHSEED=1 gives Tokat, Karabük, Düzce…; =7 gives Bolu, Mersin,
+    Sinop…). The committed file is supposed to be a reproducible output of the
+    committed builder; with a shuffling key order every regeneration is a
+    whole-file diff, and the one thing a reader needs to see - which cells this
+    gate removed - is buried in it."""
+    rows = [
+        R("Tokat", "Domates", 2025, "uretim", 300.0),
+        R("Tokat", "Domates", 2025, "alan", 100.0),
+        R("Adana", "Domates", 2025, "uretim", 300.0),
+        R("Adana", "Domates", 2025, "alan", 100.0),
+        R("Bolu", "Domates", 2025, "uretim", 300.0),
+        R("Bolu", "Domates", 2025, "alan", 100.0),
+    ]
+    keys = [k for k in bcn.build(rows)["crops"]["domates"]["yield_kg_da"]
+            if k not in ("scope", "TR")]
+    assert keys == ["Adana", "Bolu", "Tokat"]
+
+
 def test_the_verdict_names_which_bound_was_crossed():
     """The report has to say WHY, and the three reasons are not interchangeable:
     two are impossible figures, one is an unjudgeable one."""
@@ -349,6 +370,12 @@ Inside the `for crop_id, by_measure in seen.items():` loop, after the three exis
         # publish one, so the gate below cannot touch them - and must not:
         # their denominator really is the whole crop's sown area.
         per_tree = by_measure.get("verim_agac", {})
+```
+
+Make the province iteration deterministic while you are in this loop — sort it:
+
+```python
+        for province in sorted(set(published) | (set(uretim) & set(alan))):
 ```
 
 Then replace the derivation block inside the year loop with:
