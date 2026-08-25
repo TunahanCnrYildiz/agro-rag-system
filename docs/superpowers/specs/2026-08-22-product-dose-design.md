@@ -1,6 +1,6 @@
 # Product dose (P3): how much of this fertilizer for this field
 
-Status: built (P3a `cafa526`, P3b on `product-dose-route`)
+Status: built (P3a `cafa526`, P3b `14d93fb`)
 Date: 2026-08-22
 Follows: P1 `2026-08-17-budget-form-design.md`, P2 `2026-08-17-numeric-data-layer-design.md`,
 P2b `2026-08-22-budget-prefill-design.md`
@@ -228,5 +228,5 @@ P3a ships nothing user-visible, exactly as P2a did. P3b is where the answer appe
 | P2a | crop norms data layer | done, `b7415a2` |
 | P2b | budget prefill | done, `6b5d831` |
 | P3a | the dose data | done, `cafa526` |
-| **P3b** | **the route and the card** | **done on `product-dose-route`, pending merge** |
+| P3b | the route and the card | done, `14d93fb` |
 | P4 | `crop_choice` naming a crop | needs P2's series; reverses a shipped decision |
