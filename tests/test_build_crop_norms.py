@@ -143,10 +143,21 @@ def test_a_per_tree_yield_is_read_under_its_own_measure():
 
 def test_a_per_tree_yield_never_becomes_a_yield():
     """Written into a per-dekar field an apple would read 80 instead of ~2500 -
-    silently wrong by more than an order of magnitude. Evidence only."""
-    rows = [R("Manisa", "Elma", 2025, "verim_agac", 80.0)]
+    silently wrong by more than an order of magnitude. Evidence only.
+
+    The uretim/alan pair is what makes this test BITE, and it was missing when
+    the test was first written: without a derivable figure to compete with, the
+    assertion held whether or not `published` ever read the per-tree bucket.
+    Here 250 tons over 100 dekars derives 2500 kg/da at an implied 31 trees/da,
+    so the cell is written - and if anything ever taught `published` to read
+    `verim_agac`, this reads 80.0 instead."""
+    rows = [
+        R("Manisa", "Elma", 2025, "verim_agac", 80.0),
+        R("Manisa", "Elma", 2025, "uretim", 250.0),
+        R("Manisa", "Elma", 2025, "alan", 100.0),
+    ]
     out = bcn.build(rows)
-    assert out["crops"]["elma"]["yield_kg_da"] == {"scope": "tr", "TR": [None]}
+    assert out["crops"]["elma"]["yield_kg_da"]["Manisa"] == [2500.0]
 
 
 def test_a_per_dekar_verim_is_still_read_as_a_yield():
