@@ -270,8 +270,16 @@ def test_a_shared_entrys_from_typo_is_blamed_on_the_review_not_the_page():
     but it ships no 'hububat' row - the panel changed under the review" -
     blaming the manufacturer's page for a typo that lives entirely in our own
     review file. The `from` value must be checked against GROUP_KEYS, same as
-    `also`, before the "ships no such row" check runs."""
-    with pytest.raises(ValueError, match="hububat"):
+    `also`, before the "ships no such row" check runs.
+
+    match="hububat" alone does not pin this: the typo value appears in BOTH
+    the old wrong-blame message and the new correct one, so that regex passed
+    against either. Disabling the GROUP_KEYS check confirms it - the very next
+    check ("source not in rows") also fails to find 'hububat' as a key and
+    raises its own message, which still contains the substring 'hububat'
+    since it quotes the same value. The match has to land on wording that only
+    the new, correct guard produces."""
+    with pytest.raises(ValueError, match="not a group we publish"):
         build(SHARED_PANEL, {}, _shared(**{"from": "hububat"}))
 
 
