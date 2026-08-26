@@ -136,7 +136,7 @@ crop's mean it invites being read as a ranking, which is precisely why the secon
 | --- | --- |
 | Fewer than two crops selected | A field error naming which select is empty |
 | The same crop selected twice | A field error: a comparison needs two different crops |
-| No province resolved | The card still serves; the answer says it needs the province and asks, as `fert_plan` does |
+| No province resolved | **No card at all** — the route asks which province and stops. Corrected 2026-08-26 against the implementation, which is the safer of the two: a card served without a province lets the farmer pick two crops, submit, fail province resolution again on the same resent message, and lose both picks with nothing to retry |
 | A crop has no yield for that province | That crop's row shows the missing half by name, and no revenue |
 | A crop has no latest-year price | Same, naming the price as the missing half |
 | `crop_norms.json` missing or malformed | Empty table; the route says it has no figures. Never an exception |
