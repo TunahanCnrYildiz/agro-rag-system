@@ -1,6 +1,6 @@
 # One published figure, two crop groups: the reviewed shared row
 
-Status: proposed
+Status: done, `8cc4ace`
 Date: 2026-08-26
 Follows: P3a `2026-08-22-product-dose-design.md`, and the reviewed-scope pattern it established
 Scope: **one product, one group, one figure.** Measured, not assumed — see §1.
@@ -133,4 +133,4 @@ Everything is `pytest`, no network.
 | --- | --- | --- |
 | P3a | product dose data | done, `cafa526` |
 | P3b | the dose route and card | done, `14d93fb` |
-| **this** | **the reviewed shared row** | **proposed** |
+| **this** | **the reviewed shared row** | **done, `8cc4ace`** |
