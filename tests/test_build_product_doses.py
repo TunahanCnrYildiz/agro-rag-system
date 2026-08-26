@@ -60,13 +60,18 @@ def test_every_row_has_low_no_greater_than_high():
 def test_the_shipped_file_is_what_the_converter_produces():
     """Re-run the committed converter over the committed raw panels and diff
     against the committed output. This is the check that proves the data file
-    was generated, not hand-edited - the one P2a's final review ran by hand."""
+    was generated, not hand-edited - the one P2a's final review ran by hand.
+
+    It must build the way main() builds, INCLUDING the reviewed shared rows:
+    rebuilding without them would compare the shipped file against a table the
+    shipping code never produces, and pass only by accident."""
     from src.config import DATA_DIR
     raw = json.loads((DATA_DIR / "raw" / "product_panels.json").read_text(encoding="utf-8"))
     review = json.loads((DATA_DIR / "dose_group_scope.json").read_text(encoding="utf-8"))
     shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
     scope = {n: e["groups"] for n, e in review["scope"].items()}
-    rebuilt, _, _, rebuilt_scope = build(raw["panels"], scope)
+    rebuilt, _, _, rebuilt_scope = build(raw["panels"], scope,
+                                         review.get("shared_rows", {}))
     assert rebuilt == shipped["products"]
     assert rebuilt_scope == shipped["all_groups_scope"]
 
@@ -227,3 +232,53 @@ def test_no_shared_section_changes_nothing():
     """The default must be inert: an omitted argument may not copy anything."""
     plain, _u, _d, _s = build(SHARED_PANEL, {})
     assert "tarla" not in plain["PAYLAŞAN ÜRÜN"]
+
+
+def test_the_shipped_file_gives_ferry_its_field_crop_figure():
+    """The whole point, on the real data: the page publishes 1-2 litre for
+    field crops and vegetables in one sentence, and a field grower now gets it."""
+    from src import doses
+    found = doses.lookup("HİGRO FERRY", "tarla")
+    assert len(found) == 1
+    assert (found[0].low, found[0].high, found[0].unit, found[0].method) == (
+        1.0, 2.0, "litre", "toprak")
+
+
+def test_ferrys_other_groups_did_not_move():
+    """A copy onto one group must not disturb the two that were already right."""
+    from src import doses
+    sebze = doses.lookup("HİGRO FERRY", "sebze")
+    meyve = doses.lookup("HİGRO FERRY", "meyve")
+    assert len(sebze) == 1 and (sebze[0].low, sebze[0].high, sebze[0].unit,
+                                sebze[0].method) == (1.0, 2.0, "litre", "toprak")
+    assert len(meyve) == 1 and (meyve[0].low, meyve[0].high, meyve[0].unit,
+                                meyve[0].method) == (2.0, 3.0, "litre", "yaprak")
+
+
+def test_the_shipped_file_records_which_rows_were_copied():
+    """A reader diffing the file must be able to tell a copied row from one the
+    page published under its own heading."""
+    from src.config import DATA_DIR
+    shipped = json.loads((DATA_DIR / "product_doses.json").read_text(encoding="utf-8"))
+    assert shipped["meta"]["shared_rows"] == {
+        "HİGRO FERRY": {"from": "sebze", "also": ["tarla"]}}
+
+
+def test_a_shared_entrys_from_typo_is_blamed_on_the_review_not_the_page():
+    """Before this fix, a typo like "from": "hububat" fell through the
+    GROUP_KEYS-blind lookup and raised "reviewed to share its 'hububat' row,
+    but it ships no 'hububat' row - the panel changed under the review" -
+    blaming the manufacturer's page for a typo that lives entirely in our own
+    review file. The `from` value must be checked against GROUP_KEYS, same as
+    `also`, before the "ships no such row" check runs."""
+    with pytest.raises(ValueError, match="hububat"):
+        build(SHARED_PANEL, {}, _shared(**{"from": "hububat"}))
+
+
+def test_a_shared_entry_missing_a_key_raises_a_clean_error():
+    """entry["from"], entry["also"] and entry["expect_methods"] used to be read
+    with [], so a hand-edit that dropped a key raised a bare KeyError instead
+    of a ValueError naming the product and the missing key."""
+    entry = {"from": "sebze", "also": ["tarla"]}
+    with pytest.raises(ValueError, match="PAYLAŞAN ÜRÜN"):
+        build(SHARED_PANEL, {}, {"PAYLAŞAN ÜRÜN": entry})

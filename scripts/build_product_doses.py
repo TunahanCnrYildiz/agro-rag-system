@@ -110,7 +110,15 @@ def build(panels: dict[str, str], scope: dict[str, list[str]],
                 f"data/dose_group_scope.json shares a row for {name!r}, which "
                 f"ships no dose at all - a review of nothing, sitting in the "
                 f"file looking like coverage")
+        for key in ("from", "also", "expect_methods"):
+            if key not in entry:
+                raise ValueError(
+                    f"{name}: its shared_rows entry is missing {key!r} - a "
+                    f"hand-edit dropped a key the build needs")
         source = entry["from"]
+        if source not in GROUP_KEYS:
+            raise ValueError(f"{name}: reviewed to share from {source!r}, which "
+                             f"is not a group we publish (known: {list(GROUP_KEYS)})")
         if source not in rows:
             raise ValueError(
                 f"{name}: reviewed to share its {source!r} row, but it ships no "
