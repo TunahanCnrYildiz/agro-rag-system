@@ -157,3 +157,73 @@ def test_the_shipped_scope_covers_every_shipped_hepsi_row():
     unqualified = {n for n, groups in shipped["products"].items() if "hepsi" in groups}
     assert unqualified == set(shipped["all_groups_scope"]), unqualified
     assert unqualified == {"FLY AZOT", "HIGRO 8 MN"}
+
+
+SHARED_PANEL = {
+    "PAYLAŞAN ÜRÜN": "Topraktan : Tek yıllık tarla ve endüstri bitkileri ile "
+                     "sebzelerde 1000m² alana 1-2 litre uygulanır.",
+}
+
+
+def _shared(**overrides):
+    entry = {"from": "sebze", "also": ["tarla"], "expect_methods": ["toprak"]}
+    entry.update(overrides)
+    return {"PAYLAŞAN ÜRÜN": entry}
+
+
+def test_a_reviewed_shared_row_reaches_the_other_group():
+    """The page counts field crops and vegetables in one sentence, but only
+    'sebzelerde' opens a segment. The reviewed copy is what gives a field
+    grower the figure the manufacturer already published for them."""
+    table, _unparsed, _dropped, _scope = build(SHARED_PANEL, {}, _shared())
+    rows = table["PAYLAŞAN ÜRÜN"]
+    assert rows["tarla"] == rows["sebze"]
+    assert rows["tarla"]["toprak"] == {"low": 1.0, "high": 2.0, "unit": "litre"}
+
+
+def test_the_copied_row_is_not_the_same_object_as_its_source():
+    """Sharing one dict between two groups means a later edit to one silently
+    edits the other."""
+    table, _u, _d, _s = build(SHARED_PANEL, {}, _shared())
+    rows = table["PAYLAŞAN ÜRÜN"]
+    assert rows["tarla"] is not rows["sebze"]
+    assert rows["tarla"]["toprak"] is not rows["sebze"]["toprak"]
+
+
+def test_a_source_group_that_grew_a_method_stops_the_build():
+    """THE GUARD THAT MAKES THE REVIEW MEAN SOMETHING. A person approved this
+    copy on the strength of ONE published sentence. If the page later gives
+    that group a second figure, the copy must not silently widen - the build
+    stops and a human re-reads."""
+    with pytest.raises(ValueError, match="expect_methods"):
+        build(SHARED_PANEL, {}, _shared(expect_methods=["damlama"]))
+
+
+def test_a_shared_entry_for_a_product_that_does_not_ship_stops_the_build():
+    with pytest.raises(ValueError, match="YOK ÜRÜN"):
+        build(SHARED_PANEL, {}, {"YOK ÜRÜN": {"from": "sebze", "also": ["tarla"],
+                                              "expect_methods": ["toprak"]}})
+
+
+def test_a_shared_entry_whose_source_group_is_missing_stops_the_build():
+    with pytest.raises(ValueError, match="meyve"):
+        build(SHARED_PANEL, {}, _shared(**{"from": "meyve"}))
+
+
+def test_a_shared_entry_targeting_a_group_that_already_ships_stops_the_build():
+    """If the parser ever learns to read the coordination itself, this override
+    becomes redundant and must SAY SO rather than overwrite a row the page
+    published under its own heading."""
+    with pytest.raises(ValueError, match="sebze"):
+        build(SHARED_PANEL, {}, _shared(also=["sebze"]))
+
+
+def test_a_shared_entry_naming_an_unknown_group_stops_the_build():
+    with pytest.raises(ValueError, match="hububat"):
+        build(SHARED_PANEL, {}, _shared(also=["hububat"]))
+
+
+def test_no_shared_section_changes_nothing():
+    """The default must be inert: an omitted argument may not copy anything."""
+    plain, _u, _d, _s = build(SHARED_PANEL, {})
+    assert "tarla" not in plain["PAYLAŞAN ÜRÜN"]
