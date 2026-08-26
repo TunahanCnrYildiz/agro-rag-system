@@ -1,6 +1,6 @@
 # P4 — crop comparison: the two crops the farmer already narrowed to
 
-Status: proposed
+Status: done, `177f907`
 Date: 2026-08-26
 Follows: P2a `2026-08-17-numeric-data-layer-design.md`, P2b `2026-08-22-budget-prefill-design.md`,
 P3 `2026-08-22-product-dose-design.md`, the fruit yield gate `2026-08-25-fruit-yield-gate-design.md`
@@ -179,4 +179,4 @@ no model call, so a case there would read green while asserting nothing.
 | P2b | budget prefill | done, `6b5d831` |
 | P3 | product dose | done, `14d93fb` |
 | — | fruit yield gate | done, `16445fc` |
-| **P4** | **this spec** | **proposed** |
+| **P4** | **this spec** | **done, `177f907`** |
