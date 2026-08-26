@@ -27,7 +27,8 @@ OUT = DATA_DIR / "product_doses.json"
 REVIEW = DATA_DIR / "dose_group_scope.json"
 
 
-def build(panels: dict[str, str], scope: dict[str, list[str]]
+def build(panels: dict[str, str], scope: dict[str, list[str]],
+          shared: dict | None = None
           ) -> tuple[dict, list[str], dict, dict]:
     """(table, unparsed names, dropped slots by product, resolved scope). Pure -
     no file access, so it is testable.
@@ -43,6 +44,16 @@ def build(panels: dict[str, str], scope: dict[str, list[str]]
     An unreviewed `hepsi` row RAISES rather than shipping, because the shipped
     behaviour of an unscoped row would be "answers every group" - a guess, in
     the one place this project has decided never to guess.
+
+    `shared` is the second REVIEWED answer to the same kind of question: a
+    page that publishes ONE figure for TWO groups in one sentence. HIGRO
+    FERRY writes "Tek yillik tarla ve endustri bitkileri ILE sebzelerde ...
+    1-2 litre", and _segments opens a segment on "sebzelerde" only, so field
+    growers get nothing for a figure the maker published for them. Widening
+    the `tarla` pattern to span intervening words was measured and refused -
+    it swallows FERFORCE's "Tarla sebzelerinde", a VEGETABLE sub-case - so
+    the coverage is recorded by a person instead, with the sentence quoted.
+    Measured 2026-08-26: exactly one of the 48 panels loses a group this way.
     """
     table: dict = {}
     unparsed: list[str] = []
@@ -92,6 +103,53 @@ def build(panels: dict[str, str], scope: dict[str, list[str]]
         if unknown:
             raise ValueError(f"{name}: reviewed for {unknown}, which is not a "
                              f"group we publish (known: {list(GROUP_KEYS)})")
+    for name, entry in (shared or {}).items():
+        rows = table.get(name)
+        if rows is None:
+            raise ValueError(
+                f"data/dose_group_scope.json shares a row for {name!r}, which "
+                f"ships no dose at all - a review of nothing, sitting in the "
+                f"file looking like coverage")
+        for key in ("from", "also", "expect_methods"):
+            if key not in entry:
+                raise ValueError(
+                    f"{name}: its shared_rows entry is missing {key!r} - a "
+                    f"hand-edit dropped a key the build needs")
+        source = entry["from"]
+        if source not in GROUP_KEYS:
+            raise ValueError(f"{name}: reviewed to share from {source!r}, which "
+                             f"is not a group we publish (known: {list(GROUP_KEYS)})")
+        if source not in rows:
+            raise ValueError(
+                f"{name}: reviewed to share its {source!r} row, but it ships no "
+                f"{source!r} row - the panel changed under the review")
+        # THE GUARD THAT MAKES THE REVIEW MEAN SOMETHING. A person approved this
+        # copy on the strength of one published sentence, and recorded which
+        # methods that sentence produced. If the page later gives the source
+        # group another figure, copying it too would widen a row nobody
+        # approved - so the build stops and a human re-reads the panel.
+        found, expected = sorted(rows[source]), sorted(entry["expect_methods"])
+        if found != expected:
+            raise ValueError(
+                f"{name}: its {source!r} row now carries {found}, but the review "
+                f"in data/dose_group_scope.json recorded expect_methods "
+                f"{expected}. Re-read the panel and update the entry rather "
+                f"than shipping a copy nobody approved")
+        for group in entry["also"]:
+            if group not in GROUP_KEYS:
+                raise ValueError(
+                    f"{name}: shared to {group!r}, which is not a group we "
+                    f"publish (known: {list(GROUP_KEYS)})")
+            if group in rows:
+                raise ValueError(
+                    f"{name}: shared to {group!r}, which already ships its own "
+                    f"row. If the parser learned to read this page itself, the "
+                    f"entry is redundant - delete it rather than overwrite a "
+                    f"published row")
+            # A fresh dict per method: two groups sharing one mapping means a
+            # later edit to either silently edits both.
+            rows[group] = {method: dict(dose)
+                           for method, dose in rows[source].items()}
     return table, unparsed, dropped, {n: list(g) for n, g in scope.items()}
 
 
@@ -100,7 +158,8 @@ def main() -> None:
     raw = json.loads(RAW.read_text(encoding="utf-8"))
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
     scope = {name: entry["groups"] for name, entry in review["scope"].items()}
-    table, unparsed, conflicts, resolved = build(raw["panels"], scope)
+    shared = review.get("shared_rows", {})
+    table, unparsed, conflicts, resolved = build(raw["panels"], scope, shared)
 
     OUT.write_text(json.dumps(
         # Both findings travel WITH the file, not only to the console. Task 2
@@ -115,7 +174,13 @@ def main() -> None:
                   "products_with_a_dose": len(table),
                   "products_read": len(raw["panels"]),
                   "unparsed": unparsed,
-                  "dropped_slots": conflicts},
+                  "dropped_slots": conflicts,
+                  # Which rows were COPIED by review rather than published
+                  # under their own heading. Without this a reader diffing the
+                  # file cannot tell the two apart.
+                  "shared_rows": {name: {"from": e["from"], "also": list(e["also"])}
+                                  for name, e in shared.items()},
+                  },
          "products": table,
          "all_groups_scope": resolved},
         ensure_ascii=False, indent=1), encoding="utf-8")
@@ -135,6 +200,10 @@ def main() -> None:
         print(f"[doses] {len(resolved)} unqualified row(s) answer only their reviewed groups:")
         for name, groups in resolved.items():
             print(f"          {name}: {', '.join(groups)}")
+    if shared:
+        print(f"[doses] {len(shared)} reviewed shared row(s):")
+        for name, entry in shared.items():
+            print(f"          {name}: {entry['from']} -> {', '.join(entry['also'])}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-08-25",
+  "generated": "2026-08-26",
   "source": {
    "fetched": "2026-08-22",
    "source": "ekolojiktarim.com.tr product pages, Uygulama tab",
@@ -38,6 +38,14 @@
      "damlama"
     ]
    ]
+  },
+  "shared_rows": {
+   "HİGRO FERRY": {
+    "from": "sebze",
+    "also": [
+     "tarla"
+    ]
+   }
   }
  },
  "products": {
@@ -592,6 +600,13 @@
     "yaprak": {
      "low": 2.0,
      "high": 3.0,
+     "unit": "litre"
+    }
+   },
+   "tarla": {
+    "toprak": {
+     "low": 1.0,
+     "high": 2.0,
      "unit": "litre"
     }
    }

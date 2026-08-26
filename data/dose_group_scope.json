@@ -13,5 +13,13 @@
    "groups": ["sebze", "meyve", "tarla"],
    "evidence": "Panel hiçbir bitki adı vermiyor: 'DAMLAMA SULAMA: Mangan eksikliğinde bir dekara (1.000 m²) 2 – 2,5 litre dozunda'. Rakam bir gruba bağlı değil."
   }
+ },
+ "shared_rows": {
+  "HİGRO FERRY": {
+   "from": "sebze",
+   "also": ["tarla"],
+   "expect_methods": ["toprak"],
+   "evidence": "Panel iki kez 'Tek yıllık tarla ve endüstri bitkileri ile sebzelerde ... 1000m² alana 1-2 litre' diyor. Cümle iki grubu birlikte sayıyor; dose_parse._segments yalnızca 'sebzelerde' üzerinden segment açtığı için tarla figürsüz kalıyor. Ölçüldü 2026-08-26: 48 panelin yalnızca bu birinde bir grup bu şekilde kayboluyor."
+  }
  }
 }
