@@ -133,11 +133,31 @@ export interface DoseFormSpec {
   errors: { product: string | null; group: string | null; area: string | null };
 }
 
+export interface ComparePayload {
+  first?: string;
+  second?: string;
+}
+
+export interface CompareCrop {
+  id: string;
+  label: string;
+}
+
+export interface CompareFormSpec {
+  kind: "crop_compare";
+  province: string | null;
+  crops: CompareCrop[];
+  first: string;
+  second: string;
+  errors: { first: string | null; second: string | null };
+}
+
 export interface ChatStreamHandlers {
   onToken: (content: string) => void;
   onProducts: (products: RecommendedProduct[]) => void;
   onForm?: (form: FormSpec) => void;
   onDoseForm?: (form: DoseFormSpec) => void;
+  onCompareForm?: (form: CompareFormSpec) => void;
   onDone: () => void;
   onError: (err: Error) => void;
 }
@@ -149,7 +169,8 @@ export function sendChatMessageStream(
   history: ChatTurn[],
   handlers: ChatStreamHandlers,
   budget?: BudgetPayload,
-  dose?: DosePayload
+  dose?: DosePayload,
+  compare?: ComparePayload
 ): void {
   const xhr = new XMLHttpRequest();
   let processedEvents = 0;
@@ -174,6 +195,8 @@ export function sendChatMessageStream(
         handlers.onForm?.(evt.form);
       } else if (evt.type === "dose_form") {
         handlers.onDoseForm?.(evt.form);
+      } else if (evt.type === "compare_form") {
+        handlers.onCompareForm?.(evt.form);
       }
     }
     processedEvents = complete.length;
@@ -191,7 +214,7 @@ export function sendChatMessageStream(
     }
   };
   xhr.onerror = () => handlers.onError(new Error("Network error"));
-  xhr.send(JSON.stringify({ message, history, stream: true, budget, dose }));
+  xhr.send(JSON.stringify({ message, history, stream: true, budget, dose, compare }));
 }
 
 export interface CatalogProduct {

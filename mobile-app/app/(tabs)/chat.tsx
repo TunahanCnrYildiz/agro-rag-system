@@ -22,6 +22,8 @@ import { clearChat, loadChat, recentWithinBudget, saveChat } from "../../src/cha
 import {
   BudgetPayload,
   ChatTurn,
+  ComparePayload,
+  CompareFormSpec,
   DosePayload,
   DoseFormSpec,
   FormSpec,
@@ -30,6 +32,7 @@ import {
 } from "../../src/api";
 import BudgetCard from "../../src/BudgetCard";
 import DoseCard from "../../src/DoseCard";
+import CompareCard from "../../src/CompareCard";
 
 interface Message {
   id: string;
@@ -38,6 +41,7 @@ interface Message {
   products?: RecommendedProduct[];
   form?: FormSpec;
   doseForm?: DoseFormSpec;
+  compareForm?: CompareFormSpec;
   // The question this form was a reply to. Turn 2 resends it so history stays
   // coherent and the router still classifies the turn the same way.
   question?: string;
@@ -103,7 +107,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!restored) return;
     saveChat({
-      messages: messages.map(({ form, doseForm, ...rest }) => rest) as never,
+      messages: messages.map(({ form, doseForm, compareForm, ...rest }) => rest) as never,
       history: historyRef.current,
     });
   }, [messages, restored]);
@@ -129,7 +133,8 @@ export default function ChatScreen() {
   // The network half, shared by a typed message and a submitted budget form.
   // The caller owns the user bubble: a form turn shows the values entered, not
   // the question repeated.
-  function sendTurn(text: string, budget?: BudgetPayload, dose?: DosePayload) {
+  function sendTurn(text: string, budget?: BudgetPayload, dose?: DosePayload,
+                    compare?: ComparePayload) {
     // Prior turns only - the current message is sent separately as `text`,
     // so it must not also be the last entry in the history we send.
     //
@@ -194,6 +199,11 @@ export default function ChatScreen() {
           prev.map((m) => (m.id === botId ? { ...m, doseForm, question: text } : m))
         );
       },
+      onCompareForm: (compareForm) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, compareForm, question: text } : m))
+        );
+      },
       onDone: () => {
         historyRef.current.push({ role: "user", content: text });
         historyRef.current.push({ role: "assistant", content: accumulated });
@@ -214,7 +224,7 @@ export default function ChatScreen() {
         setStreamingId(null);
         scrollToEnd();
       },
-    }, budget, dose);
+    }, budget, dose, compare);
   }
 
   return (
@@ -307,6 +317,22 @@ export default function ChatScreen() {
                       { id: newId(), role: "user", text: summary },
                     ]);
                     sendTurn(m.question ?? summary, undefined, payload);
+                  }}
+                />
+              )}
+              {m.compareForm && (
+                <CompareCard
+                  form={m.compareForm}
+                  disabled={loading}
+                  onSubmit={(payload, summary) => {
+                    if (loading) return;
+                    setMessages((prev) => [
+                      ...prev.map((x) =>
+                        x.id === m.id ? { ...x, compareForm: undefined } : x
+                      ),
+                      { id: newId(), role: "user", text: summary },
+                    ]);
+                    sendTurn(m.question ?? summary, undefined, undefined, payload);
                   }}
                 />
               )}
