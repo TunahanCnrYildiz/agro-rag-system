@@ -450,6 +450,106 @@ def test_the_shadow_falls_backwards_only():
     assert out["crops"]["turunc"]["yield_kg_da"]["Adana"] == [None, 23098.0]
 
 
+def _spread(crop, densities, tons=100.0, per_tree=25.0, first=0):
+    """One cell per province, each at a chosen implied density.
+
+    A UNIFORM fixture cannot test a crop-level rule: if every cell is above the
+    ceiling the per-cell gate already removes them all and the crop rule is
+    invisible. So the densities are spread, and the cases below check the cells
+    that survive the CELL gate.
+    """
+    from src.context.location import PROVINCES
+    trees = tons * 1000.0 / per_tree
+    out = []
+    for province, per_da in zip(list(PROVINCES)[first:], densities):
+        out += [R(province, crop, 2025, "uretim", tons),
+                R(province, crop, 2025, "alan", trees / per_da),
+                R(province, crop, 2025, "verim_agac", per_tree)]
+    return out
+
+
+# Median 650, and FOUR cells sit under the 444 cell gate, so they survive it and
+# only a crop-level rule can reach them.
+_MEDIAN_ABOVE = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200]
+
+
+def _provinces_served(out, crop_id):
+    return [k for k in out["crops"][crop_id]["yield_kg_da"]
+            if k not in ("scope", bcn.NATIONAL)]
+
+
+def test_the_cell_gate_alone_leaves_the_sound_looking_cells_standing():
+    """Pins WHY the crop-level rule is needed: four of these twelve cells clear
+    the 444 cell gate untouched, and they are cells of a crop whose median
+    province cannot hold its trees."""
+    out = bcn.build(_spread("Kızılcık", [100, 200, 300, 400]))
+    assert len(_provinces_served(out, "kizilcik")) == 4
+
+
+def test_a_crop_whose_median_province_cannot_hold_its_trees_yields_nothing():
+    """THE CEILING ONE LEVEL UP. The per-cell gate asks whether THIS province's
+    area can hold its trees. When the MEDIAN province cannot, the answer is not
+    about a province at all - the crop's `Toplu Meyveliklerin Alani` does not
+    describe how it is grown anywhere, and the cells that happen to fall under
+    the bound are not sounder than the rest.
+
+    Measured on the real exports: kizilcik's median province implies 837
+    trees/da (1,2 m2 per tree) and igde's 727 (1,4 m2) - both past the same
+    geometric bound `_MAX_TREES_PER_DA` already rests on. Their served yields
+    read 12.312 and 11.571 kg/da, which no cornelian cherry or oleaster
+    produces. This adds NO new constant: it is the 444 argument applied to the
+    crop instead of the cell.
+    """
+    out = bcn.build(_spread("Kızılcık", _MEDIAN_ABOVE))
+    assert _provinces_served(out, "kizilcik") == []
+
+
+def test_a_crop_refused_whole_still_keeps_its_prices():
+    """The same split the reviewed `not_field_area` crops get: a price is a
+    price even where the area column is meaningless."""
+    rows = _spread("Kızılcık", _MEDIAN_ABOVE)
+    rows += [R("Adana", "Kızılcık", 2025, "fiyat", 31.5)]
+    out = bcn.build(rows)
+    assert out["crops"]["kizilcik"]["price_tl_kg"]["Adana"] == [31.5]
+
+
+def test_the_whole_crop_refusal_is_recorded_once_not_per_cell():
+    record = bcn.build(_spread("Kızılcık", _MEDIAN_ABOVE))["meta"]["refused_yield_cells"]
+    assert record["counts"]["crop_median_density_above_ceiling"] == 1
+    assert {"crop": "Kızılcık", "province": "*", "year": 0,
+            "reason": "crop_median_density_above_ceiling"} in record["cells"]
+
+
+def test_a_crop_recorded_in_too_few_provinces_is_not_judged_as_a_crop():
+    """A median over one or two provincial administrations describes THEM, not
+    the crop, so it cannot carry a statement about how the crop is recorded
+    nationally. Turunç is the real case that sits just outside: median 2.480
+    trees/da but only 2 provinces record it, and its bad cells are already
+    removed by the per-cell gate and the ceiling shadow.
+
+    The cut is insensitive rather than tuned - the above-ceiling crops rest on
+    29, 18 and 2 provinces, so every minimum from 3 to 18 selects the same two.
+    """
+    out = bcn.build(_spread("Turunç", [300, 5000]))
+    reasons = {c["reason"]
+               for c in out["meta"]["refused_yield_cells"]["cells"]}
+    assert "crop_median_density_above_ceiling" not in reasons
+    # the sound-looking cell is left to the cell gate, which keeps it
+    assert _provinces_served(out, "turunc") == [list(__import__(
+        "src.context.location", fromlist=["PROVINCES"]).PROVINCES)[0]]
+
+
+def test_a_sound_crop_with_a_few_bad_provinces_survives_whole():
+    """THE MISTAKE THIS RULE MUST NOT MAKE. Apple is recorded properly nearly
+    everywhere; a handful of scattered-tree provinces must cost those cells,
+    never the crop. The median is used precisely because it does not move when
+    a few cells are wild."""
+    rows = _spread("Elma (Golden)", [30, 32, 34, 36, 38, 40, 42, 44, 46, 48])
+    rows += _spread("Elma (Golden)", [3000, 4000], first=10)
+    out = bcn.build(rows)
+    assert len(_provinces_served(out, "elma (golden)")) == 10
+
+
 def test_a_vegetable_is_never_gated():
     """THE MOST DANGEROUS MISTAKE THIS GATE CAN MAKE. Vegetables publish no
     per-tree yield anywhere, and their denominator - Ekilen Alan - really is the
