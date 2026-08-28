@@ -726,39 +726,30 @@ In `_crop_rows`, replace the `"yield": _norm_cell(...)` entry:
         })
 ```
 
-Replace `_VERIFIED` and the loop head in `_verify`. The yield entry can no
-longer name its measure up front, so it is resolved per row:
+Replace `_VERIFIED` so each entry carries its own cell builder. The yield's
+builder depends on the ROW (see `_yield_cell`) while the price's does not, and a
+table of builders keeps that difference inside the table instead of forking the
+loop into two copies of the same eight lines:
 
 ```python
-# Which submitted field each norm measure prefills, and how that cell is built.
-# The yield entry carries no measure name: which one a row was served from is a
-# property of the ROW, not of the field - see _yield_cell.
-_VERIFIED = (("price", "price_tl_kg", "price", 2),)
+# Which submitted field each norm claim is checked against, and how that cell is
+# built. The yield's builder takes the ROW because which measure a row was served
+# from is a property of the row, not of the field - see _yield_cell.
+_VERIFIED = (
+    ("yield_total", lambda row: _yield_cell(row)[0]),
+    ("price", lambda row: _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2,
+                                     show_range=False)),
+)
 ```
 
-and inside `_verify`, replace the `for field_id, measure, unit_key, decimals in _VERIFIED:`
-loop with:
+and in `_verify`, the loop keeps its shape - only the cell line changes:
 
 ```python
-    # The yield first, because its measure depends on the row.
-    value = values.get("yield_total")
-    if value is not None and value.source == "norm":
-        cell = None if row is None else _yield_cell(row)[0]
-        entry = raw.get("yield_total") or {}
-        if (cell is not None
-                and entry.get("value") == cell["value"]
-                and entry.get("unit") == cell["unit"]):
-            values["yield_total"] = Value(value.amount, "norm", cell["note"])
-        else:
-            values["yield_total"] = Value(value.amount, "user")
-
-    for field_id, measure, unit_key, decimals in _VERIFIED:
+    for field_id, build in _VERIFIED:
         value = values.get(field_id)
         if value is None or value.source != "norm":
             continue
-        cell = (None if row is None
-                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals,
-                                 show_range=False))
+        cell = None if row is None else build(row)
         entry = raw.get(field_id) or {}
         if (cell is not None
                 and entry.get("value") == cell["value"]
@@ -920,7 +911,8 @@ carries the actual command and its expected output. No TBD, no "handle edge
 cases", no "similar to Task N".
 
 **Type consistency:** `_yield_cell(row) -> tuple[dict | None, str]` is defined
-in Task 4 and used only there (`_crop_rows` takes `[0]`, `_verify` takes `[0]`).
+in Task 4 and used only there (`_crop_rows` takes `[0]`, and `_VERIFIED`'s
+yield builder takes `[0]`).
 `_read`'s fourth parameter is named `trees` in both its definition (Task 3) and
 its call sites. `CropNorm.yield_kg_tree` is named identically in Tasks 2, 4 and
 5. `_NORM_UNITS["yield_tree"]` is defined in Task 4 before its only use.
