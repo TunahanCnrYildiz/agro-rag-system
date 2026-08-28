@@ -40,6 +40,78 @@ def test_a_valid_file_loads(tmp_path, monkeypatch):
     assert "domates" in data["crops"]
 
 
+TREE = {
+    "meta": {
+        "generated": "2026-08-28",
+        "years": [2023, 2024, 2025],
+        "sources": {"yield": {"name": "TUIK"}, "price": {"name": "TUIK"}},
+    },
+    "crops": {
+        "bugday": {
+            "label": "Buğday",
+            "yield_kg_da": {"scope": "il", "Ordu": [369, 344, 322],
+                            "TR": [None, None, None]},
+            "price_tl_kg": {"scope": "tr", "TR": [6.05, 9.40, 12.40]},
+        },
+        "ayva": {
+            "label": "Ayva",
+            "yield_kg_da": {"scope": "il", "Ordu": [None, None, None],
+                            "TR": [None, None, None]},
+            "price_tl_kg": {"scope": "il", "Ordu": [11.0, 14.0, 19.0],
+                            "TR": [None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Ordu": [25, 27, 31],
+                              "TR": [None, None, None]},
+        },
+    },
+}
+
+
+def test_a_crop_without_a_per_tree_measure_still_loads(tmp_path, monkeypatch):
+    """THE TRAP IN THIS DESIGN. _load drops a crop whole unless every name in
+    _MEASURES validates. Field crops publish no per-tree yield, so listing
+    yield_kg_tree there would make _valid_measure(None) return False for every
+    one of them and empty the table - 246 crops gone, silently, with a
+    green-looking file on disk.
+
+    Proven by mutation: move "yield_kg_tree" into _MEASURES and this test must
+    go red."""
+    _write(tmp_path, monkeypatch, TREE)
+    data = norms._load()
+    assert set(data["crops"]) == {"bugday", "ayva"}
+
+
+def test_a_per_tree_yield_resolves_with_its_year_and_region(tmp_path, monkeypatch):
+    _write(tmp_path, monkeypatch, TREE)
+    row = norms.lookup("ayva", "Ordu")
+    assert row.yield_kg_tree.amount == 31.0
+    assert row.yield_kg_tree.year == 2025
+    assert row.yield_kg_tree.scope == "il"
+    assert row.yield_kg_tree.region == "Ordu"
+
+
+def test_a_crop_with_no_per_tree_measure_resolves_it_to_none(tmp_path, monkeypatch):
+    """Absence is absence - the module's binding rule, on the new measure."""
+    _write(tmp_path, monkeypatch, TREE)
+    assert norms.lookup("bugday", "Ordu").yield_kg_tree is None
+
+
+def test_a_malformed_per_tree_measure_drops_the_crop_whole(tmp_path, monkeypatch):
+    """The same rule the required measures get: a crop carrying one good
+    measure and one malformed one would prefill a field and leave another
+    blank with no explanation."""
+    payload = json.loads(json.dumps(TREE))
+    payload["crops"]["ayva"]["yield_kg_tree"]["Ordu"] = [25, 27]   # short series
+    _write(tmp_path, monkeypatch, payload)
+    assert set(norms._load()["crops"]) == {"bugday"}
+
+
+def test_the_per_tree_measure_carries_its_own_five_year_range(tmp_path, monkeypatch):
+    """_pick's range logic is measure-agnostic and must stay that way."""
+    _write(tmp_path, monkeypatch, TREE)
+    value = norms.lookup("ayva", "Ordu").yield_kg_tree
+    assert value.recent_min == 25.0 and value.recent_max == 27.0
+
+
 def test_a_missing_file_is_an_empty_table(tmp_path, monkeypatch):
     """A broken data file must never break answering - fertplan._load's rule."""
     monkeypatch.setattr(norms, "_PATH", tmp_path / "nope.json")
