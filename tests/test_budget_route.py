@@ -258,3 +258,32 @@ def test_a_rejected_submission_comes_back_with_its_values(no_llm):
     fields = {f["id"]: f for f in result.form["fields"]}
     assert fields["yield_total"]["value"] == "100"
     assert result.form["crop"] == "findik"
+
+
+def test_a_fruit_budget_uses_the_published_per_tree_figure():
+    """End to end on the SHIPPED data: the farmer's own tree count times
+    TUIK's published kg/agac gives the harvest, and dividing by the farmer's
+    own area gives a per-dekar figure that belongs to them. TUIK's broken
+    orchard-area denominator never enters the arithmetic."""
+    from src import budget, norms
+    table = norms.province_table("Karabük")
+    row = next(r for r in table if r.crop == "ayva")
+    assert row.yield_kg_tree is not None
+    cell = budget.form_spec([], table)["crops"]
+    ayva = next(c for c in cell if c["id"] == "ayva")
+    assert ayva["yield"]["unit"] == "kg_agac"
+
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "400", "unit": "adet", "source": "user"},
+        "yield_total": {"value": ayva["yield"]["value"], "unit": "kg_agac",
+                        "source": "norm"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+        "crop": "ayva",
+    }, table)
+    assert errors == []
+    assert inputs.yield_kg.source == "norm"
+    result = budget.compute(inputs)
+    # 400 trees x the published kg/agac, over 10 donum.
+    assert result.yield_kg_da == inputs.yield_kg.amount / 10.0
+    assert result.yield_kg_da < 13419.4      # the derived figure it replaces
