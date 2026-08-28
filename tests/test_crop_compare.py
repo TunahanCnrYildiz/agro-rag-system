@@ -56,6 +56,24 @@ TABLE = {
             "price_tl_kg": {"scope": "il", "Konya": [11.0, 12.0, 13.0, 14.5],
                             "TR": [None, None, None, None]},
         },
+        "ayva": {
+            "label": "Ayva",
+            "yield_kg_da": {"scope": "il", "Konya": [8000.0, 8500.0, 9000.0, 9500.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [11.0, 14.0, 16.0, 19.0],
+                            "TR": [None, None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Konya": [25.0, 27.0, 28.0, 31.0],
+                              "TR": [None, None, None, None]},
+        },
+        "ceviz": {
+            "label": "Ceviz",
+            "yield_kg_da": {"scope": "il", "Konya": [250.0, 255.0, 260.0, 263.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [80.0, 90.0, 100.0, 110.0],
+                            "TR": [None, None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Konya": [18.0, 19.0, 20.0, 22.0],
+                              "TR": [None, None, None, None]},
+        },
     },
 }
 
@@ -233,6 +251,69 @@ def test_each_figure_keeps_its_year_and_region():
     inputs, _ = crop_compare.validate(_raw(), _table())
     first, _second = crop_compare.compute(inputs, _table(), 2025)
     assert (first.yield_value.year, first.yield_value.region) == (2025, "Konya")
+
+
+def _figures_for(crop_id, latest_year=2025):
+    row = next(r for r in _table() if r.crop == crop_id)
+    return crop_compare._figures(row, latest_year)
+
+
+def test_a_tree_crop_is_read_from_its_published_per_tree_measure():
+    """TUIK publishes no per-dekar yield for 61 tree crops. The kg/da this
+    project derives for them divides a province's whole production by the few
+    dekars of COMPACT orchard it records, so Karabuk/Ayva ships 13.419 kg/da -
+    about four times any real quince yield."""
+    figures = _figures_for("ayva")
+    assert figures.per_tree is True
+    assert figures.yield_value.amount == 31.0
+
+
+def test_a_tree_crop_gets_no_revenue_figure():
+    """There is no honest money figure for it: converting per-tree to per-dekar
+    needs a planting density nobody published, and revenue per TREE is not a
+    fair comparison either - crop median densities run 11 to 79 trees/da."""
+    assert _figures_for("ayva").revenue_tl_da is None
+
+
+def test_a_field_crop_is_untouched_and_still_carries_its_revenue():
+    figures = _figures_for("domates (sofralik)")
+    assert figures.per_tree is False
+    assert figures.yield_value.amount == 5492.1
+    assert figures.revenue_tl_da == 5492.1 * 21.06
+
+
+def test_a_tree_crop_never_blames_the_price_for_the_missing_revenue():
+    """`missing == "fiyat"` renders "there is a yield but no price, so I am not
+    computing revenue". On a per-tree row that states a false cause - the
+    revenue was refused for the UNIT - and invites the reader to think a price
+    would fix it."""
+    figures = _figures_for("ayva", latest_year=2099)
+    assert figures.price_value is None
+    assert figures.missing is None
+    assert figures.per_tree is True
+
+
+def test_a_genuine_absence_still_reports_itself():
+    """per_tree must not swallow a real gap. A row carrying neither measure is
+    a missing yield, not a per-tree crop."""
+    from dataclasses import replace
+    row = next(r for r in _table() if r.crop == "ayva")
+    figures = crop_compare._figures(
+        replace(row, yield_kg_da=None, yield_kg_tree=None), 2025)
+    assert figures.per_tree is False
+    assert figures.missing == "verim"
+
+
+def test_the_two_surfaces_choose_the_same_measure_for_the_same_row():
+    """THE TEST THAT STOPS THEM DRIFTING AGAIN. src/budget.py and this module
+    each decide which measure to serve; they disagreed on 1.568 cells for one
+    round, and Karabuk/Ayva prefilled 31 kg/agac in the form while the
+    comparison printed 13.419 kg/da."""
+    from src import budget
+    for row in _table():
+        cell = budget._yield_cell(row)
+        chose_per_tree = cell is not None and cell["unit"] == "kg_agac"
+        assert crop_compare._figures(row, 2025).per_tree == chose_per_tree, row.label
 
 
 def test_the_answer_prints_both_crops_with_their_figures():

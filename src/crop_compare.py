@@ -182,10 +182,19 @@ class CropFigures:
     price_value: object | None       # norms.NormValue
     revenue_tl_da: float | None
     missing: str | None
+    # TUIK publishes this crop's yield per TREE, so no per-dekar money figure
+    # exists for it. NOT folded into `missing`: that field names the half we
+    # do not HOLD, and here both halves are held and cannot be combined.
+    per_tree: bool = False
 
 
 def _figures(row, latest_year: int | None) -> CropFigures:
-    yield_value = row.yield_kg_da
+    # A row is served PER TREE exactly when its yield_kg_tree resolved - the
+    # same test, character for character, that src/budget.py's _yield_cell
+    # uses. The two surfaces decide this separately and disagreed on 1.568
+    # cells for a round; a test pins them together.
+    per_tree = row.yield_kg_tree is not None
+    yield_value = row.yield_kg_tree if per_tree else row.yield_kg_da
     price = row.price_tl_kg
     # A price from an older year is not a smaller number, it is a different
     # currency: P2b measured Ordu's `Arpa (Diğer)` prefilling a 2018 price nine
@@ -196,13 +205,17 @@ def _figures(row, latest_year: int | None) -> CropFigures:
     missing = None
     if yield_value is None:
         missing = "verim"
-    elif price is None:
+    elif price is None and not per_tree:
+        # A per-tree row never blames the PRICE for its missing revenue. That
+        # branch's message is "there is a yield but no price, so I am not
+        # computing revenue", which here names a false cause - the revenue was
+        # refused for the unit - and suggests a price would fix it.
         missing = "fiyat"
-    revenue = (None if missing is not None
+    revenue = (None if (missing is not None or per_tree)
                else yield_value.amount * price.amount)
     return CropFigures(label=row.label, yield_value=yield_value,
                        price_value=price, revenue_tl_da=revenue,
-                       missing=missing)
+                       missing=missing, per_tree=per_tree)
 
 
 def compute(inputs: CompareInputs, table,
