@@ -67,6 +67,9 @@ class UnitOption:
     # of the UNIT rather than a second field, so the conversion stays one line
     # and a new per-area unit needs no new branch.
     per_area: bool = False
+    # The same idea for a per-TREE unit, which needs the tree count. TUIK
+    # publishes no per-dekar yield for 61 tree crops, only Kg/Meyve Veren Agac.
+    per_tree: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,12 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("area", "Alan", True, 0.0, True,
               (UnitOption("donum", "dönüm", 1.0),
                UnitOption("hektar", "hektar", 10.0))),
+    # Optional, and enforced by the UNIT rather than by `required`: this flag is
+    # a property of the field, not of the crop the farmer picked, so a
+    # conditionally-required field would need a mechanism that does not exist
+    # here. A wheat budget must not be made to name a number of trees.
+    FieldSpec("tree_count", "Ağaç sayısı", False, 0.0, True,
+              (UnitOption("adet", "adet", 1.0),)),
     # "Toplam" would be wrong under kg/dekar, so the label is neutral across all
     # three units. The per-dekar unit exists because TUIK publishes yields that
     # way and P2b prefills them; a farmer stating their own harvest still picks
@@ -93,7 +102,8 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
                UnitOption("ton", "ton", 1000.0),
-               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True))),
+               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True),
+               UnitOption("kg_agac", "kg/ağaç", 1.0, per_tree=True))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -166,7 +176,8 @@ def coerce_number(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict, area_da: float | None
+def _read(spec: FieldSpec, raw: dict, area_da: float | None,
+          trees: float | None = None
           ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
@@ -197,6 +208,16 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None
                 f"{spec.label} için dekar başına değer girdiniz; "
                 f"önce alanı doldurun.")
         amount = amount * area_da
+
+    if unit.per_tree:
+        if trees is None:
+            # Refused, never multiplied by a guessed count and never zeroed -
+            # the per_area rule, on the other denominator.
+            return None, FieldError(
+                spec.id,
+                f"{spec.label} için ağaç başına değer girdiniz; "
+                f"önce ağaç sayısını doldurun.")
+        amount = amount * trees
 
     claimed = "norm" if entry.get("source") == "norm" else "user"
     return Value(amount * unit.factor, claimed), None
@@ -266,10 +287,27 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
         errors.append(area_error)
     area_da = area_value.amount if area_value is not None else None
 
+    # Read out of FIELDS order for the same reason as the area: a per-tree unit
+    # cannot be converted without it, and that order is a layout decision.
+    trees_spec = _FIELDS_BY_ID["tree_count"]
+    trees_value, trees_error = _read(trees_spec, raw, area_da)
+    values[trees_spec.id] = trees_value
+    if trees_error is not None:
+        errors.append(trees_error)
+    trees = trees_value.amount if trees_value is not None else None
+    # A tree count that was TYPED and rejected already carries its own error
+    # (e.g. "Ağaç sayısı sıfırdan büyük olmalı."); a per-tree field blaming
+    # itself for depending on it would report the same root cause twice. Only
+    # a genuinely unfilled tree count - no error of its own - should produce
+    # the per-tree field's "önce ağaç sayısını doldurun" message. The 0.0 fed
+    # in the other case is discarded: `errors` is already non-empty, so
+    # validate() returns None before any field's parsed amount is used.
+    field_trees = trees if trees_error is None else 0.0
+
     for spec in FIELDS:
-        if spec.id == area_spec.id:
+        if spec.id in (area_spec.id, trees_spec.id):
             continue
-        value, error = _read(spec, raw, area_da)
+        value, error = _read(spec, raw, area_da, field_trees)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
