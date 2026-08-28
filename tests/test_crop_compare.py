@@ -351,12 +351,18 @@ def test_not_profit_is_absent_when_neither_crop_shows_revenue():
     assert crop_compare.NOT_PROFIT not in text
 
 
-def test_not_profit_is_present_when_exactly_one_crop_shows_revenue():
+def test_not_profit_is_absent_when_only_one_crop_shows_revenue():
+    """NOT_PROFIT refuses a RANKING; with a missing price on one side there is
+    only one figure and nothing to rank. This test used to assert the opposite
+    - that was the bug ONLY_ONE_REVENUE and the `all(revenues)` gate exist to
+    fix. Here the other crop is a plain gap, not per-tree, so neither closing
+    sentence has anything true to say."""
     inputs, _ = crop_compare.validate(_raw(), _table())
     first, second = crop_compare.compute(inputs, _table(), 2025)
     second = replace(second, revenue_tl_da=None, missing="fiyat")
     text = crop_compare.render(inputs, (first, second))
-    assert crop_compare.NOT_PROFIT in text
+    assert crop_compare.NOT_PROFIT not in text
+    assert crop_compare.ONLY_ONE_REVENUE not in text
 
 
 def test_the_answer_never_names_a_winner():
@@ -469,3 +475,51 @@ def test_a_field_crops_block_is_byte_identical_to_before():
         "**Biber (Salçalık, Kapya)** · dekara brüt gelir **125.841 TL**")
     assert text.splitlines()[7] == (
         "   verim 3.154,7 kg/da (TÜİK 2025, Konya) × fiyat 39,89 TL/kg (TÜİK 2025)")
+
+
+def test_not_profit_needs_both_crops_to_have_shown_a_revenue():
+    """It refuses a RANKING - "kârlılık sıralamasını bu tablodan söyleyemem".
+    With one figure there is no ranking to refuse and the sentence points at
+    something the page does not contain. This route already shipped that fix
+    once, for the case where NEITHER crop could show a revenue."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.NOT_PROFIT not in text
+
+
+def test_not_profit_still_appears_for_two_field_crops():
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert crop_compare.NOT_PROFIT in text
+
+
+def test_a_lone_revenue_beside_a_tree_crop_says_it_is_not_a_comparison():
+    """Otherwise the single money figure reads as a default winner."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.ONLY_ONE_REVENUE in text
+
+
+def test_two_tree_crops_get_no_closing_sentence_at_all():
+    """No revenue anywhere, so neither closing sentence has anything to
+    describe. Both would name figures the answer never printed."""
+    text = _render("ayva", "ceviz")
+    assert crop_compare.NOT_PROFIT not in text
+    assert crop_compare.ONLY_ONE_REVENUE not in text
+    assert text.count(crop_compare.PER_TREE_NOTE) == 2
+
+
+def test_a_lone_revenue_beside_a_plain_gap_says_nothing_extra():
+    """THE CONDITION'S LOAD-BEARING HALF. A crop can lack a revenue because the
+    province publishes nothing for it, and ONLY_ONE_REVENUE would then assert a
+    per-tree reason that is simply untrue. Its own block already says what is
+    missing."""
+    from dataclasses import replace
+    rows = {r.crop: r for r in _table()}
+    blank = replace(rows["biber (salcalik, kapya)"],
+                    yield_kg_da=None, yield_kg_tree=None)
+    figures = (crop_compare._figures(rows["domates (sofralik)"], 2025),
+               crop_compare._figures(blank, 2025))
+    inputs, _ = crop_compare.validate(
+        _raw("domates (sofralik)", "biber (salcalik, kapya)"), _table())
+    text = crop_compare.render(inputs, figures)
+    assert crop_compare.ONLY_ONE_REVENUE not in text
+    assert crop_compare.NOT_PROFIT not in text
+    assert "bu il için yayımlanmış verim rakamı yok" in text

@@ -250,6 +250,16 @@ NOT_PROFIT = (
     "girerek bütçe hesabı yaptırırsanız kâr karşılaştırmasını yapabilirsiniz."
 )
 
+# Only when one crop showed a revenue AND the other is per-tree. A crop can
+# also lack a revenue because the province publishes nothing for it, and this
+# sentence would then assert a per-tree reason that is untrue - the failure
+# this route has already shipped two fixes for.
+ONLY_ONE_REVENUE = (
+    "Bu tabloda tek bir gelir rakamı var, dolayısıyla bir karşılaştırma değil: "
+    "diğer ürünün verimi ağaç başına yayımlandığı için aynı birime "
+    "getirilemiyor."
+)
+
 # Written BY CODE and printed under the crop it explains, never at the foot of
 # the answer - a reader must not have to work out which crop it refers to.
 PER_TREE_NOTE = (
@@ -333,10 +343,14 @@ def _crop_block(figures: CropFigures) -> list[str]:
 def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> str:
     """Code-written Turkish. Both crops, no verdict.
 
-    NOT_PROFIT opens with "these figures ARE gross revenue" - true only when a
-    revenue figure was actually printed above it. When both crops are missing
-    their revenue (e.g. every price on hand is older than the latest year),
-    appending it anyway would refer to numbers that are not on the page.
+    NOT_PROFIT opens with "these figures ARE gross revenue" and goes on to
+    refuse a RANKING, so it needs BOTH crops to have printed one. With a single
+    figure there is nothing to rank and the sentence describes a page that does
+    not exist; with none it names figures that were never printed.
+
+    ONLY_ONE_REVENUE covers the case NOT_PROFIT no longer does - one revenue
+    beside a per-tree crop - and stops the lone money figure reading as a
+    default winner.
     """
     where = f" ({inputs.province})" if inputs.province else ""
     lines = [f"İki ürünün yayımlanmış rakamları{where}:", ""]
@@ -344,6 +358,9 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
         lines.extend(_crop_block(crop))
         lines.append("")
     lines.append(ATTRIBUTION)
-    if any(crop.revenue_tl_da is not None for crop in figures):
+    revenues = [crop.revenue_tl_da is not None for crop in figures]
+    if all(revenues):
         lines.extend(["", NOT_PROFIT])
+    elif any(revenues) and any(crop.per_tree for crop in figures):
+        lines.extend(["", ONLY_ONE_REVENUE])
     return "\n".join(lines)
