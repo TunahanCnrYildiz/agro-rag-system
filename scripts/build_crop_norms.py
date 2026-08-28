@@ -324,22 +324,40 @@ def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
     return max(refused, default=None)
 
 
-def build(rows, not_field_area=()) -> dict:
+def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
     """Group Row(...) into the schema src/norms.py validates.
 
     Format-independent on purpose: read_export does the parsing, this does the
     shaping, and only this half can be tested without a real export.
 
-    `not_field_area` is the REVIEWED answer to a question no published number
-    can settle: whether a crop's recorded area is the ground its production came
-    off. Mushroom's is a building's footprint. Those crops get no yield at all;
-    their prices are untouched. A reviewed crop that no longer appears in the
+    TWO REVIEWED LISTS, AND THEY SAY DIFFERENT THINGS. Both answer a question no
+    published number can settle, and both are recorded under their own reason so
+    the committed audit does not attribute one crop's finding to another:
+
+      `not_field_area` - the recorded area is the WRONG KIND of surface.
+        Mushroom's `Ekilen Alan` is a building's footprint and its beds are
+        stacked in tiers, so production over area is not a yield in any unit.
+        Nothing survives: not the derived figure, not a published one.
+
+      `area_excludes_the_trees` - the area is the right kind and INCOMPLETE.
+        `Toplu Meyveliklerin Alani` counts compact orchards while `Uretim
+        Miktari` counts fruit from every tree in the province. Where a crop is
+        grown as scattered trees almost everywhere, the ratio is not a yield -
+        but a PUBLISHED Kg/Dekar figure still is, so only the derived half goes.
+        This is what the density gate cannot see: it judges cell by cell, and
+        `_area_never_orchard` only reaches crops whose median already clears the
+        geometric ceiling. Dut's median implies 3,0 m2 of ground per tree, which
+        no fruiting mulberry stands at, yet it sits UNDER that bound.
+
+    Prices are untouched in both. A reviewed crop that no longer appears in the
     exports RAISES rather than sitting in the file looking like coverage.
     """
     known = set(PROVINCES)
     rows = list(rows)
     refused: list[dict] = []
     excluded = {_normalize_tr(name): name for name in not_field_area}
+    derived_only = {_normalize_tr(name): name
+                    for name in area_excludes_the_trees}
     years = sorted({r.year for r in rows})
     index = {y: i for i, y in enumerate(years)}
 
@@ -359,7 +377,8 @@ def build(rows, not_field_area=()) -> dict:
         by_measure = seen.setdefault(crop_id, {})
         by_measure.setdefault(r.measure, {}).setdefault(province, {})[r.year] = r.value
 
-    stale = sorted(name for crop_id, name in excluded.items() if crop_id not in seen)
+    stale = sorted(name for crop_id, name in (excluded | derived_only).items()
+                   if crop_id not in seen)
     if stale:
         raise ValueError(
             f"data/crop_area_review.json reviews {stale}, which the exports do "
@@ -384,6 +403,14 @@ def build(rows, not_field_area=()) -> dict:
             published, uretim, alan = {}, {}, {}
             refused.append({"crop": labels[crop_id], "province": "*",
                             "year": 0, "reason": "area_is_not_field"})
+
+        # Reviewed as scattered-tree: the derived half goes, a published
+        # Kg/Dekar figure stays. Recorded under its OWN reason - mulberry's
+        # finding is not mushroom's.
+        if crop_id in derived_only:
+            uretim, alan = {}, {}
+            refused.append({"crop": labels[crop_id], "province": "*",
+                            "year": 0, "reason": "area_excludes_the_trees"})
 
         # Only the DERIVED half is dropped: the finding is about the area
         # column, and a published Kg/Dekar figure does not use one.
@@ -493,7 +520,8 @@ def main() -> None:
         print(f"read {path.name}", file=sys.stderr)
     out = DATA_DIR / "crop_norms.json"
     review = json.loads(REVIEW.read_text(encoding="utf-8"))
-    data = build(rows, not_field_area=review["not_field_area"])
+    data = build(rows, not_field_area=review["not_field_area"],
+                 area_excludes_the_trees=review["area_excludes_the_trees"])
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     record = data["meta"]["refused_yield_cells"]
     print(f"wrote {out}: {len(data['crops'])} crops, years {data['meta']['years']}")

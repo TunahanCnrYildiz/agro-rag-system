@@ -113,11 +113,27 @@ that lead from a nicety to **the** fix: the derivation is unsound because its nu
 counts every tree in the province and its denominator counts only compact orchards, and
 no bound on the ratio repairs that. Cost: a tree-count form field and a new APK.
 
-**Dut escapes both rules and remains the worst crop.** Median 330/da = 3,0 m² per tree —
-implausible for a fruiting mulberry, but under the 444 bound, so the crop-level rule
-cannot reach it without a new constant. It ships 14.950 kg/da in Diyarbakır. A reviewed
-entry in `data/crop_area_review.json` is the honest instrument here, the way mushroom is
-handled — a judgement recorded as a judgement, not a threshold pretending to be geometry.
+**~~Dut escapes both rules~~ — CLOSED the same day by a reviewed entry.** Median 330/da =
+3,0 m² per tree, under the 444 bound, so neither gate could reach it without a new
+constant pretending to be geometry. Recorded as a judgement instead, in
+`data/crop_area_review.json`.
+
+The evidence that justified it: across 559 derived cells in 66 provinces the implied
+density runs p25 = 78/da (12,9 m²/tree), median 330 (3,0 m², 1,7 m spacing), p75 = 1.167
+(0,9 m²), p90 = 4.139 (0,2 m²). **Only 11 of 559 cells fall under 20 trees/da** — a real
+mulberry spacing — so the breakage is the whole column, not a tail. Its 37 served cells had
+a median of 2.319 kg/da against TÜİK's own median of 24 kg per tree, which at any real
+spacing is 400-600 kg/da.
+
+**It needed a SECOND reviewed category, not mushroom's.** Mushroom's area is the wrong KIND
+of surface — a building's footprint — and nothing about it survives. Dut's area is the right
+kind and INCOMPLETE: `Toplu Meyveliklerin Alanı` counts compact orchards while `Üretim
+Miktarı` counts fruit from every mulberry in the province. Different finding, so
+`area_excludes_the_trees` with its own reason string, and only the DERIVED half is dropped —
+a published Kg/Dekar figure uses no denominator. Filing it under `area_is_not_field` would
+have put a false statement about mulberry into the committed audit record, which is the
+same "a statement about one thing filed as a statement about another" that blocked both the
+fruit yield gate and P3a. Cost: 37 served cells; 69 mulberry price cells untouched.
 
 **Caveat on this round's own numbers:** "more than 5× its crop's median" measures
 suspicion, not proven error. Each flagged cell was not individually shown impossible. What
