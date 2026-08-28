@@ -592,6 +592,76 @@ def test_a_table_ships_every_crop_with_its_figures():
     assert cell["recent"] == "önceki 5 yıl: 73,7–105,6 kg/da"
 
 
+def _tree_table():
+    """Ayva carries a per-tree figure; Mısır does not."""
+    return (
+        CropNorm("ayva", "Ayva",
+                 NormValue(13419.4, 2025, "il", "Karabük", None, None),
+                 NormValue(19.0, 2025, "il", "Karabük", None, None),
+                 NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)),
+        CropNorm("misir", "Mısır",
+                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 NormValue(8.0, 2025, "tr", "Türkiye", None, None)),
+    )
+
+
+def test_a_row_with_a_per_tree_figure_prefills_it_instead_of_the_derived_one():
+    """THE POINT OF THE CHANGE. Karabük's derived kg/da is 13.419 - a quince
+    yield roughly four times any real one, because the numerator counts every
+    tree in the province and the denominator counts 31 dekars of compact
+    orchard. The published 31 kg/agac needs no denominator at all."""
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][0]["yield"]
+    assert cell["value"] == "31"
+    assert cell["unit"] == "kg_agac"
+    assert cell["note"] == "TÜİK 2025, Karabük"
+
+
+def test_the_per_tree_cell_shows_its_own_five_year_range():
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["recent"] == "önceki 5 yıl: 27–28 kg/ağaç"
+
+
+def test_a_row_without_a_per_tree_figure_still_prefills_kg_da():
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][1]["yield"]
+    assert cell["value"] == "1.100"
+    assert cell["unit"] == "kg_da"
+
+
+def test_a_per_tree_norm_claim_is_confirmed_against_the_per_tree_cell():
+    """_verify compares the served TEXT and unit. A claim must be checked
+    against the very cell that was sent, or a per-tree submission would be
+    compared to a kg/da cell, never match, and silently downgrade to "user" -
+    the answer would then drop TUIK's name from a figure that is TUIK's."""
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "120", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "31", "unit": "kg_agac", "source": "norm"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+        "crop": "ayva",
+    }, _tree_table())
+    assert errors == []
+    assert inputs.yield_kg.source == "norm"
+    assert inputs.yield_kg.note == "TÜİK 2025, Karabük"
+    assert inputs.yield_kg.amount == 3720.0
+
+
+def test_a_per_tree_claim_that_does_not_match_what_we_served_downgrades():
+    """The farmer's own figure wearing TUIK's name is the thing this guard
+    exists to stop."""
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "120", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "45", "unit": "kg_agac", "source": "norm"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+        "crop": "ayva",
+    }, _tree_table())
+    assert errors == []
+    assert inputs.yield_kg.source == "user"
+    assert inputs.yield_kg.note is None
+
+
 def test_a_price_cell_carries_two_decimals_and_its_own_unit():
     spec = budget.form_spec([], _table(), latest_year=2025)
     cell = spec["crops"][0]["price"]

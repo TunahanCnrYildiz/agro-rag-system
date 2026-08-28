@@ -223,9 +223,14 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None,
     return Value(amount * unit.factor, claimed), None
 
 
-# Which submitted field each norm measure prefills, and how that cell is built.
-_VERIFIED = (("yield_total", "yield_kg_da", "yield", None),
-             ("price", "price_tl_kg", "price", 2))
+# Which submitted field each norm claim is checked against, and how that cell is
+# built. The yield's builder takes the ROW because which measure a row was served
+# from is a property of the row, not of the field - see _yield_cell.
+_VERIFIED = (
+    ("yield_total", lambda row: _yield_cell(row)[0]),
+    ("price", lambda row: _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2,
+                                     show_range=False)),
+)
 
 
 def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, object | None]:
@@ -249,13 +254,11 @@ def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, obj
     if crop is not None:
         row = next((r for r in (table or ()) if r.crop == crop), None)
 
-    for field_id, measure, unit_key, decimals in _VERIFIED:
+    for field_id, build in _VERIFIED:
         value = values.get(field_id)
         if value is None or value.source != "norm":
             continue
-        cell = (None if row is None
-                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals,
-                                 show_range=unit_key == "yield"))
+        cell = None if row is None else build(row)
         entry = raw.get(field_id) or {}
         if (cell is not None
                 and entry.get("value") == cell["value"]
@@ -323,7 +326,8 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
 
 # The unit each measure is published in, and how it is written when it appears
 # inside a sentence rather than on a chip.
-_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg")}
+_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg"),
+               "yield_tree": ("kg_agac", "kg/ağaç")}
 
 
 def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
@@ -361,6 +365,29 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     }
 
 
+def _yield_cell(row) -> tuple[dict | None, str]:
+    """This row's yield cell, and which measure it came from.
+
+    A row is served PER TREE exactly when its `yield_kg_tree` resolved - no
+    list of crops, no flag, no name matching. TUIK publishes no per-dekar yield
+    for 61 tree crops, and the kg/da this project derives for them divides a
+    province's whole production by the few dekars of COMPACT orchard it
+    records; the published per-tree figure has no such denominator. So per-tree
+    wins wherever it exists, which is the same precedence the builder already
+    applies in the other direction.
+
+    Returns the measure name too, so _verify checks a claim against the very
+    cell that was served rather than guessing which one it was.
+    """
+    if row.yield_kg_tree is not None:
+        return (_norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+                           show_range=True),
+                "yield_kg_tree")
+    return (_norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
+                       show_range=True),
+            "yield_kg_da")
+
+
 def _crop_rows(table, latest_year: int | None) -> list[dict]:
     """Every crop's figures, for a card that picks one of them client-side.
 
@@ -381,8 +408,7 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
         rows.append({
             "id": row.crop,
             "label": row.label,
-            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
-                                 show_range=True),
+            "yield": _yield_cell(row)[0],
             "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
         })
     return rows
