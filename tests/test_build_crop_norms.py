@@ -630,6 +630,60 @@ def test_a_reviewed_crop_keeps_its_price():
     assert out["crops"]["mantar (kultur)"]["price_tl_kg"]["Ordu"] == [132.18]
 
 
+def test_a_crop_whose_area_excludes_its_trees_yields_nothing():
+    """THE SECOND REVIEWED CATEGORY, AND IT IS NOT THE MUSHROOM ONE. Mushroom's
+    area is the WRONG KIND of surface - a building's footprint. Dut's is the
+    right kind and INCOMPLETE: `Toplu Meyveliklerin Alani` counts compact
+    orchards while `Uretim Miktari` counts fruit from every mulberry in the
+    province, roadside and garden trees included.
+
+    The cells here sit at 100 trees/da, under `_MAX_TREES_PER_DA` and under the
+    crop-level median test, so neither gate can reach them. Only the review can.
+    """
+    out = bcn.build(_spread("Dut", [100, 100, 100]),
+                    area_excludes_the_trees=["Dut"])
+    assert _provinces_served(out, "dut") == []
+
+
+def test_the_two_reviewed_categories_are_recorded_apart():
+    """The refusal record is a committed audit. Filing mulberry under the
+    mushroom reason would put a false statement about mulberry into it - the
+    same "a statement about one thing filed as a statement about another" that
+    the fruit yield gate and P3a were both blocked by."""
+    rows = _spread("Dut", [100, 100, 100]) + [
+        R("Ordu", "Mantar (Kültür)", 2025, "uretim", 179.0),
+        R("Ordu", "Mantar (Kültür)", 2025, "alan", 1.0)]
+    record = bcn.build(rows, not_field_area=["Mantar (Kültür)"],
+                       area_excludes_the_trees=["Dut"])["meta"]["refused_yield_cells"]
+    by_crop = {c["crop"]: c["reason"] for c in record["cells"]
+               if c["province"] == "*"}
+    assert by_crop == {"Mantar (Kültür)": "area_is_not_field",
+                       "Dut": "area_excludes_the_trees"}
+
+
+def test_a_crop_whose_area_excludes_its_trees_keeps_its_price():
+    rows = _spread("Dut", [100, 100, 100]) + [R("Adana", "Dut", 2025, "fiyat", 42.5)]
+    out = bcn.build(rows, area_excludes_the_trees=["Dut"])
+    assert out["crops"]["dut"]["price_tl_kg"]["Adana"] == [42.5]
+
+
+def test_a_published_yield_survives_the_second_category():
+    """Only the DERIVED half goes. The finding is about a denominator this
+    script chose, and a published Kg/Dekar figure does not use one - the same
+    line `_ceiling_shadow` and `_area_never_orchard` already hold."""
+    rows = _spread("Dut", [100, 100]) + [R("Bursa", "Dut", 2025, "verim", 640.0)]
+    out = bcn.build(rows, area_excludes_the_trees=["Dut"])
+    assert out["crops"]["dut"]["yield_kg_da"]["Bursa"] == [640.0]
+
+
+def test_a_stale_entry_in_the_second_category_stops_the_build():
+    """Both reviewed lists carry the same promise: a review of a crop the
+    exports no longer carry is a review of nothing."""
+    rows = [R("Ordu", "Ayva", 2025, "verim", 1200.0)]
+    with pytest.raises(ValueError, match="Dut"):
+        bcn.build(rows, area_excludes_the_trees=["Dut"])
+
+
 def test_a_stale_review_entry_stops_the_build():
     """A review of a crop that is no longer in the exports is a review of
     nothing, sitting in the file looking like coverage."""
@@ -701,7 +755,8 @@ def test_the_shipped_file_is_what_the_builder_produces():
     for path in sorted((DATA_DIR / "raw").glob("*.csv")):
         rows.extend(bcn.read_export(path))
     review = _json.loads((DATA_DIR / "crop_area_review.json").read_text(encoding="utf-8"))
-    rebuilt = bcn.build(rows, not_field_area=review["not_field_area"])
+    rebuilt = bcn.build(rows, not_field_area=review["not_field_area"],
+                        area_excludes_the_trees=review["area_excludes_the_trees"])
     shipped = _json.loads((DATA_DIR / "crop_norms.json").read_text(encoding="utf-8"))
     assert rebuilt["crops"] == shipped["crops"]
     assert rebuilt["meta"]["refused_yield_cells"] == shipped["meta"]["refused_yield_cells"]
