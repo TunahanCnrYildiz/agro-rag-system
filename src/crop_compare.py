@@ -250,6 +250,14 @@ NOT_PROFIT = (
     "girerek bütçe hesabı yaptırırsanız kâr karşılaştırmasını yapabilirsiniz."
 )
 
+# The half of NOT_PROFIT that is true of a SINGLE figure too. NOT_PROFIT does
+# two jobs - warn that the figure is gross, and refuse a ranking - and only the
+# second needs two figures. Printed whenever any revenue reached the page and
+# NOT_PROFIT did not.
+GROSS_ONLY = (
+    "Basılan gelir rakamı dekara BRÜT gelirdir, masraf içermez."
+)
+
 # Only when one crop showed a revenue AND the other is per-tree. A crop can
 # also lack a revenue because the province publishes nothing for it, and this
 # sentence would then assert a per-tree reason that is untrue - the failure
@@ -348,9 +356,17 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
     figure there is nothing to rank and the sentence describes a page that does
     not exist; with none it names figures that were never printed.
 
+    NOT_PROFIT bundles two claims, and only the ranking-refusal half needs two
+    figures - the gross-revenue warning is just as true of one. GROSS_ONLY is
+    that first half alone: printed whenever exactly one revenue reached the
+    page, so the lone figure still carries its caveat even though there is
+    nothing to rank against it.
+
     ONLY_ONE_REVENUE covers the case NOT_PROFIT no longer does - one revenue
     beside a per-tree crop - and stops the lone money figure reading as a
-    default winner.
+    default winner. It only ever appears together with GROSS_ONLY, never
+    alone: a printed revenue is always gross, whether or not the OTHER crop
+    happens to be per-tree.
     """
     where = f" ({inputs.province})" if inputs.province else ""
     lines = [f"İki ürünün yayımlanmış rakamları{where}:", ""]
@@ -361,6 +377,11 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
     revenues = [crop.revenue_tl_da is not None for crop in figures]
     if all(revenues):
         lines.extend(["", NOT_PROFIT])
-    elif any(revenues) and any(crop.per_tree for crop in figures):
-        lines.extend(["", ONLY_ONE_REVENUE])
+    elif any(revenues):
+        # GROSS_ONLY first, ONLY_ONE_REVENUE second - the same order NOT_PROFIT
+        # itself uses internally (gross caveat, then the comparison refusal),
+        # so the one-sentence and two-sentence forms read the same way.
+        lines.extend(["", GROSS_ONLY])
+        if any(crop.per_tree for crop in figures):
+            lines.append(ONLY_ONE_REVENUE)
     return "\n".join(lines)

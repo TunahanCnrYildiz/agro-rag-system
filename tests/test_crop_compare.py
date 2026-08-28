@@ -506,11 +506,12 @@ def test_two_tree_crops_get_no_closing_sentence_at_all():
     assert text.count(crop_compare.PER_TREE_NOTE) == 2
 
 
-def test_a_lone_revenue_beside_a_plain_gap_says_nothing_extra():
+def test_a_lone_revenue_beside_a_plain_gap_says_it_is_gross():
     """THE CONDITION'S LOAD-BEARING HALF. A crop can lack a revenue because the
     province publishes nothing for it, and ONLY_ONE_REVENUE would then assert a
-    per-tree reason that is simply untrue. Its own block already says what is
-    missing."""
+    per-tree reason that is simply untrue - its own block already says what is
+    missing. But the one revenue that DID print is still gross, and GROSS_ONLY
+    is the sentence that says so without also claiming a per-tree cause."""
     from dataclasses import replace
     rows = {r.crop: r for r in _table()}
     blank = replace(rows["biber (salcalik, kapya)"],
@@ -520,6 +521,35 @@ def test_a_lone_revenue_beside_a_plain_gap_says_nothing_extra():
     inputs, _ = crop_compare.validate(
         _raw("domates (sofralik)", "biber (salcalik, kapya)"), _table())
     text = crop_compare.render(inputs, figures)
+    assert crop_compare.GROSS_ONLY in text
     assert crop_compare.ONLY_ONE_REVENUE not in text
     assert crop_compare.NOT_PROFIT not in text
     assert "bu il için yayımlanmış verim rakamı yok" in text
+
+
+def test_gross_only_accompanies_only_one_revenue_beside_a_tree_crop():
+    """The other half of the split: a lone revenue beside a per-tree crop still
+    needs the gross caveat, on top of ONLY_ONE_REVENUE explaining why the two
+    figures are not a comparison. Order matters for the reading - GROSS_ONLY
+    comes first, mirroring NOT_PROFIT's own internal order (gross caveat, then
+    the comparison refusal), so the two-sentence and one-sentence forms read
+    the same way."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.GROSS_ONLY in text
+    assert crop_compare.ONLY_ONE_REVENUE in text
+    assert text.index(crop_compare.GROSS_ONLY) < text.index(crop_compare.ONLY_ONE_REVENUE)
+
+
+def test_gross_only_is_absent_when_both_crops_show_revenue():
+    """NOT_PROFIT already carries the gross caveat for this case ("Bu rakamlar
+    dekara BRÜT gelirdir..."); printing GROSS_ONLY too would say the same thing
+    twice."""
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert crop_compare.GROSS_ONLY not in text
+    assert crop_compare.NOT_PROFIT in text
+
+
+def test_gross_only_is_absent_when_no_revenue_printed():
+    """Nothing printed a lira figure, so there is no gross figure to caveat."""
+    text = _render("ayva", "ceviz")
+    assert crop_compare.GROSS_ONLY not in text
