@@ -227,7 +227,7 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None,
 # built. The yield's builder takes the ROW because which measure a row was served
 # from is a property of the row, not of the field - see _yield_cell.
 _VERIFIED = (
-    ("yield_total", lambda row: _yield_cell(row)[0]),
+    ("yield_total", lambda row: _yield_cell(row)),
     ("price", lambda row: _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2,
                                      show_range=False)),
 )
@@ -365,8 +365,8 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     }
 
 
-def _yield_cell(row) -> tuple[dict | None, str]:
-    """This row's yield cell, and which measure it came from.
+def _yield_cell(row) -> dict | None:
+    """This row's yield cell.
 
     A row is served PER TREE exactly when its `yield_kg_tree` resolved - no
     list of crops, no flag, no name matching. TUIK publishes no per-dekar yield
@@ -375,17 +375,12 @@ def _yield_cell(row) -> tuple[dict | None, str]:
     records; the published per-tree figure has no such denominator. So per-tree
     wins wherever it exists, which is the same precedence the builder already
     applies in the other direction.
-
-    Returns the measure name too, so _verify checks a claim against the very
-    cell that was served rather than guessing which one it was.
     """
     if row.yield_kg_tree is not None:
-        return (_norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
-                           show_range=True),
-                "yield_kg_tree")
-    return (_norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
-                       show_range=True),
-            "yield_kg_da")
+        return _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+                          show_range=True)
+    return _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
+                      show_range=True)
 
 
 def _crop_rows(table, latest_year: int | None) -> list[dict]:
@@ -408,7 +403,7 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
         rows.append({
             "id": row.crop,
             "label": row.label,
-            "yield": _yield_cell(row)[0],
+            "yield": _yield_cell(row),
             "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
         })
     return rows

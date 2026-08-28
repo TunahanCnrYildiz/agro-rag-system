@@ -226,6 +226,20 @@ def test_a_conversation_with_no_province_prefills_nothing(no_llm):
     assert "crops" not in without.form
 
 
+def test_a_per_tree_only_table_is_not_discarded(no_llm, monkeypatch):
+    """Sibling to test_a_conversation_with_no_province_prefills_nothing, but
+    for a table the empty-table guard must NOT throw away: every row carries
+    a per-tree figure and nothing else, which is exactly the shape 61 tree
+    crops publish. Before yield_kg_tree joined the guard's condition this
+    table was indistinguishable from a genuinely empty one."""
+    from src import norms
+    table = (norms.CropNorm("ayva", "Ayva", None, None,
+                             norms.NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)),)
+    monkeypatch.setattr("src.norms.province_table", lambda *a, **k: table)
+    result = engine.answer(BUDGET_Q, ORDU_HISTORY)
+    assert "crops" in result.form
+
+
 def test_a_broken_norm_layer_does_not_break_the_route(no_llm, monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("norms exploded")
