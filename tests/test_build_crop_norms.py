@@ -621,6 +621,78 @@ def test_a_sound_crop_with_a_few_bad_provinces_survives_whole():
     assert len(_provinces_served(out, "elma (golden)")) == 10
 
 
+def test_a_published_per_tree_yield_is_written_as_its_own_measure():
+    """TUIK publishes Kg/Meyve Veren Agac for 61 tree crops and no per-dekar
+    yield at all. The builder has been reading it as the density gate's
+    evidence and throwing it away; it is a norm in its own right."""
+    rows = [
+        R("Ordu", "Ayva", 2024, "verim_agac", 27.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_tree"]["Ordu"] == [27.0, 31.0]
+
+
+def test_a_crop_with_no_per_tree_figure_carries_no_such_measure():
+    """A field crop must not gain an empty measure. src/norms.py validates
+    this key only when present, and an empty one would be noise in every
+    diff of the file."""
+    rows = [
+        R("Ordu", "Durum Buğdayı", 2024, "verim", 369.0),
+        R("Ordu", "Durum Buğdayı", 2025, "verim", 322.0),
+    ]
+    out = bcn.build(rows)
+    assert "yield_kg_tree" not in out["crops"]["durum bugdayi"]
+
+
+def test_a_per_tree_zero_is_refused_like_every_other_measure():
+    """A zero is not a norm. The exports carry zeros with no way to tell a
+    true one from a missing marker."""
+    rows = [
+        R("Ordu", "Ayva", 2024, "verim_agac", 0.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_tree"]["Ordu"] == [None, 31.0]
+
+
+def test_no_density_rule_touches_the_per_tree_series():
+    """THE POINT OF THE WHOLE CHANGE. Every gate in this file defends a
+    denominator the script chose; a published figure has none. Ordu here is
+    refused above the ceiling for its DERIVED cell and still publishes its
+    per-tree figure in full."""
+    rows = [
+        R("Ordu", "Ayva", 2025, "uretim", 267.0),
+        R("Ordu", "Ayva", 2025, "alan", 3.0),
+        R("Ordu", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
+    assert out["crops"]["ayva"]["yield_kg_tree"]["Ordu"] == [31.0]
+
+
+def test_a_reviewed_crop_still_publishes_its_per_tree_yield():
+    """Dut is reviewed out of the DERIVED yield because its area column does
+    not count the trees its production does. Its per-tree figure uses no area
+    at all, so the review has no reason to reach it - the review restores
+    mulberry rather than removing it."""
+    rows = _spread("Dut", [100, 100, 100]) + [
+        R("Adana", "Dut", 2025, "verim_agac", 24.0)]
+    out = bcn.build(rows, area_excludes_the_trees=["Dut"])
+    assert _provinces_served(out, "dut") == []
+    assert out["crops"]["dut"]["yield_kg_tree"]["Adana"] == [24.0]
+
+
+def test_the_per_tree_measure_carries_a_national_row_and_a_scope():
+    """src/norms.py validates both. The national row ships EMPTY: the exports
+    are province-level, so a mean of the provinces is a number nobody
+    published."""
+    rows = [R("Ordu", "Ayva", 2025, "verim_agac", 31.0)]
+    measure = bcn.build(rows)["crops"]["ayva"]["yield_kg_tree"]
+    assert measure["scope"] == "il"
+    assert measure[bcn.NATIONAL] == [None]
+
+
 def test_a_vegetable_is_never_gated():
     """THE MOST DANGEROUS MISTAKE THIS GATE CAN MAKE. Vegetables publish no
     per-tree yield anywhere, and their denominator - Ekilen Alan - really is the
