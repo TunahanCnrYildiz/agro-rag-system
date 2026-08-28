@@ -38,6 +38,7 @@ from __future__ import annotations
 import csv
 import json
 import re
+import statistics
 import sys
 from collections import namedtuple
 from datetime import date
@@ -237,6 +238,48 @@ def _density_verdict(tons: float, dekar: float,
     return None
 
 
+# A median over one or two provincial administrations describes THEM, not the
+# crop, so it cannot carry a statement about how the crop is RECORDED nationally.
+# The cut is insensitive rather than tuned: the crops whose median clears the
+# ceiling rest on 29, 18 and 2 provinces, so every minimum from 3 to 18 selects
+# the same two.
+_MIN_PROVINCES_TO_JUDGE_A_CROP = 10
+
+
+def _area_never_orchard(published: dict, uretim: dict, alan: dict,
+                        per_tree: dict) -> bool:
+    """Whether this crop's area column fails to describe it ANYWHERE.
+
+    THE CEILING ONE LEVEL UP, AND NO NEW CONSTANT. The cell gate asks whether
+    THIS province's area can hold its trees. When the MEDIAN province cannot,
+    the question was never about a province: `Toplu Meyveliklerin Alani` is not
+    recording this crop's ground at all, and the cells that happen to fall under
+    the bound are no sounder than the ones above it - they are the same
+    bookkeeping, less extreme.
+
+    Measured on the real exports: kizilcik's median province implies 837
+    trees/da (1,2 m2 of ground per tree) and igde's 727 (1,4 m2). Both are past
+    the very bound `_MAX_TREES_PER_DA` already rests on. Their served yields
+    read 12.312 and 11.571 kg/da, which no cornelian cherry or oleaster grows.
+
+    The MEDIAN, so that a handful of scattered-tree provinces costs those cells
+    and never the crop - apple is recorded properly nearly everywhere and must
+    survive whole.
+    """
+    densities, provinces = [], set()
+    for province, by_year in uretim.items():
+        for year, tons in by_year.items():
+            dekar = alan.get(province, {}).get(year)
+            tree = per_tree.get(province, {}).get(year)
+            if (tons and dekar and tree
+                    and published.get(province, {}).get(year) is None):
+                densities.append((tons * 1000.0 / tree) / dekar)
+                provinces.add(province)
+    if len(provinces) < _MIN_PROVINCES_TO_JUDGE_A_CROP:
+        return False
+    return statistics.median(densities) > _MAX_TREES_PER_DA
+
+
 def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
                     per_tree: dict, years) -> int | None:
     """The LATEST year the ceiling refuses this province, or None.
@@ -341,6 +384,14 @@ def build(rows, not_field_area=()) -> dict:
             published, uretim, alan = {}, {}, {}
             refused.append({"crop": labels[crop_id], "province": "*",
                             "year": 0, "reason": "area_is_not_field"})
+
+        # Only the DERIVED half is dropped: the finding is about the area
+        # column, and a published Kg/Dekar figure does not use one.
+        if per_tree and _area_never_orchard(published, uretim, alan, per_tree):
+            uretim, alan = {}, {}
+            refused.append({"crop": labels[crop_id], "province": "*",
+                            "year": 0,
+                            "reason": "crop_median_density_above_ceiling"})
 
         yields: dict[str, list] = {}
         for province in sorted(set(published) | (set(uretim) & set(alan))):
