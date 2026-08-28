@@ -284,7 +284,10 @@ def _crop_block(figures: CropFigures) -> list[str]:
     BRANCH ORDER IS LOAD-BEARING. A genuine absence outranks everything; then
     the per-tree case; only then a missing price. Testing the price first would
     tell a per-tree crop's reader that a price is what stands between them and
-    a revenue figure, which is false.
+    a revenue figure, which is false. `_figures` cannot currently produce a
+    per-tree row with `missing == "fiyat"`, so this order is defence in depth
+    rather than the only thing protecting that reader - a test pins the order
+    itself, directly, so it is not "simplified" away as unreachable.
     """
     if figures.missing == "verim":
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]

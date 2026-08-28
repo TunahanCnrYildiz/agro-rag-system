@@ -392,10 +392,25 @@ def _render(first, second, latest_year=2025):
         inputs, crop_compare.compute(inputs, _table(), latest_year))
 
 
+def _crop_block_lines(text, label):
+    """The lines belonging to one crop's block: the line naming it, plus every
+    line after it up to the next `**`-led block or the blank line that ends
+    it. A structural lookup, not a string-position guess - it stays right
+    however the OTHER crop's label spells or where it sits in the answer."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"**{label}**"))
+    block = [lines[start]]
+    for line in lines[start + 1:]:
+        if not line or line.startswith("**"):
+            break
+        block.append(line)
+    return block
+
+
 def test_a_tree_crop_prints_its_published_unit_and_never_the_derived_figure():
-    text = _render("ayva", "domates (sofralik)")
-    assert "31 kg/ağaç" in text
-    assert "9.500" not in text and "kg/da" not in text.split("Domates")[0]
+    block = "\n".join(_crop_block_lines(_render("ayva", "domates (sofralik)"), "Ayva"))
+    assert "31 kg/ağaç" in block
+    assert "9.500" not in block and "kg/da" not in block
 
 
 def test_a_tree_crop_carries_the_sentence_explaining_the_missing_revenue():
@@ -427,6 +442,21 @@ def test_a_tree_crop_with_no_current_price_drops_the_price_and_keeps_the_rest():
         crop_compare.PER_TREE_NOTE, "")
 
 
+def test_crop_block_puts_per_tree_ahead_of_a_missing_price():
+    """`_figures` can never build a CropFigures that is both `per_tree=True`
+    and `missing == "fiyat"` - the `and not per_tree` guard in `_figures` sees
+    to that. So the branch order in `_crop_block` is currently defended twice:
+    once by that guard, and once by the order itself. This test removes the
+    guard's protection by hand, via `replace`, to pin the order on its own -
+    if a future change ever drops the guard, this is what keeps a per-tree
+    reader from being told a missing price is why there is no revenue figure,
+    when the real reason is the unit."""
+    figures = replace(_figures_for("ayva"), missing="fiyat", price_value=None)
+    lines = crop_compare._crop_block(figures)
+    assert lines[0].startswith("**Ayva**: verim 31 kg/ağaç")
+    assert not any("yayımlanmış fiyat yok" in line for line in lines)
+
+
 def test_a_field_crops_block_is_byte_identical_to_before():
     """The regression that matters: 185 of the 246 crops are not tree crops and
     their answer must not move by one character."""
@@ -435,3 +465,7 @@ def test_a_field_crops_block_is_byte_identical_to_before():
         "**Domates (Sofralık)** · dekara brüt gelir **115.664 TL**")
     assert text.splitlines()[3] == (
         "   verim 5.492,1 kg/da (TÜİK 2025, Konya) × fiyat 21,06 TL/kg (TÜİK 2025)")
+    assert text.splitlines()[6] == (
+        "**Biber (Salçalık, Kapya)** · dekara brüt gelir **125.841 TL**")
+    assert text.splitlines()[7] == (
+        "   verim 3.154,7 kg/da (TÜİK 2025, Konya) × fiyat 39,89 TL/kg (TÜİK 2025)")
