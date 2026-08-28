@@ -250,12 +250,33 @@ def test_a_tree_count_is_optional_for_a_field_crop():
 
 
 def test_a_tree_count_of_zero_is_refused():
+    """Both errors, exactly as a zero AREA reports both its own and the
+    per-area unit's. validate() reports ALL errors rather than the first, and
+    the two out-of-order reads are mirrors of each other - a reader who
+    understands one must not be surprised by the other."""
     inputs, errors = budget.validate(_payload(
         yield_total={"value": "31", "unit": "kg_agac", "source": "user"},
         tree_count={"value": "0", "unit": "adet", "source": "user"}))
     assert inputs is None
-    assert [e.field for e in errors] == ["tree_count"]
+    assert [e.field for e in errors] == ["tree_count", "yield_total"]
     assert errors[0].message == "Ağaç sayısı sıfırdan büyük olmalı."
+    assert errors[1].message == (
+        "Ürün miktarı için ağaç başına değer girdiniz; "
+        "önce ağaç sayısını doldurun.")
+
+
+def test_a_zero_area_and_a_zero_tree_count_report_the_same_shape():
+    """The two out-of-order reads in validate() are mirrors. This pins that:
+    a divergence here was introduced once already, to satisfy a test that was
+    itself wrong."""
+    area = budget.validate(_payload(
+        area={"value": "0", "unit": "donum", "source": "user"},
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))[1]
+    trees = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"},
+        tree_count={"value": "0", "unit": "adet", "source": "user"}))[1]
+    assert [e.field for e in area] == ["area", "yield_total"]
+    assert [e.field for e in trees] == ["tree_count", "yield_total"]
 
 
 def test_the_tree_count_is_read_before_the_field_loop():

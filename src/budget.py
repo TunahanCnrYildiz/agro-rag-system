@@ -295,19 +295,11 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     if trees_error is not None:
         errors.append(trees_error)
     trees = trees_value.amount if trees_value is not None else None
-    # A tree count that was TYPED and rejected already carries its own error
-    # (e.g. "Ağaç sayısı sıfırdan büyük olmalı."); a per-tree field blaming
-    # itself for depending on it would report the same root cause twice. Only
-    # a genuinely unfilled tree count - no error of its own - should produce
-    # the per-tree field's "önce ağaç sayısını doldurun" message. The 0.0 fed
-    # in the other case is discarded: `errors` is already non-empty, so
-    # validate() returns None before any field's parsed amount is used.
-    field_trees = trees if trees_error is None else 0.0
 
     for spec in FIELDS:
         if spec.id in (area_spec.id, trees_spec.id):
             continue
-        value, error = _read(spec, raw, area_da, field_trees)
+        value, error = _read(spec, raw, area_da, trees)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
