@@ -36,6 +36,11 @@ NATIONAL_KEY = "TR"
 NATIONAL_LABEL = "Türkiye"
 
 _MEASURES = ("yield_kg_da", "price_tl_kg")
+# Published only for the 61 crops TUIK gives a Kg/Meyve Veren Agac figure for,
+# so it is validated ONLY WHEN PRESENT. Listing it in _MEASURES instead would
+# make crop.get(...) return None for every field crop, _valid_measure(None)
+# return False, and the whole table empty itself in silence.
+_OPTIONAL_MEASURES = ("yield_kg_tree",)
 _SCOPES = ("il", "tr")
 
 
@@ -83,7 +88,9 @@ def _load() -> dict:
         for crop_id, crop in (raw.get("crops") or {}).items():
             if not isinstance(crop, dict) or not isinstance(crop.get("label"), str):
                 continue
-            if all(_valid_measure(crop.get(m), len(years)) for m in _MEASURES):
+            if (all(_valid_measure(crop.get(m), len(years)) for m in _MEASURES)
+                    and all(_valid_measure(crop[m], len(years))
+                            for m in _OPTIONAL_MEASURES if m in crop)):
                 crops[crop_id] = crop
         return {"years": years, "crops": crops}
     except Exception:  # noqa: BLE001 - a broken data file must not break answering
@@ -112,6 +119,9 @@ class CropNorm:
     label: str
     yield_kg_da: NormValue | None
     price_tl_kg: NormValue | None
+    # Defaulted so the four-argument constructions in the tests keep working,
+    # and because most crops genuinely do not have one.
+    yield_kg_tree: NormValue | None = None
 
 
 def available_crops() -> tuple[tuple[str, str], ...]:
@@ -177,6 +187,8 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
         label=entry["label"],
         yield_kg_da=_pick(entry["yield_kg_da"], years, province),
         price_tl_kg=_pick(entry["price_tl_kg"], years, province),
+        yield_kg_tree=(_pick(entry["yield_kg_tree"], years, province)
+                       if "yield_kg_tree" in entry else None),
     )
 
 

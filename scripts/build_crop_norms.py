@@ -531,6 +531,22 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
             if any(v is not None for v in series):
                 prices[province] = series
 
+        # The published per-tree yield, as a measure rather than as evidence.
+        # NO GATE RUNS ON IT, and that is the whole point: every rule in this
+        # file defends a denominator this script chose, and this figure has
+        # none. The reviewed exclusions above do not reach it either - Dut is
+        # reviewed out of the DERIVED yield because its AREA does not count
+        # the trees its production does, which says nothing about kg per tree.
+        trees: dict[str, list] = {}
+        for province, by_year in per_tree.items():
+            series = [None] * len(years)
+            for year, i in index.items():
+                value = by_year.get(year)
+                if value:      # a zero is refused for the same reason as above
+                    series[i] = round(value, _DECIMALS["verim"])
+            if any(v is not None for v in series):
+                trees[province] = series
+
         # The exports are province-level only, so no national figure was
         # published. The row is required by src/norms.py and ships EMPTY rather
         # than averaged: a mean of the provinces is a number nobody published.
@@ -548,6 +564,14 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                 **prices,
             },
         }
+        # Added only for crops that publish one. An empty measure on every
+        # field crop would be noise in the file and in every diff of it.
+        if trees:
+            trees.setdefault(NATIONAL, [None] * len(years))
+            crops[crop_id]["yield_kg_tree"] = {
+                "scope": "il" if any(k != NATIONAL for k in trees) else "tr",
+                **trees,
+            }
 
     refused.sort(key=lambda r: (r["crop"], r["province"], r["year"]))
     counts: dict[str, int] = {}

@@ -67,6 +67,9 @@ class UnitOption:
     # of the UNIT rather than a second field, so the conversion stays one line
     # and a new per-area unit needs no new branch.
     per_area: bool = False
+    # The same idea for a per-TREE unit, which needs the tree count. TUIK
+    # publishes no per-dekar yield for 61 tree crops, only Kg/Meyve Veren Agac.
+    per_tree: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,12 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("area", "Alan", True, 0.0, True,
               (UnitOption("donum", "dönüm", 1.0),
                UnitOption("hektar", "hektar", 10.0))),
+    # Optional, and enforced by the UNIT rather than by `required`: this flag is
+    # a property of the field, not of the crop the farmer picked, so a
+    # conditionally-required field would need a mechanism that does not exist
+    # here. A wheat budget must not be made to name a number of trees.
+    FieldSpec("tree_count", "Ağaç sayısı", False, 0.0, True,
+              (UnitOption("adet", "adet", 1.0),)),
     # "Toplam" would be wrong under kg/dekar, so the label is neutral across all
     # three units. The per-dekar unit exists because TUIK publishes yields that
     # way and P2b prefills them; a farmer stating their own harvest still picks
@@ -93,7 +102,8 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
                UnitOption("ton", "ton", 1000.0),
-               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True))),
+               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True),
+               UnitOption("kg_agac", "kg/ağaç", 1.0, per_tree=True))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -166,7 +176,8 @@ def coerce_number(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict, area_da: float | None
+def _read(spec: FieldSpec, raw: dict, area_da: float | None,
+          trees: float | None = None
           ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
@@ -198,13 +209,28 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None
                 f"önce alanı doldurun.")
         amount = amount * area_da
 
+    if unit.per_tree:
+        if trees is None:
+            # Refused, never multiplied by a guessed count and never zeroed -
+            # the per_area rule, on the other denominator.
+            return None, FieldError(
+                spec.id,
+                f"{spec.label} için ağaç başına değer girdiniz; "
+                f"önce ağaç sayısını doldurun.")
+        amount = amount * trees
+
     claimed = "norm" if entry.get("source") == "norm" else "user"
     return Value(amount * unit.factor, claimed), None
 
 
-# Which submitted field each norm measure prefills, and how that cell is built.
-_VERIFIED = (("yield_total", "yield_kg_da", "yield", None),
-             ("price", "price_tl_kg", "price", 2))
+# Which submitted field each norm claim is checked against, and how that cell is
+# built. The yield's builder takes the ROW because which measure a row was served
+# from is a property of the row, not of the field - see _yield_cell.
+_VERIFIED = (
+    ("yield_total", lambda row: _yield_cell(row)),
+    ("price", lambda row: _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2,
+                                     show_range=False)),
+)
 
 
 def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, object | None]:
@@ -228,13 +254,11 @@ def _verify(values: dict, raw: dict, crop: str | None, table) -> tuple[dict, obj
     if crop is not None:
         row = next((r for r in (table or ()) if r.crop == crop), None)
 
-    for field_id, measure, unit_key, decimals in _VERIFIED:
+    for field_id, build in _VERIFIED:
         value = values.get(field_id)
         if value is None or value.source != "norm":
             continue
-        cell = (None if row is None
-                else _norm_cell(getattr(row, measure), *_NORM_UNITS[unit_key], decimals,
-                                 show_range=unit_key == "yield"))
+        cell = None if row is None else build(row)
         entry = raw.get(field_id) or {}
         if (cell is not None
                 and entry.get("value") == cell["value"]
@@ -266,10 +290,19 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
         errors.append(area_error)
     area_da = area_value.amount if area_value is not None else None
 
+    # Read out of FIELDS order for the same reason as the area: a per-tree unit
+    # cannot be converted without it, and that order is a layout decision.
+    trees_spec = _FIELDS_BY_ID["tree_count"]
+    trees_value, trees_error = _read(trees_spec, raw, area_da)
+    values[trees_spec.id] = trees_value
+    if trees_error is not None:
+        errors.append(trees_error)
+    trees = trees_value.amount if trees_value is not None else None
+
     for spec in FIELDS:
-        if spec.id == area_spec.id:
+        if spec.id in (area_spec.id, trees_spec.id):
             continue
-        value, error = _read(spec, raw, area_da)
+        value, error = _read(spec, raw, area_da, trees)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
@@ -293,7 +326,8 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
 
 # The unit each measure is published in, and how it is written when it appears
 # inside a sentence rather than on a chip.
-_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg")}
+_NORM_UNITS = {"yield": ("kg_da", "kg/da"), "price": ("tl_kg", "TL/kg"),
+               "yield_tree": ("kg_agac", "kg/ağaç")}
 
 
 def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
@@ -331,6 +365,24 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     }
 
 
+def _yield_cell(row) -> dict | None:
+    """This row's yield cell.
+
+    A row is served PER TREE exactly when its `yield_kg_tree` resolved - no
+    list of crops, no flag, no name matching. TUIK publishes no per-dekar yield
+    for 61 tree crops, and the kg/da this project derives for them divides a
+    province's whole production by the few dekars of COMPACT orchard it
+    records; the published per-tree figure has no such denominator. So per-tree
+    wins wherever it exists, which is the same precedence the builder already
+    applies in the other direction.
+    """
+    if row.yield_kg_tree is not None:
+        return _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+                          show_range=True)
+    return _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
+                      show_range=True)
+
+
 def _crop_rows(table, latest_year: int | None) -> list[dict]:
     """Every crop's figures, for a card that picks one of them client-side.
 
@@ -351,8 +403,7 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
         rows.append({
             "id": row.crop,
             "label": row.label,
-            "yield": _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
-                                 show_range=True),
+            "yield": _yield_cell(row),
             "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
         })
     return rows

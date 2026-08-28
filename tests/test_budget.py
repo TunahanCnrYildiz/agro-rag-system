@@ -211,6 +211,89 @@ def test_form_spec_attaches_an_error_to_its_own_field_only():
     assert by_id["area"]["error"] is None
 
 
+def _payload(**over):
+    """A complete, valid field-crop submission. Overrides replace one entry."""
+    base = {
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "yield_total": {"value": "4000", "unit": "kg", "source": "user"},
+        "price": {"value": "12,50", "unit": "tl_kg", "source": "user"},
+    }
+    base.update(over)
+    return base
+
+
+def test_a_per_tree_value_without_a_tree_count_is_refused():
+    """The exact mirror of the per-area rule: refused, never multiplied by a
+    guessed count and never zeroed."""
+    inputs, errors = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"}))
+    assert inputs is None
+    assert [e.field for e in errors] == ["yield_total"]
+    assert errors[0].message == (
+        "Ürün miktarı için ağaç başına değer girdiniz; "
+        "önce ağaç sayısını doldurun.")
+
+
+def test_a_per_tree_value_is_multiplied_by_the_tree_count():
+    inputs, errors = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"},
+        tree_count={"value": "120", "unit": "adet", "source": "user"}))
+    assert errors == []
+    assert inputs.yield_kg.amount == 3720.0
+
+
+def test_a_tree_count_is_optional_for_a_field_crop():
+    """A wheat budget must not be made to name a number of trees."""
+    inputs, errors = budget.validate(_payload())
+    assert errors == []
+    assert inputs.yield_kg.amount == 4000.0
+
+
+def test_a_tree_count_of_zero_is_refused():
+    """Both errors, exactly as a zero AREA reports both its own and the
+    per-area unit's. validate() reports ALL errors rather than the first, and
+    the two out-of-order reads are mirrors of each other - a reader who
+    understands one must not be surprised by the other."""
+    inputs, errors = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"},
+        tree_count={"value": "0", "unit": "adet", "source": "user"}))
+    assert inputs is None
+    assert [e.field for e in errors] == ["tree_count", "yield_total"]
+    assert errors[0].message == "Ağaç sayısı sıfırdan büyük olmalı."
+    assert errors[1].message == (
+        "Ürün miktarı için ağaç başına değer girdiniz; "
+        "önce ağaç sayısını doldurun.")
+
+
+def test_a_zero_area_and_a_zero_tree_count_report_the_same_shape():
+    """The two out-of-order reads in validate() are mirrors. This pins that:
+    a divergence here was introduced once already, to satisfy a test that was
+    itself wrong."""
+    area = budget.validate(_payload(
+        area={"value": "0", "unit": "donum", "source": "user"},
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))[1]
+    trees = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"},
+        tree_count={"value": "0", "unit": "adet", "source": "user"}))[1]
+    assert [e.field for e in area] == ["area", "yield_total"]
+    assert [e.field for e in trees] == ["tree_count", "yield_total"]
+
+
+def test_the_tree_count_is_read_before_the_field_loop():
+    """FIELDS order is a layout decision, not a contract - the same reason
+    `area` is read out of order. Moving tree_count to the end of FIELDS must
+    not break a per-tree conversion."""
+    order = [f.id for f in budget.FIELDS]
+    assert "tree_count" in order
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "120", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "31", "unit": "kg_agac", "source": "user"},
+        "price": {"value": "12,50", "unit": "tl_kg", "source": "user"},
+    })
+    assert errors == [] and inputs.yield_kg.amount == 3720.0
+
+
 def _computed(**kwargs):
     inputs, errors = budget.validate(_raw(**kwargs))
     assert errors == [], errors
@@ -433,8 +516,9 @@ def test_the_yield_label_reads_correctly_under_every_unit_it_offers():
     unit is the mismatch the selector exists to prevent."""
     spec = next(f for f in budget.FIELDS if f.id == "yield_total")
     assert "toplam" not in spec.label.lower()
-    assert [u.id for u in spec.units] == ["kg", "ton", "kg_da"]
-    assert [u.per_area for u in spec.units] == [False, False, True]
+    assert [u.id for u in spec.units] == ["kg", "ton", "kg_da", "kg_agac"]
+    assert [u.per_area for u in spec.units] == [False, False, True, False]
+    assert [u.per_tree for u in spec.units] == [False, False, False, True]
 
 
 def test_the_original_units_are_untouched():
@@ -461,23 +545,31 @@ def _table():
     )
 
 
-def test_a_form_with_no_table_is_byte_identical_to_p1():
+def test_the_form_with_no_table_is_pinned_as_a_literal():
     """An old deployed client reads this dict, so it is pinned as a LITERAL.
 
     Rebuilding the expected value from budget.FIELDS with the same comprehension
     form_spec uses would assert only that the function is itself - it would
     follow any change to a label, a unit id or the key set rather than catch it.
-    A wire contract is pinned by writing it out."""
+    A wire contract is pinned by writing it out.
+
+    Changed 2026-08-28: `tree_count` and the `kg/ağaç` unit were added. The
+    client renders `form.fields` and each field's `units` generically, so both
+    appear on an already-deployed build without a release."""
     assert budget.form_spec([]) == {
         "fields": [
             {"id": "area", "label": "Alan", "required": True,
              "units": [{"id": "donum", "label": "dönüm"},
                        {"id": "hektar", "label": "hektar"}],
              "value": "", "source": "empty", "error": None},
+            {"id": "tree_count", "label": "Ağaç sayısı", "required": False,
+             "units": [{"id": "adet", "label": "adet"}],
+             "value": "", "source": "empty", "error": None},
             {"id": "yield_total", "label": "Ürün miktarı", "required": True,
              "units": [{"id": "kg", "label": "kg"},
                        {"id": "ton", "label": "ton"},
-                       {"id": "kg_da", "label": "kg/dekar"}],
+                       {"id": "kg_da", "label": "kg/dekar"},
+                       {"id": "kg_agac", "label": "kg/ağaç"}],
              "value": "", "source": "empty", "error": None},
             {"id": "price", "label": "Fiyat", "required": True,
              "units": [{"id": "tl_kg", "label": "TL/kg"},
@@ -498,6 +590,76 @@ def test_a_table_ships_every_crop_with_its_figures():
     assert cell["unit"] == "kg_da"
     assert cell["note"] == "TÜİK 2025, Ordu"
     assert cell["recent"] == "önceki 5 yıl: 73,7–105,6 kg/da"
+
+
+def _tree_table():
+    """Ayva carries a per-tree figure; Mısır does not."""
+    return (
+        CropNorm("ayva", "Ayva",
+                 NormValue(13419.4, 2025, "il", "Karabük", None, None),
+                 NormValue(19.0, 2025, "il", "Karabük", None, None),
+                 NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)),
+        CropNorm("misir", "Mısır",
+                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 NormValue(8.0, 2025, "tr", "Türkiye", None, None)),
+    )
+
+
+def test_a_row_with_a_per_tree_figure_prefills_it_instead_of_the_derived_one():
+    """THE POINT OF THE CHANGE. Karabük's derived kg/da is 13.419 - a quince
+    yield roughly four times any real one, because the numerator counts every
+    tree in the province and the denominator counts 31 dekars of compact
+    orchard. The published 31 kg/agac needs no denominator at all."""
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][0]["yield"]
+    assert cell["value"] == "31"
+    assert cell["unit"] == "kg_agac"
+    assert cell["note"] == "TÜİK 2025, Karabük"
+
+
+def test_the_per_tree_cell_shows_its_own_five_year_range():
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["recent"] == "önceki 5 yıl: 27–28 kg/ağaç"
+
+
+def test_a_row_without_a_per_tree_figure_still_prefills_kg_da():
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][1]["yield"]
+    assert cell["value"] == "1.100"
+    assert cell["unit"] == "kg_da"
+
+
+def test_a_per_tree_norm_claim_is_confirmed_against_the_per_tree_cell():
+    """_verify compares the served TEXT and unit. A claim must be checked
+    against the very cell that was sent, or a per-tree submission would be
+    compared to a kg/da cell, never match, and silently downgrade to "user" -
+    the answer would then drop TUIK's name from a figure that is TUIK's."""
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "120", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "31", "unit": "kg_agac", "source": "norm"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+        "crop": "ayva",
+    }, _tree_table())
+    assert errors == []
+    assert inputs.yield_kg.source == "norm"
+    assert inputs.yield_kg.note == "TÜİK 2025, Karabük"
+    assert inputs.yield_kg.amount == 3720.0
+
+
+def test_a_per_tree_claim_that_does_not_match_what_we_served_downgrades():
+    """The farmer's own figure wearing TUIK's name is the thing this guard
+    exists to stop."""
+    inputs, errors = budget.validate({
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "120", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "45", "unit": "kg_agac", "source": "norm"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+        "crop": "ayva",
+    }, _tree_table())
+    assert errors == []
+    assert inputs.yield_kg.source == "user"
+    assert inputs.yield_kg.note is None
 
 
 def test_a_price_cell_carries_two_decimals_and_its_own_unit():
