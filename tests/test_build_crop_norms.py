@@ -486,6 +486,77 @@ def test_the_cell_gate_alone_leaves_the_sound_looking_cells_standing():
     assert len(_provinces_served(out, "kizilcik")) == 4
 
 
+def _years(crop, province, densities, tons=100.0, per_tree=25.0, start=2016):
+    """One cell per year for ONE province, each at a chosen implied density."""
+    trees = tons * 1000.0 / per_tree
+    out = []
+    for i, per_da in enumerate(densities):
+        out += [R(province, crop, start + i, "uretim", tons),
+                R(province, crop, start + i, "alan", trees / per_da),
+                R(province, crop, start + i, "verim_agac", per_tree)]
+    return out
+
+
+def test_a_province_whose_median_year_cannot_hold_its_trees_is_refused():
+    """THE MIDDLE GRANULARITY: cell, then PROVINCE, then crop - same geometric
+    bound at each, no new constant.
+
+    The last year here sits at 100 trees/da, so the cell gate passes it, and the
+    ceiling shadow cannot reach it either because the refusals are all EARLIER
+    and the shadow only falls backwards. Yet this province's median year implies
+    0,7 m2 of ground per tree: its `Toplu Meyveliklerin Alani` is not recording
+    where the fruit came from, and the one year that looks sound is the same
+    bookkeeping on a better day.
+
+    Measured: 165 of 1.917 (crop, province) pairs qualify; because the cell gate
+    and the shadow already take most of them, this removes 14 SERVED cells -
+    Erik/Tunceli at 0,8 m2 per tree, Incir/Karaman at 0,4, Ayva/Hatay at 0,9.
+    """
+    out = bcn.build(_years("Ayva", "Karabük", [1500, 1400, 1450, 100]))
+    assert _provinces_served(out, "ayva") == []
+
+
+def test_the_province_refusal_is_recorded_once_under_its_own_reason():
+    record = bcn.build(_years("Ayva", "Karabük", [1500, 1400, 1450, 100]))         ["meta"]["refused_yield_cells"]
+    mine = [c for c in record["cells"]
+            if c["reason"] == "province_median_density_above_ceiling"]
+    assert mine == [{"crop": "Ayva", "province": "Karabük", "year": 0,
+                     "reason": "province_median_density_above_ceiling"}]
+
+
+def test_a_sound_province_with_one_wild_year_keeps_the_rest():
+    """THE MISTAKE THIS RULE MUST NOT MAKE. The median is used precisely so one
+    bad year costs that year and never the province.
+
+    The wild year is FIRST on purpose: put it in the middle and the ceiling
+    shadow - which refuses everything EARLIER than a ceiling refusal - would
+    blank the sound years ahead of it and the province rule would look
+    innocent. This orders the fixture so only the rule under test can act."""
+    out = bcn.build(_years("Ayva", "Tokat", [5000, 80, 79, 81]))
+    assert out["crops"]["ayva"]["yield_kg_da"]["Tokat"] == [None, 2000.0,
+                                                            1975.0, 2025.0]
+
+
+def test_a_province_recorded_in_too_few_years_is_not_judged_as_a_province():
+    """A median over one or two years describes those years, not how the
+    province keeps its books. Those cells are left to the cell gate, which is
+    what already judges them."""
+    out = bcn.build(_years("Ayva", "Karabük", [1500, 100]))
+    reasons = {c["reason"] for c in
+               out["meta"]["refused_yield_cells"]["cells"]}
+    assert "province_median_density_above_ceiling" not in reasons
+    assert out["crops"]["ayva"]["yield_kg_da"]["Karabük"] == [None, 2500.0]
+
+
+def test_a_published_yield_survives_the_province_gate():
+    """Only the DERIVED half goes - the same line every rule in this file holds."""
+    rows = _years("Ayva", "Karabük", [1500, 1400, 1450, 100])
+    rows += [R("Karabük", "Ayva", 2019, "verim", 1200.0)]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Karabük"] == [None, None,
+                                                              None, 1200.0]
+
+
 def test_a_crop_whose_median_province_cannot_hold_its_trees_yields_nothing():
     """THE CEILING ONE LEVEL UP. The per-cell gate asks whether THIS province's
     area can hold its trees. When the MEDIAN province cannot, the answer is not

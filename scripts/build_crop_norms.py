@@ -280,6 +280,51 @@ def _area_never_orchard(published: dict, uretim: dict, alan: dict,
     return statistics.median(densities) > _MAX_TREES_PER_DA
 
 
+# A median over one or two years describes THOSE YEARS, not how the province
+# keeps its books, and the cell gate already judges them one by one.
+_MIN_YEARS_TO_JUDGE_A_PROVINCE = 3
+
+
+def _province_area_never_orchard(province: str, published: dict, uretim: dict,
+                                 alan: dict, per_tree: dict) -> bool:
+    """Whether THIS province's area column fails to record THIS crop's ground.
+
+    THE MIDDLE GRANULARITY, AND STILL NO NEW CONSTANT. `_density_verdict` asks
+    the geometric question of one cell and `_area_never_orchard` asks it of a
+    whole crop; between them sits the case both miss - a crop that is recorded
+    properly nearly everywhere, in a province that records it as scattered
+    trees every single year.
+
+    Neither existing rule can reach it. The cells are individually under the
+    bound, and `_ceiling_shadow` only falls BACKWARDS, so a province whose bad
+    years all precede a merely-less-bad recent one keeps serving that recent
+    one. Measured: 165 of 1.917 (crop, province) pairs have a median year past
+    the bound; the cell gate and the shadow already take most, so this removes
+    14 SERVED cells - Erik/Tunceli at 0,8 m2 of ground per tree, Incir/Karaman
+    at 0,4, Ayva/Hatay at 0,9.
+
+    THE MEDIAN, so one wild year costs that year and never the province.
+
+    NOTE WHAT THIS STILL DOES NOT REACH: Ayva/Karabük's median implies 2,4 m2
+    per tree - past what any quince stands at, but not past the 2,25 m2 this
+    bound already permits, so it survives and keeps serving 13.419 kg/da.
+    Closing it means a bound somewhere in 2,25-4 m2, which sweeps 44 served
+    cells and would condemn spacings that are real for super-spindle apple
+    (~3,15 m2). That is the per-crop-bound path measured and closed on
+    2026-08-28; see docs/superpowers/2026-08-28-ceiling-findings.md.
+    """
+    densities = []
+    for year, tons in uretim.get(province, {}).items():
+        dekar = alan.get(province, {}).get(year)
+        tree = per_tree.get(province, {}).get(year)
+        if (tons and dekar and tree
+                and published.get(province, {}).get(year) is None):
+            densities.append((tons * 1000.0 / tree) / dekar)
+    if len(densities) < _MIN_YEARS_TO_JUDGE_A_PROVINCE:
+        return False
+    return statistics.median(densities) > _MAX_TREES_PER_DA
+
+
 def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
                     per_tree: dict, years) -> int | None:
     """The LATEST year the ceiling refuses this province, or None.
@@ -427,6 +472,14 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
             # can be written.
             shadow = (_ceiling_shadow(province, published, uretim, alan,
                                       per_tree, index) if per_tree else None)
+            # Recorded once for the province, not once per cell - the finding
+            # is about the column, and a per-cell line would say the wrong thing.
+            no_orchard = bool(per_tree) and _province_area_never_orchard(
+                province, published, uretim, alan, per_tree)
+            if no_orchard:
+                refused.append({"crop": labels[crop_id], "province": province,
+                                "year": 0,
+                                "reason": "province_median_density_above_ceiling"})
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
@@ -436,6 +489,8 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     # halves exist. Ton -> kg is the 1000.
                     tons = uretim.get(province, {}).get(year)
                     dekar = alan.get(province, {}).get(year)
+                    if no_orchard:
+                        continue          # already refused, once, above
                     if tons is not None and dekar:
                         reason = (_density_verdict(
                                       tons, dekar,
