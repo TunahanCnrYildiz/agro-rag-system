@@ -120,8 +120,15 @@ one can.
 one multiplication per crop, `ATTRIBUTION`, `NO_PROVINCE`, `ASK_FOR_CROPS`,
 `COMPUTE_FAILED`.
 
-**A field-or-vegetable pair must render byte-identically to today.** A regression test
-pins this rather than trusting it.
+**Each field-or-vegetable pair's per-crop BLOCK must render byte-identically to today.**
+A regression test pins this rather than trusting it. The CLOSING SENTENCE does not carry
+the same guarantee: where exactly one crop prints a revenue, `NOT_PROFIT` is replaced by
+the shorter `GROSS_ONLY` (see "`NOT_PROFIT` tightens" above) — a later, deliberate change.
+Measured on 2.520 real field/vegetable pairs: every block matched, but 667 pairs' closing
+sentence changed this way (e.g. Aksaray's `marul (kıvırcık)` + `dereotu`, where the lettuce
+has no current price so only one revenue prints). `NOT_PROFIT` bundles a gross-revenue
+caveat with a refusal to rank; a single revenue has nothing to rank against, so only the
+caveat half still applies.
 
 The client is untouched: this route returns plain text, not a card.
 
@@ -129,14 +136,15 @@ The client is untouched: this route returns plain text, not a card.
 
 - A tree crop prints no revenue, prints the `kg/ağaç` unit, and carries its explanation.
 - A field crop's block is byte-identical to today (regression).
-- Mixed pair: the field crop's revenue shows, the tree crop's does not, the single-revenue
-  sentence appears, `NOT_PROFIT` does NOT.
+- Mixed pair: the field crop's revenue shows, the tree crop's does not, `GROSS_ONLY` and
+  the single-revenue sentence both appear, `NOT_PROFIT` does NOT.
 - Two tree crops: no revenue anywhere, no `NOT_PROFIT`, no single-revenue sentence, two
   explanations.
 - Two field crops: two revenues, `NOT_PROFIT` present, no single-revenue sentence.
 - **One field crop with a revenue beside a crop this province publishes NOTHING for:** the
-  single-revenue sentence is absent, because its stated reason would be false. `NOT_PROFIT`
-  is absent too.
+  single-revenue sentence is absent, because its stated reason would be false — but the one
+  revenue that did print is still gross, so `GROSS_ONLY` appears alone. `NOT_PROFIT` is
+  absent.
 - A tree crop with a stale price: no price clause, no second reason for the missing
   revenue, yield still per-tree.
 - A tree crop with no yield at all still reports `missing == "verim"` — `per_tree` must not

@@ -382,6 +382,12 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
         # itself uses internally (gross caveat, then the comparison refusal),
         # so the one-sentence and two-sentence forms read the same way.
         lines.extend(["", GROSS_ONLY])
+        # The rule is "the crop with NO revenue is per-tree"; `any` asks the
+        # weaker "either crop is per-tree". They coincide only because
+        # `_figures` never lets a per_tree row carry a revenue - the same
+        # invariant `_crop_block`'s branch order leans on. If this route ever
+        # computed a per-tree revenue, `any` would start firing on the crop
+        # WITH the money figure instead of the one without.
         if any(crop.per_tree for crop in figures):
             lines.append(ONLY_ONE_REVENUE)
     return "\n".join(lines)
