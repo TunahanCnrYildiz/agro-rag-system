@@ -250,6 +250,14 @@ NOT_PROFIT = (
     "girerek bütçe hesabı yaptırırsanız kâr karşılaştırmasını yapabilirsiniz."
 )
 
+# Written BY CODE and printed under the crop it explains, never at the foot of
+# the answer - a reader must not have to work out which crop it refers to.
+PER_TREE_NOTE = (
+    "TÜİK bu ürünün verimini ağaç başına yayımlıyor; dekara çevirmek "
+    "yayımlanmayan bir dikim sıklığı gerektirdiği için dekara gelir "
+    "hesaplamıyorum."
+)
+
 ASK_FOR_CROPS = (
     "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
     "ilinizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
@@ -271,9 +279,32 @@ COMPUTE_FAILED = (
 
 
 def _crop_block(figures: CropFigures) -> list[str]:
-    """One crop's lines. Says what is missing rather than printing a blank."""
+    """One crop's lines. Says what is missing rather than printing a blank.
+
+    BRANCH ORDER IS LOAD-BEARING. A genuine absence outranks everything; then
+    the per-tree case; only then a missing price. Testing the price first would
+    tell a per-tree crop's reader that a price is what stands between them and
+    a revenue figure, which is false.
+    """
     if figures.missing == "verim":
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
+
+    if figures.per_tree:
+        y = figures.yield_value
+        head = (f"**{figures.label}**: verim {format_qty(y.amount)} kg/ağaç "
+                f"(TÜİK {y.year}, {y.region})")
+        if figures.price_value is not None:
+            # A comma, not the revenue line's `×`: that sign announces a
+            # product, and this route computes none for a per-tree crop.
+            head += (f", fiyat {format_tr(figures.price_value.amount, 2)} TL/kg "
+                     f"(TÜİK {figures.price_value.year})")
+        lines = [head]
+        if y.recent_min is not None and y.recent_max is not None:
+            lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
+                         f"{format_qty(y.recent_max)} kg/ağaç")
+        lines.append(f"   {PER_TREE_NOTE}")
+        return lines
+
     if figures.missing == "fiyat":
         return [f"**{figures.label}**: verim {format_qty(figures.yield_value.amount)} "
                 f"kg/da (TÜİK {figures.yield_value.year}, {figures.yield_value.region}), "

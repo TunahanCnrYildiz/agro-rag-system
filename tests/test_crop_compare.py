@@ -383,3 +383,55 @@ def test_the_five_year_range_reaches_the_answer():
     inputs, _ = crop_compare.validate(_raw(), _table())
     text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
     assert "önceki" in text
+
+
+def _render(first, second, latest_year=2025):
+    inputs, errors = crop_compare.validate(_raw(first, second), _table())
+    assert errors == []
+    return crop_compare.render(
+        inputs, crop_compare.compute(inputs, _table(), latest_year))
+
+
+def test_a_tree_crop_prints_its_published_unit_and_never_the_derived_figure():
+    text = _render("ayva", "domates (sofralik)")
+    assert "31 kg/ağaç" in text
+    assert "9.500" not in text and "kg/da" not in text.split("Domates")[0]
+
+
+def test_a_tree_crop_carries_the_sentence_explaining_the_missing_revenue():
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.PER_TREE_NOTE in text
+
+
+def test_a_tree_crops_price_is_joined_with_a_comma_not_a_times_sign():
+    """`×` announces a product, and there is none - the revenue was refused."""
+    text = _render("ayva", "domates (sofralik)")
+    line = next(l for l in text.splitlines() if l.startswith("**Ayva**"))
+    assert "fiyat 19,00 TL/kg" in line and "×" not in line
+
+
+def test_a_tree_crops_five_year_range_reads_in_its_own_unit():
+    text = _render("ayva", "domates (sofralik)")
+    assert "verimde önceki 5 yıl: 25–28 kg/ağaç" in text
+
+
+def test_a_tree_crop_with_no_current_price_drops_the_price_and_keeps_the_rest():
+    """One absence, one reason. Naming the price too would suggest supplying
+    one restores a revenue this route will not compute either way."""
+    text = _render("ayva", "ceviz", latest_year=2099)
+    line = next(l for l in text.splitlines() if l.startswith("**Ayva**"))
+    assert "fiyat" not in line
+    assert "31 kg/ağaç" in line
+    assert crop_compare.PER_TREE_NOTE in text
+    assert "gelir hesaplamıyorum." not in text.replace(
+        crop_compare.PER_TREE_NOTE, "")
+
+
+def test_a_field_crops_block_is_byte_identical_to_before():
+    """The regression that matters: 185 of the 246 crops are not tree crops and
+    their answer must not move by one character."""
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert text.splitlines()[2] == (
+        "**Domates (Sofralık)** · dekara brüt gelir **115.664 TL**")
+    assert text.splitlines()[3] == (
+        "   verim 5.492,1 kg/da (TÜİK 2025, Konya) × fiyat 21,06 TL/kg (TÜİK 2025)")
