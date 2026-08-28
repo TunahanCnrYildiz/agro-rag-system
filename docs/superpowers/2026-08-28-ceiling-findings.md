@@ -135,6 +135,52 @@ have put a false statement about mulberry into the committed audit record, which
 same "a statement about one thing filed as a statement about another" that blocked both the
 fruit yield gate and P3a. Cost: 37 served cells; 69 mulberry price cells untouched.
 
+## Addendum, same day: Ayva/Karabük and the MIDDLE granularity
+
+Looked at because it became the highest served fruit figure. **Ayva as a crop is sound** —
+median 79 trees/da = 12,7 m² per tree = 3,6 m spacing, right for quince — so the crop-level
+rule would have been a large over-reach. The defect is per-PROVINCE: 15 of ayva's 71
+provinces have a median implying under 4 m² per tree (Kayseri 0,1; Ordu 0,2; Trabzon 0,2).
+Karabük itself records 7, 7, 10, 10 dekar of compact quince orchard in 2016-2019 — against
+231-280 tons — then steps to 31-38 dekar, and still implies 433 trees/da.
+
+**Shipped: `_province_area_never_orchard`, the same bound at the granularity between the
+two that already existed.** Cell → PROVINCE → crop, one geometric argument, no new
+constant. 165 of 1.917 (crop, province) pairs have a median year past the bound; because
+the cell gate and the shadow already take most of them, it removes **14 served cells** —
+Erik/Tunceli at 0,8 m² per tree, İncir/Karaman at 0,4, Ayva/Hatay at 0,9. Median not mean,
+so one wild year costs that year and never the province; at least 3 years before a province
+is judged as a province.
+
+**It does NOT close Karabük, and that was decided rather than missed.** Karabük's median
+implies 2,4 m² per tree — past what a quince stands at, but not past the 2,25 m² this bound
+already permits. Closing it means a bound somewhere in 2,25-4 m², and that band holds **44
+served cells** including `Elma (Golden)/Edirne` at 3,3 m² — a spacing that is real for
+super-spindle apple (0,9 m in-row × 3,5 m between rows ≈ 3,15 m²). Geometry cannot condemn
+3,3 m²; what condemns Edirne is its 11.873 kg/da, which is a different argument. That is
+exactly the per-crop-bound path measured and closed above, so it was not reopened on the
+same evidence.
+
+The band structure, which is the clearest thing this round produced:
+
+| province-median implies | served cells | their median yield |
+|---|---|---|
+| < 2,25 m² (past the bound) | 14 | 2.139 kg/da |
+| **2,25 - 4 m² ← Karabük** | **44** | **3.722** |
+| 4 - 6 m² | 66 | 2.940 |
+| 6 - 9 m² | 70 | 1.924 |
+| > 9 m² | 1.388 | **602** |
+
+Monotone: the less ground each tree implies, the more inflated the served yield. The sound
+population sits at 602 kg/da and Karabük's band is six times it. **Ayva/Karabük stays open
+knowingly, at 13.419 kg/da**, and `kg/ağaç` dissolves it along with the rest.
+
+**A test caught the test, again.** The province rule's guard case — "one wild year must cost
+that year, not the province" — went red against correct code: the wild year was in the
+MIDDLE, and the ceiling shadow shipped that morning had already blanked everything before
+it, so the expectation was wrong, not the builder. Moving the wild year to the front made
+the fixture test only the rule under test. Third instance in one day of the same class.
+
 **Caveat on this round's own numbers:** "more than 5× its crop's median" measures
 suspicion, not proven error. Each flagged cell was not individually shown impossible. What
 IS shown is that the density gate is not positioned to tell them apart.

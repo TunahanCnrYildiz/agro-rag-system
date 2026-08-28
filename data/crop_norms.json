@@ -29,10 +29,11 @@
   },
   "refused_yield_cells": {
    "counts": {
-    "no_per_tree_figure": 334,
-    "density_above_ceiling": 871,
-    "density_below_floor": 336,
-    "shadowed_by_ceiling_refusal": 209,
+    "no_per_tree_figure": 333,
+    "province_median_density_above_ceiling": 95,
+    "density_above_ceiling": 148,
+    "density_below_floor": 335,
+    "shadowed_by_ceiling_refusal": 143,
     "area_excludes_the_trees": 1,
     "crop_median_density_above_ceiling": 2,
     "area_is_not_field": 1
@@ -47,62 +48,8 @@
     {
      "crop": "Armut",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Armut",
@@ -137,80 +84,14 @@
     {
      "crop": "Armut",
      "province": "Rize",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Rize",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Rize",
-     "year": 2018,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Armut",
      "province": "Trabzon",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Armut",
-     "province": "Trabzon",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Avokado",
@@ -347,56 +228,8 @@
     {
      "crop": "Ayva",
      "province": "Düzce",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Düzce",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
@@ -443,32 +276,8 @@
     {
      "crop": "Ayva",
      "province": "Hatay",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Hatay",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Hatay",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Hatay",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Hatay",
-     "year": 2020,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
@@ -527,62 +336,8 @@
     {
      "crop": "Ayva",
      "province": "Kayseri",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kayseri",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
@@ -593,320 +348,38 @@
     {
      "crop": "Ayva",
      "province": "Kırşehir",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Kırşehir",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
      "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
      "province": "Sinop",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Sinop",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
      "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Trabzon",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Ayva",
      "province": "Zonguldak",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Ayva",
-     "province": "Zonguldak",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Badem",
@@ -1715,62 +1188,8 @@
     {
      "crop": "Diğer Elmalar",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Diğer Elmalar",
@@ -1781,122 +1200,14 @@
     {
      "crop": "Diğer Elmalar",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Diğer Elmalar",
      "province": "Rize",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Rize",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Diğer Elmalar",
@@ -1925,86 +1236,14 @@
     {
      "crop": "Diğer Elmalar",
      "province": "Trabzon",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Elmalar",
-     "province": "Trabzon",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Diğer Portakallar",
      "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Portakallar",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Portakallar",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Diğer Portakallar",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Diğer Tropikal Ve Subtropikal Meyveler (Frenk İnciri Hariç)",
@@ -2435,56 +1674,8 @@
     {
      "crop": "Elma (Amasya)",
      "province": "Artvin",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Amasya)",
-     "province": "Artvin",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2663,122 +1854,14 @@
     {
      "crop": "Elma (Golden)",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Elma (Golden)",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Golden)",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Elma (Golden)",
@@ -2891,62 +1974,8 @@
     {
      "crop": "Elma (Starking)",
      "province": "Düzce",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Düzce",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Elma (Starking)",
@@ -2963,62 +1992,8 @@
     {
      "crop": "Elma (Starking)",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Elma (Starking)",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Elma (Starking)",
@@ -3119,62 +2094,8 @@
     {
      "crop": "Erik",
      "province": "Bolu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Bolu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
@@ -3203,62 +2124,8 @@
     {
      "crop": "Erik",
      "province": "Karabük",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Karabük",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
@@ -3323,272 +2190,32 @@
     {
      "crop": "Erik",
      "province": "Kırşehir",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Kırşehir",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
      "province": "Sinop",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Sinop",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
      "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Trabzon",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
      "province": "Tunceli",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Tunceli",
-     "year": 2022,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
@@ -3647,122 +2274,14 @@
     {
      "crop": "Erik",
      "province": "Çankırı",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çankırı",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
      "province": "Çorum",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Erik",
-     "province": "Çorum",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Erik",
@@ -4403,62 +2922,8 @@
     {
      "crop": "Kayısı",
      "province": "Edirne",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Edirne",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kayısı",
@@ -4475,32 +2940,8 @@
     {
      "crop": "Kayısı",
      "province": "Kastamonu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Kastamonu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Kastamonu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Kastamonu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Kastamonu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kayısı",
@@ -4535,80 +2976,14 @@
     {
      "crop": "Kayısı",
      "province": "Çankırı",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çankırı",
-     "year": 2022,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kayısı",
      "province": "Çorum",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çorum",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çorum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çorum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çorum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kayısı",
-     "province": "Çorum",
-     "year": 2021,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kayısı",
@@ -4667,20 +3042,8 @@
     {
      "crop": "Kestane",
      "province": "Bartın",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Bartın",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Bartın",
-     "year": 2018,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
@@ -4727,182 +3090,26 @@
     {
      "crop": "Kestane",
      "province": "Kütahya",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Kütahya",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Kütahya",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Kütahya",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Kütahya",
-     "year": 2020,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
      "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
      "province": "Sinop",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Sinop",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
@@ -5003,98 +3210,14 @@
     {
      "crop": "Kestane",
      "province": "Yalova",
-     "year": 2016,
-     "reason": "density_below_floor"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Yalova",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kestane",
      "province": "Zonguldak",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Zonguldak",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Zonguldak",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Zonguldak",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Zonguldak",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kestane",
-     "province": "Zonguldak",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Keçiboynuzu (Harnup)",
@@ -5153,62 +3276,8 @@
     {
      "crop": "Kiraz",
      "province": "Düzce",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Düzce",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kiraz",
@@ -5219,62 +3288,8 @@
     {
      "crop": "Kiraz",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kiraz",
@@ -5309,62 +3324,8 @@
     {
      "crop": "Kiraz",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kiraz",
@@ -5381,62 +3342,8 @@
     {
      "crop": "Kiraz",
      "province": "Trabzon",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Kiraz",
-     "province": "Trabzon",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Kiraz",
@@ -5711,38 +3618,8 @@
     {
      "crop": "Limon Ve Misket Limonu",
      "province": "Trabzon",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Limon Ve Misket Limonu",
-     "province": "Trabzon",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Limon Ve Misket Limonu",
-     "province": "Trabzon",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Limon Ve Misket Limonu",
-     "province": "Trabzon",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Limon Ve Misket Limonu",
-     "province": "Trabzon",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Limon Ve Misket Limonu",
-     "province": "Trabzon",
-     "year": 2021,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Mandalina (Diğer)",
@@ -5765,56 +3642,8 @@
     {
      "crop": "Mandalina (Diğer)",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Diğer)",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Mandalina (Satsuma)",
@@ -5849,44 +3678,8 @@
     {
      "crop": "Mandalina (Satsuma)",
      "province": "Rize",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Mandalina (Satsuma)",
-     "province": "Rize",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Mandalina (Satsuma)",
@@ -5957,38 +3750,8 @@
     {
      "crop": "Muşmula",
      "province": "Ankara",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Ankara",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Ankara",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Ankara",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Ankara",
-     "year": 2023,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Ankara",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Muşmula",
@@ -6059,20 +3822,8 @@
     {
      "crop": "Muşmula",
      "province": "Bolu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Bolu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Bolu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Muşmula",
@@ -6095,116 +3846,14 @@
     {
      "crop": "Muşmula",
      "province": "Kastamonu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Kastamonu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Muşmula",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Muşmula",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Muşmula",
@@ -6317,62 +3966,8 @@
     {
      "crop": "Nar",
      "province": "Hakkâri",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Hakkâri",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nar",
@@ -6383,122 +3978,14 @@
     {
      "crop": "Nar",
      "province": "Sakarya",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2021,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Sakarya",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nar",
      "province": "Samsun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Samsun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nar",
@@ -6599,50 +4086,8 @@
     {
      "crop": "Nar",
      "province": "Çorum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2021,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nar",
-     "province": "Çorum",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nektarin",
@@ -6653,50 +4098,8 @@
     {
      "crop": "Nektarin",
      "province": "Diyarbakır",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Diyarbakır",
-     "year": 2023,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nektarin",
@@ -6737,62 +4140,8 @@
     {
      "crop": "Nektarin",
      "province": "Hakkâri",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Hakkâri",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nektarin",
@@ -6803,20 +4152,8 @@
     {
      "crop": "Nektarin",
      "province": "Karaman",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Karaman",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Nektarin",
-     "province": "Karaman",
-     "year": 2018,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Nektarin",
@@ -7247,62 +4584,8 @@
     {
      "crop": "Sofralık Zeytinler",
      "province": "Ordu",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Sofralık Zeytinler",
-     "province": "Ordu",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Sofralık Zeytinler",
@@ -7631,98 +4914,14 @@
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Erzurum",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Erzurum",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Erzurum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Erzurum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Erzurum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Erzurum",
-     "year": 2021,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Trabzon Hurması (Cennet Elması)",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -7805,122 +5004,20 @@
     {
      "crop": "Turunç",
      "province": "Adana",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Adana",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Adana",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Adana",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Adana",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Adana",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Turunç",
      "province": "Hatay",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Hatay",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Hatay",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Turunç",
-     "province": "Hatay",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
      "province": "Adıyaman",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Adıyaman",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
@@ -7967,68 +5064,14 @@
     {
      "crop": "Vişne",
      "province": "Artvin",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Artvin",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
      "province": "Bartın",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Bartın",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Bartın",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Bartın",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
@@ -8057,182 +5100,20 @@
     {
      "crop": "Vişne",
      "province": "Edirne",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Edirne",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
      "province": "Karabük",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Karabük",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
@@ -8267,56 +5148,8 @@
     {
      "crop": "Vişne",
      "province": "Kırşehir",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2021,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Kırşehir",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
@@ -8387,122 +5220,14 @@
     {
      "crop": "Vişne",
      "province": "Tekirdağ",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Tekirdağ",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
      "province": "Zonguldak",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2019,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2020,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Vişne",
-     "province": "Zonguldak",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Vişne",
@@ -8657,44 +5382,8 @@
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Muğla",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Yenidünya (Malta Eriği)",
-     "province": "Muğla",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
@@ -8741,20 +5430,8 @@
     {
      "crop": "Zerdali",
      "province": "Adıyaman",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Adıyaman",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Adıyaman",
-     "year": 2019,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
@@ -8765,26 +5442,8 @@
     {
      "crop": "Zerdali",
      "province": "Ankara",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Ankara",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Ankara",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Ankara",
-     "year": 2019,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
@@ -8867,62 +5526,8 @@
     {
      "crop": "Zerdali",
      "province": "Burdur",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Burdur",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
@@ -8993,56 +5598,8 @@
     {
      "crop": "Zerdali",
      "province": "Kayseri",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kayseri",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
@@ -9053,344 +5610,38 @@
     {
      "crop": "Zerdali",
      "province": "Kırıkkale",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırıkkale",
-     "year": 2025,
-     "reason": "no_per_tree_figure"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
      "province": "Kırşehir",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Kırşehir",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
      "province": "Uşak",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Uşak",
-     "year": 2024,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
      "province": "Yozgat",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Yozgat",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
      "province": "Çanakkale",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çanakkale",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Zerdali",
      "province": "Çorum",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Zerdali",
-     "province": "Çorum",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Üvez",
@@ -9467,56 +5718,8 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Bartın",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Bartın",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9581,110 +5784,14 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Elazığ",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Elazığ",
-     "year": 2023,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Hakkâri",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Hakkâri",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9713,44 +5820,8 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Karaman",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Karaman",
-     "year": 2022,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9815,44 +5886,8 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Sakarya",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sakarya",
-     "year": 2022,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9893,62 +5928,8 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Sinop",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Sinop",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9959,122 +5940,20 @@
     {
      "crop": "İncir (Yaş)",
      "province": "Çorum",
-     "year": 2018,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Çorum",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "İstanbul",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "İstanbul",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "İstanbul",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "İstanbul",
-     "year": 2023,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Şanlıurfa",
-     "year": 2016,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2017,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "İncir (Yaş)",
-     "province": "Şanlıurfa",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "İncir (Yaş)",
@@ -10487,62 +6366,8 @@
     {
      "crop": "Şeftali",
      "province": "Giresun",
-     "year": 2016,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2017,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2018,
-     "reason": "shadowed_by_ceiling_refusal"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2019,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2020,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2021,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2022,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2023,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2024,
-     "reason": "density_above_ceiling"
-    },
-    {
-     "crop": "Şeftali",
-     "province": "Giresun",
-     "year": 2025,
-     "reason": "density_above_ceiling"
+     "year": 0,
+     "reason": "province_median_density_above_ceiling"
     },
     {
      "crop": "Şeftali",
@@ -119953,18 +115778,6 @@
      687.2,
      325.5
     ],
-    "Karaman": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     3914.3,
-     1613.7,
-     1559.3
-    ],
     "Kastamonu": [
      2051.5,
      2082.5,
@@ -120073,18 +115886,6 @@
      null,
      9000.0
     ],
-    "Sakarya": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     5026.7,
-     5200.0,
-     5066.7
-    ],
     "Samsun": [
      null,
      null,
@@ -120144,18 +115945,6 @@
      1730.0,
      1479.4,
      1480.5
-    ],
-    "İstanbul": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     3571.4,
-     1755.6
     ],
     "İzmir": [
      541.5,
@@ -123273,18 +119062,6 @@
      2062.7,
      1750.1,
      678.6
-    ],
-    "Ordu": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     6187.5
     ],
     "Osmaniye": [
      1923.1,
@@ -127353,18 +123130,6 @@
      null,
      null,
      null
-    ],
-    "Artvin": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     6066.7
     ],
     "Aydın": [
      1298.9,
@@ -134386,18 +130151,6 @@
      5091.7,
      4423.4
     ],
-    "Hatay": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     5684.2,
-     5500.0,
-     5476.2,
-     26714.3,
-     4697.0
-    ],
     "Isparta": [
      1053.4,
      1218.6,
@@ -136423,30 +132176,6 @@
      829.9,
      734.6
     ],
-    "Çankırı": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     2823.5,
-     3235.3,
-     1411.8
-    ],
-    "Çorum": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     4247.8,
-     2284.5,
-     2745.8,
-     428.6
-    ],
     "İstanbul": [
      8800.0,
      5700.0,
@@ -137308,18 +133037,6 @@
    "label": "Zerdali",
    "yield_kg_da": {
     "scope": "il",
-    "Adıyaman": [
-     null,
-     null,
-     null,
-     null,
-     2521.7,
-     null,
-     null,
-     null,
-     null,
-     null
-    ],
     "Afyonkarahisar": [
      4588.2,
      12035.7,
@@ -140385,18 +136102,6 @@
      1699.3,
      1751.8,
      null
-    ],
-    "Kırşehir": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     1250.0
     ],
     "Malatya": [
      1199.2,
@@ -145164,18 +140869,6 @@
      4598.0,
      5058.3,
      81.8
-    ],
-    "Tunceli": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     8437.5,
-     8625.0,
-     7187.5
     ],
     "Uşak": [
      1711.3,
@@ -152566,18 +148259,6 @@
      635.6,
      605.9
     ],
-    "Kütahya": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     8609.2,
-     3269.4,
-     3302.4,
-     3066.4,
-     1543.4
-    ],
     "Manisa": [
      649.5,
      580.7,
@@ -156919,18 +152600,6 @@
      6588.2,
      409.1
     ],
-    "Ankara": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     875.0
-    ],
     "Antalya": [
      null,
      null,
@@ -158868,18 +154537,6 @@
      null,
      null,
      166.7
-    ],
-    "Erzurum": [
-     null,
-     null,
-     null,
-     null,
-     null,
-     null,
-     4000.0,
-     4428.6,
-     3916.7,
-     3958.3
     ],
     "Eskişehir": [
      370.4,
