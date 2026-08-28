@@ -345,6 +345,111 @@ def test_a_tree_crop_cell_with_no_per_tree_figure_is_refused():
     assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
 
 
+def test_a_cell_older_than_a_ceiling_refusal_is_refused_too():
+    """THE SHADOW RULE. A ceiling refusal is not a verdict on one cell - it says
+    this province's Toplu Meyveliklerin Alani is not the ground its production
+    came off, and that is bookkeeping, not weather. It does not change from year
+    to year.
+
+    Measured on the real file: Turunc in Adana is refused above the ceiling in
+    2022, 2023, 2024 AND 2025, and norms._pick walked past all four to serve
+    2017 - the same broken denominator, 405 trees/da, just under the 444 ceiling
+    - as 23.098 kg/da with no five-year range to warn anyone.
+    """
+    rows = [
+        # 2017: squeaks under the ceiling at 405 trees/da.
+        R("Adana", "Turunç", 2017, "uretim", 2309.8),
+        R("Adana", "Turunç", 2017, "alan", 100.0),
+        R("Adana", "Turunç", 2017, "verim_agac", 57.0),
+        # 2025: 20.325 trees/da, refused.
+        R("Adana", "Turunç", 2025, "uretim", 2439.0),
+        R("Adana", "Turunç", 2025, "alan", 2.0),
+        R("Adana", "Turunç", 2025, "verim_agac", 60.0),
+    ]
+    out = bcn.build(rows)
+    assert "Adana" not in out["crops"]["turunc"]["yield_kg_da"]
+
+
+def test_the_shadow_is_recorded_rather_than_dropped_silently():
+    """Every refusal is visible - the same promise the gate itself makes."""
+    rows = [
+        R("Adana", "Turunç", 2017, "uretim", 2309.8),
+        R("Adana", "Turunç", 2017, "alan", 100.0),
+        R("Adana", "Turunç", 2017, "verim_agac", 57.0),
+        R("Adana", "Turunç", 2025, "uretim", 2439.0),
+        R("Adana", "Turunç", 2025, "alan", 2.0),
+        R("Adana", "Turunç", 2025, "verim_agac", 60.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["counts"] == {"density_above_ceiling": 1,
+                                "shadowed_by_ceiling_refusal": 1}
+    assert {"crop": "Turunç", "province": "Adana", "year": 2017,
+            "reason": "shadowed_by_ceiling_refusal"} in record["cells"]
+
+
+def test_a_passing_year_sandwiched_between_refusals_is_shadowed():
+    """THE SHADOW IS CAST BY THE LATEST REFUSAL, NOT THE EARLIEST. Refusals are
+    not one contiguous run at the recent end - Dut in Mugla is refused in 2016,
+    2017, 2018 and again in every year from 2020 on, because the recorded area
+    lurches between 1, 46, 39 and 12 dekars. 2019 is the one year that lands
+    under the ceiling, and shadowing only what precedes the FIRST refusal would
+    leave it standing: 403 trees/da, 12.500 kg/da of mulberry, and it is exactly
+    the cell norms._pick walks back to.
+
+    Written after the first implementation shipped `min` and this case survived
+    it - every other test in this file passed either way.
+    """
+    rows = [
+        R("Muğla", "Dut", 2018, "uretim", 557.0),      # 17.406 trees/da
+        R("Muğla", "Dut", 2018, "alan", 1.0),
+        R("Muğla", "Dut", 2018, "verim_agac", 32.0),
+        R("Muğla", "Dut", 2019, "uretim", 575.0),      # 403 trees/da - passes
+        R("Muğla", "Dut", 2019, "alan", 46.0),
+        R("Muğla", "Dut", 2019, "verim_agac", 31.0),
+        R("Muğla", "Dut", 2020, "uretim", 600.0),      # 466 trees/da
+        R("Muğla", "Dut", 2020, "alan", 39.0),
+        R("Muğla", "Dut", 2020, "verim_agac", 33.0),
+    ]
+    out = bcn.build(rows)
+    assert "Muğla" not in out["crops"]["dut"]["yield_kg_da"]
+
+
+def test_publication_lag_casts_no_shadow():
+    """THE PRECISION THAT KEEPS THE RULE CHEAP. `no_per_tree_figure` means TUIK
+    has not published the per-tree survey for that year yet - it says nothing
+    about the denominator, so an older judged cell behind it is still good. Half
+    of those refusals sit in 2025 purely because that survey lags; shadowing on
+    them would delete sound figures across the whole freshest year.
+    """
+    rows = [
+        R("Ordu", "Ayva", 2024, "uretim", 182.0),
+        R("Ordu", "Ayva", 2024, "alan", 155.0),
+        R("Ordu", "Ayva", 2024, "verim_agac", 31.0),
+        # 2025 carries no per-tree figure, so it is refused unjudged.
+        R("Ordu", "Ayva", 2025, "uretim", 182.0),
+        R("Ordu", "Ayva", 2025, "alan", 155.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Ordu"] == [1174.2, None]
+
+
+def test_the_shadow_falls_backwards_only():
+    """A later year that passes the gate is untouched by an earlier refusal -
+    an orchard really can be planted, and the direction matters: _pick reads
+    from the newest end, so shadowing forwards would delete the good cell it
+    would otherwise have served."""
+    rows = [
+        R("Adana", "Turunç", 2017, "uretim", 2439.0),
+        R("Adana", "Turunç", 2017, "alan", 2.0),
+        R("Adana", "Turunç", 2017, "verim_agac", 60.0),
+        R("Adana", "Turunç", 2025, "uretim", 2309.8),
+        R("Adana", "Turunç", 2025, "alan", 100.0),
+        R("Adana", "Turunç", 2025, "verim_agac", 57.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["turunc"]["yield_kg_da"]["Adana"] == [None, 23098.0]
+
+
 def test_a_vegetable_is_never_gated():
     """THE MOST DANGEROUS MISTAKE THIS GATE CAN MAKE. Vegetables publish no
     per-tree yield anywhere, and their denominator - Ekilen Alan - really is the

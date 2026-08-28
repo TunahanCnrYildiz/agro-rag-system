@@ -237,6 +237,50 @@ def _density_verdict(tons: float, dekar: float,
     return None
 
 
+def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
+                    per_tree: dict, years) -> int | None:
+    """The LATEST year the ceiling refuses this province, or None.
+
+    WHY A REFUSAL REACHES BACKWARDS. The ceiling does not say "this year's
+    figure is odd", it says the recorded area is not the ground the production
+    came off - the province books scattered trees' fruit against a compact
+    orchard's dekars. That is how the province KEEPS ITS BOOKS, not what the
+    weather did, so it condemns the earlier derived cells too.
+
+    Without this, refusing the recent cells only moves the damage: src/norms.py
+    walks back to the most recent surviving year, and the year it lands on is
+    the one that squeaked under the ceiling with the SAME broken denominator.
+    Measured on the real exports - Turunc in Adana is refused in 2022, 2023,
+    2024 and 2025, and 2017 was served instead at 405 trees/da: 23.098 kg/da,
+    a citrus yield ten times any real one, carrying no five-year range to warn
+    anyone because walking back that far leaves too few prior years to build one.
+
+    Only `density_above_ceiling` casts a shadow. `no_per_tree_figure` means
+    TUIK has not published that year's per-tree survey yet - half of those sit
+    in the freshest year for exactly that reason - and says nothing about the
+    denominator. `density_below_floor` understates rather than inflates.
+
+    A PUBLISHED kg/dekar figure is never shadowed: the argument is about a
+    denominator this script chose, and a published yield does not use one.
+
+    LATEST, not earliest. The refusals are not one run at the recent end - Dut
+    in Mugla is refused in 2016-2018 and again from 2020 on, because the
+    recorded area lurches between 1, 46, 39 and 12 dekars. Shadowing only what
+    precedes the FIRST refusal leaves the 2019 cell sitting in the hole between
+    them, which is precisely the one src/norms.py walks back to.
+    """
+    refused = [
+        year for year in years
+        if published.get(province, {}).get(year) is None
+        and uretim.get(province, {}).get(year) is not None
+        and alan.get(province, {}).get(year)
+        and _density_verdict(uretim[province][year], alan[province][year],
+                             per_tree.get(province, {}).get(year))
+        == "density_above_ceiling"
+    ]
+    return max(refused, default=None)
+
+
 def build(rows, not_field_area=()) -> dict:
     """Group Row(...) into the schema src/norms.py validates.
 
@@ -300,6 +344,11 @@ def build(rows, not_field_area=()) -> dict:
 
         yields: dict[str, list] = {}
         for province in sorted(set(published) | (set(uretim) & set(alan))):
+            # Verdicts before values: a ceiling refusal condemns every EARLIER
+            # derived cell in this province, so it has to be known before one
+            # can be written.
+            shadow = (_ceiling_shadow(province, published, uretim, alan,
+                                      per_tree, index) if per_tree else None)
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
@@ -314,6 +363,8 @@ def build(rows, not_field_area=()) -> dict:
                                       tons, dekar,
                                       per_tree.get(province, {}).get(year))
                                   if per_tree else None)
+                        if reason is None and shadow is not None and year < shadow:
+                            reason = "shadowed_by_ceiling_refusal"
                         if reason is not None:
                             refused.append({"crop": labels[crop_id],
                                             "province": province,
