@@ -279,6 +279,43 @@ def test_a_zero_area_and_a_zero_tree_count_report_the_same_shape():
     assert [e.field for e in trees] == ["tree_count", "yield_total"]
 
 
+def test_a_unit_names_the_field_it_cannot_be_converted_without():
+    """One fact in one place. `_read` refuses on it and Task 3's wire `requires`
+    is derived from it, so the client's label and the server's refusal cannot
+    disagree."""
+    units = {u.id: u for u in budget._FIELDS_BY_ID["yield_total"].units}
+    assert units["kg_da"].needs == "area"
+    assert units["kg_agac"].needs == "tree_count"
+    assert units["kg"].needs is None
+    assert units["ton"].needs is None
+
+
+def test_the_per_area_refusal_reads_exactly_as_it_did():
+    """A refactor may not move one character of user-facing Turkish."""
+    _, errors = budget.validate(_payload(
+        area={"value": "", "unit": "donum", "source": "user"},
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))
+    messages = [e.message for e in errors]
+    assert ("Ürün miktarı için dekar başına değer girdiniz; "
+            "önce alanı doldurun.") in messages
+
+
+def test_the_per_tree_refusal_reads_exactly_as_it_did():
+    _, errors = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"}))
+    assert [e.message for e in errors] == [
+        "Ürün miktarı için ağaç başına değer girdiniz; "
+        "önce ağaç sayısını doldurun."]
+
+
+def test_a_unit_with_no_dependency_is_never_refused_for_one():
+    """`kg` and `ton` state a total already. A lookup that fired on them would
+    make every plain submission depend on a field it does not need."""
+    inputs, errors = budget.validate(_payload(
+        yield_total={"value": "4000", "unit": "kg", "source": "user"}))
+    assert errors == [] and inputs.yield_kg.amount == 4000.0
+
+
 def test_the_tree_count_is_read_before_the_field_loop():
     """FIELDS order is a layout decision, not a contract - the same reason
     `area` is read out of order. Moving tree_count to the end of FIELDS must
@@ -517,8 +554,7 @@ def test_the_yield_label_reads_correctly_under_every_unit_it_offers():
     spec = next(f for f in budget.FIELDS if f.id == "yield_total")
     assert "toplam" not in spec.label.lower()
     assert [u.id for u in spec.units] == ["kg", "ton", "kg_da", "kg_agac"]
-    assert [u.per_area for u in spec.units] == [False, False, True, False]
-    assert [u.per_tree for u in spec.units] == [False, False, False, True]
+    assert [u.needs for u in spec.units] == [None, None, "area", "tree_count"]
 
 
 def test_the_original_units_are_untouched():

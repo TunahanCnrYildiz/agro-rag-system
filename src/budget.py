@@ -63,13 +63,18 @@ class UnitOption:
     id: str
     label: str
     factor: float          # multiply by this to reach the canonical unit
-    # A per-area unit needs the area before it means anything. Kept a property
-    # of the UNIT rather than a second field, so the conversion stays one line
-    # and a new per-area unit needs no new branch.
-    per_area: bool = False
-    # The same idea for a per-TREE unit, which needs the tree count. TUIK
-    # publishes no per-dekar yield for 61 tree crops, only Kg/Meyve Veren Agac.
-    per_tree: bool = False
+    # The FIELD this unit cannot be converted without: a per-dekar value needs
+    # the area, a per-tree value needs the tree count. Kept ON THE UNIT rather
+    # than as a second field, so the conversion stays one lookup, a new
+    # dependent unit needs no new branch, and the wire's `requires` is derived
+    # from the same fact the validator enforces instead of restating it.
+    needs: str | None = None            # a FieldSpec id
+    # The refusal when `needs` is not filled. Carried per unit because the two
+    # messages differ in more than the field's name - "dekar başına" against
+    # "ağaç başına", "alanı" against "ağaç sayısını" - so one f-string over the
+    # label cannot produce both, and generating them would change user-facing
+    # Turkish.
+    needs_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,8 +107,12 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
                UnitOption("ton", "ton", 1000.0),
-               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True),
-               UnitOption("kg_agac", "kg/ağaç", 1.0, per_tree=True))),
+               UnitOption("kg_da", "kg/dekar", 1.0, needs="area",
+                          needs_error="için dekar başına değer girdiniz; "
+                                      "önce alanı doldurun."),
+               UnitOption("kg_agac", "kg/ağaç", 1.0, needs="tree_count",
+                          needs_error="için ağaç başına değer girdiniz; "
+                                      "önce ağaç sayısını doldurun."))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -176,8 +185,8 @@ def coerce_number(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict, area_da: float | None,
-          trees: float | None = None
+def _read(spec: FieldSpec, raw: dict,
+          provided: dict[str, float | None] | None = None
           ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
@@ -200,24 +209,12 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None,
     if not spec.min_exclusive and amount < spec.min_value:
         return None, FieldError(spec.id, f"{spec.label} negatif olamaz.")
 
-    if unit.per_area:
-        if area_da is None:
-            # Refused, never multiplied by a guessed area and never zeroed.
-            return None, FieldError(
-                spec.id,
-                f"{spec.label} için dekar başına değer girdiniz; "
-                f"önce alanı doldurun.")
-        amount = amount * area_da
-
-    if unit.per_tree:
-        if trees is None:
-            # Refused, never multiplied by a guessed count and never zeroed -
-            # the per_area rule, on the other denominator.
-            return None, FieldError(
-                spec.id,
-                f"{spec.label} için ağaç başına değer girdiniz; "
-                f"önce ağaç sayısını doldurun.")
-        amount = amount * trees
+    if unit.needs is not None:
+        have = (provided or {}).get(unit.needs)
+        if have is None:
+            # Refused, never multiplied by a guessed value and never zeroed.
+            return None, FieldError(spec.id, f"{spec.label} {unit.needs_error}")
+        amount = amount * have
 
     claimed = "norm" if entry.get("source") == "norm" else "user"
     return Value(amount * unit.factor, claimed), None
@@ -284,7 +281,7 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     # on the tuple happening to list it first: that order is a layout decision,
     # not a contract, and a reorder would silently break every per-area field.
     area_spec = _FIELDS_BY_ID["area"]
-    area_value, area_error = _read(area_spec, raw, None)
+    area_value, area_error = _read(area_spec, raw)
     values[area_spec.id] = area_value
     if area_error is not None:
         errors.append(area_error)
@@ -293,16 +290,17 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     # Read out of FIELDS order for the same reason as the area: a per-tree unit
     # cannot be converted without it, and that order is a layout decision.
     trees_spec = _FIELDS_BY_ID["tree_count"]
-    trees_value, trees_error = _read(trees_spec, raw, area_da)
+    trees_value, trees_error = _read(trees_spec, raw, {"area": area_da})
     values[trees_spec.id] = trees_value
     if trees_error is not None:
         errors.append(trees_error)
     trees = trees_value.amount if trees_value is not None else None
 
+    provided = {"area": area_da, "tree_count": trees}
     for spec in FIELDS:
         if spec.id in (area_spec.id, trees_spec.id):
             continue
-        value, error = _read(spec, raw, area_da, trees)
+        value, error = _read(spec, raw, provided)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
