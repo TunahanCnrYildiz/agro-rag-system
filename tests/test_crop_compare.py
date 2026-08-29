@@ -56,6 +56,24 @@ TABLE = {
             "price_tl_kg": {"scope": "il", "Konya": [11.0, 12.0, 13.0, 14.5],
                             "TR": [None, None, None, None]},
         },
+        "ayva": {
+            "label": "Ayva",
+            "yield_kg_da": {"scope": "il", "Konya": [8000.0, 8500.0, 9000.0, 9500.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [11.0, 14.0, 16.0, 19.0],
+                            "TR": [None, None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Konya": [25.0, 27.0, 28.0, 31.0],
+                              "TR": [None, None, None, None]},
+        },
+        "ceviz": {
+            "label": "Ceviz",
+            "yield_kg_da": {"scope": "il", "Konya": [250.0, 255.0, 260.0, 263.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [80.0, 90.0, 100.0, 110.0],
+                            "TR": [None, None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Konya": [18.0, 19.0, 20.0, 22.0],
+                              "TR": [None, None, None, None]},
+        },
     },
 }
 
@@ -235,6 +253,69 @@ def test_each_figure_keeps_its_year_and_region():
     assert (first.yield_value.year, first.yield_value.region) == (2025, "Konya")
 
 
+def _figures_for(crop_id, latest_year=2025):
+    row = next(r for r in _table() if r.crop == crop_id)
+    return crop_compare._figures(row, latest_year)
+
+
+def test_a_tree_crop_is_read_from_its_published_per_tree_measure():
+    """TUIK publishes no per-dekar yield for 61 tree crops. The kg/da this
+    project derives for them divides a province's whole production by the few
+    dekars of COMPACT orchard it records, so Karabuk/Ayva ships 13.419 kg/da -
+    about four times any real quince yield."""
+    figures = _figures_for("ayva")
+    assert figures.per_tree is True
+    assert figures.yield_value.amount == 31.0
+
+
+def test_a_tree_crop_gets_no_revenue_figure():
+    """There is no honest money figure for it: converting per-tree to per-dekar
+    needs a planting density nobody published, and revenue per TREE is not a
+    fair comparison either - crop median densities run 11 to 79 trees/da."""
+    assert _figures_for("ayva").revenue_tl_da is None
+
+
+def test_a_field_crop_is_untouched_and_still_carries_its_revenue():
+    figures = _figures_for("domates (sofralik)")
+    assert figures.per_tree is False
+    assert figures.yield_value.amount == 5492.1
+    assert figures.revenue_tl_da == 5492.1 * 21.06
+
+
+def test_a_tree_crop_never_blames_the_price_for_the_missing_revenue():
+    """`missing == "fiyat"` renders "there is a yield but no price, so I am not
+    computing revenue". On a per-tree row that states a false cause - the
+    revenue was refused for the UNIT - and invites the reader to think a price
+    would fix it."""
+    figures = _figures_for("ayva", latest_year=2099)
+    assert figures.price_value is None
+    assert figures.missing is None
+    assert figures.per_tree is True
+
+
+def test_a_genuine_absence_still_reports_itself():
+    """per_tree must not swallow a real gap. A row carrying neither measure is
+    a missing yield, not a per-tree crop."""
+    from dataclasses import replace
+    row = next(r for r in _table() if r.crop == "ayva")
+    figures = crop_compare._figures(
+        replace(row, yield_kg_da=None, yield_kg_tree=None), 2025)
+    assert figures.per_tree is False
+    assert figures.missing == "verim"
+
+
+def test_the_two_surfaces_choose_the_same_measure_for_the_same_row():
+    """THE TEST THAT STOPS THEM DRIFTING AGAIN. src/budget.py and this module
+    each decide which measure to serve; they disagreed on 1.568 cells for one
+    round, and Karabuk/Ayva prefilled 31 kg/agac in the form while the
+    comparison printed 13.419 kg/da."""
+    from src import budget
+    for row in _table():
+        cell = budget._yield_cell(row)
+        chose_per_tree = cell is not None and cell["unit"] == "kg_agac"
+        assert crop_compare._figures(row, 2025).per_tree == chose_per_tree, row.label
+
+
 def test_the_answer_prints_both_crops_with_their_figures():
     inputs, _ = crop_compare.validate(_raw(), _table())
     text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
@@ -270,12 +351,18 @@ def test_not_profit_is_absent_when_neither_crop_shows_revenue():
     assert crop_compare.NOT_PROFIT not in text
 
 
-def test_not_profit_is_present_when_exactly_one_crop_shows_revenue():
+def test_not_profit_is_absent_when_only_one_crop_shows_revenue():
+    """NOT_PROFIT refuses a RANKING; with a missing price on one side there is
+    only one figure and nothing to rank. This test used to assert the opposite
+    - that was the bug ONLY_ONE_REVENUE and the `all(revenues)` gate exist to
+    fix. Here the other crop is a plain gap, not per-tree, so neither closing
+    sentence has anything true to say."""
     inputs, _ = crop_compare.validate(_raw(), _table())
     first, second = crop_compare.compute(inputs, _table(), 2025)
     second = replace(second, revenue_tl_da=None, missing="fiyat")
     text = crop_compare.render(inputs, (first, second))
-    assert crop_compare.NOT_PROFIT in text
+    assert crop_compare.NOT_PROFIT not in text
+    assert crop_compare.ONLY_ONE_REVENUE not in text
 
 
 def test_the_answer_never_names_a_winner():
@@ -302,3 +389,167 @@ def test_the_five_year_range_reaches_the_answer():
     inputs, _ = crop_compare.validate(_raw(), _table())
     text = crop_compare.render(inputs, crop_compare.compute(inputs, _table(), 2025))
     assert "önceki" in text
+
+
+def _render(first, second, latest_year=2025):
+    inputs, errors = crop_compare.validate(_raw(first, second), _table())
+    assert errors == []
+    return crop_compare.render(
+        inputs, crop_compare.compute(inputs, _table(), latest_year))
+
+
+def _crop_block_lines(text, label):
+    """The lines belonging to one crop's block: the line naming it, plus every
+    line after it up to the next `**`-led block or the blank line that ends
+    it. A structural lookup, not a string-position guess - it stays right
+    however the OTHER crop's label spells or where it sits in the answer."""
+    lines = text.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"**{label}**"))
+    block = [lines[start]]
+    for line in lines[start + 1:]:
+        if not line or line.startswith("**"):
+            break
+        block.append(line)
+    return block
+
+
+def test_a_tree_crop_prints_its_published_unit_and_never_the_derived_figure():
+    block = "\n".join(_crop_block_lines(_render("ayva", "domates (sofralik)"), "Ayva"))
+    assert "31 kg/ağaç" in block
+    assert "9.500" not in block and "kg/da" not in block
+
+
+def test_a_tree_crop_carries_the_sentence_explaining_the_missing_revenue():
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.PER_TREE_NOTE in text
+
+
+def test_a_tree_crops_price_is_joined_with_a_comma_not_a_times_sign():
+    """`×` announces a product, and there is none - the revenue was refused."""
+    text = _render("ayva", "domates (sofralik)")
+    line = next(l for l in text.splitlines() if l.startswith("**Ayva**"))
+    assert "fiyat 19,00 TL/kg" in line and "×" not in line
+
+
+def test_a_tree_crops_five_year_range_reads_in_its_own_unit():
+    text = _render("ayva", "domates (sofralik)")
+    assert "verimde önceki 5 yıl: 25–28 kg/ağaç" in text
+
+
+def test_a_tree_crop_with_no_current_price_drops_the_price_and_keeps_the_rest():
+    """One absence, one reason. Naming the price too would suggest supplying
+    one restores a revenue this route will not compute either way."""
+    text = _render("ayva", "ceviz", latest_year=2099)
+    line = next(l for l in text.splitlines() if l.startswith("**Ayva**"))
+    assert "fiyat" not in line
+    assert "31 kg/ağaç" in line
+    assert crop_compare.PER_TREE_NOTE in text
+    assert "gelir hesaplamıyorum." not in text.replace(
+        crop_compare.PER_TREE_NOTE, "")
+
+
+def test_crop_block_puts_per_tree_ahead_of_a_missing_price():
+    """`_figures` can never build a CropFigures that is both `per_tree=True`
+    and `missing == "fiyat"` - the `and not per_tree` guard in `_figures` sees
+    to that. So the branch order in `_crop_block` is currently defended twice:
+    once by that guard, and once by the order itself. This test removes the
+    guard's protection by hand, via `replace`, to pin the order on its own -
+    if a future change ever drops the guard, this is what keeps a per-tree
+    reader from being told a missing price is why there is no revenue figure,
+    when the real reason is the unit."""
+    figures = replace(_figures_for("ayva"), missing="fiyat", price_value=None)
+    lines = crop_compare._crop_block(figures)
+    assert lines[0].startswith("**Ayva**: verim 31 kg/ağaç")
+    assert not any("yayımlanmış fiyat yok" in line for line in lines)
+
+
+def test_a_field_crops_block_is_byte_identical_to_before():
+    """The regression that matters: 185 of the 246 crops are not tree crops and
+    their answer must not move by one character."""
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert text.splitlines()[2] == (
+        "**Domates (Sofralık)** · dekara brüt gelir **115.664 TL**")
+    assert text.splitlines()[3] == (
+        "   verim 5.492,1 kg/da (TÜİK 2025, Konya) × fiyat 21,06 TL/kg (TÜİK 2025)")
+    assert text.splitlines()[6] == (
+        "**Biber (Salçalık, Kapya)** · dekara brüt gelir **125.841 TL**")
+    assert text.splitlines()[7] == (
+        "   verim 3.154,7 kg/da (TÜİK 2025, Konya) × fiyat 39,89 TL/kg (TÜİK 2025)")
+
+
+def test_not_profit_needs_both_crops_to_have_shown_a_revenue():
+    """It refuses a RANKING - "kârlılık sıralamasını bu tablodan söyleyemem".
+    With one figure there is no ranking to refuse and the sentence points at
+    something the page does not contain. This route already shipped that fix
+    once, for the case where NEITHER crop could show a revenue."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.NOT_PROFIT not in text
+
+
+def test_not_profit_still_appears_for_two_field_crops():
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert crop_compare.NOT_PROFIT in text
+
+
+def test_a_lone_revenue_beside_a_tree_crop_says_it_is_not_a_comparison():
+    """Otherwise the single money figure reads as a default winner."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.ONLY_ONE_REVENUE in text
+
+
+def test_two_tree_crops_get_no_closing_sentence_at_all():
+    """No revenue anywhere, so neither closing sentence has anything to
+    describe. Both would name figures the answer never printed."""
+    text = _render("ayva", "ceviz")
+    assert crop_compare.NOT_PROFIT not in text
+    assert crop_compare.ONLY_ONE_REVENUE not in text
+    assert text.count(crop_compare.PER_TREE_NOTE) == 2
+
+
+def test_a_lone_revenue_beside_a_plain_gap_says_it_is_gross():
+    """THE CONDITION'S LOAD-BEARING HALF. A crop can lack a revenue because the
+    province publishes nothing for it, and ONLY_ONE_REVENUE would then assert a
+    per-tree reason that is simply untrue - its own block already says what is
+    missing. But the one revenue that DID print is still gross, and GROSS_ONLY
+    is the sentence that says so without also claiming a per-tree cause."""
+    from dataclasses import replace
+    rows = {r.crop: r for r in _table()}
+    blank = replace(rows["biber (salcalik, kapya)"],
+                    yield_kg_da=None, yield_kg_tree=None)
+    figures = (crop_compare._figures(rows["domates (sofralik)"], 2025),
+               crop_compare._figures(blank, 2025))
+    inputs, _ = crop_compare.validate(
+        _raw("domates (sofralik)", "biber (salcalik, kapya)"), _table())
+    text = crop_compare.render(inputs, figures)
+    assert crop_compare.GROSS_ONLY in text
+    assert crop_compare.ONLY_ONE_REVENUE not in text
+    assert crop_compare.NOT_PROFIT not in text
+    assert "bu il için yayımlanmış verim rakamı yok" in text
+
+
+def test_gross_only_accompanies_only_one_revenue_beside_a_tree_crop():
+    """The other half of the split: a lone revenue beside a per-tree crop still
+    needs the gross caveat, on top of ONLY_ONE_REVENUE explaining why the two
+    figures are not a comparison. Order matters for the reading - GROSS_ONLY
+    comes first, mirroring NOT_PROFIT's own internal order (gross caveat, then
+    the comparison refusal), so the two-sentence and one-sentence forms read
+    the same way."""
+    text = _render("ayva", "domates (sofralik)")
+    assert crop_compare.GROSS_ONLY in text
+    assert crop_compare.ONLY_ONE_REVENUE in text
+    assert text.index(crop_compare.GROSS_ONLY) < text.index(crop_compare.ONLY_ONE_REVENUE)
+
+
+def test_gross_only_is_absent_when_both_crops_show_revenue():
+    """NOT_PROFIT already carries the gross caveat for this case ("Bu rakamlar
+    dekara BRÜT gelirdir..."); printing GROSS_ONLY too would say the same thing
+    twice."""
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert crop_compare.GROSS_ONLY not in text
+    assert crop_compare.NOT_PROFIT in text
+
+
+def test_gross_only_is_absent_when_no_revenue_printed():
+    """Nothing printed a lira figure, so there is no gross figure to caveat."""
+    text = _render("ayva", "ceviz")
+    assert crop_compare.GROSS_ONLY not in text

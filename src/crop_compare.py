@@ -182,10 +182,19 @@ class CropFigures:
     price_value: object | None       # norms.NormValue
     revenue_tl_da: float | None
     missing: str | None
+    # TUIK publishes this crop's yield per TREE, so no per-dekar money figure
+    # exists for it. NOT folded into `missing`: that field names the half we
+    # do not HOLD, and here both halves are held and cannot be combined.
+    per_tree: bool = False
 
 
 def _figures(row, latest_year: int | None) -> CropFigures:
-    yield_value = row.yield_kg_da
+    # A row is served PER TREE exactly when its yield_kg_tree resolved - the
+    # same test, character for character, that src/budget.py's _yield_cell
+    # uses. The two surfaces decide this separately and disagreed on 1.568
+    # cells for a round; a test pins them together.
+    per_tree = row.yield_kg_tree is not None
+    yield_value = row.yield_kg_tree if per_tree else row.yield_kg_da
     price = row.price_tl_kg
     # A price from an older year is not a smaller number, it is a different
     # currency: P2b measured Ordu's `Arpa (Diğer)` prefilling a 2018 price nine
@@ -196,13 +205,17 @@ def _figures(row, latest_year: int | None) -> CropFigures:
     missing = None
     if yield_value is None:
         missing = "verim"
-    elif price is None:
+    elif price is None and not per_tree:
+        # A per-tree row never blames the PRICE for its missing revenue. That
+        # branch's message is "there is a yield but no price, so I am not
+        # computing revenue", which here names a false cause - the revenue was
+        # refused for the unit - and suggests a price would fix it.
         missing = "fiyat"
-    revenue = (None if missing is not None
+    revenue = (None if (missing is not None or per_tree)
                else yield_value.amount * price.amount)
     return CropFigures(label=row.label, yield_value=yield_value,
                        price_value=price, revenue_tl_da=revenue,
-                       missing=missing)
+                       missing=missing, per_tree=per_tree)
 
 
 def compute(inputs: CompareInputs, table,
@@ -237,6 +250,32 @@ NOT_PROFIT = (
     "girerek bütçe hesabı yaptırırsanız kâr karşılaştırmasını yapabilirsiniz."
 )
 
+# The half of NOT_PROFIT that is true of a SINGLE figure too. NOT_PROFIT does
+# two jobs - warn that the figure is gross, and refuse a ranking - and only the
+# second needs two figures. Printed whenever any revenue reached the page and
+# NOT_PROFIT did not.
+GROSS_ONLY = (
+    "Basılan gelir rakamı dekara BRÜT gelirdir, masraf içermez."
+)
+
+# Only when one crop showed a revenue AND the other is per-tree. A crop can
+# also lack a revenue because the province publishes nothing for it, and this
+# sentence would then assert a per-tree reason that is untrue - the failure
+# this route has already shipped two fixes for.
+ONLY_ONE_REVENUE = (
+    "Bu tabloda tek bir gelir rakamı var, dolayısıyla bir karşılaştırma değil: "
+    "diğer ürünün verimi ağaç başına yayımlandığı için aynı birime "
+    "getirilemiyor."
+)
+
+# Written BY CODE and printed under the crop it explains, never at the foot of
+# the answer - a reader must not have to work out which crop it refers to.
+PER_TREE_NOTE = (
+    "TÜİK bu ürünün verimini ağaç başına yayımlıyor; dekara çevirmek "
+    "yayımlanmayan bir dikim sıklığı gerektirdiği için dekara gelir "
+    "hesaplamıyorum."
+)
+
 ASK_FOR_CROPS = (
     "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
     "ilinizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
@@ -258,9 +297,35 @@ COMPUTE_FAILED = (
 
 
 def _crop_block(figures: CropFigures) -> list[str]:
-    """One crop's lines. Says what is missing rather than printing a blank."""
+    """One crop's lines. Says what is missing rather than printing a blank.
+
+    BRANCH ORDER IS LOAD-BEARING. A genuine absence outranks everything; then
+    the per-tree case; only then a missing price. Testing the price first would
+    tell a per-tree crop's reader that a price is what stands between them and
+    a revenue figure, which is false. `_figures` cannot currently produce a
+    per-tree row with `missing == "fiyat"`, so this order is defence in depth
+    rather than the only thing protecting that reader - a test pins the order
+    itself, directly, so it is not "simplified" away as unreachable.
+    """
     if figures.missing == "verim":
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
+
+    if figures.per_tree:
+        y = figures.yield_value
+        head = (f"**{figures.label}**: verim {format_qty(y.amount)} kg/ağaç "
+                f"(TÜİK {y.year}, {y.region})")
+        if figures.price_value is not None:
+            # A comma, not the revenue line's `×`: that sign announces a
+            # product, and this route computes none for a per-tree crop.
+            head += (f", fiyat {format_tr(figures.price_value.amount, 2)} TL/kg "
+                     f"(TÜİK {figures.price_value.year})")
+        lines = [head]
+        if y.recent_min is not None and y.recent_max is not None:
+            lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
+                         f"{format_qty(y.recent_max)} kg/ağaç")
+        lines.append(f"   {PER_TREE_NOTE}")
+        return lines
+
     if figures.missing == "fiyat":
         return [f"**{figures.label}**: verim {format_qty(figures.yield_value.amount)} "
                 f"kg/da (TÜİK {figures.yield_value.year}, {figures.yield_value.region}), "
@@ -286,10 +351,22 @@ def _crop_block(figures: CropFigures) -> list[str]:
 def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> str:
     """Code-written Turkish. Both crops, no verdict.
 
-    NOT_PROFIT opens with "these figures ARE gross revenue" - true only when a
-    revenue figure was actually printed above it. When both crops are missing
-    their revenue (e.g. every price on hand is older than the latest year),
-    appending it anyway would refer to numbers that are not on the page.
+    NOT_PROFIT opens with "these figures ARE gross revenue" and goes on to
+    refuse a RANKING, so it needs BOTH crops to have printed one. With a single
+    figure there is nothing to rank and the sentence describes a page that does
+    not exist; with none it names figures that were never printed.
+
+    NOT_PROFIT bundles two claims, and only the ranking-refusal half needs two
+    figures - the gross-revenue warning is just as true of one. GROSS_ONLY is
+    that first half alone: printed whenever exactly one revenue reached the
+    page, so the lone figure still carries its caveat even though there is
+    nothing to rank against it.
+
+    ONLY_ONE_REVENUE covers the case NOT_PROFIT no longer does - one revenue
+    beside a per-tree crop - and stops the lone money figure reading as a
+    default winner. It only ever appears together with GROSS_ONLY, never
+    alone: a printed revenue is always gross, whether or not the OTHER crop
+    happens to be per-tree.
     """
     where = f" ({inputs.province})" if inputs.province else ""
     lines = [f"İki ürünün yayımlanmış rakamları{where}:", ""]
@@ -297,6 +374,20 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
         lines.extend(_crop_block(crop))
         lines.append("")
     lines.append(ATTRIBUTION)
-    if any(crop.revenue_tl_da is not None for crop in figures):
+    revenues = [crop.revenue_tl_da is not None for crop in figures]
+    if all(revenues):
         lines.extend(["", NOT_PROFIT])
+    elif any(revenues):
+        # GROSS_ONLY first, ONLY_ONE_REVENUE second - the same order NOT_PROFIT
+        # itself uses internally (gross caveat, then the comparison refusal),
+        # so the one-sentence and two-sentence forms read the same way.
+        lines.extend(["", GROSS_ONLY])
+        # The rule is "the crop with NO revenue is per-tree"; `any` asks the
+        # weaker "either crop is per-tree". They coincide only because
+        # `_figures` never lets a per_tree row carry a revenue - the same
+        # invariant `_crop_block`'s branch order leans on. If this route ever
+        # computed a per-tree revenue, `any` would start firing on the crop
+        # WITH the money figure instead of the one without.
+        if any(crop.per_tree for crop in figures):
+            lines.append(ONLY_ONE_REVENUE)
     return "\n".join(lines)
