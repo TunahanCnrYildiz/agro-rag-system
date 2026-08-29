@@ -372,7 +372,10 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
 #
 # DELETE THIS, and the two lines below that use it, once a build carrying the
 # `requires` label fix is deployed. Nothing here can detect that; it is a
-# human call.
+# human call. The removal also takes the "fill the tree count" sentence out
+# of `_yield_cell`'s docstring, and the hint-specific tests in
+# tests/test_budget.py: test_a_per_tree_cell_tells_the_farmer_to_fill_the_tree_count
+# and test_the_hint_survives_a_cell_with_no_five_year_range.
 _TREE_COUNT_HINT = "ağaç sayısını da girin"
 
 

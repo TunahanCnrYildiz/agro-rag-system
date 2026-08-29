@@ -654,9 +654,13 @@ def test_a_row_with_a_per_tree_figure_prefills_it_instead_of_the_derived_one():
 
 
 def test_the_per_tree_cell_shows_its_own_five_year_range():
+    """The point is the unit: a per-tree cell's range reads in kg/ağaç, not
+    kg/da. It checks only a prefix, staying indifferent to whatever the cell
+    appends after the range - that's the tree-count hint's business, covered
+    by its own tests below."""
     spec = budget.form_spec([], _tree_table())
-    assert spec["crops"][0]["yield"]["recent"] == (
-        "önceki 5 yıl: 27–28 kg/ağaç · ağaç sayısını da girin")
+    assert spec["crops"][0]["yield"]["recent"].startswith(
+        "önceki 5 yıl: 27–28 kg/ağaç")
 
 
 def test_a_per_tree_cell_tells_the_farmer_to_fill_the_tree_count():
