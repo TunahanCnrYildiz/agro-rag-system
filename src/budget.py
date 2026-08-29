@@ -412,6 +412,13 @@ def _requires(cell: dict | None) -> list[str] | None:
     client's label would drift from the server's refusal the first time a unit
     changed.
 
+    `cell` is looked up against `_FIELDS_BY_ID["yield_total"].units`
+    specifically, not against whichever field built `cell`: yield is the only
+    cell `_crop_rows` builds whose unit can name a dependency at all, since
+    price's units (tl_kg, tl_ton) never declare `needs`. A dependent price
+    unit would need this lookup widened to match; today it would just return
+    None.
+
     Only fields that are OPTIONAL by default appear. A per-dekar cell needs the
     AREA, which is required for every crop, so saying so would tell the client
     nothing and would put this key on every field crop.

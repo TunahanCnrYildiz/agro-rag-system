@@ -290,6 +290,64 @@ def test_a_unit_names_the_field_it_cannot_be_converted_without():
     assert units["ton"].needs is None
 
 
+def _entry(field, unit=None, amount="1"):
+    """A minimal valid submission for one field, under a specific unit.
+
+    "1" clears every FieldSpec's min_value regardless of min_exclusive, so
+    the same helper works for area/tree_count (>0) and yield/price/cost (>=0)."""
+    unit = unit or field.units[0]
+    return {"value": amount, "unit": unit.id, "source": "user"}
+
+
+def _payload_satisfying(field, unit):
+    """A complete submission where `field` is filled under `unit`, and the
+    field named by `unit.needs` is filled too - so the ONLY thing that can
+    still produce `unit.needs_error` is `needs` naming an id validate() does
+    not actually feed into `provided`."""
+    needed = budget._FIELDS_BY_ID.get(unit.needs)
+    payload = _payload()
+    payload[field.id] = _entry(field, unit)
+    if needed is not None:
+        payload[needed.id] = _entry(needed)
+    return payload
+
+
+def test_every_dependent_unit_has_a_pairable_error_and_a_suppliable_field():
+    """Two ways a dependent unit can ship broken, both unreachable today but
+    both uncaught if a new dependent unit were added carelessly:
+
+    1. `needs` without a matching `needs_error` - `_read` builds the refusal
+       as f"{label} {unit.needs_error}", so a missing pairing renders the
+       literal string "Ürün miktarı None" to the farmer.
+    2. `needs` naming a field id `validate()` never actually supplies before
+       the field loop runs - the client would mark that field mandatory
+       (via `_requires`) while `_read` keeps refusing the unit even after the
+       farmer fills it, because `provided` never gains that key.
+
+    The second check is behavioural, against validate()'s real refusal, on
+    purpose: a test asserting `unit.needs in {"area", "tree_count"}` would
+    just be a second copy of the same set living in the test file, silently
+    correct only until someone updated one copy and not the other. Calling
+    validate() with the named field actually filled asks the question this
+    finding is really about - does the dependency validate() enforces match
+    the dependency validate() supplies? - without hand-listing the answer."""
+    for field in budget.FIELDS:
+        for unit in field.units:
+            if unit.needs is None:
+                continue
+            assert unit.needs_error is not None, (
+                f"{field.id}/{unit.id} declares needs={unit.needs!r} with no "
+                "needs_error; _read would show the literal word 'None'")
+
+            payload = _payload_satisfying(field, unit)
+            _, errors = budget.validate(payload)
+            refused = [e.message for e in errors if e.field == field.id]
+            assert f"{field.label} {unit.needs_error}" not in refused, (
+                f"{field.id}/{unit.id} declares needs={unit.needs!r}, but "
+                "validate() still refused it after that field was supplied - "
+                "that id is not one validate() actually reads into `provided`")
+
+
 def test_the_per_area_refusal_reads_exactly_as_it_did():
     """A refactor may not move one character of user-facing Turkish."""
     _, errors = budget.validate(_payload(
