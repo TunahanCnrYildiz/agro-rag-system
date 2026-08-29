@@ -655,7 +655,43 @@ def test_a_row_with_a_per_tree_figure_prefills_it_instead_of_the_derived_one():
 
 def test_the_per_tree_cell_shows_its_own_five_year_range():
     spec = budget.form_spec([], _tree_table())
-    assert spec["crops"][0]["yield"]["recent"] == "önceki 5 yıl: 27–28 kg/ağaç"
+    assert spec["crops"][0]["yield"]["recent"] == (
+        "önceki 5 yıl: 27–28 kg/ağaç · ağaç sayısını da girin")
+
+
+def test_a_per_tree_cell_tells_the_farmer_to_fill_the_tree_count():
+    """The deployed client renders `{label}{required ? "" : " (isteğe bağlı)"}`,
+    so `Ağaç sayısı` reads OPTIONAL while a per-tree prefill makes it
+    mandatory. Until a build ships that can say otherwise, the instruction
+    rides on the one line under this field that the client already renders and
+    nothing on the server reads."""
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["recent"] == (
+        "önceki 5 yıl: 27–28 kg/ağaç · ağaç sayısını da girin")
+
+
+def test_the_hint_survives_a_cell_with_no_five_year_range():
+    """It must not depend on the range's existence, or it would vanish on
+    exactly the crops with the thinnest history."""
+    table = (CropNorm("ayva", "Ayva", None,
+                      NormValue(19.0, 2025, "il", "Karabük", None, None),
+                      NormValue(31.0, 2025, "il", "Karabük", None, None)),)
+    spec = budget.form_spec([], table)
+    assert spec["crops"][0]["yield"]["recent"] == "ağaç sayısını da girin"
+
+
+def test_a_field_crops_cell_carries_no_hint():
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][1]["yield"]
+    assert cell["recent"] == "önceki 5 yıl: 900–1.200 kg/da"
+    assert "ağaç" not in cell["recent"]
+
+
+def test_the_hint_does_not_touch_the_note_the_answer_prints():
+    """`note` is not free: _verify reads it and it becomes the answer's
+    provenance sentence. A hint there would leak into the answer."""
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["note"] == "TÜİK 2025, Karabük"
 
 
 def test_a_row_without_a_per_tree_figure_still_prefills_kg_da():

@@ -363,6 +363,19 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     }
 
 
+# TEMPORARY, added 2026-08-29. The deployed client renders a field's label as
+# `{label}{required ? "" : " (isteğe bağlı)"}` from one flag, so `Ağaç sayısı`
+# reads OPTIONAL even though a per-tree prefill makes it mandatory. Of the
+# strings the server can put under that field, `note` is spoken for - _verify
+# reads it and it becomes the answer's provenance line - so the instruction
+# rides on `recent`, which nothing on the server reads.
+#
+# DELETE THIS, and the two lines below that use it, once a build carrying the
+# `requires` label fix is deployed. Nothing here can detect that; it is a
+# human call.
+_TREE_COUNT_HINT = "ağaç sayısını da girin"
+
+
 def _yield_cell(row) -> dict | None:
     """This row's yield cell.
 
@@ -372,11 +385,17 @@ def _yield_cell(row) -> dict | None:
     province's whole production by the few dekars of COMPACT orchard it
     records; the published per-tree figure has no such denominator. So per-tree
     wins wherever it exists, which is the same precedence the builder already
-    applies in the other direction.
+    applies in the other direction. The per-tree cell also carries a temporary
+    "fill the tree count" hint - see `_TREE_COUNT_HINT` above for why and when
+    it goes.
     """
     if row.yield_kg_tree is not None:
-        return _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+        cell = _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
                           show_range=True)
+        if cell is not None:
+            cell["recent"] = (f"{cell['recent']} · {_TREE_COUNT_HINT}"
+                              if cell["recent"] else _TREE_COUNT_HINT)
+        return cell
     return _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
                       show_range=True)
 
