@@ -67,6 +67,10 @@ export interface CropOption {
   label: string;
   yield: NormCell | null;
   price: NormCell | null;
+  // Fields this crop makes mandatory even though the form marks them
+  // optional. Absent for most crops; the server sends it only when a crop
+  // earns one, so an older build simply never sees it.
+  requires?: string[];
 }
 
 export interface BudgetPayload {

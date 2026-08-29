@@ -279,6 +279,101 @@ def test_a_zero_area_and_a_zero_tree_count_report_the_same_shape():
     assert [e.field for e in trees] == ["tree_count", "yield_total"]
 
 
+def test_a_unit_names_the_field_it_cannot_be_converted_without():
+    """One fact in one place. `_read` refuses on it and Task 3's wire `requires`
+    is derived from it, so the client's label and the server's refusal cannot
+    disagree."""
+    units = {u.id: u for u in budget._FIELDS_BY_ID["yield_total"].units}
+    assert units["kg_da"].needs == "area"
+    assert units["kg_agac"].needs == "tree_count"
+    assert units["kg"].needs is None
+    assert units["ton"].needs is None
+
+
+def _entry(field, unit=None, amount="1"):
+    """A minimal valid submission for one field, under a specific unit.
+
+    "1" clears every FieldSpec's min_value regardless of min_exclusive, so
+    the same helper works for area/tree_count (>0) and yield/price/cost (>=0)."""
+    unit = unit or field.units[0]
+    return {"value": amount, "unit": unit.id, "source": "user"}
+
+
+def _payload_satisfying(field, unit):
+    """A complete submission where `field` is filled under `unit`, and the
+    field named by `unit.needs` is filled too - so the ONLY thing that can
+    still produce `unit.needs_error` is `needs` naming an id validate() does
+    not actually feed into `provided`."""
+    needed = budget._FIELDS_BY_ID.get(unit.needs)
+    payload = _payload()
+    payload[field.id] = _entry(field, unit)
+    if needed is not None:
+        payload[needed.id] = _entry(needed)
+    return payload
+
+
+def test_every_dependent_unit_has_a_pairable_error_and_a_suppliable_field():
+    """Two ways a dependent unit can ship broken, both unreachable today but
+    both uncaught if a new dependent unit were added carelessly:
+
+    1. `needs` without a matching `needs_error` - `_read` builds the refusal
+       as f"{label} {unit.needs_error}", so a missing pairing renders the
+       literal string "Ürün miktarı None" to the farmer.
+    2. `needs` naming a field id `validate()` never actually supplies before
+       the field loop runs - the client would mark that field mandatory
+       (via `_requires`) while `_read` keeps refusing the unit even after the
+       farmer fills it, because `provided` never gains that key.
+
+    The second check is behavioural, against validate()'s real refusal, on
+    purpose: a test asserting `unit.needs in {"area", "tree_count"}` would
+    just be a second copy of the same set living in the test file, silently
+    correct only until someone updated one copy and not the other. Calling
+    validate() with the named field actually filled asks the question this
+    finding is really about - does the dependency validate() enforces match
+    the dependency validate() supplies? - without hand-listing the answer."""
+    for field in budget.FIELDS:
+        for unit in field.units:
+            if unit.needs is None:
+                continue
+            assert unit.needs_error is not None, (
+                f"{field.id}/{unit.id} declares needs={unit.needs!r} with no "
+                "needs_error; _read would show the literal word 'None'")
+
+            payload = _payload_satisfying(field, unit)
+            _, errors = budget.validate(payload)
+            refused = [e.message for e in errors if e.field == field.id]
+            assert f"{field.label} {unit.needs_error}" not in refused, (
+                f"{field.id}/{unit.id} declares needs={unit.needs!r}, but "
+                "validate() still refused it after that field was supplied - "
+                "that id is not one validate() actually reads into `provided`")
+
+
+def test_the_per_area_refusal_reads_exactly_as_it_did():
+    """A refactor may not move one character of user-facing Turkish."""
+    _, errors = budget.validate(_payload(
+        area={"value": "", "unit": "donum", "source": "user"},
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))
+    messages = [e.message for e in errors]
+    assert ("Ürün miktarı için dekar başına değer girdiniz; "
+            "önce alanı doldurun.") in messages
+
+
+def test_the_per_tree_refusal_reads_exactly_as_it_did():
+    _, errors = budget.validate(_payload(
+        yield_total={"value": "31", "unit": "kg_agac", "source": "user"}))
+    assert [e.message for e in errors] == [
+        "Ürün miktarı için ağaç başına değer girdiniz; "
+        "önce ağaç sayısını doldurun."]
+
+
+def test_a_unit_with_no_dependency_is_never_refused_for_one():
+    """`kg` and `ton` state a total already. A lookup that fired on them would
+    make every plain submission depend on a field it does not need."""
+    inputs, errors = budget.validate(_payload(
+        yield_total={"value": "4000", "unit": "kg", "source": "user"}))
+    assert errors == [] and inputs.yield_kg.amount == 4000.0
+
+
 def test_the_tree_count_is_read_before_the_field_loop():
     """FIELDS order is a layout decision, not a contract - the same reason
     `area` is read out of order. Moving tree_count to the end of FIELDS must
@@ -517,8 +612,7 @@ def test_the_yield_label_reads_correctly_under_every_unit_it_offers():
     spec = next(f for f in budget.FIELDS if f.id == "yield_total")
     assert "toplam" not in spec.label.lower()
     assert [u.id for u in spec.units] == ["kg", "ton", "kg_da", "kg_agac"]
-    assert [u.per_area for u in spec.units] == [False, False, True, False]
-    assert [u.per_tree for u in spec.units] == [False, False, False, True]
+    assert [u.needs for u in spec.units] == [None, None, "area", "tree_count"]
 
 
 def test_the_original_units_are_untouched():
@@ -618,8 +712,48 @@ def test_a_row_with_a_per_tree_figure_prefills_it_instead_of_the_derived_one():
 
 
 def test_the_per_tree_cell_shows_its_own_five_year_range():
+    """The point is the unit: a per-tree cell's range reads in kg/ağaç, not
+    kg/da. It checks only a prefix, staying indifferent to whatever the cell
+    appends after the range - that's the tree-count hint's business, covered
+    by its own tests below."""
     spec = budget.form_spec([], _tree_table())
-    assert spec["crops"][0]["yield"]["recent"] == "önceki 5 yıl: 27–28 kg/ağaç"
+    assert spec["crops"][0]["yield"]["recent"].startswith(
+        "önceki 5 yıl: 27–28 kg/ağaç")
+
+
+def test_a_per_tree_cell_tells_the_farmer_to_fill_the_tree_count():
+    """The deployed client renders `{label}{required ? "" : " (isteğe bağlı)"}`,
+    so `Ağaç sayısı` reads OPTIONAL while a per-tree prefill makes it
+    mandatory. Until a build ships that can say otherwise, the instruction
+    rides on the one line under this field that the client already renders and
+    nothing on the server reads."""
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["recent"] == (
+        "önceki 5 yıl: 27–28 kg/ağaç · ağaç sayısını da girin")
+
+
+def test_the_hint_survives_a_cell_with_no_five_year_range():
+    """It must not depend on the range's existence, or it would vanish on
+    exactly the crops with the thinnest history."""
+    table = (CropNorm("ayva", "Ayva", None,
+                      NormValue(19.0, 2025, "il", "Karabük", None, None),
+                      NormValue(31.0, 2025, "il", "Karabük", None, None)),)
+    spec = budget.form_spec([], table)
+    assert spec["crops"][0]["yield"]["recent"] == "ağaç sayısını da girin"
+
+
+def test_a_field_crops_cell_carries_no_hint():
+    spec = budget.form_spec([], _tree_table())
+    cell = spec["crops"][1]["yield"]
+    assert cell["recent"] == "önceki 5 yıl: 900–1.200 kg/da"
+    assert "ağaç" not in cell["recent"]
+
+
+def test_the_hint_does_not_touch_the_note_the_answer_prints():
+    """`note` is not free: _verify reads it and it becomes the answer's
+    provenance sentence. A hint there would leak into the answer."""
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["yield"]["note"] == "TÜİK 2025, Karabük"
 
 
 def test_a_row_without_a_per_tree_figure_still_prefills_kg_da():
@@ -660,6 +794,50 @@ def test_a_per_tree_claim_that_does_not_match_what_we_served_downgrades():
     assert errors == []
     assert inputs.yield_kg.source == "user"
     assert inputs.yield_kg.note is None
+
+
+def test_a_per_tree_crop_row_names_the_field_it_makes_mandatory():
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["requires"] == ["tree_count"]
+
+
+def test_a_field_crop_row_carries_no_requires_key_at_all():
+    """Not an empty list: the row must stay byte-identical to what an already
+    deployed client has been reading."""
+    spec = budget.form_spec([], _tree_table())
+    assert "requires" not in spec["crops"][1]
+
+
+def test_an_already_required_dependency_is_not_listed():
+    """A per-dekar cell needs the AREA, and the area is required for every
+    crop. Listing it would tell the client nothing it does not know and would
+    put the key on every field crop."""
+    spec = budget.form_spec([], _table())
+    assert all("requires" not in crop for crop in spec["crops"])
+
+
+def test_a_crop_with_no_yield_cell_gets_no_requires():
+    """The derivation must not assume a cell exists."""
+    table = (CropNorm("bos", "Boş", None, None, None),)
+    spec = budget.form_spec([], table)
+    assert "requires" not in spec["crops"][0]
+
+
+def test_requires_is_derived_from_the_unit_not_hand_listed():
+    """THE POINT. The server's real rule lives in the unit - a per-tree value
+    is refused without the tree count. A hand-written list would be a second
+    source of truth for one fact and would drift the first time a unit changed.
+    Blank the unit's dependency and the wire must stop claiming it."""
+    from dataclasses import replace
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    stripped = tuple(replace(u, needs=None) if u.id == "kg_agac" else u
+                     for u in spec.units)
+    original = budget._FIELDS_BY_ID["yield_total"]
+    try:
+        budget._FIELDS_BY_ID["yield_total"] = replace(spec, units=stripped)
+        assert "requires" not in budget.form_spec([], _tree_table())["crops"][0]
+    finally:
+        budget._FIELDS_BY_ID["yield_total"] = original
 
 
 def test_a_price_cell_carries_two_decimals_and_its_own_unit():

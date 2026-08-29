@@ -181,7 +181,9 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
         <View key={f.id} style={styles.row}>
           <Text style={styles.label}>
             {f.label}
-            {f.required ? "" : " (isteğe bağlı)"}
+            {f.required || (selected?.requires ?? []).includes(f.id)
+              ? ""
+              : " (isteğe bağlı)"}
           </Text>
           <View style={styles.inputRow}>
             <TextInput

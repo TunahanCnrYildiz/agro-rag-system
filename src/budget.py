@@ -63,13 +63,18 @@ class UnitOption:
     id: str
     label: str
     factor: float          # multiply by this to reach the canonical unit
-    # A per-area unit needs the area before it means anything. Kept a property
-    # of the UNIT rather than a second field, so the conversion stays one line
-    # and a new per-area unit needs no new branch.
-    per_area: bool = False
-    # The same idea for a per-TREE unit, which needs the tree count. TUIK
-    # publishes no per-dekar yield for 61 tree crops, only Kg/Meyve Veren Agac.
-    per_tree: bool = False
+    # The FIELD this unit cannot be converted without: a per-dekar value needs
+    # the area, a per-tree value needs the tree count. Kept ON THE UNIT rather
+    # than as a second field, so the conversion stays one lookup, a new
+    # dependent unit needs no new branch, and the wire's `requires` is derived
+    # from the same fact the validator enforces instead of restating it.
+    needs: str | None = None            # a FieldSpec id
+    # The refusal when `needs` is not filled. Carried per unit because the two
+    # messages differ in more than the field's name - "dekar başına" against
+    # "ağaç başına", "alanı" against "ağaç sayısını" - so one f-string over the
+    # label cannot produce both, and generating them would change user-facing
+    # Turkish.
+    needs_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,8 +107,12 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec("yield_total", "Ürün miktarı", True, 0.0, False,
               (UnitOption("kg", "kg", 1.0),
                UnitOption("ton", "ton", 1000.0),
-               UnitOption("kg_da", "kg/dekar", 1.0, per_area=True),
-               UnitOption("kg_agac", "kg/ağaç", 1.0, per_tree=True))),
+               UnitOption("kg_da", "kg/dekar", 1.0, needs="area",
+                          needs_error="için dekar başına değer girdiniz; "
+                                      "önce alanı doldurun."),
+               UnitOption("kg_agac", "kg/ağaç", 1.0, needs="tree_count",
+                          needs_error="için ağaç başına değer girdiniz; "
+                                      "önce ağaç sayısını doldurun."))),
     FieldSpec("price", "Fiyat", True, 0.0, False,
               (UnitOption("tl_kg", "TL/kg", 1.0),
                UnitOption("tl_ton", "TL/ton", 0.001))),
@@ -176,8 +185,8 @@ def coerce_number(value: object) -> float | None:
     return None
 
 
-def _read(spec: FieldSpec, raw: dict, area_da: float | None,
-          trees: float | None = None
+def _read(spec: FieldSpec, raw: dict,
+          provided: dict[str, float | None] | None = None
           ) -> tuple[Value | None, FieldError | None]:
     entry = raw.get(spec.id)
     if not isinstance(entry, dict) or entry.get("value") in (None, ""):
@@ -200,24 +209,12 @@ def _read(spec: FieldSpec, raw: dict, area_da: float | None,
     if not spec.min_exclusive and amount < spec.min_value:
         return None, FieldError(spec.id, f"{spec.label} negatif olamaz.")
 
-    if unit.per_area:
-        if area_da is None:
-            # Refused, never multiplied by a guessed area and never zeroed.
-            return None, FieldError(
-                spec.id,
-                f"{spec.label} için dekar başına değer girdiniz; "
-                f"önce alanı doldurun.")
-        amount = amount * area_da
-
-    if unit.per_tree:
-        if trees is None:
-            # Refused, never multiplied by a guessed count and never zeroed -
-            # the per_area rule, on the other denominator.
-            return None, FieldError(
-                spec.id,
-                f"{spec.label} için ağaç başına değer girdiniz; "
-                f"önce ağaç sayısını doldurun.")
-        amount = amount * trees
+    if unit.needs is not None:
+        have = (provided or {}).get(unit.needs)
+        if have is None:
+            # Refused, never multiplied by a guessed value and never zeroed.
+            return None, FieldError(spec.id, f"{spec.label} {unit.needs_error}")
+        amount = amount * have
 
     claimed = "norm" if entry.get("source") == "norm" else "user"
     return Value(amount * unit.factor, claimed), None
@@ -284,7 +281,7 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     # on the tuple happening to list it first: that order is a layout decision,
     # not a contract, and a reorder would silently break every per-area field.
     area_spec = _FIELDS_BY_ID["area"]
-    area_value, area_error = _read(area_spec, raw, None)
+    area_value, area_error = _read(area_spec, raw)
     values[area_spec.id] = area_value
     if area_error is not None:
         errors.append(area_error)
@@ -293,16 +290,17 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     # Read out of FIELDS order for the same reason as the area: a per-tree unit
     # cannot be converted without it, and that order is a layout decision.
     trees_spec = _FIELDS_BY_ID["tree_count"]
-    trees_value, trees_error = _read(trees_spec, raw, area_da)
+    trees_value, trees_error = _read(trees_spec, raw, {"area": area_da})
     values[trees_spec.id] = trees_value
     if trees_error is not None:
         errors.append(trees_error)
     trees = trees_value.amount if trees_value is not None else None
 
+    provided = {"area": area_da, "tree_count": trees}
     for spec in FIELDS:
         if spec.id in (area_spec.id, trees_spec.id):
             continue
-        value, error = _read(spec, raw, area_da, trees)
+        value, error = _read(spec, raw, provided)
         values[spec.id] = value
         if error is not None:
             errors.append(error)
@@ -365,6 +363,22 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
     }
 
 
+# TEMPORARY, added 2026-08-29. The deployed client renders a field's label as
+# `{label}{required ? "" : " (isteğe bağlı)"}` from one flag, so `Ağaç sayısı`
+# reads OPTIONAL even though a per-tree prefill makes it mandatory. Of the
+# strings the server can put under that field, `note` is spoken for - _verify
+# reads it and it becomes the answer's provenance line - so the instruction
+# rides on `recent`, which nothing on the server reads.
+#
+# DELETE THIS, and the two lines below that use it, once a build carrying the
+# `requires` label fix is deployed. Nothing here can detect that; it is a
+# human call. The removal also takes the "fill the tree count" sentence out
+# of `_yield_cell`'s docstring, and the hint-specific tests in
+# tests/test_budget.py: test_a_per_tree_cell_tells_the_farmer_to_fill_the_tree_count
+# and test_the_hint_survives_a_cell_with_no_five_year_range.
+_TREE_COUNT_HINT = "ağaç sayısını da girin"
+
+
 def _yield_cell(row) -> dict | None:
     """This row's yield cell.
 
@@ -374,13 +388,51 @@ def _yield_cell(row) -> dict | None:
     province's whole production by the few dekars of COMPACT orchard it
     records; the published per-tree figure has no such denominator. So per-tree
     wins wherever it exists, which is the same precedence the builder already
-    applies in the other direction.
+    applies in the other direction. The per-tree cell also carries a temporary
+    "fill the tree count" hint - see `_TREE_COUNT_HINT` above for why and when
+    it goes.
     """
     if row.yield_kg_tree is not None:
-        return _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+        cell = _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
                           show_range=True)
+        if cell is not None:
+            cell["recent"] = (f"{cell['recent']} · {_TREE_COUNT_HINT}"
+                              if cell["recent"] else _TREE_COUNT_HINT)
+        return cell
     return _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
                       show_range=True)
+
+
+def _requires(cell: dict | None) -> list[str] | None:
+    """Which normally-optional field this crop makes mandatory, or None.
+
+    DERIVED, never hand-listed. The server's rule lives in the unit: a per-tree
+    value cannot be converted without the tree count and `_read` refuses it. A
+    separate list would be a second source of truth for one fact, and the
+    client's label would drift from the server's refusal the first time a unit
+    changed.
+
+    `cell` is looked up against `_FIELDS_BY_ID["yield_total"].units`
+    specifically, not against whichever field built `cell`: yield is the only
+    cell `_crop_rows` builds whose unit can name a dependency at all, since
+    price's units (tl_kg, tl_ton) never declare `needs`. A dependent price
+    unit would need this lookup widened to match; today it would just return
+    None.
+
+    Only fields that are OPTIONAL by default appear. A per-dekar cell needs the
+    AREA, which is required for every crop, so saying so would tell the client
+    nothing and would put this key on every field crop.
+    """
+    if cell is None:
+        return None
+    unit = next((u for u in _FIELDS_BY_ID["yield_total"].units
+                 if u.id == cell["unit"]), None)
+    if unit is None or unit.needs is None:
+        return None
+    needed = _FIELDS_BY_ID.get(unit.needs)
+    if needed is None or needed.required:
+        return None
+    return [needed.id]
 
 
 def _crop_rows(table, latest_year: int | None) -> list[dict]:
@@ -400,12 +452,19 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
         price = row.price_tl_kg
         if price is not None and (latest_year is None or price.year != latest_year):
             price = None
-        rows.append({
+        cell = _yield_cell(row)
+        entry = {
             "id": row.crop,
             "label": row.label,
-            "yield": _yield_cell(row),
+            "yield": cell,
             "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
-        })
+        }
+        # Absent, not an empty list: a field crop's row must stay exactly what
+        # an already-deployed client has been reading.
+        requires = _requires(cell)
+        if requires:
+            entry["requires"] = requires
+        rows.append(entry)
     return rows
 
 
