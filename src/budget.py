@@ -403,6 +403,31 @@ def _yield_cell(row) -> dict | None:
                       show_range=True)
 
 
+def _requires(cell: dict | None) -> list[str] | None:
+    """Which normally-optional field this crop makes mandatory, or None.
+
+    DERIVED, never hand-listed. The server's rule lives in the unit: a per-tree
+    value cannot be converted without the tree count and `_read` refuses it. A
+    separate list would be a second source of truth for one fact, and the
+    client's label would drift from the server's refusal the first time a unit
+    changed.
+
+    Only fields that are OPTIONAL by default appear. A per-dekar cell needs the
+    AREA, which is required for every crop, so saying so would tell the client
+    nothing and would put this key on every field crop.
+    """
+    if cell is None:
+        return None
+    unit = next((u for u in _FIELDS_BY_ID["yield_total"].units
+                 if u.id == cell["unit"]), None)
+    if unit is None or unit.needs is None:
+        return None
+    needed = _FIELDS_BY_ID.get(unit.needs)
+    if needed is None or needed.required:
+        return None
+    return [needed.id]
+
+
 def _crop_rows(table, latest_year: int | None) -> list[dict]:
     """Every crop's figures, for a card that picks one of them client-side.
 
@@ -420,12 +445,19 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
         price = row.price_tl_kg
         if price is not None and (latest_year is None or price.year != latest_year):
             price = None
-        rows.append({
+        cell = _yield_cell(row)
+        entry = {
             "id": row.crop,
             "label": row.label,
-            "yield": _yield_cell(row),
+            "yield": cell,
             "price": _norm_cell(price, *_NORM_UNITS["price"], 2, show_range=False),
-        })
+        }
+        # Absent, not an empty list: a field crop's row must stay exactly what
+        # an already-deployed client has been reading.
+        requires = _requires(cell)
+        if requires:
+            entry["requires"] = requires
+        rows.append(entry)
     return rows
 
 

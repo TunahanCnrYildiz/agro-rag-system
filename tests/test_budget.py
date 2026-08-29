@@ -738,6 +738,50 @@ def test_a_per_tree_claim_that_does_not_match_what_we_served_downgrades():
     assert inputs.yield_kg.note is None
 
 
+def test_a_per_tree_crop_row_names_the_field_it_makes_mandatory():
+    spec = budget.form_spec([], _tree_table())
+    assert spec["crops"][0]["requires"] == ["tree_count"]
+
+
+def test_a_field_crop_row_carries_no_requires_key_at_all():
+    """Not an empty list: the row must stay byte-identical to what an already
+    deployed client has been reading."""
+    spec = budget.form_spec([], _tree_table())
+    assert "requires" not in spec["crops"][1]
+
+
+def test_an_already_required_dependency_is_not_listed():
+    """A per-dekar cell needs the AREA, and the area is required for every
+    crop. Listing it would tell the client nothing it does not know and would
+    put the key on every field crop."""
+    spec = budget.form_spec([], _table())
+    assert all("requires" not in crop for crop in spec["crops"])
+
+
+def test_a_crop_with_no_yield_cell_gets_no_requires():
+    """The derivation must not assume a cell exists."""
+    table = (CropNorm("bos", "Boş", None, None, None),)
+    spec = budget.form_spec([], table)
+    assert "requires" not in spec["crops"][0]
+
+
+def test_requires_is_derived_from_the_unit_not_hand_listed():
+    """THE POINT. The server's real rule lives in the unit - a per-tree value
+    is refused without the tree count. A hand-written list would be a second
+    source of truth for one fact and would drift the first time a unit changed.
+    Blank the unit's dependency and the wire must stop claiming it."""
+    from dataclasses import replace
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    stripped = tuple(replace(u, needs=None) if u.id == "kg_agac" else u
+                     for u in spec.units)
+    original = budget._FIELDS_BY_ID["yield_total"]
+    try:
+        budget._FIELDS_BY_ID["yield_total"] = replace(spec, units=stripped)
+        assert "requires" not in budget.form_spec([], _tree_table())["crops"][0]
+    finally:
+        budget._FIELDS_BY_ID["yield_total"] = original
+
+
 def test_a_price_cell_carries_two_decimals_and_its_own_unit():
     spec = budget.form_spec([], _table(), latest_year=2025)
     cell = spec["crops"][0]["price"]
