@@ -383,9 +383,10 @@ _TREE_COUNT_HINT = "ağaç sayısını da girin"
 
 # Appended to the range line, which is this warning's own evidence, so one line
 # does both jobs. It names no CAUSE: a harvest can fail or a province can leave
-# the crop, and the sentence must stay true either way.
-def _far_below_clause(value) -> str:
-    return f" — {value.year} bunun çok altında"
+# the crop, and the sentence must stay true either way. Kept in the same shape
+# as its sibling, crop_compare.FAR_BELOW_NOTE, so the two code-written clauses
+# for this same warning grep together.
+FAR_BELOW_CLAUSE = " — {year} bunun çok altında"
 
 
 def _yield_cell(row) -> dict | None:
@@ -416,7 +417,8 @@ def _yield_cell(row) -> dict | None:
     if norms.far_below_recent(value):
         # far_below_recent is False without a range, so `recent` is never None
         # here and the clause always has something to attach to.
-        cell["recent"] = f"{cell['recent']}{_far_below_clause(value)}"
+        cell["recent"] = (f"{cell['recent']}"
+                          f"{FAR_BELOW_CLAUSE.format(year=value.year)}")
     if row.yield_kg_tree is not None:
         cell["recent"] = (f"{cell['recent']} · {_TREE_COUNT_HINT}"
                           if cell["recent"] else _TREE_COUNT_HINT)

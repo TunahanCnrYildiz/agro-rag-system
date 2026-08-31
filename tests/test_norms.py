@@ -545,3 +545,17 @@ def test_a_zero_range_cannot_divide_by_zero():
     not raise on a value someone constructs."""
     assert norms.far_below_recent(
         norms.NormValue(1.0, 2025, "il", "Bilecik", 0.0, 0.0)) is False
+
+
+def test_a_value_at_its_own_range_minimum_is_never_flagged():
+    """K.Maraş/Fındık 2025: 1 kg/ağaç against a prior 1-12 - the served figure
+    IS the printed minimum. One fifth of the midpoint (6.5) is 1.3, so the
+    magnitude-only rule flags this even though the sentence it produces would
+    call the range's own endpoint 'far below' that range. Three rounds of
+    mutation testing missed this because every existing fixture keeps its
+    spread under about 2x; this one is over 10x, wide enough for one fifth of
+    the midpoint to sit above recent_min itself. The fix adds the ordering the
+    sentence already asserts: below recent_min, not just below one fifth of
+    the midpoint."""
+    value = norms.NormValue(1.0, 2025, "il", "Kahramanmaraş", 1.0, 12.0)
+    assert norms.far_below_recent(value) is False

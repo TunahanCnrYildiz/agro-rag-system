@@ -315,7 +315,13 @@ def _crop_block(figures: CropFigures) -> list[str]:
 
     The far-below sentence follows the range line in both the per-tree and
     revenue branches, because the range is its evidence; the `missing`
-    branches print no range at all, so they cannot carry it.
+    branches print no range at all, so they cannot carry it. This makes the
+    card and this route disagree on purpose for `missing == "fiyat"` crops
+    (measured: 234 cells carry the sentence on the card, 225 here - the 9
+    missing here all go through this branch): the card has no such branch and
+    always prints its range, but this route's own no-range-no-sentence rule
+    says the same thing consistently on both surfaces, it just has one more
+    case where there is no range to say it about.
     """
     if figures.missing == "verim":
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]

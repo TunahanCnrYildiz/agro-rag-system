@@ -121,7 +121,7 @@ class NormValue:
 # the prior five" fires on 28,8% of cells and 57% of those are near misses. All
 # that can be said for one fifth is that the histogram's slope is shallowest
 # across roughly 0,20-0,35, so the choice is least consequential there, and that
-# it fires on 240 cells (3,3%).
+# it fires on 234 cells (3,2%) once paired with the ordering check below.
 #
 # WHY A TUNED NUMBER IS ACCEPTABLE HERE and was not for the density gates in
 # scripts/build_crop_norms.py: this one drives a SENTENCE, not a refusal. Firing
@@ -141,13 +141,20 @@ def far_below_recent(value: NormValue | None) -> bool:
 
     False without a range: the range is this warning's own evidence, and with
     nothing to compare against there is nothing to warn about.
+
+    Magnitude alone is not enough: on a wide range, one fifth of the midpoint
+    can sit ABOVE recent_min, so a value equal to the range's own printed
+    minimum could pass the magnitude test - flagging the sentence "far below
+    this range" onto a number that IS the range's edge. The sentence asserts
+    an ordering (below the range), so the ordering is required too.
     """
     if value is None or value.recent_min is None or value.recent_max is None:
         return False
     midpoint = (value.recent_min + value.recent_max) / 2
     if midpoint <= 0:
         return False
-    return value.amount < _FAR_BELOW_RECENT * midpoint
+    return (value.amount < value.recent_min
+            and value.amount < _FAR_BELOW_RECENT * midpoint)
 
 
 @dataclass(frozen=True)
