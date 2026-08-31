@@ -146,8 +146,8 @@ class BudgetInputs:
     cost_tl: Value | None
     # The tree count, and ONLY when it actually multiplied the yield - that is,
     # when the harvest was submitted in a per-tree unit. A farmer can fill it in
-    # and then state their harvest in kg, and naming it under "Şu değerlere
-    # göre" would list a figure that entered no arithmetic.
+    # and then state their harvest in kg, and naming it in the restating clause
+    # would list a figure that entered no arithmetic.
     trees: Value | None = None
     # Which crop the farmer picked - an explicit client selection, never
     # inferred. It is not part of FIELDS: form_spec() emits it as a bare id

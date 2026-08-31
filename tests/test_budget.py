@@ -1295,12 +1295,35 @@ def test_the_answer_restates_the_tree_count_it_used():
                            "**4.000 ağaç**, toplam **124.000 kg**")
 
 
+def test_the_restated_tree_count_keeps_its_fractional_digits():
+    """A count entered as 400,5 must echo as 400,5, not round to 400 - the
+    total beneath it was computed from the true 400,5, and a rounded echo
+    would disagree with its own arithmetic."""
+    inputs, errors = budget.validate(_fruit_payload(
+        tree_count={"value": "400,5", "unit": "adet", "source": "user"}))
+    assert errors == []
+    assert "**400,5 ağaç**" in budget.render(inputs, budget.compute(inputs))
+
+
 def test_a_tree_count_that_took_no_part_is_not_restated():
     """THE DISCRIMINATING CASE. The harvest is stated in kg, so the count
     multiplied nothing. Listing it under "Girdiğiniz değerlere göre" would name
     a figure that entered no arithmetic."""
     inputs, errors = budget.validate(_fruit_payload(
         yield_total={"value": "4000", "unit": "kg", "source": "user"}))
+    assert errors == []
+    assert inputs.trees is None
+    assert "ağaç" not in budget.render(inputs, budget.compute(inputs))
+
+
+def test_a_leftover_tree_count_is_not_restated_under_kg_per_dekar():
+    """A SECOND DISCRIMINATING CASE. kg/dekar needs the AREA, not the tree
+    count - `needs` must be checked against "tree_count" specifically, not
+    merely against being filled at all. A farmer who fills the count on one
+    attempt and then submits kg/dekar (what the norms card prefills for every
+    non-tree crop) must not see that leftover count multiplied nothing."""
+    inputs, errors = budget.validate(_fruit_payload(
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))
     assert errors == []
     assert inputs.trees is None
     assert "ağaç" not in budget.render(inputs, budget.compute(inputs))
