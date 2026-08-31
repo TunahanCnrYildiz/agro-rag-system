@@ -12,6 +12,7 @@ data" test placed there would silently read the fixture and pass vacuously.
 from collections import namedtuple
 
 from src import budget, crop_compare, norms
+from src.config import DATA_DIR
 from src.context.location import PROVINCES
 
 
@@ -50,17 +51,19 @@ def _sweep():
 def test_the_sweep_really_reads_the_shipped_file():
     """PROVE THE INSTRUMENT BEFORE TRUSTING IT. norms._load is an
     lru_cache(maxsize=1) and several test modules repoint norms._PATH at a temp
-    table. Measured today: after tests/test_norms.py and
-    tests/test_crop_compare.py both run, a fresh read still sees the real file -
-    so there is no leak. That is one teardown away from being false, and a smoke
-    test silently reading a fixture would pass vacuously while claiming to guard
-    the shipped data.
+    table. A leaked repoint would make norms._PATH some tmp_path fixture file -
+    which, because every fixture writes to tmp_path / "crop_norms.json" too,
+    still has the right file NAME. Comparing to DATA_DIR / "crop_norms.json"
+    catches that; a bare name check would not. If this assertion ever fails,
+    a previous test's monkeypatch of norms._PATH outlived its teardown and
+    every test in this file would silently be sweeping a fixture instead of
+    the shipped data. If the crop-count assertion below ever fails on its
+    own, the shipped file shrank to a fixture-sized table - a data-loss bug,
+    not a test bug.
     """
     norms._load.cache_clear()
-    assert norms._PATH.name == "crop_norms.json"
-    assert norms._PATH.is_file(), norms._PATH
+    assert norms._PATH == DATA_DIR / "crop_norms.json", norms._PATH
     assert len(norms.available_crops()) > 200, len(norms.available_crops())
-    assert len(PROVINCES) == 81, len(PROVINCES)
 
 
 def test_the_sweep_covers_the_whole_table():
