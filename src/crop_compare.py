@@ -276,6 +276,12 @@ PER_TREE_NOTE = (
     "hesaplamıyorum."
 )
 
+# Written BY CODE and printed directly under the range it refers to. It names
+# no CAUSE - a harvest can fail or a province can leave the crop - so it stays
+# true either way, and it says nothing about what next season will bring.
+FAR_BELOW_NOTE = ("{year} bu aralığın çok altında; olağan bir yılın "
+                  "beklentisi değil.")
+
 ASK_FOR_CROPS = (
     "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
     "ilinizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
@@ -306,6 +312,10 @@ def _crop_block(figures: CropFigures) -> list[str]:
     per-tree row with `missing == "fiyat"`, so this order is defence in depth
     rather than the only thing protecting that reader - a test pins the order
     itself, directly, so it is not "simplified" away as unreachable.
+
+    The far-below sentence follows the range line in both the per-tree and
+    revenue branches, because the range is its evidence; the `missing`
+    branches print no range at all, so they cannot carry it.
     """
     if figures.missing == "verim":
         return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
@@ -323,6 +333,8 @@ def _crop_block(figures: CropFigures) -> list[str]:
         if y.recent_min is not None and y.recent_max is not None:
             lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
                          f"{format_qty(y.recent_max)} kg/ağaç")
+            if norms.far_below_recent(y):
+                lines.append(f"   {FAR_BELOW_NOTE.format(year=y.year)}")
         lines.append(f"   {PER_TREE_NOTE}")
         return lines
 
@@ -345,6 +357,8 @@ def _crop_block(figures: CropFigures) -> list[str]:
     if y.recent_min is not None and y.recent_max is not None:
         lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
                      f"{format_qty(y.recent_max)} kg/da")
+        if norms.far_below_recent(y):
+            lines.append(f"   {FAR_BELOW_NOTE.format(year=y.year)}")
     return lines
 
 

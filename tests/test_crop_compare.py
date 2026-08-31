@@ -74,6 +74,22 @@ TABLE = {
             "yield_kg_tree": {"scope": "il", "Konya": [18.0, 19.0, 20.0, 22.0],
                               "TR": [None, None, None, None]},
         },
+        "visne": {
+            "label": "Vişne",
+            "yield_kg_da": {"scope": "il", "Konya": [900.0, 950.0, 1000.0, 30.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [20.0, 24.0, 28.0, 33.0],
+                            "TR": [None, None, None, None]},
+            "yield_kg_tree": {"scope": "il", "Konya": [30.0, 32.0, 34.0, 1.0],
+                              "TR": [None, None, None, None]},
+        },
+        "kayisi": {
+            "label": "Kayısı",
+            "yield_kg_da": {"scope": "il", "Konya": [900.0, 950.0, 1000.0, 40.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [18.0, 22.0, 26.0, 31.0],
+                            "TR": [None, None, None, None]},
+        },
     },
 }
 
@@ -553,3 +569,53 @@ def test_gross_only_is_absent_when_no_revenue_printed():
     """Nothing printed a lira figure, so there is no gross figure to caveat."""
     text = _render("ayva", "ceviz")
     assert crop_compare.GROSS_ONLY not in text
+
+
+def test_a_collapsed_per_tree_yield_is_called_out_under_its_range():
+    """The sentence sits directly under the range it refers to, so a reader
+    never has to work out which figure it is about."""
+    text = _render("visne", "domates (sofralik)")
+    lines = _crop_block_lines(text, "Vişne")
+    assert lines[1] == "   verimde önceki 5 yıl: 30–34 kg/ağaç"
+    assert lines[2] == (
+        "   2025 bu aralığın çok altında; olağan bir yılın beklentisi değil.")
+
+
+def test_a_collapsed_per_dekar_yield_is_called_out_too():
+    """The test is the VALUE, not the measure. Kayısı here has no per-tree
+    figure, so it renders through the revenue branch."""
+    text = _render("kayisi", "domates (sofralik)")
+    lines = _crop_block_lines(text, "Kayısı")
+    assert lines[2] == "   verimde önceki 5 yıl: 900–1.000 kg/da"
+    assert lines[3] == (
+        "   2025 bu aralığın çok altında; olağan bir yılın beklentisi değil.")
+
+
+def test_an_ordinary_crop_gets_no_such_sentence():
+    text = _render("domates (sofralik)", "biber (salcalik, kapya)")
+    assert crop_compare.FAR_BELOW_NOTE.format(year=2025) not in text
+
+
+def test_a_block_that_prints_no_range_never_carries_the_sentence():
+    """`missing == "fiyat"` prints ONE line and no range at all. Kayısı is
+    chosen deliberately: its 2025 figure IS far below its history, so this test
+    fails if the sentence is emitted from the value alone rather than from the
+    range line it belongs under. With any ordinary crop it would pass
+    vacuously."""
+    text = _render("kayisi", "domates (sofralik)", latest_year=2099)
+    assert "yayımlanmış fiyat yok" in text
+    assert crop_compare.FAR_BELOW_NOTE.format(year=2025) not in text
+
+
+def test_the_two_surfaces_agree_on_which_figures_are_far_below():
+    """The pair to the measure-agreement test above. These surfaces drifted
+    once already; both now ask norms the same question."""
+    from src import budget
+    for row in _table():
+        value = (row.yield_kg_tree if row.yield_kg_tree is not None
+                 else row.yield_kg_da)
+        cell = budget._yield_cell(row)
+        if cell is None or cell["recent"] is None:
+            continue
+        on_card = "çok altında" in cell["recent"]
+        assert on_card == norms.far_below_recent(value), row.label
