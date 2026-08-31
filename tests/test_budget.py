@@ -749,6 +749,50 @@ def test_a_field_crops_cell_carries_no_hint():
     assert "ağaç" not in cell["recent"]
 
 
+def _collapsed_table():
+    """Erik's 2025 figure collapsed; Mısır's did not. Erik is per-tree so its
+    cell also carries the temporary tree-count hint - the worst-case line."""
+    return (
+        CropNorm("erik", "Erik",
+                 NormValue(7.1, 2025, "il", "Bilecik", 449.9, 925.4),
+                 NormValue(30.0, 2025, "il", "Bilecik", None, None),
+                 NormValue(1.0, 2025, "il", "Bilecik", 20.0, 37.0)),
+        CropNorm("misir", "Mısır",
+                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 NormValue(8.0, 2025, "tr", "Türkiye", None, None)),
+    )
+
+
+def test_a_collapsed_yield_says_so_on_its_range_line():
+    """The range is the warning's evidence, so one line does both jobs."""
+    spec = budget.form_spec([], _collapsed_table())
+    assert spec["crops"][0]["yield"]["recent"] == (
+        "önceki 5 yıl: 20–37 kg/ağaç — 2025 bunun çok altında "
+        "· ağaç sayısını da girin")
+
+
+def test_an_ordinary_yield_line_is_untouched():
+    spec = budget.form_spec([], _collapsed_table())
+    assert spec["crops"][1]["yield"]["recent"] == "önceki 5 yıl: 900–1.200 kg/da"
+
+
+def test_a_collapsed_per_dekar_yield_says_so_too():
+    """The test is the VALUE, not the measure - a field crop collapses the same
+    way. Erik here carries no per-tree figure, so its kg/da cell is served."""
+    from dataclasses import replace
+    row = replace(_collapsed_table()[0], yield_kg_tree=None)
+    spec = budget.form_spec([], (row,))
+    assert spec["crops"][0]["yield"]["recent"] == (
+        "önceki 5 yıl: 449,9–925,4 kg/da — 2025 bunun çok altında")
+
+
+def test_the_warning_does_not_touch_the_note():
+    """`note` is not free: _verify reads it and it becomes the answer's
+    provenance sentence. A warning there would move the answer text."""
+    spec = budget.form_spec([], _collapsed_table())
+    assert spec["crops"][0]["yield"]["note"] == "TÜİK 2025, Bilecik"
+
+
 def test_the_hint_does_not_touch_the_note_the_answer_prints():
     """`note` is not free: _verify reads it and it becomes the answer's
     provenance sentence. A hint there would leak into the answer."""

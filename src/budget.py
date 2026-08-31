@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import re
 
+from src import norms
+
 # A complete Turkish number token, with BOTH boundaries anchored. The pattern is
 # inherited from the reviewed extraction module: it refuses "1.5" and "1.2.3"
 # outright rather than re-parsing them from the middle, which is how a scanning
@@ -379,6 +381,14 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
 _TREE_COUNT_HINT = "ağaç sayısını da girin"
 
 
+# Appended to the range line, which is this warning's own evidence, so one line
+# does both jobs. It names no CAUSE: a harvest can fail or a province can leave
+# the crop, and the sentence must stay true either way. Kept in the same shape
+# as its sibling, crop_compare.FAR_BELOW_NOTE, so the two code-written clauses
+# for this same warning grep together.
+FAR_BELOW_CLAUSE = " — {year} bunun çok altında"
+
+
 def _yield_cell(row) -> dict | None:
     """This row's yield cell.
 
@@ -388,19 +398,31 @@ def _yield_cell(row) -> dict | None:
     province's whole production by the few dekars of COMPACT orchard it
     records; the published per-tree figure has no such denominator. So per-tree
     wins wherever it exists, which is the same precedence the builder already
-    applies in the other direction. The per-tree cell also carries a temporary
-    "fill the tree count" hint - see `_TREE_COUNT_HINT` above for why and when
-    it goes.
+    applies in the other direction.
+
+    Both measures then pass through the same two additions to `recent`, in this
+    order: the far-below clause, which belongs to the figure, and only then the
+    temporary "fill the tree count" hint, which belongs to the form - see
+    `_TREE_COUNT_HINT` above for why and when that one goes.
     """
     if row.yield_kg_tree is not None:
-        cell = _norm_cell(row.yield_kg_tree, *_NORM_UNITS["yield_tree"], None,
+        value = row.yield_kg_tree
+        cell = _norm_cell(value, *_NORM_UNITS["yield_tree"], None,
                           show_range=True)
-        if cell is not None:
-            cell["recent"] = (f"{cell['recent']} · {_TREE_COUNT_HINT}"
-                              if cell["recent"] else _TREE_COUNT_HINT)
-        return cell
-    return _norm_cell(row.yield_kg_da, *_NORM_UNITS["yield"], None,
-                      show_range=True)
+    else:
+        value = row.yield_kg_da
+        cell = _norm_cell(value, *_NORM_UNITS["yield"], None, show_range=True)
+    if cell is None:
+        return None
+    if norms.far_below_recent(value):
+        # far_below_recent is False without a range, so `recent` is never None
+        # here and the clause always has something to attach to.
+        cell["recent"] = (f"{cell['recent']}"
+                          f"{FAR_BELOW_CLAUSE.format(year=value.year)}")
+    if row.yield_kg_tree is not None:
+        cell["recent"] = (f"{cell['recent']} · {_TREE_COUNT_HINT}"
+                          if cell["recent"] else _TREE_COUNT_HINT)
+    return cell
 
 
 def _requires(cell: dict | None) -> list[str] | None:

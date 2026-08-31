@@ -113,6 +113,50 @@ class NormValue:
     recent_max: float | None = None
 
 
+# ONE FIFTH, AND THIS NUMBER IS TUNED RATHER THAN ARGUED. Measured over the
+# 7.245 provincial yield cells that print a prior range: the distribution of
+# `served / prior midpoint` decays smoothly from its mode at 0,9-1,2 with NO gap
+# and no second peak, so a catastrophic year and a merely poor one lie on one
+# continuum. An ordering rule does not rescue it either - "below the minimum of
+# the prior five" fires on 28,8% of cells and 57% of those are near misses. All
+# that can be said for one fifth is that the histogram's slope is shallowest
+# across roughly 0,20-0,35, so the choice is least consequential there, and that
+# it fires on 234 cells (3,2%) once paired with the ordering check below.
+#
+# WHY A TUNED NUMBER IS ACCEPTABLE HERE and was not for the density gates in
+# scripts/build_crop_norms.py: this one drives a SENTENCE, not a refusal. Firing
+# too often costs an unnecessary sentence; firing too rarely leaves today's
+# behaviour. No outcome is worse than shipping nothing. The density rules delete
+# data, which is why they were held to the higher "argued from geometry" bar.
+_FAR_BELOW_RECENT = 0.2
+
+
+def far_below_recent(value: NormValue | None) -> bool:
+    """Whether this figure sits far below the five years printed beside it.
+
+    A statement about the VALUE, not about presentation, so it lives here and
+    both surfaces reach the same verdict for the same cell. The budget form and
+    the comparison decided a measure separately once before and disagreed on
+    1.568 cells for a round; a test pins them together.
+
+    False without a range: the range is this warning's own evidence, and with
+    nothing to compare against there is nothing to warn about.
+
+    Magnitude alone is not enough: on a wide range, one fifth of the midpoint
+    can sit ABOVE recent_min, so a value equal to the range's own printed
+    minimum could pass the magnitude test - flagging the sentence "far below
+    this range" onto a number that IS the range's edge. The sentence asserts
+    an ordering (below the range), so the ordering is required too.
+    """
+    if value is None or value.recent_min is None or value.recent_max is None:
+        return False
+    midpoint = (value.recent_min + value.recent_max) / 2
+    if midpoint <= 0:
+        return False
+    return (value.amount < value.recent_min
+            and value.amount < _FAR_BELOW_RECENT * midpoint)
+
+
 @dataclass(frozen=True)
 class CropNorm:
     crop: str

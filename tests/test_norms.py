@@ -503,3 +503,59 @@ def test_the_shipped_file_keeps_the_two_tomatoes_apart():
     assert "Domates (Sofralık)" in labels
     assert "Domates (Salçalık)" in labels
     assert "Domates" not in labels
+
+
+def test_a_figure_far_below_its_own_five_year_range_is_flagged():
+    """Bilecik/Erik 2025: 1 kg/ağaç against a prior 20-37. Production fell from
+    2.954 tons to 27 while the recorded orchard area GREW - the trees are there
+    and the harvest is not. The most recent published figure is not an
+    expectation when there was almost nothing to measure."""
+    value = norms.NormValue(1.0, 2025, "il", "Bilecik", 20.0, 37.0)
+    assert norms.far_below_recent(value) is True
+
+
+def test_an_ordinary_figure_is_not_flagged():
+    value = norms.NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)
+    assert norms.far_below_recent(value) is False
+
+
+def test_a_figure_with_no_range_is_never_flagged():
+    """With nothing to compare against there is nothing to warn about. The
+    range is the warning's own evidence."""
+    assert norms.far_below_recent(
+        norms.NormValue(1.0, 2025, "il", "Bilecik")) is False
+
+
+def test_no_value_is_not_flagged():
+    assert norms.far_below_recent(None) is False
+
+
+def test_the_threshold_is_exercised_from_both_sides():
+    """A midpoint of 100: 19 is below one fifth of it, 21 is not. Pins the
+    constant itself, so it cannot drift without a test noticing."""
+    below = norms.NormValue(19.0, 2025, "il", "Bilecik", 80.0, 120.0)
+    above = norms.NormValue(21.0, 2025, "il", "Bilecik", 80.0, 120.0)
+    assert norms.far_below_recent(below) is True
+    assert norms.far_below_recent(above) is False
+
+
+def test_a_zero_range_cannot_divide_by_zero():
+    """recent_min == recent_max == 0 cannot occur through _recent_range, which
+    refuses a range whose ends are equal - but this function is public and must
+    not raise on a value someone constructs."""
+    assert norms.far_below_recent(
+        norms.NormValue(1.0, 2025, "il", "Bilecik", 0.0, 0.0)) is False
+
+
+def test_a_value_at_its_own_range_minimum_is_never_flagged():
+    """K.Maraş/Fındık 2025: 1 kg/ağaç against a prior 1-12 - the served figure
+    IS the printed minimum. One fifth of the midpoint (6.5) is 1.3, so the
+    magnitude-only rule flags this even though the sentence it produces would
+    call the range's own endpoint 'far below' that range. Three rounds of
+    mutation testing missed this because every existing fixture keeps its
+    spread under about 2x; this one is over 10x, wide enough for one fifth of
+    the midpoint to sit above recent_min itself. The fix adds the ordering the
+    sentence already asserts: below recent_min, not just below one fifth of
+    the midpoint."""
+    value = norms.NormValue(1.0, 2025, "il", "Kahramanmaraş", 1.0, 12.0)
+    assert norms.far_below_recent(value) is False
