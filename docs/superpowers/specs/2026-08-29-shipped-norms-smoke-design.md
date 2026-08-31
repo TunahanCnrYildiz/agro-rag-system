@@ -75,9 +75,11 @@ already does exactly this, and says why:
 pinned `2.097` or `234` would go red on every regeneration and teach whoever regenerates it
 to edit the number rather than read it.
 
-Measured today, for the floors: **2.097** per-tree cells served, **7.745** derived `kg/da`
-cells (`scope == "il"`), 19.926 rows, 246 crops, 81 provinces. The floors sit at roughly two
-thirds: **1.400** and **5.000**.
+Measured today, for the floors: of 19.926 rows the card serves **8.274** yield cells —
+**2.097** per tree and **6.177** per dekar. (7.745 rows carry a provincial `yield_kg_da`
+value, but per-tree takes precedence where both exist, so that is not what the card
+serves; the test counts what is served.) 246 crops, 81 provinces. The floors sit at
+roughly two thirds: **1.400** and **4.000**.
 
 **The invariants are NOT floors.** "Zero mismatches" is the whole point of them, and a
 tolerance there would let exactly the drift they exist to catch slip through.
