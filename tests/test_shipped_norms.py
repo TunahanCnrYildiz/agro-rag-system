@@ -16,7 +16,7 @@ from src.config import DATA_DIR
 from src.context.location import PROVINCES
 
 
-Row = namedtuple("Row", "label province value card block")
+Row = namedtuple("Row", "label province value card block per_tree")
 
 
 def _sweep():
@@ -44,6 +44,7 @@ def _sweep():
                 card=budget._yield_cell(row),
                 block=crop_compare._crop_block(
                     crop_compare._figures(row, latest)),
+                per_tree=row.yield_kg_tree is not None,
             ))
     return rows
 
@@ -76,11 +77,18 @@ def test_the_sweep_covers_the_whole_table():
 
 def test_both_surfaces_choose_the_same_measure_for_every_row():
     """They disagreed on 1.568 cells for a whole round: the form prefilled
-    Karabük/Ayva at 31 kg/ağaç while the comparison printed 13.419 kg/da."""
+    Karabük/Ayva at 31 kg/ağaç while the comparison printed 13.419 kg/da.
+    Checked against `row.yield_kg_tree` - the shipped table's own verdict -
+    rather than card against block: two surfaces wrong in the same direction
+    would still agree with each other, so a surface-against-surface check
+    only catches them diverging, never both drifting off the data the same
+    way. A failure here means one surface picked the wrong measure for a row,
+    whichever surface it is."""
     mismatched = [
         r.label for r in _sweep()
         if r.card is not None
-        and (r.card["unit"] == "kg_agac") != ("kg/ağaç" in r.block[0])
+        and ((r.card["unit"] == "kg_agac") != r.per_tree
+             or ("kg/ağaç" in r.block[0]) != r.per_tree)
     ]
     assert mismatched == [], mismatched[:10]
 
@@ -88,11 +96,18 @@ def test_both_surfaces_choose_the_same_measure_for_every_row():
 def test_no_per_tree_row_prints_a_per_dekar_unit_anywhere():
     """The derived kg/da for a tree crop divides a province's whole production
     by the few dekars of COMPACT orchard it records. It still exists in the data
-    file; no surface may show it."""
+    file; no surface may show it. Selected by `row.yield_kg_tree`, the shipped
+    table's own verdict, NOT by `r.card["unit"] == "kg_agac"`: that would ask
+    the code under test which rows to check it on, so a mutation that stops
+    tagging per-tree cells as `kg_agac` would also erase them from this
+    test's own filter, and the assertion would pass over an empty list
+    instead of catching the leak. A failure here means a per-tree row is
+    showing its derived per-dekar figure somewhere a farmer would read it."""
     leaked = [
         (r.label, r.province) for r in _sweep()
-        if r.card is not None and r.card["unit"] == "kg_agac"
-        and ("kg/da" in " ".join(r.block) or "kg/da" in (r.card["recent"] or ""))
+        if r.per_tree
+        and ("kg/da" in " ".join(r.block)
+             or (r.card is not None and "kg/da" in (r.card["recent"] or "")))
     ]
     assert leaked == [], leaked[:10]
 
