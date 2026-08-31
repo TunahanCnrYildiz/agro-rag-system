@@ -1268,3 +1268,57 @@ def test_a_non_dict_submitted_coerces_to_empty_rather_than_raising():
     spec = budget.form_spec([], None, 42)
     assert "fields" in spec
     assert "crop" not in spec
+
+
+def _fruit_payload(**over):
+    """A per-tree submission: the yield is stated per tree, so the count is
+    what turns it into a total."""
+    base = {
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "4000", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "31", "unit": "kg_agac", "source": "user"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+    }
+    base.update(over)
+    return base
+
+
+def test_the_answer_restates_the_tree_count_it_used():
+    """render's own docstring promises it "restates its inputs". A farmer who
+    types 4000 where they meant 400 currently sees that mistake only inside a
+    total they would have to divide by 31 to check."""
+    inputs, errors = budget.validate(_fruit_payload())
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert "**4.000 ağaç**" in text
+    assert text.startswith("Girdiğiniz değerlere göre: **10 dönüm**, "
+                           "**4.000 ağaç**, toplam **124.000 kg**")
+
+
+def test_a_tree_count_that_took_no_part_is_not_restated():
+    """THE DISCRIMINATING CASE. The harvest is stated in kg, so the count
+    multiplied nothing. Listing it under "Girdiğiniz değerlere göre" would name
+    a figure that entered no arithmetic."""
+    inputs, errors = budget.validate(_fruit_payload(
+        yield_total={"value": "4000", "unit": "kg", "source": "user"}))
+    assert errors == []
+    assert inputs.trees is None
+    assert "ağaç" not in budget.render(inputs, budget.compute(inputs))
+
+
+def test_a_field_crop_answer_is_byte_identical_to_before():
+    """185 of the 246 crops are not tree crops; their answer must not move by
+    one character."""
+    inputs, errors = budget.validate(_payload())
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith(
+        "Girdiğiniz değerlere göre: **10 dönüm**, toplam **4.000 kg** "
+        "(dekara 400 kg), kilogram fiyatı **12,50 TL**.")
+    assert "ağaç" not in text
+
+
+def test_the_count_is_carried_only_for_a_per_tree_yield():
+    """The flag on BudgetInputs, not just the rendered text."""
+    assert budget.validate(_fruit_payload())[0].trees.amount == 4000.0
+    assert budget.validate(_payload())[0].trees is None

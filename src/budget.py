@@ -144,6 +144,11 @@ class BudgetInputs:
     yield_kg: Value
     price_tl_kg: Value
     cost_tl: Value | None
+    # The tree count, and ONLY when it actually multiplied the yield - that is,
+    # when the harvest was submitted in a per-tree unit. A farmer can fill it in
+    # and then state their harvest in kg, and naming it under "Şu değerlere
+    # göre" would list a figure that entered no arithmetic.
+    trees: Value | None = None
     # Which crop the farmer picked - an explicit client selection, never
     # inferred. It is not part of FIELDS: form_spec() emits it as a bare id
     # (the top-level "crop" key, and each row's own "id" under "crops"), the
@@ -332,11 +337,18 @@ def validate(raw: dict, table=None) -> tuple[BudgetInputs | None, list[FieldErro
     crop = crop if isinstance(crop, str) and crop.strip() else None
     values, row = _verify(values, raw, crop, table)
 
+    # Whether the count took part is a property of the UNIT the yield was
+    # submitted in - the same `needs` the validator refuses on - so it is read
+    # from there rather than restated.
+    yield_unit = _chosen_unit(_FIELDS_BY_ID["yield_total"], raw)
+    took_part = yield_unit is not None and yield_unit.needs == "tree_count"
+
     return BudgetInputs(
         area_da=values["area"],
         yield_kg=values["yield_total"],
         price_tl_kg=values["price"],
         cost_tl=values["cost"],
+        trees=values["tree_count"] if took_part else None,
         crop=crop,
         crop_label=row.label if row is not None else None,
     ), []
@@ -715,12 +727,17 @@ def render(inputs: BudgetInputs, result: BudgetResult) -> str:
     """Code-written Turkish. Restates its inputs before stating its result."""
     crop_name = inputs.crop_label or inputs.crop
     crop = f" {crop_name} için" if crop_name else ""
-    given = [
-        f"**{format_qty(inputs.area_da.amount)} dönüm**",
+    given = [f"**{format_qty(inputs.area_da.amount)} dönüm**"]
+    if inputs.trees is not None:
+        # Beside the area, because both are the farmer's own measurement of
+        # their own orchard. Not inside the yield clause, which already carries
+        # two figures - a third would bury the one they need to check.
+        given.append(f"**{format_qty(inputs.trees.amount)} ağaç**")
+    given.extend([
         f"toplam **{format_qty(inputs.yield_kg.amount)} kg** "
         f"(dekara {format_qty(result.yield_kg_da)} kg)",
         f"kilogram fiyatı **{format_tr(inputs.price_tl_kg.amount, 2)} TL**",
-    ]
+    ])
     if result.cost_tl is not None:
         given.append(f"masraf **{format_tr(result.cost_tl, 2)} TL**")
 
