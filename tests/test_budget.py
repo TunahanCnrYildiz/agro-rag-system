@@ -290,6 +290,36 @@ def test_a_unit_names_the_field_it_cannot_be_converted_without():
     assert units["ton"].needs is None
 
 
+def test_the_chosen_unit_is_the_one_the_payload_names():
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    unit = budget._chosen_unit(spec, {"yield_total": {"value": "31",
+                                                      "unit": "kg_agac"}})
+    assert unit is not None and unit.id == "kg_agac"
+
+
+def test_no_unit_is_chosen_when_the_payload_names_none():
+    """`_read` refuses such a submission with "birimi seçin"; the lookup must
+    report the absence rather than guessing a default."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(spec, {"yield_total": {"value": "31"}}) is None
+
+
+def test_no_unit_is_chosen_when_the_payload_names_one_the_field_lacks():
+    """A client is untrusted: a unit id this field does not offer is not a
+    unit, and must not resolve to a neighbouring field's."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(
+        spec, {"yield_total": {"value": "31", "unit": "tl_kg"}}) is None
+
+
+def test_no_unit_is_chosen_when_the_field_is_absent_or_malformed():
+    """validate() coerces a non-dict payload before use; this helper is called
+    with the raw one and must not raise on either shape."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(spec, {}) is None
+    assert budget._chosen_unit(spec, {"yield_total": "31 kg_agac"}) is None
+
+
 def _entry(field, unit=None, amount="1"):
     """A minimal valid submission for one field, under a specific unit.
 
@@ -1238,3 +1268,80 @@ def test_a_non_dict_submitted_coerces_to_empty_rather_than_raising():
     spec = budget.form_spec([], None, 42)
     assert "fields" in spec
     assert "crop" not in spec
+
+
+def _fruit_payload(**over):
+    """A per-tree submission: the yield is stated per tree, so the count is
+    what turns it into a total."""
+    base = {
+        "area": {"value": "10", "unit": "donum", "source": "user"},
+        "tree_count": {"value": "4000", "unit": "adet", "source": "user"},
+        "yield_total": {"value": "31", "unit": "kg_agac", "source": "user"},
+        "price": {"value": "19,00", "unit": "tl_kg", "source": "user"},
+    }
+    base.update(over)
+    return base
+
+
+def test_the_answer_restates_the_tree_count_it_used():
+    """render's own docstring promises it "restates its inputs". A farmer who
+    types 4000 where they meant 400 currently sees that mistake only inside a
+    total they would have to divide by 31 to check."""
+    inputs, errors = budget.validate(_fruit_payload())
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert "**4.000 ağaç**" in text
+    assert text.startswith("Girdiğiniz değerlere göre: **10 dönüm**, "
+                           "**4.000 ağaç**, toplam **124.000 kg**")
+
+
+def test_the_restated_tree_count_keeps_its_fractional_digits():
+    """A count entered as 400,5 must echo as 400,5, not round to 400 - the
+    total beneath it was computed from the true 400,5, and a rounded echo
+    would disagree with its own arithmetic."""
+    inputs, errors = budget.validate(_fruit_payload(
+        tree_count={"value": "400,5", "unit": "adet", "source": "user"}))
+    assert errors == []
+    assert "**400,5 ağaç**" in budget.render(inputs, budget.compute(inputs))
+
+
+def test_a_tree_count_that_took_no_part_is_not_restated():
+    """THE DISCRIMINATING CASE. The harvest is stated in kg, so the count
+    multiplied nothing. Listing it under "Girdiğiniz değerlere göre" would name
+    a figure that entered no arithmetic."""
+    inputs, errors = budget.validate(_fruit_payload(
+        yield_total={"value": "4000", "unit": "kg", "source": "user"}))
+    assert errors == []
+    assert inputs.trees is None
+    assert "ağaç" not in budget.render(inputs, budget.compute(inputs))
+
+
+def test_a_leftover_tree_count_is_not_restated_under_kg_per_dekar():
+    """A SECOND DISCRIMINATING CASE. kg/dekar needs the AREA, not the tree
+    count - `needs` must be checked against "tree_count" specifically, not
+    merely against being filled at all. A farmer who fills the count on one
+    attempt and then submits kg/dekar (what the norms card prefills for every
+    non-tree crop) must not see that leftover count multiplied nothing."""
+    inputs, errors = budget.validate(_fruit_payload(
+        yield_total={"value": "400", "unit": "kg_da", "source": "user"}))
+    assert errors == []
+    assert inputs.trees is None
+    assert "ağaç" not in budget.render(inputs, budget.compute(inputs))
+
+
+def test_a_field_crop_answer_is_byte_identical_to_before():
+    """185 of the 246 crops are not tree crops; their answer must not move by
+    one character."""
+    inputs, errors = budget.validate(_payload())
+    assert errors == []
+    text = budget.render(inputs, budget.compute(inputs))
+    assert text.startswith(
+        "Girdiğiniz değerlere göre: **10 dönüm**, toplam **4.000 kg** "
+        "(dekara 400 kg), kilogram fiyatı **12,50 TL**.")
+    assert "ağaç" not in text
+
+
+def test_the_count_is_carried_only_for_a_per_tree_yield():
+    """The flag on BudgetInputs, not just the rendered text."""
+    assert budget.validate(_fruit_payload())[0].trees.amount == 4000.0
+    assert budget.validate(_payload())[0].trees is None
