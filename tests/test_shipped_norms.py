@@ -72,3 +72,73 @@ def test_the_sweep_covers_the_whole_table():
     rows = _sweep()
     assert len(rows) > 15000, len(rows)
     assert sum(1 for r in rows if r.card is not None) > 5000
+
+
+def test_both_surfaces_choose_the_same_measure_for_every_row():
+    """They disagreed on 1.568 cells for a whole round: the form prefilled
+    Karabük/Ayva at 31 kg/ağaç while the comparison printed 13.419 kg/da."""
+    mismatched = [
+        r.label for r in _sweep()
+        if r.card is not None
+        and (r.card["unit"] == "kg_agac") != ("kg/ağaç" in r.block[0])
+    ]
+    assert mismatched == [], mismatched[:10]
+
+
+def test_no_per_tree_row_prints_a_per_dekar_unit_anywhere():
+    """The derived kg/da for a tree crop divides a province's whole production
+    by the few dekars of COMPACT orchard it records. It still exists in the data
+    file; no surface may show it."""
+    leaked = [
+        (r.label, r.province) for r in _sweep()
+        if r.card is not None and r.card["unit"] == "kg_agac"
+        and ("kg/da" in " ".join(r.block) or "kg/da" in (r.card["recent"] or ""))
+    ]
+    assert leaked == [], leaked[:10]
+
+
+def test_both_surfaces_reach_the_same_far_below_verdict():
+    """One predicate, two callers. Checked only where the comparison prints a
+    range at all - its `missing` branches print none, and by the design's own
+    rule they carry no warning either."""
+    disagreed = []
+    for r in _sweep():
+        if r.card is None or not any("önceki 5 yıl" in ln for ln in r.block):
+            continue
+        on_card = "çok altında" in (r.card["recent"] or "")
+        in_block = any(
+            crop_compare.FAR_BELOW_NOTE.format(year=r.value.year) in ln
+            for ln in r.block)
+        if on_card != in_block:
+            disagreed.append((r.label, r.province))
+    assert disagreed == [], disagreed[:10]
+
+
+def test_no_warned_cell_sits_at_or_above_its_own_range_minimum():
+    """The sentence says the figure is far below the range printed beside it.
+    Before this was fixed, six cells were warned while sitting ON their range's
+    minimum - K.Maraş/Fındık served 1 under a printed range of 1-12."""
+    violations = [
+        (r.label, r.province, r.value.amount, r.value.recent_min)
+        for r in _sweep()
+        if norms.far_below_recent(r.value)
+        and (r.value.recent_min is None or r.value.amount >= r.value.recent_min)
+    ]
+    assert violations == [], violations[:10]
+
+
+def test_the_file_still_serves_most_of_its_yields():
+    """FLOORS, not the measured counts. Measured today: 2.097 cells served
+    per tree and 6.177 served per dekar. The floors sit at roughly two thirds, the same
+    reasoning tests/test_build_crop_norms.py already uses: an order-of-magnitude
+    collapse trips them, normal year-to-year drift in the TÜİK exports does not.
+    A pinned exact count would go red on every yearly regeneration and teach
+    whoever regenerates it to edit the number rather than read it.
+    """
+    rows = _sweep()
+    per_tree = sum(1 for r in rows
+                   if r.card is not None and r.card["unit"] == "kg_agac")
+    per_dekar = sum(1 for r in rows
+                    if r.card is not None and r.card["unit"] == "kg_da")
+    assert per_tree > 1400, per_tree
+    assert per_dekar > 4000, per_dekar
