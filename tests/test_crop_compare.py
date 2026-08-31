@@ -609,13 +609,33 @@ def test_a_block_that_prints_no_range_never_carries_the_sentence():
 
 def test_the_two_surfaces_agree_on_which_figures_are_far_below():
     """The pair to the measure-agreement test above. These surfaces drifted
-    once already; both now ask norms the same question."""
+    once already on WHICH MEASURE to serve; they can just as easily drift on
+    WHETHER a served figure is far below its own history, since each renders
+    its own clause from its own call to `norms.far_below_recent`. This checks
+    all three legs of that agreement, per row: what norms itself says, whether
+    the budget card's cell carries the clause, and whether the comparison's
+    own rendered block carries the sentence.
+
+    A block reached through a `missing` branch (see
+    test_a_block_that_prints_no_range_never_carries_the_sentence) prints no
+    range at all, so it cannot carry the sentence regardless of the verdict -
+    that is skipped rather than counted as a disagreement.
+    """
     from src import budget
+    other = "domates (sofralik)"
     for row in _table():
         value = (row.yield_kg_tree if row.yield_kg_tree is not None
                  else row.yield_kg_da)
+        verdict = norms.far_below_recent(value)
+
         cell = budget._yield_cell(row)
         if cell is None or cell["recent"] is None:
             continue
-        on_card = "çok altında" in cell["recent"]
-        assert on_card == norms.far_below_recent(value), row.label
+        assert ("çok altında" in cell["recent"]) == verdict, row.label
+
+        partner = "biber (salcalik, kapya)" if row.crop == other else other
+        block = "\n".join(_crop_block_lines(_render(row.crop, partner), row.label))
+        if "önceki 5 yıl" not in block:
+            continue
+        in_compare = crop_compare.FAR_BELOW_NOTE.format(year=value.year) in block
+        assert in_compare == verdict, row.label

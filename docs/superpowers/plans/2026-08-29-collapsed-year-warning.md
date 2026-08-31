@@ -483,7 +483,7 @@ git commit -m "Say in the comparison when a yield is far below its own history"
 | comparison: own line, exact text, directly under the range | 3 |
 | comparison: both branches, per-tree and per-dekar | 3 (two tests) |
 | comparison: no-range blocks cannot carry it | 3 (test) |
-| both surfaces reach the same verdict | 3 (cross-surface test) |
+| both surfaces reach the same verdict | 3 (cross-surface test — norms, the card's cell and the comparison's rendered block, all three checked) |
 | ordinary cells byte-identical | 2 and 3 (guards) |
 | threshold proven by mutation | 1 (Step 5) |
 | every sentence read against the printed answer | 3 (Step 6) |
