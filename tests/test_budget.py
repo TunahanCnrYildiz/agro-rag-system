@@ -290,6 +290,36 @@ def test_a_unit_names_the_field_it_cannot_be_converted_without():
     assert units["ton"].needs is None
 
 
+def test_the_chosen_unit_is_the_one_the_payload_names():
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    unit = budget._chosen_unit(spec, {"yield_total": {"value": "31",
+                                                      "unit": "kg_agac"}})
+    assert unit is not None and unit.id == "kg_agac"
+
+
+def test_no_unit_is_chosen_when_the_payload_names_none():
+    """`_read` refuses such a submission with "birimi seçin"; the lookup must
+    report the absence rather than guessing a default."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(spec, {"yield_total": {"value": "31"}}) is None
+
+
+def test_no_unit_is_chosen_when_the_payload_names_one_the_field_lacks():
+    """A client is untrusted: a unit id this field does not offer is not a
+    unit, and must not resolve to a neighbouring field's."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(
+        spec, {"yield_total": {"value": "31", "unit": "tl_kg"}}) is None
+
+
+def test_no_unit_is_chosen_when_the_field_is_absent_or_malformed():
+    """validate() coerces a non-dict payload before use; this helper is called
+    with the raw one and must not raise on either shape."""
+    spec = budget._FIELDS_BY_ID["yield_total"]
+    assert budget._chosen_unit(spec, {}) is None
+    assert budget._chosen_unit(spec, {"yield_total": "31 kg_agac"}) is None
+
+
 def _entry(field, unit=None, amount="1"):
     """A minimal valid submission for one field, under a specific unit.
 

@@ -187,6 +187,24 @@ def coerce_number(value: object) -> float | None:
     return None
 
 
+def _chosen_unit(spec: FieldSpec, raw: dict) -> UnitOption | None:
+    """The unit this payload names for that field, or None.
+
+    Named rather than inlined because `validate` has to ask the same question
+    `_read` answers internally - was the yield submitted in a unit that needs
+    the tree count? - and a second copy of the lookup would be a second place
+    to get "which unit did they pick" wrong.
+
+    None both for a payload naming no unit and for one naming a unit this field
+    does not offer: the client is untrusted, and a stray id must not resolve to
+    some other field's unit.
+    """
+    entry = raw.get(spec.id)
+    if not isinstance(entry, dict):
+        return None
+    return next((u for u in spec.units if u.id == entry.get("unit")), None)
+
+
 def _read(spec: FieldSpec, raw: dict,
           provided: dict[str, float | None] | None = None
           ) -> tuple[Value | None, FieldError | None]:
@@ -201,7 +219,7 @@ def _read(spec: FieldSpec, raw: dict,
         return None, FieldError(
             spec.id, f"{spec.label} bir sayı olmalı. Ondalık için virgül kullanın.")
 
-    unit = next((u for u in spec.units if u.id == entry.get("unit")), None)
+    unit = _chosen_unit(spec, raw)
     if unit is None:
         return None, FieldError(spec.id, f"{spec.label} için birimi seçin.")
 
