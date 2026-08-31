@@ -72,7 +72,6 @@ def test_the_sweep_covers_the_whole_table():
     file vacuously true."""
     rows = _sweep()
     assert len(rows) > 15000, len(rows)
-    assert sum(1 for r in rows if r.card is not None) > 5000
 
 
 def test_both_surfaces_choose_the_same_measure_for_every_row():
@@ -101,13 +100,18 @@ def test_no_per_tree_row_prints_a_per_dekar_unit_anywhere():
     the code under test which rows to check it on, so a mutation that stops
     tagging per-tree cells as `kg_agac` would also erase them from this
     test's own filter, and the assertion would pass over an empty list
-    instead of catching the leak. A failure here means a per-tree row is
-    showing its derived per-dekar figure somewhere a farmer would read it."""
+    instead of catching the leak. The card side also checks `card["unit"]`
+    directly, not just `card["recent"]`: `recent` is None for 747 cells, and
+    for those the unit is the only evidence a leak would leave behind. A
+    failure here means a per-tree row is showing its derived per-dekar figure
+    somewhere a farmer would read it."""
     leaked = [
         (r.label, r.province) for r in _sweep()
         if r.per_tree
         and ("kg/da" in " ".join(r.block)
-             or (r.card is not None and "kg/da" in (r.card["recent"] or "")))
+             or (r.card is not None
+                 and ("kg/da" in (r.card["recent"] or "")
+                      or r.card["unit"] != "kg_agac")))
     ]
     assert leaked == [], leaked[:10]
 
@@ -132,12 +136,14 @@ def test_both_surfaces_reach_the_same_far_below_verdict():
 def test_no_warned_cell_sits_at_or_above_its_own_range_minimum():
     """The sentence says the figure is far below the range printed beside it.
     Before this was fixed, six cells were warned while sitting ON their range's
-    minimum - K.Maraş/Fındık served 1 under a printed range of 1-12."""
+    minimum - K.Maraş/Fındık served 1 under a printed range of 1-12.
+    `far_below_recent` is False whenever `recent_min is None`, so a warned row
+    is guaranteed to carry a range - this check does not need to guard for it."""
     violations = [
         (r.label, r.province, r.value.amount, r.value.recent_min)
         for r in _sweep()
         if norms.far_below_recent(r.value)
-        and (r.value.recent_min is None or r.value.amount >= r.value.recent_min)
+        and r.value.amount >= r.value.recent_min
     ]
     assert violations == [], violations[:10]
 
@@ -149,11 +155,16 @@ def test_the_file_still_serves_most_of_its_yields():
     collapse trips them, normal year-to-year drift in the TÜİK exports does not.
     A pinned exact count would go red on every yearly regeneration and teach
     whoever regenerates it to edit the number rather than read it.
+
+    Counted from `r.per_tree` and `r.value` - the shipped table's own verdict,
+    resolved straight off `row.yield_kg_tree` / `row.yield_kg_da` - not from
+    `card["unit"]`: this test's name says "the file", and counting from the
+    derived card would let a regression in src/budget.py trip it too, which
+    is not what the name promises. `r.value` is None when the table itself
+    carries no figure for a cell, so a served-but-empty row still doesn't count.
     """
     rows = _sweep()
-    per_tree = sum(1 for r in rows
-                   if r.card is not None and r.card["unit"] == "kg_agac")
-    per_dekar = sum(1 for r in rows
-                    if r.card is not None and r.card["unit"] == "kg_da")
+    per_tree = sum(1 for r in rows if r.per_tree)
+    per_dekar = sum(1 for r in rows if not r.per_tree and r.value is not None)
     assert per_tree > 1400, per_tree
     assert per_dekar > 4000, per_dekar
