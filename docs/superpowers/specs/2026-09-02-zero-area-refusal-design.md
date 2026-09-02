@@ -114,8 +114,12 @@ Muşmula/Bursa —
 
 — 24 to 63 trees per dekar, an area that grows smoothly from 127 to 1.389 dekars, and not
 one zero year of its own. It would be destroyed by other provinces' zeros, which is the
-failure its rule was written to prevent. With the zeros in the province median only, the loss
-is 74 cells and Bursa survives whole.
+failure its rule was written to prevent. With the zeros in the province median only, the
+further loss over the shadow alone is 74 cells and Bursa survives whole.
+
+(Both figures are design-time measurements taken one variant at a time. On the finished
+branch, where all four changes are in place, adding the zeros to the crop median as well
+would remove 264 more served cells — see "As built" below.)
 
 The cell this split is for is Elma (Amasya)/Karaman: 2016-2020 recorded at zero area, then
 2021-2024 carrying 11.615 to 12.769 kg/da off 11-13 dekars at 155-223 trees/da. The cell gate
@@ -150,6 +154,39 @@ The refusal record roughly triples, from 1.058 entries to about 3.100, and
 `data/crop_norms.json` grows from 2,7 MB to roughly 2,9 MB. Those figures are estimates from
 the counts above; the rebuilt file states the real ones. The builder prints one stderr line
 per refused cell, as it does today; the console summary stays one line per reason.
+
+### As built — what the rebuilt file actually says
+
+Written after implementation, because two of the estimates above were wrong and the design
+should carry the correction rather than the guess.
+
+**Served cells: 66.610, exactly as predicted.** The four changes together reproduce the
+design measurement to the cell.
+
+**The refusal record holds 1.714 entries, not ~3.100, and `area_is_zero` appears 110 times,
+not ~1.674.** The estimate ignored an interaction between two of the changes. Counting zero
+years in the province median takes that gate from 95 refused (crop, province) pairs to 275,
+and a province-wide refusal is recorded ONCE, for the province, and skips the year loop
+before the per-cell block runs. So 1.564 of the zero-area cells are folded into a
+province-level entry instead of getting their own. That is the file's existing convention,
+stated in its own comment — *"Recorded once for the province, not once per cell - the finding
+is about the column, and a per-cell line would say the wrong thing"* — and the finding stays
+visible at the granularity the rule works at. The file is 2,8 MB.
+
+**One naming question this leaves open.** 132 of those 275 province entries cover pairs where
+every member of the median was unbounded — no density was ever computed for them — yet they
+are recorded under `province_median_density_above_ceiling`. The name is defensible on this
+design's own premise, since a zero-area year IS an unbounded implied density and a median of
+those is above any bound. But a reader mining the record for zero-area bookkeeping finds 110
+cells while 132 wholly zero-area pairs sit under a density reason. Left as it is; recorded
+here so it is a decision rather than an oversight.
+
+**`counting them here removes 338 served cells` in `_area_never_orchard`'s docstring is now
+264.** The 338 was measured during design, on a standalone reimplementation, before the other
+three changes existed. The docstring carries the corrected figure; the qualitative half of
+that sentence — Muşmula/Bursa destroyed, 24-63 trees/da, area growing smoothly from 127 to
+1.389 dekars, not one zero year of its own — was re-verified against the raw exports and
+holds.
 
 ## Known survivor, stated rather than fixed
 

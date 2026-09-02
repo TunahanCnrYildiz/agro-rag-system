@@ -217,6 +217,21 @@ def read_export(path: Path):
 _MAX_TREES_PER_DA = 444
 _MIN_TREES_PER_DA = 5
 
+# A zero recorded area implies a density no bound can hold. It enters the
+# PROVINCE median as this and never the CROP median - see both docstrings for
+# why the same figure belongs in one and not the other.
+#
+# WHAT IT BUYS IS A RANKING, NOT A VERDICT. An unbounded member sorts above
+# every finite one, so it can only push the median UP - but it decides the
+# outcome only when it reaches the middle: the median position on an odd-length
+# list, or one of the two averaged on an even one, where the average is
+# unbounded too. Where the finite years outnumber the zero ones the middle
+# stays finite and the province is judged on it. Limon Ve Misket Limonu in
+# Burdur books four zero-area years against six real ones, its median is 27
+# trees/da - 37 m2 of ground per tree - and it keeps serving. 26 (crop,
+# province) pairs carrying a zero year are still served for that reason.
+_UNBOUNDED_DENSITY = float("inf")
+
 
 def _density_verdict(tons: float, dekar: float,
                      per_tree: float | None) -> str | None:
@@ -265,6 +280,16 @@ def _area_never_orchard(published: dict, uretim: dict, alan: dict,
     The MEDIAN, so that a handful of scattered-tree provinces costs those cells
     and never the crop - apple is recorded properly nearly everywhere and must
     survive whole.
+
+    A YEAR OF ZERO RECORDED AREA DOES NOT COUNT HERE, though it does in
+    `_province_area_never_orchard`. The two rules ask different questions. That
+    one asks whether a province records this crop's ground, and a zero answers
+    it. This one asks whether the COLUMN describes the crop anywhere, and
+    zeros concentrated in scattered-tree provinces answer a question about those
+    provinces. Measured: counting them here removes 264 served cells including
+    the whole of Musmula/Bursa - 24 to 63 trees/da, an area growing smoothly
+    from 127 to 1.389 dekars, not one zero year of its own - which is exactly
+    the "apple must survive whole" failure the median was chosen to prevent.
     """
     densities, provinces = [], set()
     for province, by_year in uretim.items():
@@ -312,13 +337,28 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
     cells and would condemn spacings that are real for super-spindle apple
     (~3,15 m2). That is the per-crop-bound path measured and closed on
     2026-08-28; see docs/superpowers/2026-08-28-ceiling-findings.md.
+
+    A YEAR OF ZERO RECORDED AREA COUNTS, as an unbounded density. It is the
+    most extreme possible answer to the question this rule asks, and leaving it
+    out let a province book six consecutive years of fruit against no orchard
+    at all and still be judged sound on the three years that carried an area.
+
+    IT ALSO COUNTS TOWARD `_MIN_YEARS_TO_JUDGE_A_PROVINCE`, not only toward the
+    median. A province with one real area-year and two zero years used to fall
+    under the threshold on that single density and be presumed sound; now the
+    two zeros supply the other two years, because a zero-area year is evidence
+    about what the column records, not an absence of evidence.
     """
     densities = []
     for year, tons in uretim.get(province, {}).items():
         dekar = alan.get(province, {}).get(year)
         tree = per_tree.get(province, {}).get(year)
-        if (tons and dekar and tree
+        if not (tons and tree
                 and published.get(province, {}).get(year) is None):
+            continue
+        if dekar == 0:
+            densities.append(_UNBOUNDED_DENSITY)
+        elif dekar:
             densities.append((tons * 1000.0 / tree) / dekar)
     if len(densities) < _MIN_YEARS_TO_JUDGE_A_PROVINCE:
         return False
@@ -343,10 +383,14 @@ def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
     a citrus yield ten times any real one, carrying no five-year range to warn
     anyone because walking back that far leaves too few prior years to build one.
 
-    Only `density_above_ceiling` casts a shadow. `no_per_tree_figure` means
-    TUIK has not published that year's per-tree survey yet - half of those sit
-    in the freshest year for exactly that reason - and says nothing about the
-    denominator. `density_below_floor` understates rather than inflates.
+    `density_above_ceiling` casts a shadow, and so does a zero recorded area -
+    the same statement with the denominator gone entirely. The others do not:
+    `no_per_tree_figure` means TUIK has not published that year's per-tree
+    survey yet - half of those sit in the freshest year for exactly that reason
+    - and says nothing about the denominator. `density_below_floor` understates
+    rather than inflates. An area of zero with no production booked against it
+    says the province grew none of the crop, which is not a claim about the
+    area column either.
 
     A PUBLISHED kg/dekar figure is never shadowed: the argument is about a
     denominator this script chose, and a published yield does not use one.
@@ -357,15 +401,26 @@ def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
     precedes the FIRST refusal leaves the 2019 cell sitting in the hole between
     them, which is precisely the one src/norms.py walks back to.
     """
-    refused = [
-        year for year in years
-        if published.get(province, {}).get(year) is None
-        and uretim.get(province, {}).get(year) is not None
-        and alan.get(province, {}).get(year)
-        and _density_verdict(uretim[province][year], alan[province][year],
-                             per_tree.get(province, {}).get(year))
-        == "density_above_ceiling"
-    ]
+    refused = []
+    for year in years:
+        if published.get(province, {}).get(year) is not None:
+            continue
+        tons = uretim.get(province, {}).get(year)
+        dekar = alan.get(province, {}).get(year)
+        if tons is None:
+            continue
+        if dekar == 0:
+            # A zero recorded area cannot be divided into, so no verdict is
+            # computed - but the statement it makes is the ceiling's, at its
+            # limit. Only when production was booked AGAINST it: production and
+            # area both at zero say the province grew none that year, which is
+            # a claim about the crop and not about the area column.
+            if tons:
+                refused.append(year)
+        elif dekar and _density_verdict(
+                tons, dekar, per_tree.get(province, {}).get(year)
+        ) == "density_above_ceiling":
+            refused.append(year)
     return max(refused, default=None)
 
 
@@ -483,6 +538,16 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
+                if value == 0:
+                    # TUIK published a yield of exactly zero. Refused for the
+                    # reason argued at `if value` below - a true zero and a
+                    # missing marker are indistinguishable here, and neither
+                    # reading is a norm - and recorded, so the file does not
+                    # present a discarded figure as a crop nobody grows.
+                    refused.append({"crop": labels[crop_id],
+                                    "province": province, "year": year,
+                                    "reason": "published_yield_is_zero"})
+                    continue
                 if value is None:
                     # Vegetables publish no Verim, and most fruits publish only
                     # a per-tree one; derive from the pair, and only where BOTH
@@ -491,6 +556,26 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     dekar = alan.get(province, {}).get(year)
                     if no_orchard:
                         continue          # already refused, once, above
+                    if tons and dekar == 0:
+                        # THE CEILING'S OWN FINDING AT ITS LIMIT. The province
+                        # books fruit from scattered trees against a compact
+                        # orchard's dekars, and here those dekars reached zero:
+                        # the implied density is past every bound rather than
+                        # merely past 444. The cell was already dropped - by the
+                        # truthiness of `dekar` on the next line, which forms no
+                        # verdict and leaves no trace.
+                        #
+                        # Recorded whether or not the crop publishes a per-tree
+                        # figure: the refusal is that nothing can be divided by
+                        # zero, which is as true of a vegetable's `Ekilen Alan`.
+                        # Today every such cell is a tree crop, so this costs
+                        # nothing and closes the hole a future export would fall
+                        # into.
+                        refused.append({"crop": labels[crop_id],
+                                        "province": province,
+                                        "year": year,
+                                        "reason": "area_is_zero"})
+                        continue
                     if tons is not None and dekar:
                         reason = (_density_verdict(
                                       tons, dekar,
@@ -507,17 +592,36 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                         value = tons * 1000.0 / dekar
                 if value:
                     # `if value` and not `is not None`: a yield of exactly 0 is
-                    # refused. The exports carry zeros in 0.4-12% of cells and
-                    # there is no way to tell a true zero from a missing marker -
-                    # but neither reading is a norm. Prefilling 0 would tell a
-                    # farmer to expect no harvest and compute an income of zero,
-                    # which is the confident-wrong-answer this whole route exists
-                    # to prevent. No norm is the honest outcome.
+                    # refused, and the `elif` below records it. The exports
+                    # carry zeros in 0.4-12% of cells and there is no way to
+                    # tell a true zero from a missing marker - but neither
+                    # reading is a norm. Prefilling 0 would tell a farmer to
+                    # expect no harvest and compute an income of zero, which is
+                    # the confident-wrong-answer this whole route exists to
+                    # prevent. No norm is the honest outcome.
                     #
                     # One decimal: a derived yield is tonnes over dekars, both
                     # already rounded at the source, so thirteen significant
                     # digits would advertise a precision nobody has.
                     series[i] = round(value, _DECIMALS["verim"])
+                elif value is not None:
+                    # A derived 0,0: an area is recorded and nothing came off
+                    # it. NO TREE CROP REACHES THIS LINE. `_density_verdict`
+                    # refuses a zero production whichever way the year falls -
+                    # as `no_per_tree_figure` where it carries no survey, which
+                    # is all 307 of today's, and as `density_below_floor` where
+                    # it does, since no tons is no trees per dekar. That second
+                    # branch fires on nothing in the current exports - a year
+                    # with no harvest carries no per-tree figure either - and
+                    # is kept because it is the code's actual path, not because
+                    # anything walks it. So this reason is left to the crops
+                    # publishing no per-tree figure ANYWHERE, which is where
+                    # the 36 measured cells sit.
+                    # `value is not None` keeps the genuinely absent cell
+                    # silent: nothing was thrown out there.
+                    refused.append({"crop": labels[crop_id],
+                                    "province": province, "year": year,
+                                    "reason": "production_is_zero"})
             if any(v is not None for v in series):
                 yields[province] = series
 

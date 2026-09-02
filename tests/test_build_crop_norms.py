@@ -345,6 +345,50 @@ def test_a_tree_crop_cell_with_no_per_tree_figure_is_refused():
     assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
 
 
+def test_a_zero_area_cell_is_refused_under_its_own_reason():
+    """Zerdali in Afyonkarahisar 2019-2024: the province books 322 tons of fruit
+    against ZERO dekars of compact orchard. No division can be performed, so no
+    yield was ever written - but nothing said so, and the file could not tell
+    this from a province that grows no wild apricot at all."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2024, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2024, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2024, "verim_agac", 42.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert {"crop": "Zerdali", "province": "Afyonkarahisar", "year": 2024,
+            "reason": "area_is_zero"} in record["cells"]
+
+
+def test_a_zero_area_is_refused_on_a_crop_with_no_per_tree_figure_too():
+    """Every zero-area cell in today's exports belongs to a tree crop, so this
+    is the case the data does not currently carry. It is pinned anyway: the
+    refusal is that nothing can be divided by zero, which is as true of a
+    vegetable's `Ekilen Alan` as of an orchard's `Toplu Meyveliklerin Alani`.
+    A future export must not fall back into silence."""
+    rows = [
+        R("Sivas", "Marul (Göbekli)", 2025, "uretim", 12.0),
+        R("Sivas", "Marul (Göbekli)", 2025, "alan", 0.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert [c["reason"] for c in record["cells"]] == ["area_is_zero"]
+
+
+def test_a_zero_area_with_nothing_grown_against_it_records_nothing():
+    """A GUARD, NOT A NEW BEHAVIOUR - it passes before this change and must keep
+    passing after it. Production 0 over area 0 is not a refusal: no figure was
+    discarded, the province simply grew none of the crop that year. The record
+    is a record of what was thrown out, and an entry here would say the
+    opposite of the truth."""
+    rows = [
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "uretim", 0.0),
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "alan", 0.0),
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "verim_agac", 30.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["cells"] == []
+
+
 def test_a_cell_older_than_a_ceiling_refusal_is_refused_too():
     """THE SHADOW RULE. A ceiling refusal is not a verdict on one cell - it says
     this province's Toplu Meyveliklerin Alani is not the ground its production
@@ -412,6 +456,63 @@ def test_a_passing_year_sandwiched_between_refusals_is_shadowed():
     ]
     out = bcn.build(rows)
     assert "Muğla" not in out["crops"]["dut"]["yield_kg_da"]
+
+
+def test_a_cell_older_than_a_zero_area_year_is_shadowed_too():
+    """A zero recorded orchard makes the ceiling's own statement in the
+    strongest terms available: the recorded area is not the ground the
+    production came off. That is how the province keeps its books, not what the
+    weather did, so it condemns the earlier derived cells exactly as a ceiling
+    refusal does.
+
+    Zerdali in Afyonkarahisar, from the real exports: 2018 is 341 tons over 28
+    dekars at 41 kg per tree - 297 trees/da, under the 444 ceiling, so the cell
+    gate passes it and norms._pick serves it as 12.179 kg/da. 2019 books 322
+    tons against zero dekars."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2018, "uretim", 341.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "alan", 28.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "verim_agac", 41.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "verim_agac", 42.0),
+    ]
+    out = bcn.build(rows)
+    assert "Afyonkarahisar" not in out["crops"]["zerdali"]["yield_kg_da"]
+
+
+def test_the_zero_area_shadow_carries_the_reason_that_already_exists():
+    """A zero area is treated as a ceiling refusal throughout, so the cells it
+    condemns carry the existing reason. A second shadow reason would name a
+    second concept, and there is only one."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2018, "uretim", 341.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "alan", 28.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "verim_agac", 41.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "verim_agac", 42.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["counts"] == {"area_is_zero": 1,
+                                "shadowed_by_ceiling_refusal": 1}
+
+
+def test_a_zero_area_with_no_production_casts_no_shadow():
+    """A GUARD - it passes before this change and must keep passing after it.
+    Both figures at zero make no claim about the denominator: the province grew
+    none of the crop that year. Only a zero area that production was booked
+    against says the area column is wrong, so only that one reaches backwards."""
+    rows = [
+        R("Tokat", "Ayva", 2024, "uretim", 182.0),
+        R("Tokat", "Ayva", 2024, "alan", 155.0),
+        R("Tokat", "Ayva", 2024, "verim_agac", 31.0),
+        R("Tokat", "Ayva", 2025, "uretim", 0.0),
+        R("Tokat", "Ayva", 2025, "alan", 0.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Tokat"] == [1174.2, None]
 
 
 def test_publication_lag_casts_no_shadow():
@@ -546,6 +647,89 @@ def test_a_province_recorded_in_too_few_years_is_not_judged_as_a_province():
                out["meta"]["refused_yield_cells"]["cells"]}
     assert "province_median_density_above_ceiling" not in reasons
     assert out["crops"]["ayva"]["yield_kg_da"]["Karabük"] == [None, 2500.0]
+
+
+def test_zero_years_push_a_province_past_the_ceiling():
+    """A year of zero recorded orchard is the most extreme answer there is to
+    the question this rule asks, so it enters the median as an unbounded
+    density. Six years split three and three, so the median averages the two
+    middle ones rather than placing a single one untouched - but the average
+    of a finite figure and an unbounded one is itself unbounded, so the
+    verdict is the same either way.
+
+    Elma (Amasya) in Karaman is the cell this is for: 2016-2020 recorded at zero
+    area, then 2021-2024 carrying 11.615 to 12.769 kg/da off 11 to 13 dekars at
+    155-223 trees/da. The cell gate passes that spacing, and the shadow cannot
+    reach those years because every zero year precedes them. Only this rule
+    can."""
+    rows = []
+    for year in (2016, 2017, 2018):
+        rows += [R("Karaman", "Elma (Amasya)", year, "uretim", 100.0),
+                 R("Karaman", "Elma (Amasya)", year, "alan", 0.0),
+                 R("Karaman", "Elma (Amasya)", year, "verim_agac", 25.0)]
+    # 100 t at 25 kg/tree is 4.000 trees; over 20 dekars that is 200 trees/da,
+    # under the 444 ceiling, and these years are LATER than every zero year.
+    for year in (2019, 2020, 2021):
+        rows += [R("Karaman", "Elma (Amasya)", year, "uretim", 100.0),
+                 R("Karaman", "Elma (Amasya)", year, "alan", 20.0),
+                 R("Karaman", "Elma (Amasya)", year, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "elma (amasya)") == []
+
+
+def test_zero_years_count_toward_the_three_a_province_needs_to_be_judged():
+    """The threshold asks for three years of evidence about how the province
+    keeps its books, and a year that records no orchard at all is evidence -
+    not an absence of it. One finite year among two zeros used to fall under
+    the threshold on that single density and be presumed sound.
+
+    Measured: requiring three FINITE years instead moves `area_is_zero` from
+    110 recorded cells to 1.482 and province-level refusals from 275 to 129.
+    The test above cannot see it - its fixture clears the threshold either
+    way."""
+    rows = []
+    for year in (2016, 2017):
+        rows += [R("Düzce", "İncir (Yaş)", year, "uretim", 100.0),
+                 R("Düzce", "İncir (Yaş)", year, "alan", 0.0),
+                 R("Düzce", "İncir (Yaş)", year, "verim_agac", 25.0)]
+    # 100 t at 25 kg/tree is 4.000 trees; over 20 dekars that is 200 trees/da,
+    # under the 444 ceiling. It is also LATER than both zero years, so the
+    # shadow cannot reach it either - only the three-year threshold decides.
+    rows += [R("Düzce", "İncir (Yaş)", 2018, "uretim", 100.0),
+             R("Düzce", "İncir (Yaş)", 2018, "alan", 20.0),
+             R("Düzce", "İncir (Yaş)", 2018, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "incir (yas)") == []
+
+
+def test_zero_years_do_not_push_a_crop_past_the_ceiling():
+    """THE MISTAKE THIS SPLIT EXISTS TO PREVENT, and it is a guard: it passes
+    before the change above and must keep passing after it.
+
+    `_area_never_orchard` states its own intent - a handful of scattered-tree
+    provinces costs those cells and never the crop. Measured with the zeros in
+    the crop median too, 338 served cells fell and among them was the whole of
+    Musmula/Bursa: 24 to 63 trees per dekar, an area growing smoothly from 127
+    to 1.389 dekars, not one zero year of its own, destroyed by OTHER provinces'
+    zeros. That is precisely the failure the median was chosen to avoid.
+
+    Ten zero-area provinces is deliberate: it is the number
+    `_MIN_PROVINCES_TO_JUDGE_A_CROP` needs before the crop rule will judge at
+    all, so if the zeros ever enter this median they arrive with enough weight
+    to act."""
+    sound = "Bursa"
+    rows = []
+    for province in [p for p in bcn.PROVINCES if p != sound][:10]:
+        rows += [R(province, "Muşmula", 2025, "uretim", 100.0),
+                 R(province, "Muşmula", 2025, "alan", 0.0),
+                 R(province, "Muşmula", 2025, "verim_agac", 25.0)]
+    # 4.000 trees over 100 dekars is 40 trees/da - a 5m x 5m orchard, exactly
+    # what the denominator claims to be.
+    rows += [R(sound, "Muşmula", 2025, "uretim", 100.0),
+             R(sound, "Muşmula", 2025, "alan", 100.0),
+             R(sound, "Muşmula", 2025, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "musmula") == [sound]
 
 
 def test_a_published_yield_survives_the_province_gate():
@@ -968,3 +1152,37 @@ def test_the_shipped_file_refused_the_cells_the_spec_names():
     assert ("Turunç", "Adana") in refused
     assert ("Mantar (Kültür)", "*") in refused
     assert ("Ayva", "Tokat") not in refused
+
+
+def test_a_published_yield_of_zero_is_refused_and_recorded():
+    """TUIK publishes a Verim of exactly 0 in 268 cells. It has always been
+    refused - prefilling 0 would tell a farmer to expect no harvest and compute
+    an income of zero - but the refusal left no trace, so the committed file
+    could not tell it from a province that grows none of the crop."""
+    rows = [
+        R("Ordu", "Bakla, Kuru (İnsan Tüketimi İçin)", 2016, "verim", 0.0),
+        R("Ordu", "Bakla, Kuru (İnsan Tüketimi İçin)", 2017, "verim", 145.0),
+    ]
+    out = bcn.build(rows)
+    record = out["meta"]["refused_yield_cells"]
+    assert {"crop": "Bakla, Kuru (İnsan Tüketimi İçin)", "province": "Ordu",
+            "year": 2016,
+            "reason": "published_yield_is_zero"} in record["cells"]
+    assert out["crops"]["bakla, kuru (insan tuketimi icin)"] \
+              ["yield_kg_da"]["Ordu"] == [None, 145.0]
+
+
+def test_a_zero_production_against_a_recorded_area_is_refused_and_recorded():
+    """Two dekars sown, nothing off them: the derived yield is 0,0 and has
+    always been dropped. No TREE crop reaches this reason at all - a zero
+    production is refused one step earlier either way, as `no_per_tree_figure`
+    where the year carries no survey and as `density_below_floor` where it
+    does, since no tons is no trees per dekar. So this reason belongs to the
+    crops publishing no per-tree figure anywhere, which is where the 36
+    measured cells sit."""
+    rows = [
+        R("Sivas", "Marul (Göbekli)", 2025, "uretim", 0.0),
+        R("Sivas", "Marul (Göbekli)", 2025, "alan", 2.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert [c["reason"] for c in record["cells"]] == ["production_is_zero"]
