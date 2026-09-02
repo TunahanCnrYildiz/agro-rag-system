@@ -77,9 +77,10 @@ underneath the features and won't announce themselves.
    of 8,192, so 439 tokens spare. That headroom was measured against the LOCAL
    model's 8,192-token window. This repository does not know what
    `OPENROUTER_MODEL` names, so confirming the hosted model's window is on you
-   — it is not an assertion this file can make for you. Undersized, and the failure does
-   not look like the old one: instead of an ANSWER visibly cut mid-sentence,
-   the PROMPT gets silently truncated and drops the system instructions first.
+   — it is not an assertion this file can make for you. If that window is
+   smaller, the failure does not look like the old one: instead of an ANSWER
+   visibly cut mid-sentence, the PROMPT is silently truncated and drops the
+   system instructions first.
    `SEND_BUDGET_CHARS` in `mobile-app/src/chatStore.ts` is the other half of
    this number and cannot move independently of `max_tokens`.
 2. `vector_store_url` and `vector_store_sha256` now carry real defaults, so a
