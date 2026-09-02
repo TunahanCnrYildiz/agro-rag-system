@@ -1174,11 +1174,12 @@ def test_a_published_yield_of_zero_is_refused_and_recorded():
 
 def test_a_zero_production_against_a_recorded_area_is_refused_and_recorded():
     """Two dekars sown, nothing off them: the derived yield is 0,0 and has
-    always been dropped. Most tree crops are already caught one step earlier
-    too: a zero-production year carries no per-tree survey of its own, so
-    `no_per_tree_figure` takes it as an unjudged cell first. This reason
-    reaches only the crops that publish no per-tree figure anywhere, which is
-    where the 36 measured cells sit."""
+    always been dropped. No TREE crop reaches this reason at all - a zero
+    production is refused one step earlier either way, as `no_per_tree_figure`
+    where the year carries no survey and as `density_below_floor` where it
+    does, since no tons is no trees per dekar. So this reason belongs to the
+    crops publishing no per-tree figure anywhere, which is where the 36
+    measured cells sit."""
     rows = [
         R("Sivas", "Marul (Göbekli)", 2025, "uretim", 0.0),
         R("Sivas", "Marul (Göbekli)", 2025, "alan", 2.0),

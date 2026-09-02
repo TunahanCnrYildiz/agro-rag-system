@@ -219,15 +219,17 @@ _MIN_TREES_PER_DA = 5
 
 # A zero recorded area implies a density no bound can hold. It enters the
 # PROVINCE median as this and never the CROP median - see both docstrings for
-# why the same figure belongs in one and not the other. On an odd-length list
-# the median is a placement and an unbounded member is never touched; on an
-# even one it is averaged with its neighbour, and that average is itself
-# unbounded. Either way an unbounded member ranks above every finite one, so
-# it can only push the median UP, never down - but whether it reaches the
-# bound depends on how many zero years the province carries against how many
-# finite ones. A province with more finite years than zero can still be
-# judged sound: measured, 40 of the 336 zero-carrying (crop, province) pairs
-# land under the bound and keep serving.
+# why the same figure belongs in one and not the other.
+#
+# WHAT IT BUYS IS A RANKING, NOT A VERDICT. An unbounded member sorts above
+# every finite one, so it can only push the median UP - but it decides the
+# outcome only when it reaches the middle: the median position on an odd-length
+# list, or one of the two averaged on an even one, where the average is
+# unbounded too. Where the finite years outnumber the zero ones the middle
+# stays finite and the province is judged on it. Limon Ve Misket Limonu in
+# Burdur books four zero-area years against six real ones, its median is 27
+# trees/da - 37 m2 of ground per tree - and it keeps serving. 26 (crop,
+# province) pairs carrying a zero year are still served for that reason.
 _UNBOUNDED_DENSITY = float("inf")
 
 
@@ -604,11 +606,13 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     series[i] = round(value, _DECIMALS["verim"])
                 elif value is not None:
                     # A derived 0,0: an area is recorded and nothing came off
-                    # it. Most tree crops never arrive here either - a
-                    # zero-production year carries no per-tree survey of its
-                    # own, so `no_per_tree_figure` takes it one step earlier
-                    # as an unjudged cell - which leaves this reason for the
-                    # crops that publish no per-tree figure anywhere.
+                    # it. NO TREE CROP REACHES THIS LINE. `_density_verdict`
+                    # refuses a zero production whichever way the year falls -
+                    # as `no_per_tree_figure` where it carries no survey, which
+                    # is all 357 of today's cells, and as `density_below_floor`
+                    # where it does, since no tons is no trees per dekar. So
+                    # this reason is left to the crops publishing no per-tree
+                    # figure ANYWHERE, which is where the 36 measured cells sit.
                     # `value is not None` keeps the genuinely absent cell
                     # silent: nothing was thrown out there.
                     refused.append({"crop": labels[crop_id],
