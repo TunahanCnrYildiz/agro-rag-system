@@ -609,10 +609,14 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     # it. NO TREE CROP REACHES THIS LINE. `_density_verdict`
                     # refuses a zero production whichever way the year falls -
                     # as `no_per_tree_figure` where it carries no survey, which
-                    # is all 357 of today's cells, and as `density_below_floor`
-                    # where it does, since no tons is no trees per dekar. So
-                    # this reason is left to the crops publishing no per-tree
-                    # figure ANYWHERE, which is where the 36 measured cells sit.
+                    # is all 307 of today's, and as `density_below_floor` where
+                    # it does, since no tons is no trees per dekar. That second
+                    # branch fires on nothing in the current exports - a year
+                    # with no harvest carries no per-tree figure either - and
+                    # is kept because it is the code's actual path, not because
+                    # anything walks it. So this reason is left to the crops
+                    # publishing no per-tree figure ANYWHERE, which is where
+                    # the 36 measured cells sit.
                     # `value is not None` keeps the genuinely absent cell
                     # silent: nothing was thrown out there.
                     refused.append({"crop": labels[crop_id],
