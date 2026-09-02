@@ -17,9 +17,11 @@ def _clear_the_norms_cache():
     Until this fixture existed the file stayed clean by ACCIDENT: the last
     `_write` test happened to be followed by real-data tests that cleared the
     cache for their own reasons. Reordering the file was enough to break it.
-    This fixture clears only AFTER each test, so every test in this file
-    starts from an empty cache left behind by the one before it - unlike
-    `tests/test_crop_compare.py`, which clears on both sides.
+    This fixture clears only AFTER each test, and that side is deliberate
+    because it is the side that can be proved: delete the line below and two
+    real-data tests go red on a leaked fixture table. The entry side stays
+    with `_write`, which has always had it. `tests/test_crop_compare.py`
+    clears on both sides.
     """
     yield
     norms._load.cache_clear()
