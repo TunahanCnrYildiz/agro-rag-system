@@ -491,6 +491,26 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     dekar = alan.get(province, {}).get(year)
                     if no_orchard:
                         continue          # already refused, once, above
+                    if tons and dekar == 0:
+                        # THE CEILING'S OWN FINDING AT ITS LIMIT. The province
+                        # books fruit from scattered trees against a compact
+                        # orchard's dekars, and here those dekars reached zero:
+                        # the implied density is past every bound rather than
+                        # merely past 444. The cell was already dropped - by the
+                        # truthiness of `dekar` on the next line, which forms no
+                        # verdict and leaves no trace.
+                        #
+                        # Recorded whether or not the crop publishes a per-tree
+                        # figure: the refusal is that nothing can be divided by
+                        # zero, which is as true of a vegetable's `Ekilen Alan`.
+                        # Today every such cell is a tree crop, so this costs
+                        # nothing and closes the hole a future export would fall
+                        # into.
+                        refused.append({"crop": labels[crop_id],
+                                        "province": province,
+                                        "year": year,
+                                        "reason": "area_is_zero"})
+                        continue
                     if tons is not None and dekar:
                         reason = (_density_verdict(
                                       tons, dekar,

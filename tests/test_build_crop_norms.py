@@ -345,6 +345,50 @@ def test_a_tree_crop_cell_with_no_per_tree_figure_is_refused():
     assert "Ordu" not in out["crops"]["ayva"]["yield_kg_da"]
 
 
+def test_a_zero_area_cell_is_refused_under_its_own_reason():
+    """Zerdali in Afyonkarahisar 2019-2024: the province books 322 tons of fruit
+    against ZERO dekars of compact orchard. No division can be performed, so no
+    yield was ever written - but nothing said so, and the file could not tell
+    this from a province that grows no wild apricot at all."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2024, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2024, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2024, "verim_agac", 42.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert {"crop": "Zerdali", "province": "Afyonkarahisar", "year": 2024,
+            "reason": "area_is_zero"} in record["cells"]
+
+
+def test_a_zero_area_is_refused_on_a_crop_with_no_per_tree_figure_too():
+    """Every zero-area cell in today's exports belongs to a tree crop, so this
+    is the case the data does not currently carry. It is pinned anyway: the
+    refusal is that nothing can be divided by zero, which is as true of a
+    vegetable's `Ekilen Alan` as of an orchard's `Toplu Meyveliklerin Alani`.
+    A future export must not fall back into silence."""
+    rows = [
+        R("Sivas", "Marul (Göbekli)", 2025, "uretim", 12.0),
+        R("Sivas", "Marul (Göbekli)", 2025, "alan", 0.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert [c["reason"] for c in record["cells"]] == ["area_is_zero"]
+
+
+def test_a_zero_area_with_nothing_grown_against_it_records_nothing():
+    """A GUARD, NOT A NEW BEHAVIOUR - it passes before this change and must keep
+    passing after it. Production 0 over area 0 is not a refusal: no figure was
+    discarded, the province simply grew none of the crop that year. The record
+    is a record of what was thrown out, and an entry here would say the
+    opposite of the truth."""
+    rows = [
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "uretim", 0.0),
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "alan", 0.0),
+        R("Kastamonu", "Limon Ve Misket Limonu", 2024, "verim_agac", 30.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["cells"] == []
+
+
 def test_a_cell_older_than_a_ceiling_refusal_is_refused_too():
     """THE SHADOW RULE. A ceiling refusal is not a verdict on one cell - it says
     this province's Toplu Meyveliklerin Alani is not the ground its production
