@@ -625,6 +625,57 @@ def test_the_province_refusal_is_recorded_once_under_its_own_reason():
                      "reason": "province_median_density_above_ceiling"}]
 
 
+def test_a_province_with_no_orchard_area_at_all_says_so():
+    """Its judged years record no compact orchard in ANY of them, so no density
+    was ever computed and the median is unbounded. Calling that "median density
+    above ceiling" names a measurement that did not happen - 132 of the shipped
+    file's 275 province entries are this shape, İncir (Yaş)/Düzce among them
+    with ten zero-area years."""
+    rows = []
+    for year in (2016, 2017, 2018):
+        rows += [R("Düzce", "İncir (Yaş)", year, "uretim", 100.0),
+                 R("Düzce", "İncir (Yaş)", year, "alan", 0.0),
+                 R("Düzce", "İncir (Yaş)", year, "verim_agac", 25.0)]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert [c["reason"] for c in record["cells"]] == [
+        "province_median_year_records_no_orchard"]
+
+
+def test_real_densities_do_not_save_a_province_whose_middle_year_has_none():
+    """THE SHAPE A MEMBER-COUNTING RULE WOULD MISS, and the reason the cut is
+    the MEDIAN. This province recorded a real orchard in two years - 200
+    trees/da, well under the 444 ceiling, so those cells would have been served
+    - and no orchard at all in three. Five members, the middle one unbounded.
+
+    The verdict does not rest on the two real densities, so the reason must not
+    claim it does. 59 of the shipped file's 275 entries are this shape."""
+    rows = []
+    for year in (2016, 2017, 2018):
+        rows += [R("Kırklareli", "İncir (Yaş)", year, "uretim", 100.0),
+                 R("Kırklareli", "İncir (Yaş)", year, "alan", 0.0),
+                 R("Kırklareli", "İncir (Yaş)", year, "verim_agac", 25.0)]
+    rows += _years("İncir (Yaş)", "Kırklareli", [200, 200], start=2019)
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert {c["reason"] for c in record["cells"]} == {
+        "province_median_year_records_no_orchard"}
+
+
+def test_a_finite_median_above_the_ceiling_keeps_the_density_reason():
+    """THE BOUNDARY, in the direction that is easy to get wrong. Zero years are
+    present, but four real densities of 1.500 trees/da outnumber the single
+    zero, so the middle member IS a density and it IS above the ceiling. The
+    old reason is the true one here and must survive. 21 of the shipped file's
+    275 entries are this shape."""
+    rows = _years("Ayva", "Karabük", [1500, 1500, 1500, 1500])
+    rows += [R("Karabük", "Ayva", 2020, "uretim", 100.0),
+             R("Karabük", "Ayva", 2020, "alan", 0.0),
+             R("Karabük", "Ayva", 2020, "verim_agac", 25.0)]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    reasons = {c["reason"] for c in record["cells"]}
+    assert "province_median_density_above_ceiling" in reasons
+    assert "province_median_year_records_no_orchard" not in reasons
+
+
 def test_a_sound_province_with_one_wild_year_keeps_the_rest():
     """THE MISTAKE THIS RULE MUST NOT MAKE. The median is used precisely so one
     bad year costs that year and never the province.

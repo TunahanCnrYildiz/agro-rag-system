@@ -46,9 +46,22 @@ So 191 entries take a new reason and 84 keep the existing one.
 
 **`province_median_year_records_no_orchard`.**
 
-True of both failing shapes without qualification — the median year records no compact orchard
-area — and parallel in grammar to the reason it sits beside, so the record reads as one family.
-It states what the gate found rather than what a reader might infer from it.
+The median year records no compact orchard area — parallel in grammar to the reason it sits
+beside, so the record reads as one family, and stating what the gate found rather than what a
+reader might infer from it.
+
+**One qualification, added after review rather than claimed away.** For 14 of the 191 the
+judged years are even in number and split exactly in half — five zero against five real in
+twelve of them, four against four in Zerdali/Batman and Vişne/Batman. There
+is then no single median year: there are two, and one of them records a real orchard. The
+median is still unbounded — `statistics.median` averages the middle pair and an unbounded
+member absorbs — so those provinces belong on this side of the cut, but the name's singular
+"median year" is imprecise for them.
+
+It is kept anyway. One of the two middle years does record no orchard, so the name is imprecise
+rather than false, and it is strictly better than the old name, which was flatly false there —
+the median is not a density. A further rename would cost another full rebuild of the data file
+for a marginal gain. Recorded here so it is a decision rather than an oversight.
 
 ### What it costs
 
@@ -116,12 +129,20 @@ def table(tmp_path, monkeypatch):
 `test_the_shipped_file_still_carries_provincial_yields` and in
 `test_the_shipped_file_keeps_the_two_tomatoes_apart`. Both are real-data tests defending
 themselves by hand against the fixture tests above them, and between them they are what has
-kept the file honest. With the fixture in place every test starts from an empty cache by
-construction, and leaving a redundant clear that reads as load-bearing is its own small
-untruth — the next person to touch those tests would not know whether it may go.
+kept the file honest. With the fixture in place each of them is preceded by a teardown that
+just cleared, so the clear inside them buys nothing, and leaving a redundant clear that reads
+as load-bearing is its own small untruth — the next person to touch those tests would not know
+whether it may go.
+
+Note the limit of what the fixture provides, since the round has already written one sentence
+overreaching it: clearing after every test guarantees that nothing this file caches escapes
+into what runs later, and that each test after the first starts clean. The first test in the
+file is covered by `_write`'s own clear on entry, not by the fixture.
 
 Removing them is also what makes the fixture testable: with the manual clears gone, deleting
-the fixture's own clear must turn both of those tests red. That is the mutation below.
+the fixture's own clear must turn both of those tests red. That is the mutation below. Three
+further redundant clears were found during review and removed too, so the measured count is
+**four** red tests, not two.
 
 `tests/test_shipped_norms.py` keeps its manual clear. That file documents it as an instrument
 check — *"PROVE THE INSTRUMENT BEFORE TRUSTING IT"* — which is a different job from hygiene,
@@ -150,3 +171,24 @@ outcome must be reported, not papered over.
 rebuilds and compares, so the file cannot lag the code. Expected afterwards: **66.610 served
 cells, unchanged**, 1.714 refusal entries, unchanged, with 191 of them under the new reason and
 84 under the old.
+
+## As built
+
+All of the above held: 66.610 served, the `crops` block byte-identical to main's, 1.714 entries
+split 191 / 84, suite 1036.
+
+Two figures in `_province_area_never_orchard`'s own docstring were found stale during review and
+corrected in passing — the rule reaches **275 of 2.024** (crop, province) pairs, not 165 of
+1.917, and removes **110** served cells, not 14. Both went wrong when the previous round put
+zero-area years into this median; neither was introduced here.
+
+The review found four false sentences from this round: two written by the round itself, one
+written while repairing those, and one — a claim that a mutation turns *two* tests red when it
+turns four — written in the commit titled "Say what the cache fixture proves, not what it
+guarantees". That last one was stale rather than careless: it was true when measured, and an
+earlier commit in the same push removed three redundant clears, which left two more tests
+leaning on the fixture. Nobody re-ran the mutation after its surface changed.
+
+That makes seven consecutive false sentences on this file across two rounds. Every one was
+prose, none was code, and every one survived a careful READ and died on the first MEASUREMENT.
+Recorded as a standing lesson rather than a per-round surprise.
