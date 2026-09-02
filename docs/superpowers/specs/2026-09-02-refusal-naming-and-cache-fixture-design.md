@@ -46,9 +46,21 @@ So 191 entries take a new reason and 84 keep the existing one.
 
 **`province_median_year_records_no_orchard`.**
 
-True of both failing shapes without qualification — the median year records no compact orchard
-area — and parallel in grammar to the reason it sits beside, so the record reads as one family.
-It states what the gate found rather than what a reader might infer from it.
+The median year records no compact orchard area — parallel in grammar to the reason it sits
+beside, so the record reads as one family, and stating what the gate found rather than what a
+reader might infer from it.
+
+**One qualification, added after review rather than claimed away.** For 14 of the 191 the
+judged years are even in number and split exactly in half, five zero against five real. There
+is then no single median year: there are two, and one of them records a real orchard. The
+median is still unbounded — `statistics.median` averages the middle pair and an unbounded
+member absorbs — so those provinces belong on this side of the cut, but the name's singular
+"median year" is imprecise for them.
+
+It is kept anyway. One of the two middle years does record no orchard, so the name is imprecise
+rather than false, and it is strictly better than the old name, which was flatly false there —
+the median is not a density. A further rename would cost another full rebuild of the data file
+for a marginal gain. Recorded here so it is a decision rather than an oversight.
 
 ### What it costs
 
@@ -150,3 +162,18 @@ outcome must be reported, not papered over.
 rebuilds and compares, so the file cannot lag the code. Expected afterwards: **66.610 served
 cells, unchanged**, 1.714 refusal entries, unchanged, with 191 of them under the new reason and
 84 under the old.
+
+## As built
+
+All of the above held: 66.610 served, the `crops` block byte-identical to main's, 1.714 entries
+split 191 / 84, suite 1036.
+
+Two figures in `_province_area_never_orchard`'s own docstring were found stale during review and
+corrected in passing — the rule reaches **275 of 2.024** (crop, province) pairs, not 165 of
+1.917, and removes **110** served cells, not 14. Both went wrong when the previous round put
+zero-area years into this median; neither was introduced here.
+
+The review also found two false sentences written by this round and one written while repairing
+them — the fourth and fifth in a row on this file. Every one was prose, none was code, and each
+was caught only by a reader who re-measured rather than re-read. That is now recorded as a
+standing lesson rather than a per-round surprise.
