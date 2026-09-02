@@ -118,20 +118,27 @@ def test_the_check_and_record_happens_under_the_lock():
     window fills, so CPython's scheduler almost never lands in it.
 
     That is an argument about today's scheduler, not about correctness, which
-    is why the lock stays and why this test pins the line the race test cannot.
+    is why the lock stays and why this test pins what the race test cannot.
+
+    It watches the WINDOW, not just the acquisition: the deque must grow
+    between entering the lock and leaving it. Asserting only that `__enter__`
+    ran would leave `with self._lock: pass` followed by an unguarded
+    check-and-record passing, which is the very shape the lock exists to
+    forbid.
     """
     limit = rate_limit.SlidingWindowLimit(2, _Clock())
     real = limit._lock
-    entered = []
+    depth = []
 
     class _Recording:
         def __enter__(self):
-            entered.append(1)
+            depth.append(len(limit._calls))
             return real.__enter__()
 
         def __exit__(self, *exc):
+            depth.append(len(limit._calls))
             return real.__exit__(*exc)
 
     limit._lock = _Recording()
     assert limit.allow() is True
-    assert entered == [1]
+    assert depth == [0, 1]

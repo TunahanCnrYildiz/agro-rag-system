@@ -67,11 +67,15 @@ class SlidingWindowLimit:
         detail regardless, and Python 3.14 ships a free-threaded build where
         the GIL is not there to hide it at all.
         `test_the_check_and_record_happens_under_the_lock` pins the line.
+
+        THE CLOCK IS READ INSIDE THE LOCK: the eviction loop below assumes
+        the deque's front is its oldest entry, and only the lock makes that
+        true by forcing appends to land in the order calls acquired it.
         """
         if self._per_minute <= 0:
             return True
-        now = self._clock()
         with self._lock:
+            now = self._clock()
             cutoff = now - self.WINDOW_SECONDS
             while self._calls and self._calls[0] <= cutoff:
                 self._calls.popleft()
