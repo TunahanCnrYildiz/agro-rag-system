@@ -51,7 +51,8 @@ beside, so the record reads as one family, and stating what the gate found rathe
 reader might infer from it.
 
 **One qualification, added after review rather than claimed away.** For 14 of the 191 the
-judged years are even in number and split exactly in half, five zero against five real. There
+judged years are even in number and split exactly in half — five zero against five real in
+twelve of them, four against four in Zerdali/Batman and Vişne/Batman. There
 is then no single median year: there are two, and one of them records a real orchard. The
 median is still unbounded — `statistics.median` averages the middle pair and an unbounded
 member absorbs — so those provinces belong on this side of the cut, but the name's singular
@@ -179,7 +180,13 @@ corrected in passing — the rule reaches **275 of 2.024** (crop, province) pair
 1.917, and removes **110** served cells, not 14. Both went wrong when the previous round put
 zero-area years into this median; neither was introduced here.
 
-The review also found two false sentences written by this round and one written while repairing
-them — the fourth and fifth in a row on this file. Every one was prose, none was code, and each
-was caught only by a reader who re-measured rather than re-read. That is now recorded as a
-standing lesson rather than a per-round surprise.
+The review found four false sentences from this round: two written by the round itself, one
+written while repairing those, and one — a claim that a mutation turns *two* tests red when it
+turns four — written in the commit titled "Say what the cache fixture proves, not what it
+guarantees". That last one was stale rather than careless: it was true when measured, and an
+earlier commit in the same push removed three redundant clears, which left two more tests
+leaning on the fixture. Nobody re-ran the mutation after its surface changed.
+
+That makes seven consecutive false sentences on this file across two rounds. Every one was
+prose, none was code, and every one survived a careful READ and died on the first MEASUREMENT.
+Recorded as a standing lesson rather than a per-round surprise.

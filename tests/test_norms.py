@@ -18,7 +18,7 @@ def _clear_the_norms_cache():
     `_write` test happened to be followed by real-data tests that cleared the
     cache for their own reasons. Reordering the file was enough to break it.
     This fixture clears only AFTER each test, and that side is deliberate
-    because it is the side that can be proved: delete the line below and two
+    because it is the side that can be proved: delete the line below and four
     real-data tests go red on a leaked fixture table. The entry side stays
     with `_write`, which has always had it. `tests/test_crop_compare.py`
     clears on both sides.
