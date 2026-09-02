@@ -17,8 +17,9 @@ def _clear_the_norms_cache():
     Until this fixture existed the file stayed clean by ACCIDENT: the last
     `_write` test happened to be followed by real-data tests that cleared the
     cache for their own reasons. Reordering the file was enough to break it.
-    The shape here is `tests/test_crop_compare.py`'s, which has always cleared
-    on both sides.
+    This fixture clears only AFTER each test, so every test in this file
+    starts from an empty cache left behind by the one before it - unlike
+    `tests/test_crop_compare.py`, which clears on both sides.
     """
     yield
     norms._load.cache_clear()
@@ -308,7 +309,6 @@ def test_the_shipped_file_uses_canonical_province_names():
     test is the only thing that can see it. TUIK writes "Hakkari" where
     location.py writes "Hakkâri"; the converter renames it."""
     from src.context.location import PROVINCES
-    norms._load.cache_clear()
     data = norms._load()
     assert data, "data/crop_norms.json did not load - the shipped file is broken"
     allowed = set(PROVINCES) | {norms.NATIONAL_KEY}
@@ -320,7 +320,6 @@ def test_the_shipped_file_uses_canonical_province_names():
 
 
 def test_the_shipped_file_carries_crops_and_a_decade():
-    norms._load.cache_clear()
     assert len(norms.available_crops()) > 100
     assert len(norms._load()["years"]) == 10
 
@@ -329,7 +328,6 @@ def test_a_shipped_yield_is_in_a_plausible_range():
     """Guards the unit. Reading the export as Turkish-formatted would have made
     every figure ten times too big; a wheat yield of 2840 kg/da would be absurd
     and this is what would catch it."""
-    norms._load.cache_clear()
     wheat = norms.lookup("durum bugdayi", "Konya")
     assert wheat is not None and wheat.yield_kg_da is not None
     assert 50 < wheat.yield_kg_da.amount < 1000

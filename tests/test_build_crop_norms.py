@@ -649,11 +649,12 @@ def test_real_densities_do_not_save_a_province_whose_middle_year_has_none():
 
     The verdict does not rest on the two real densities, so the reason must not
     claim it does. 59 of the shipped file's 275 entries are this shape."""
-    rows = _years("İncir (Yaş)", "Kırklareli", [200, 200])
-    for year in (2018, 2019, 2020):
+    rows = []
+    for year in (2016, 2017, 2018):
         rows += [R("Kırklareli", "İncir (Yaş)", year, "uretim", 100.0),
                  R("Kırklareli", "İncir (Yaş)", year, "alan", 0.0),
                  R("Kırklareli", "İncir (Yaş)", year, "verim_agac", 25.0)]
+    rows += _years("İncir (Yaş)", "Kırklareli", [200, 200], start=2019)
     record = bcn.build(rows)["meta"]["refused_yield_cells"]
     assert {c["reason"] for c in record["cells"]} == {
         "province_median_year_records_no_orchard"}

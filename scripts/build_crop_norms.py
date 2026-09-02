@@ -328,9 +328,9 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
     Neither existing rule can reach it. The cells are individually under the
     bound, and `_ceiling_shadow` only falls BACKWARDS, so a province whose bad
     years all precede a merely-less-bad recent one keeps serving that recent
-    one. Measured: 165 of 1.917 (crop, province) pairs have a median year past
+    one. Measured: 275 of 2.024 (crop, province) pairs have a median year past
     the bound; the cell gate and the shadow already take most, so this removes
-    14 SERVED cells - Erik/Tunceli at 0,8 m2 of ground per tree, Incir/Karaman
+    110 SERVED cells - Erik/Tunceli at 0,8 m2 of ground per tree, Incir/Karaman
     at 0,4, Ayva/Hatay at 0,9.
 
     THE MEDIAN, so one wild year costs that year and never the province.
@@ -374,7 +374,9 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
     # unbounded median means no density sits where the verdict was read, so
     # calling it a density above the ceiling would name a measurement that did
     # not happen - true of a province with no orchard area in any judged year,
-    # and equally of one whose real years are outnumbered by its zero ones.
+    # and equally of one whose zero years match or outnumber its real ones: on
+    # an even split the middle pair still holds an unbounded member, and
+    # averaging it with a real density is itself unbounded.
     return ("province_median_year_records_no_orchard"
             if median == _UNBOUNDED_DENSITY
             else "province_median_density_above_ceiling")
