@@ -112,10 +112,20 @@ def table(tmp_path, monkeypatch):
 `_write` keeps its clear on the way in. `norms._load` is the module's only cache — checked, one
 `@lru_cache` in the file — so nothing else needs clearing.
 
-The manual `norms._load.cache_clear()` inside `test_the_shipped_file_keeps_the_two_tomatoes_apart`
-is then **removed**. With the fixture in place every test starts from an empty cache by
+**Two** manual `norms._load.cache_clear()` calls then become redundant and are removed — in
+`test_the_shipped_file_still_carries_provincial_yields` and in
+`test_the_shipped_file_keeps_the_two_tomatoes_apart`. Both are real-data tests defending
+themselves by hand against the fixture tests above them, and between them they are what has
+kept the file honest. With the fixture in place every test starts from an empty cache by
 construction, and leaving a redundant clear that reads as load-bearing is its own small
-untruth — the next person to touch that test would not know whether it may go.
+untruth — the next person to touch those tests would not know whether it may go.
+
+Removing them is also what makes the fixture testable: with the manual clears gone, deleting
+the fixture's own clear must turn both of those tests red. That is the mutation below.
+
+`tests/test_shipped_norms.py` keeps its manual clear. That file documents it as an instrument
+check — *"PROVE THE INSTRUMENT BEFORE TRUSTING IT"* — which is a different job from hygiene,
+and it is out of scope here.
 
 ---
 
