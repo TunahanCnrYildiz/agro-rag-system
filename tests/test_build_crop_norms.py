@@ -652,8 +652,10 @@ def test_a_province_recorded_in_too_few_years_is_not_judged_as_a_province():
 def test_zero_years_push_a_province_past_the_ceiling():
     """A year of zero recorded orchard is the most extreme answer there is to
     the question this rule asks, so it enters the median as an unbounded
-    density. The median RANKS rather than averages, so an unbounded member
-    needs no arithmetic performed on it.
+    density. Six years split three and three, so the median averages the two
+    middle ones rather than placing a single one untouched - but the average
+    of a finite figure and an unbounded one is itself unbounded, so the
+    verdict is the same either way.
 
     Elma (Amasya) in Karaman is the cell this is for: 2016-2020 recorded at zero
     area, then 2021-2024 carrying 11.615 to 12.769 kg/da off 11 to 13 dekars at

@@ -219,9 +219,11 @@ _MIN_TREES_PER_DA = 5
 
 # A zero recorded area implies a density no bound can hold. It enters the
 # PROVINCE median as this and never the CROP median - see both docstrings for
-# why the same figure belongs in one and not the other. A median ranks rather
-# than averages, so an unbounded member is a legitimate one: nothing is
-# computed with it, it is only placed.
+# why the same figure belongs in one and not the other. On an odd-length list
+# the median is a placement and an unbounded member is never touched; on an
+# even one it is averaged with its neighbour, and that average is itself
+# unbounded. Either way the verdict is the same: it forces the province's
+# median year past the bound.
 _UNBOUNDED_DENSITY = float("inf")
 
 
@@ -334,6 +336,12 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
     most extreme possible answer to the question this rule asks, and leaving it
     out let a province book six consecutive years of fruit against no orchard
     at all and still be judged sound on the three years that carried an area.
+
+    IT ALSO COUNTS TOWARD `_MIN_YEARS_TO_JUDGE_A_PROVINCE`, not only toward the
+    median. A province with one real area-year and two zero years used to fall
+    under the threshold on that single density and be presumed sound; now the
+    two zeros supply the other two years, because a zero-area year is evidence
+    about what the column records, not an absence of evidence.
     """
     densities = []
     for year, tons in uretim.get(province, {}).items():
