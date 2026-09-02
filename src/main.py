@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -23,10 +23,12 @@ try:
     from .config import settings, PRODUCTS_JSON
     from .articles_scraper import ARTICLES_JSON
     from . import engine
+    from . import rate_limit
 except ImportError:  # pragma: no cover
     from config import settings, PRODUCTS_JSON  # type: ignore
     from articles_scraper import ARTICLES_JSON  # type: ignore
     import engine  # type: ignore
+    import rate_limit  # type: ignore
 
 
 # --------------------------------------------------------------------------- #
@@ -167,6 +169,44 @@ def _warn_if_open_cors(origins: list[str]) -> None:
 
 _warn_if_open_cors(settings.cors_origins_list)
 
+# GLOBAL, not per caller. uvicorn runs without `--proxy-headers` behind a
+# TLS-terminating proxy, so every request arrives wearing the proxy's address;
+# a per-IP limit keyed on it would throttle everyone together while reading as
+# if it isolated them, and one keyed on `X-Forwarded-For` would be bypassed by
+# setting a header. See src/rate_limit.py.
+_chat_limit = rate_limit.SlidingWindowLimit(settings.rate_limit_per_minute)
+
+
+def _announce_rate_limit(limit: rate_limit.SlidingWindowLimit) -> None:
+    """One-time startup line, the same job `_warn_if_open_cors` does above:
+    a dangerous configuration should not be the silent one."""
+    if limit.per_minute <= 0:
+        print(
+            f"[main] WARNING: RATE_LIMIT_PER_MINUTE={limit.per_minute} - "
+            "/api/chat accepts unlimited requests. It is public and "
+            "unauthenticated."
+        )
+    else:
+        print(
+            f"[main] rate limit: {limit.per_minute} requests/minute on "
+            f"/api/chat, counted globally rather than per caller. "
+            f"Set RATE_LIMIT_PER_MINUTE=0 to disable."
+        )
+
+
+_announce_rate_limit(_chat_limit)
+
+
+def _enforce_chat_limit() -> None:
+    """Reads `_chat_limit` at call time rather than closing over it, so a test
+    can swap the instance."""
+    if not _chat_limit.allow():
+        raise HTTPException(
+            status_code=429,
+            detail=("Şu anda çok fazla istek alıyorum. Lütfen biraz bekleyip "
+                    "tekrar deneyin."),
+        )
+
 
 @app.get("/health")
 def health() -> dict:
@@ -203,7 +243,8 @@ def articles(category: str | None = None):
     return data
 
 
-@app.post("/api/chat", response_model=ChatResponse)
+@app.post("/api/chat", response_model=ChatResponse,
+          dependencies=[Depends(_enforce_chat_limit)])
 def chat(req: ChatRequest):
     """Primary endpoint. Returns unified JSON, or an SSE stream when
     ``stream=true``."""

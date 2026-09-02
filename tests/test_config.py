@@ -86,6 +86,18 @@ def test_embedding_identity_defaults_to_bge_m3():
     assert Settings.model_fields["embedding_identity"].default == "bge-m3"
 
 
+def test_the_rate_limit_defaults_to_sixty_a_minute():
+    """THE ONE REGRESSION THE TEST SUITE CANNOT OTHERWISE SEE. tests/conftest.py
+    resets the limiter between tests, so a default of 1 would ship a ceiling
+    that refuses a live demo with every test still green - measured: setting
+    this default to 1 leaves all 1049 passing.
+
+    Asserted on the FIELD DEFAULT rather than an instance, for the same reason
+    as the chat_provider test above: the real .env is gitignored, so an
+    instance-level assert would be environment-dependent."""
+    assert Settings.model_fields["rate_limit_per_minute"].default == 60
+
+
 def test_embedding_endpoint_falls_back_to_lm_studio_when_unset():
     s = Settings(embedding_base_url="", embedding_api_key="")
     assert s.effective_embedding_base_url == s.lm_studio_base_url
