@@ -649,6 +649,62 @@ def test_a_province_recorded_in_too_few_years_is_not_judged_as_a_province():
     assert out["crops"]["ayva"]["yield_kg_da"]["Karabük"] == [None, 2500.0]
 
 
+def test_zero_years_push_a_province_past_the_ceiling():
+    """A year of zero recorded orchard is the most extreme answer there is to
+    the question this rule asks, so it enters the median as an unbounded
+    density. The median RANKS rather than averages, so an unbounded member
+    needs no arithmetic performed on it.
+
+    Elma (Amasya) in Karaman is the cell this is for: 2016-2020 recorded at zero
+    area, then 2021-2024 carrying 11.615 to 12.769 kg/da off 11 to 13 dekars at
+    155-223 trees/da. The cell gate passes that spacing, and the shadow cannot
+    reach those years because every zero year precedes them. Only this rule
+    can."""
+    rows = []
+    for year in (2016, 2017, 2018):
+        rows += [R("Karaman", "Elma (Amasya)", year, "uretim", 100.0),
+                 R("Karaman", "Elma (Amasya)", year, "alan", 0.0),
+                 R("Karaman", "Elma (Amasya)", year, "verim_agac", 25.0)]
+    # 100 t at 25 kg/tree is 4.000 trees; over 20 dekars that is 200 trees/da,
+    # under the 444 ceiling, and these years are LATER than every zero year.
+    for year in (2019, 2020, 2021):
+        rows += [R("Karaman", "Elma (Amasya)", year, "uretim", 100.0),
+                 R("Karaman", "Elma (Amasya)", year, "alan", 20.0),
+                 R("Karaman", "Elma (Amasya)", year, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "elma (amasya)") == []
+
+
+def test_zero_years_do_not_push_a_crop_past_the_ceiling():
+    """THE MISTAKE THIS SPLIT EXISTS TO PREVENT, and it is a guard: it passes
+    before the change above and must keep passing after it.
+
+    `_area_never_orchard` states its own intent - a handful of scattered-tree
+    provinces costs those cells and never the crop. Measured with the zeros in
+    the crop median too, 338 served cells fell and among them was the whole of
+    Musmula/Bursa: 24 to 63 trees per dekar, an area growing smoothly from 127
+    to 1.389 dekars, not one zero year of its own, destroyed by OTHER provinces'
+    zeros. That is precisely the failure the median was chosen to avoid.
+
+    Ten zero-area provinces is deliberate: it is the number
+    `_MIN_PROVINCES_TO_JUDGE_A_CROP` needs before the crop rule will judge at
+    all, so if the zeros ever enter this median they arrive with enough weight
+    to act."""
+    sound = "Bursa"
+    rows = []
+    for province in [p for p in bcn.PROVINCES if p != sound][:10]:
+        rows += [R(province, "Muşmula", 2025, "uretim", 100.0),
+                 R(province, "Muşmula", 2025, "alan", 0.0),
+                 R(province, "Muşmula", 2025, "verim_agac", 25.0)]
+    # 4.000 trees over 100 dekars is 40 trees/da - a 5m x 5m orchard, exactly
+    # what the denominator claims to be.
+    rows += [R(sound, "Muşmula", 2025, "uretim", 100.0),
+             R(sound, "Muşmula", 2025, "alan", 100.0),
+             R(sound, "Muşmula", 2025, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "musmula") == [sound]
+
+
 def test_a_published_yield_survives_the_province_gate():
     """Only the DERIVED half goes - the same line every rule in this file holds."""
     rows = _years("Ayva", "Karabük", [1500, 1400, 1450, 100])

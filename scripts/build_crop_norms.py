@@ -217,6 +217,13 @@ def read_export(path: Path):
 _MAX_TREES_PER_DA = 444
 _MIN_TREES_PER_DA = 5
 
+# A zero recorded area implies a density no bound can hold. It enters the
+# PROVINCE median as this and never the CROP median - see both docstrings for
+# why the same figure belongs in one and not the other. A median ranks rather
+# than averages, so an unbounded member is a legitimate one: nothing is
+# computed with it, it is only placed.
+_UNBOUNDED_DENSITY = float("inf")
+
 
 def _density_verdict(tons: float, dekar: float,
                      per_tree: float | None) -> str | None:
@@ -265,6 +272,16 @@ def _area_never_orchard(published: dict, uretim: dict, alan: dict,
     The MEDIAN, so that a handful of scattered-tree provinces costs those cells
     and never the crop - apple is recorded properly nearly everywhere and must
     survive whole.
+
+    A YEAR OF ZERO RECORDED AREA DOES NOT COUNT HERE, though it does in
+    `_province_area_never_orchard`. The two rules ask different questions. That
+    one asks whether a province records this crop's ground, and a zero answers
+    it. This one asks whether the COLUMN describes the crop anywhere, and
+    zeros concentrated in scattered-tree provinces answer a question about those
+    provinces. Measured: counting them here removes 338 served cells including
+    the whole of Musmula/Bursa - 24 to 63 trees/da, an area growing smoothly
+    from 127 to 1.389 dekars, not one zero year of its own - which is exactly
+    the "apple must survive whole" failure the median was chosen to prevent.
     """
     densities, provinces = [], set()
     for province, by_year in uretim.items():
@@ -312,13 +329,22 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
     cells and would condemn spacings that are real for super-spindle apple
     (~3,15 m2). That is the per-crop-bound path measured and closed on
     2026-08-28; see docs/superpowers/2026-08-28-ceiling-findings.md.
+
+    A YEAR OF ZERO RECORDED AREA COUNTS, as an unbounded density. It is the
+    most extreme possible answer to the question this rule asks, and leaving it
+    out let a province book six consecutive years of fruit against no orchard
+    at all and still be judged sound on the three years that carried an area.
     """
     densities = []
     for year, tons in uretim.get(province, {}).items():
         dekar = alan.get(province, {}).get(year)
         tree = per_tree.get(province, {}).get(year)
-        if (tons and dekar and tree
+        if not (tons and tree
                 and published.get(province, {}).get(year) is None):
+            continue
+        if dekar == 0:
+            densities.append(_UNBOUNDED_DENSITY)
+        elif dekar:
             densities.append((tons * 1000.0 / tree) / dekar)
     if len(densities) < _MIN_YEARS_TO_JUDGE_A_PROVINCE:
         return False
