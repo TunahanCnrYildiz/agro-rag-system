@@ -74,10 +74,10 @@ underneath the features and won't announce themselves.
    the number is measured, not preference: the crop_choice question is the
    longest context block at 3,452 prompt tokens on its own, 4,681 once the
    mobile client's full history budget rides along, and 4,681 + 3,072 = 7,753
-   of 8192, so 439 tokens spare. That headroom is measured against a context
-   window this repository *assumes* — it does not know what `OPENROUTER_MODEL`
-   names, so checking the hosted model's actual context window is on you, not
-   an assertion this file can make for you. Undersized, and the failure does
+   of 8,192, so 439 tokens spare. That headroom was measured against the LOCAL
+   model's 8,192-token window. This repository does not know what
+   `OPENROUTER_MODEL` names, so confirming the hosted model's window is on you
+   — it is not an assertion this file can make for you. Undersized, and the failure does
    not look like the old one: instead of an ANSWER visibly cut mid-sentence,
    the PROMPT gets silently truncated and drops the system instructions first.
    `SEND_BUDGET_CHARS` in `mobile-app/src/chatStore.ts` is the other half of
@@ -99,7 +99,9 @@ alongside a trusted-proxy list, because `X-Forwarded-For` is set by the client
 and an attacker can just rotate it. On its own the flag is worth nothing —
 don't add it expecting today's behaviour to improve.
 
-CORS narrowing is unchanged from step 2 above — same instruction, same file.
+CORS narrowing is unchanged: step 2 of the checklist above already covers it,
+and it is deliberately not repeated here — a second copy is a second thing to
+go stale.
 
 **Verify, in this order:**
 1. `GET /health` — confirm provider and model.
