@@ -677,6 +677,31 @@ def test_zero_years_push_a_province_past_the_ceiling():
     assert _provinces_served(out, "elma (amasya)") == []
 
 
+def test_zero_years_count_toward_the_three_a_province_needs_to_be_judged():
+    """The threshold asks for three years of evidence about how the province
+    keeps its books, and a year that records no orchard at all is evidence -
+    not an absence of it. One finite year among two zeros used to fall under
+    the threshold on that single density and be presumed sound.
+
+    Measured: requiring three FINITE years instead moves `area_is_zero` from
+    110 recorded cells to 1.482 and province-level refusals from 275 to 129.
+    The test above cannot see it - its fixture clears the threshold either
+    way."""
+    rows = []
+    for year in (2016, 2017):
+        rows += [R("Düzce", "İncir (Yaş)", year, "uretim", 100.0),
+                 R("Düzce", "İncir (Yaş)", year, "alan", 0.0),
+                 R("Düzce", "İncir (Yaş)", year, "verim_agac", 25.0)]
+    # 100 t at 25 kg/tree is 4.000 trees; over 20 dekars that is 200 trees/da,
+    # under the 444 ceiling. It is also LATER than both zero years, so the
+    # shadow cannot reach it either - only the three-year threshold decides.
+    rows += [R("Düzce", "İncir (Yaş)", 2018, "uretim", 100.0),
+             R("Düzce", "İncir (Yaş)", 2018, "alan", 20.0),
+             R("Düzce", "İncir (Yaş)", 2018, "verim_agac", 25.0)]
+    out = bcn.build(rows)
+    assert _provinces_served(out, "incir (yas)") == []
+
+
 def test_zero_years_do_not_push_a_crop_past_the_ceiling():
     """THE MISTAKE THIS SPLIT EXISTS TO PREVENT, and it is a guard: it passes
     before the change above and must keep passing after it.
@@ -1149,10 +1174,11 @@ def test_a_published_yield_of_zero_is_refused_and_recorded():
 
 def test_a_zero_production_against_a_recorded_area_is_refused_and_recorded():
     """Two dekars sown, nothing off them: the derived yield is 0,0 and has
-    always been dropped. A TREE crop's zero production is already caught one
-    step earlier as `density_below_floor` - 0 trees/dekar is under the floor of
-    5 - so this reason reaches only the crops with no per-tree figure to judge
-    with, which is where the 36 measured cells sit."""
+    always been dropped. Most tree crops are already caught one step earlier
+    too: a zero-production year carries no per-tree survey of its own, so
+    `no_per_tree_figure` takes it as an unjudged cell first. This reason
+    reaches only the crops that publish no per-tree figure anywhere, which is
+    where the 36 measured cells sit."""
     rows = [
         R("Sivas", "Marul (Göbekli)", 2025, "uretim", 0.0),
         R("Sivas", "Marul (Göbekli)", 2025, "alan", 2.0),

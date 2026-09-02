@@ -222,8 +222,12 @@ _MIN_TREES_PER_DA = 5
 # why the same figure belongs in one and not the other. On an odd-length list
 # the median is a placement and an unbounded member is never touched; on an
 # even one it is averaged with its neighbour, and that average is itself
-# unbounded. Either way the verdict is the same: it forces the province's
-# median year past the bound.
+# unbounded. Either way an unbounded member ranks above every finite one, so
+# it can only push the median UP, never down - but whether it reaches the
+# bound depends on how many zero years the province carries against how many
+# finite ones. A province with more finite years than zero can still be
+# judged sound: measured, 40 of the 336 zero-carrying (crop, province) pairs
+# land under the bound and keep serving.
 _UNBOUNDED_DENSITY = float("inf")
 
 
@@ -280,7 +284,7 @@ def _area_never_orchard(published: dict, uretim: dict, alan: dict,
     one asks whether a province records this crop's ground, and a zero answers
     it. This one asks whether the COLUMN describes the crop anywhere, and
     zeros concentrated in scattered-tree provinces answer a question about those
-    provinces. Measured: counting them here removes 338 served cells including
+    provinces. Measured: counting them here removes 264 served cells including
     the whole of Musmula/Bursa - 24 to 63 trees/da, an area growing smoothly
     from 127 to 1.389 dekars, not one zero year of its own - which is exactly
     the "apple must survive whole" failure the median was chosen to prevent.
@@ -600,10 +604,12 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                     series[i] = round(value, _DECIMALS["verim"])
                 elif value is not None:
                     # A derived 0,0: an area is recorded and nothing came off
-                    # it. A tree crop never arrives here - `density_below_floor`
-                    # takes it one step earlier - so this is the field and
-                    # vegetable case, where no per-tree figure exists to judge
-                    # with. `value is not None` keeps the genuinely absent cell
+                    # it. Most tree crops never arrive here either - a
+                    # zero-production year carries no per-tree survey of its
+                    # own, so `no_per_tree_figure` takes it one step earlier
+                    # as an unjudged cell - which leaves this reason for the
+                    # crops that publish no per-tree figure anywhere.
+                    # `value is not None` keeps the genuinely absent cell
                     # silent: nothing was thrown out there.
                     refused.append({"crop": labels[crop_id],
                                     "province": province, "year": year,
