@@ -311,8 +311,13 @@ _MIN_YEARS_TO_JUDGE_A_PROVINCE = 3
 
 
 def _province_area_never_orchard(province: str, published: dict, uretim: dict,
-                                 alan: dict, per_tree: dict) -> bool:
-    """Whether THIS province's area column fails to record THIS crop's ground.
+                                 alan: dict, per_tree: dict) -> str | None:
+    """Why THIS province's area column fails to record THIS crop's ground, or
+    None when it does not fail.
+
+    A reason rather than a flag, the same shape as `_density_verdict` above:
+    the caller records what the median found, and the two answers are not the
+    same finding.
 
     THE MIDDLE GRANULARITY, AND STILL NO NEW CONSTANT. `_density_verdict` asks
     the geometric question of one cell and `_area_never_orchard` asks it of a
@@ -361,8 +366,18 @@ def _province_area_never_orchard(province: str, published: dict, uretim: dict,
         elif dekar:
             densities.append((tons * 1000.0 / tree) / dekar)
     if len(densities) < _MIN_YEARS_TO_JUDGE_A_PROVINCE:
-        return False
-    return statistics.median(densities) > _MAX_TREES_PER_DA
+        return None
+    median = statistics.median(densities)
+    if not median > _MAX_TREES_PER_DA:
+        return None
+    # WHICH REASON IS A QUESTION ABOUT THE MIDDLE, NOT ABOUT THE MEMBERS. An
+    # unbounded median means no density sits where the verdict was read, so
+    # calling it a density above the ceiling would name a measurement that did
+    # not happen - true of a province with no orchard area in any judged year,
+    # and equally of one whose real years are outnumbered by its zero ones.
+    return ("province_median_year_records_no_orchard"
+            if median == _UNBOUNDED_DENSITY
+            else "province_median_density_above_ceiling")
 
 
 def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
@@ -529,12 +544,13 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                                       per_tree, index) if per_tree else None)
             # Recorded once for the province, not once per cell - the finding
             # is about the column, and a per-cell line would say the wrong thing.
-            no_orchard = bool(per_tree) and _province_area_never_orchard(
+            province_reason = (_province_area_never_orchard(
                 province, published, uretim, alan, per_tree)
+                if per_tree else None)
+            no_orchard = province_reason is not None
             if no_orchard:
                 refused.append({"crop": labels[crop_id], "province": province,
-                                "year": 0,
-                                "reason": "province_median_density_above_ceiling"})
+                                "year": 0, "reason": province_reason})
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
