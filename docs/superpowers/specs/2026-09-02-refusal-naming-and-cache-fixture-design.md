@@ -128,9 +128,15 @@ def table(tmp_path, monkeypatch):
 `test_the_shipped_file_still_carries_provincial_yields` and in
 `test_the_shipped_file_keeps_the_two_tomatoes_apart`. Both are real-data tests defending
 themselves by hand against the fixture tests above them, and between them they are what has
-kept the file honest. With the fixture in place every test starts from an empty cache by
-construction, and leaving a redundant clear that reads as load-bearing is its own small
-untruth — the next person to touch those tests would not know whether it may go.
+kept the file honest. With the fixture in place each of them is preceded by a teardown that
+just cleared, so the clear inside them buys nothing, and leaving a redundant clear that reads
+as load-bearing is its own small untruth — the next person to touch those tests would not know
+whether it may go.
+
+Note the limit of what the fixture provides, since the round has already written one sentence
+overreaching it: clearing after every test guarantees that nothing this file caches escapes
+into what runs later, and that each test after the first starts clean. The first test in the
+file is covered by `_write`'s own clear on entry, not by the fixture.
 
 Removing them is also what makes the fixture testable: with the manual clears gone, deleting
 the fixture's own clear must turn both of those tests red. That is the mutation below.
