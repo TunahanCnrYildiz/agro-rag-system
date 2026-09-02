@@ -86,11 +86,18 @@ def test_reset_empties_the_window():
     assert limit.allow() is True
 
 
-def test_the_ceiling_holds_when_threads_race():
-    """`chat()` is a synchronous def, so FastAPI runs it in a threadpool and
-    concurrent calls genuinely interleave between reading the window's length
-    and appending to it. Uses the real clock: 200 calls finish far inside one
-    60-second window."""
+def test_the_ceiling_holds_under_concurrent_load():
+    """A CONCURRENT SMOKE TEST, not proof of the lock. `chat()` is a
+    synchronous def, so FastAPI runs it in a threadpool and these 200 calls do
+    run genuinely concurrently - but on the default (GIL) build that
+    interleaving is rare enough that this test passes whether or not the lock
+    is there: measured, with the lock removed, 5 out of 5 runs. So a pass here
+    does not distinguish a locked counter from an unlocked one; it only shows
+    the ceiling holds across real concurrent traffic. The lock itself is
+    pinned by `test_the_check_and_record_happens_under_the_lock` below - see
+    that test's docstring for the measurement that argues for it.
+
+    Uses the real clock: 200 calls finish far inside one 60-second window."""
     limit = rate_limit.SlidingWindowLimit(50)
     admitted = []
     guard = threading.Lock()
