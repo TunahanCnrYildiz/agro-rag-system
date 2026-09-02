@@ -32,8 +32,9 @@
     "production_is_zero": 36,
     "published_yield_is_zero": 268,
     "no_per_tree_figure": 328,
-    "province_median_density_above_ceiling": 275,
+    "province_median_density_above_ceiling": 84,
     "density_above_ceiling": 137,
+    "province_median_year_records_no_orchard": 191,
     "density_below_floor": 331,
     "shadowed_by_ceiling_refusal": 225,
     "area_is_zero": 110,
@@ -238,13 +239,13 @@
      "crop": "Armut",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Armut",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Armut",
@@ -502,7 +503,7 @@
      "crop": "Ayva",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Ayva",
@@ -592,19 +593,19 @@
      "crop": "Ayva",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Ayva",
      "province": "Osmaniye",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Ayva",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Ayva",
@@ -694,7 +695,7 @@
      "crop": "Ayva",
      "province": "Şanlıurfa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Ayva",
@@ -826,7 +827,7 @@
      "crop": "Badem",
      "province": "Erzurum",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Badem",
@@ -940,7 +941,7 @@
      "crop": "Badem",
      "province": "Sinop",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Badem",
@@ -1918,19 +1919,19 @@
      "crop": "Diğer Portakallar",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Diğer Portakallar",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Diğer Portakallar",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Diğer Portakallar",
@@ -2398,7 +2399,7 @@
      "crop": "Elma (Amasya)",
      "province": "Adıyaman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2458,13 +2459,13 @@
      "crop": "Elma (Amasya)",
      "province": "Antalya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Ardahan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2536,7 +2537,7 @@
      "crop": "Elma (Amasya)",
      "province": "Düzce",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2554,19 +2555,19 @@
      "crop": "Elma (Amasya)",
      "province": "Karaman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Kocaeli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Kırklareli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2578,7 +2579,7 @@
      "crop": "Elma (Amasya)",
      "province": "Mardin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2596,25 +2597,25 @@
      "crop": "Elma (Amasya)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Sakarya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Tekirdağ",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Amasya)",
@@ -2656,7 +2657,7 @@
      "crop": "Elma (Amasya)",
      "province": "Zonguldak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Golden)",
@@ -2668,7 +2669,7 @@
      "crop": "Elma (Golden)",
      "province": "Ardahan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Golden)",
@@ -2722,7 +2723,7 @@
      "crop": "Elma (Golden)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Golden)",
@@ -2734,7 +2735,7 @@
      "crop": "Elma (Golden)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Golden)",
@@ -2800,19 +2801,19 @@
      "crop": "Elma (Granny Smith)",
      "province": "Ardahan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Granny Smith)",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Granny Smith)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Granny Smith)",
@@ -2884,7 +2885,7 @@
      "crop": "Elma (Granny Smith)",
      "province": "Osmaniye",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Granny Smith)",
@@ -2926,7 +2927,7 @@
      "crop": "Elma (Granny Smith)",
      "province": "İstanbul",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Granny Smith)",
@@ -2950,7 +2951,7 @@
      "crop": "Elma (Starking)",
      "province": "Ardahan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Starking)",
@@ -2980,13 +2981,13 @@
      "crop": "Elma (Starking)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Starking)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Elma (Starking)",
@@ -3148,7 +3149,7 @@
      "crop": "Erik",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Erik",
@@ -3226,13 +3227,13 @@
      "crop": "Erik",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Erik",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Erik",
@@ -3646,7 +3647,7 @@
      "crop": "Fındık",
      "province": "Hatay",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Fındık",
@@ -3730,13 +3731,13 @@
      "crop": "Greyfurt (Altıntop)",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Greyfurt (Altıntop)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Greyfurt (Altıntop)",
@@ -4210,7 +4211,7 @@
      "crop": "Kayısı",
      "province": "Bayburt",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kayısı",
@@ -4240,13 +4241,13 @@
      "crop": "Kayısı",
      "province": "Karabük",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kayısı",
      "province": "Kastamonu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kayısı",
@@ -4270,13 +4271,13 @@
      "crop": "Kayısı",
      "province": "Sakarya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kayısı",
      "province": "Sinop",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kayısı",
@@ -4582,7 +4583,7 @@
      "crop": "Kestane",
      "province": "Afyonkarahisar",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
@@ -4606,7 +4607,7 @@
      "crop": "Kestane",
      "province": "Bartın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
@@ -4642,13 +4643,13 @@
      "crop": "Kestane",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
      "province": "Isparta",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
@@ -4690,13 +4691,13 @@
      "crop": "Kestane",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
@@ -4756,13 +4757,13 @@
      "crop": "Kestane",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kestane",
@@ -4834,7 +4835,7 @@
      "crop": "Kestane",
      "province": "İstanbul",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Keten Tohumu",
@@ -5086,7 +5087,7 @@
      "crop": "Kiraz",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kiraz",
@@ -5164,7 +5165,7 @@
      "crop": "Kiraz",
      "province": "Şanlıurfa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Kiraz",
@@ -5530,13 +5531,13 @@
      "crop": "Limon Ve Misket Limonu",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Limon Ve Misket Limonu",
      "province": "Balıkesir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Limon Ve Misket Limonu",
@@ -5572,7 +5573,7 @@
      "crop": "Limon Ve Misket Limonu",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Limon Ve Misket Limonu",
@@ -5596,13 +5597,13 @@
      "crop": "Limon Ve Misket Limonu",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Limon Ve Misket Limonu",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Limon Ve Misket Limonu",
@@ -5632,13 +5633,13 @@
      "crop": "Mandalina (Diğer)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Diğer)",
      "province": "Kastamonu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Diğer)",
@@ -5650,25 +5651,25 @@
      "crop": "Mandalina (Diğer)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Diğer)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Klemantin)",
      "province": "İzmir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Satsuma)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mandalina (Satsuma)",
@@ -5968,19 +5969,19 @@
      "crop": "Muşmula",
      "province": "Antalya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Aydın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6046,7 +6047,7 @@
      "crop": "Muşmula",
      "province": "Bartın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6058,7 +6059,7 @@
      "crop": "Muşmula",
      "province": "Bolu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6112,19 +6113,19 @@
      "crop": "Muşmula",
      "province": "Düzce",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Edirne",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6142,7 +6143,7 @@
      "crop": "Muşmula",
      "province": "Karabük",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6154,37 +6155,37 @@
      "crop": "Muşmula",
      "province": "Kocaeli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Konya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Kırklareli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Nevşehir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6196,7 +6197,7 @@
      "crop": "Muşmula",
      "province": "Sinop",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
@@ -6214,43 +6215,43 @@
      "crop": "Muşmula",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Uşak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Zonguldak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "Çorum",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "İstanbul",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Muşmula",
      "province": "İzmir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Mısır",
@@ -6286,7 +6287,7 @@
      "crop": "Nar",
      "province": "Afyonkarahisar",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6352,7 +6353,7 @@
      "crop": "Nar",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6394,13 +6395,13 @@
      "crop": "Nar",
      "province": "Erzurum",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6436,7 +6437,7 @@
      "crop": "Nar",
      "province": "Kütahya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6502,13 +6503,13 @@
      "crop": "Nar",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6586,13 +6587,13 @@
      "crop": "Nar",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
      "province": "Tunceli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nar",
@@ -6670,7 +6671,7 @@
      "crop": "Nektarin",
      "province": "Erzurum",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
@@ -6706,13 +6707,13 @@
      "crop": "Nektarin",
      "province": "Karaman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
      "province": "Kayseri",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
@@ -6796,13 +6797,13 @@
      "crop": "Nektarin",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
@@ -6814,13 +6815,13 @@
      "crop": "Nektarin",
      "province": "Zonguldak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Nektarin",
      "province": "Çorum",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Oğul Otu (Melisa)",
@@ -6868,31 +6869,31 @@
      "crop": "Portakal (Washington)",
      "province": "Balıkesir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Washington)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Washington)",
      "province": "Kastamonu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Washington)",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Washington)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Washington)",
@@ -6958,7 +6959,7 @@
      "crop": "Portakal (Yafa)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Yafa)",
@@ -6976,13 +6977,13 @@
      "crop": "Portakal (Yafa)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Portakal (Yafa)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Rezene, İşlenmemiş",
@@ -7474,7 +7475,7 @@
      "crop": "Sofralık Zeytinler",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Sofralık Zeytinler",
@@ -7792,7 +7793,7 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Ankara",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -7810,7 +7811,7 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Bartın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -7870,7 +7871,7 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Erzincan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -7924,7 +7925,7 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Kütahya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -8002,7 +8003,7 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
@@ -8014,13 +8015,13 @@
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "İstanbul",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Trabzon Hurması (Cennet Elması)",
      "province": "Şanlıurfa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Turp (Bayır)",
@@ -8050,25 +8051,25 @@
      "crop": "Turunç",
      "province": "Aydın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Turunç",
      "province": "Hatay",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Turunç",
      "province": "Mersin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Turunç",
      "province": "Muğla",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Tütün, İşlenmemiş",
@@ -8146,13 +8147,13 @@
      "crop": "Vişne",
      "province": "Bartın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
      "province": "Batman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
@@ -8188,7 +8189,7 @@
      "crop": "Vişne",
      "province": "Düzce",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
@@ -8428,13 +8429,13 @@
      "crop": "Vişne",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
@@ -8452,7 +8453,7 @@
      "crop": "Vişne",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Vişne",
@@ -8674,31 +8675,31 @@
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Aydın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Bursa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Düzce",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
@@ -8710,19 +8711,19 @@
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Kocaeli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Kütahya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Mardin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
@@ -8734,31 +8735,31 @@
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Osmaniye",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
      "province": "Çanakkale",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Yenidünya (Malta Eriği)",
@@ -8818,13 +8819,13 @@
      "crop": "Zerdali",
      "province": "Adıyaman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Afyonkarahisar",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -8836,25 +8837,25 @@
      "crop": "Zerdali",
      "province": "Amasya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Ankara",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Artvin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Aydın",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -8920,7 +8921,7 @@
      "crop": "Zerdali",
      "province": "Batman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9004,7 +9005,7 @@
      "crop": "Zerdali",
      "province": "Bolu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9016,7 +9017,7 @@
      "crop": "Zerdali",
      "province": "Denizli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9082,7 +9083,7 @@
      "crop": "Zerdali",
      "province": "Edirne",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9094,7 +9095,7 @@
      "crop": "Zerdali",
      "province": "Eskişehir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9106,7 +9107,7 @@
      "crop": "Zerdali",
      "province": "Hatay",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9118,13 +9119,13 @@
      "crop": "Zerdali",
      "province": "Karaman",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Kastamonu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9196,13 +9197,13 @@
      "crop": "Zerdali",
      "province": "Kütahya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Kırklareli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9262,43 +9263,43 @@
      "crop": "Zerdali",
      "province": "Manisa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Mardin",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Muğla",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Osmaniye",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Tekirdağ",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Tunceli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9322,7 +9323,7 @@
      "crop": "Zerdali",
      "province": "Çankırı",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
@@ -9334,13 +9335,13 @@
      "crop": "Zerdali",
      "province": "İzmir",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Zerdali",
      "province": "Şanlıurfa",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Çayır Otu (Yeşilot)",
@@ -9436,7 +9437,7 @@
      "crop": "İncir (Yaş)",
      "province": "Amasya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9514,7 +9515,7 @@
      "crop": "İncir (Yaş)",
      "province": "Düzce",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9586,13 +9587,13 @@
      "crop": "İncir (Yaş)",
      "province": "Erzincan",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Giresun",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9628,7 +9629,7 @@
      "crop": "İncir (Yaş)",
      "province": "Karabük",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9640,13 +9641,13 @@
      "crop": "İncir (Yaş)",
      "province": "Kütahya",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Kırklareli",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9658,7 +9659,7 @@
      "crop": "İncir (Yaş)",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9718,7 +9719,7 @@
      "crop": "İncir (Yaş)",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -9772,25 +9773,25 @@
      "crop": "İncir (Yaş)",
      "province": "Tokat",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Uşak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
      "province": "Zonguldak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "İncir (Yaş)",
@@ -10054,7 +10055,7 @@
      "crop": "Şam Fıstığı (Antep Fıstığı)",
      "province": "Hakkâri",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Şam Fıstığı (Antep Fıstığı)",
@@ -10288,13 +10289,13 @@
      "crop": "Şeftali",
      "province": "Ordu",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Şeftali",
      "province": "Rize",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Şeftali",
@@ -10306,13 +10307,13 @@
      "crop": "Şeftali",
      "province": "Trabzon",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Şeftali",
      "province": "Zonguldak",
      "year": 0,
-     "reason": "province_median_density_above_ceiling"
+     "reason": "province_median_year_records_no_orchard"
     },
     {
      "crop": "Şeker Otu (Stevia)",
