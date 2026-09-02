@@ -483,6 +483,16 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
             series: list[float | None] = [None] * len(years)
             for year, i in index.items():
                 value = published.get(province, {}).get(year)
+                if value == 0:
+                    # TUIK published a yield of exactly zero. Refused for the
+                    # reason argued at `if value` below - a true zero and a
+                    # missing marker are indistinguishable here, and neither
+                    # reading is a norm - and recorded, so the file does not
+                    # present a discarded figure as a crop nobody grows.
+                    refused.append({"crop": labels[crop_id],
+                                    "province": province, "year": year,
+                                    "reason": "published_yield_is_zero"})
+                    continue
                 if value is None:
                     # Vegetables publish no Verim, and most fruits publish only
                     # a per-tree one; derive from the pair, and only where BOTH
@@ -527,17 +537,28 @@ def build(rows, not_field_area=(), area_excludes_the_trees=()) -> dict:
                         value = tons * 1000.0 / dekar
                 if value:
                     # `if value` and not `is not None`: a yield of exactly 0 is
-                    # refused. The exports carry zeros in 0.4-12% of cells and
-                    # there is no way to tell a true zero from a missing marker -
-                    # but neither reading is a norm. Prefilling 0 would tell a
-                    # farmer to expect no harvest and compute an income of zero,
-                    # which is the confident-wrong-answer this whole route exists
-                    # to prevent. No norm is the honest outcome.
+                    # refused, and the `elif` below records it. The exports
+                    # carry zeros in 0.4-12% of cells and there is no way to
+                    # tell a true zero from a missing marker - but neither
+                    # reading is a norm. Prefilling 0 would tell a farmer to
+                    # expect no harvest and compute an income of zero, which is
+                    # the confident-wrong-answer this whole route exists to
+                    # prevent. No norm is the honest outcome.
                     #
                     # One decimal: a derived yield is tonnes over dekars, both
                     # already rounded at the source, so thirteen significant
                     # digits would advertise a precision nobody has.
                     series[i] = round(value, _DECIMALS["verim"])
+                elif value is not None:
+                    # A derived 0,0: an area is recorded and nothing came off
+                    # it. A tree crop never arrives here - `density_below_floor`
+                    # takes it one step earlier - so this is the field and
+                    # vegetable case, where no per-tree figure exists to judge
+                    # with. `value is not None` keeps the genuinely absent cell
+                    # silent: nothing was thrown out there.
+                    refused.append({"crop": labels[crop_id],
+                                    "province": province, "year": year,
+                                    "reason": "production_is_zero"})
             if any(v is not None for v in series):
                 yields[province] = series
 

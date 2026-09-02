@@ -1012,3 +1012,35 @@ def test_the_shipped_file_refused_the_cells_the_spec_names():
     assert ("Turunç", "Adana") in refused
     assert ("Mantar (Kültür)", "*") in refused
     assert ("Ayva", "Tokat") not in refused
+
+
+def test_a_published_yield_of_zero_is_refused_and_recorded():
+    """TUIK publishes a Verim of exactly 0 in 268 cells. It has always been
+    refused - prefilling 0 would tell a farmer to expect no harvest and compute
+    an income of zero - but the refusal left no trace, so the committed file
+    could not tell it from a province that grows none of the crop."""
+    rows = [
+        R("Ordu", "Bakla, Kuru (İnsan Tüketimi İçin)", 2016, "verim", 0.0),
+        R("Ordu", "Bakla, Kuru (İnsan Tüketimi İçin)", 2017, "verim", 145.0),
+    ]
+    out = bcn.build(rows)
+    record = out["meta"]["refused_yield_cells"]
+    assert {"crop": "Bakla, Kuru (İnsan Tüketimi İçin)", "province": "Ordu",
+            "year": 2016,
+            "reason": "published_yield_is_zero"} in record["cells"]
+    assert out["crops"]["bakla, kuru (insan tuketimi icin)"] \
+              ["yield_kg_da"]["Ordu"] == [None, 145.0]
+
+
+def test_a_zero_production_against_a_recorded_area_is_refused_and_recorded():
+    """Two dekars sown, nothing off them: the derived yield is 0,0 and has
+    always been dropped. A TREE crop's zero production is already caught one
+    step earlier as `density_below_floor` - 0 trees/dekar is under the floor of
+    5 - so this reason reaches only the crops with no per-tree figure to judge
+    with, which is where the 36 measured cells sit."""
+    rows = [
+        R("Sivas", "Marul (Göbekli)", 2025, "uretim", 0.0),
+        R("Sivas", "Marul (Göbekli)", 2025, "alan", 2.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert [c["reason"] for c in record["cells"]] == ["production_is_zero"]
