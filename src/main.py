@@ -183,8 +183,8 @@ def _announce_rate_limit(limit: rate_limit.SlidingWindowLimit) -> None:
     if limit.per_minute <= 0:
         print(
             f"[main] WARNING: RATE_LIMIT_PER_MINUTE={limit.per_minute} - "
-            f"/api/chat accepts unlimited requests. It is public and "
-            f"unauthenticated."
+            "/api/chat accepts unlimited requests. It is public and "
+            "unauthenticated."
         )
     else:
         print(
