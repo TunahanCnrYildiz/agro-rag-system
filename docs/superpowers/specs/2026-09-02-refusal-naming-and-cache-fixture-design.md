@@ -140,7 +140,9 @@ into what runs later, and that each test after the first starts clean. The first
 file is covered by `_write`'s own clear on entry, not by the fixture.
 
 Removing them is also what makes the fixture testable: with the manual clears gone, deleting
-the fixture's own clear must turn both of those tests red. That is the mutation below.
+the fixture's own clear must turn both of those tests red. That is the mutation below. Three
+further redundant clears were found during review and removed too, so the measured count is
+**four** red tests, not two.
 
 `tests/test_shipped_norms.py` keeps its manual clear. That file documents it as an instrument
 check — *"PROVE THE INSTRUMENT BEFORE TRUSTING IT"* — which is a different job from hygiene,
