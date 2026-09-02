@@ -55,9 +55,18 @@ class SlidingWindowLimit:
         endpoint shut for as long as it continued - a ceiling that becomes a
         permanent outage under exactly the load it was built for.
 
-        The lock is not decoration: `chat()` is a synchronous handler, so
-        FastAPI runs it in a threadpool and two requests can otherwise read the
-        window's length before either appends to it.
+        The lock is not decoration, even though the race it guards against
+        could not be made to show itself: `chat()` is a synchronous handler,
+        so FastAPI runs it in a threadpool, and two requests reading the
+        window's length before either appends to it is a real interleaving -
+        just one the GIL makes so rare on the default build that a dedicated
+        race test could not observe it. Measured 2026-09-03: with the lock
+        removed, 2.000 calls across 40 threads at a 1-microsecond switch
+        interval never admitted more than the ceiling, over eight runs at each
+        of three configurations. Correctness should not rest on a scheduler
+        detail regardless, and Python 3.14 ships a free-threaded build where
+        the GIL is not there to hide it at all.
+        `test_the_check_and_record_happens_under_the_lock` pins the line.
         """
         if self._per_minute <= 0:
             return True

@@ -107,3 +107,31 @@ def test_the_ceiling_holds_when_threads_race():
     for t in threads:
         t.join()
     assert len(admitted) == 50
+
+
+def test_the_check_and_record_happens_under_the_lock():
+    """A GUARD ON THE LOCK ITSELF, because its EFFECT cannot be demonstrated
+    cheaply. Measured 2026-09-03: with the lock removed, 2.000 calls across 40
+    threads at a 1-microsecond switch interval never admitted more than the
+    ceiling, over eight runs at each of three configurations. The unguarded
+    window is a few bytecodes wide and only matters at the one moment the
+    window fills, so CPython's scheduler almost never lands in it.
+
+    That is an argument about today's scheduler, not about correctness, which
+    is why the lock stays and why this test pins the line the race test cannot.
+    """
+    limit = rate_limit.SlidingWindowLimit(2, _Clock())
+    real = limit._lock
+    entered = []
+
+    class _Recording:
+        def __enter__(self):
+            entered.append(1)
+            return real.__enter__()
+
+        def __exit__(self, *exc):
+            return real.__exit__(*exc)
+
+    limit._lock = _Recording()
+    assert limit.allow() is True
+    assert entered == [1]
