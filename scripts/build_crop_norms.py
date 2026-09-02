@@ -343,10 +343,14 @@ def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
     a citrus yield ten times any real one, carrying no five-year range to warn
     anyone because walking back that far leaves too few prior years to build one.
 
-    Only `density_above_ceiling` casts a shadow. `no_per_tree_figure` means
-    TUIK has not published that year's per-tree survey yet - half of those sit
-    in the freshest year for exactly that reason - and says nothing about the
-    denominator. `density_below_floor` understates rather than inflates.
+    `density_above_ceiling` casts a shadow, and so does a zero recorded area -
+    the same statement with the denominator gone entirely. The others do not:
+    `no_per_tree_figure` means TUIK has not published that year's per-tree
+    survey yet - half of those sit in the freshest year for exactly that reason
+    - and says nothing about the denominator. `density_below_floor` understates
+    rather than inflates. An area of zero with no production booked against it
+    says the province grew none of the crop, which is not a claim about the
+    area column either.
 
     A PUBLISHED kg/dekar figure is never shadowed: the argument is about a
     denominator this script chose, and a published yield does not use one.
@@ -357,15 +361,26 @@ def _ceiling_shadow(province: str, published: dict, uretim: dict, alan: dict,
     precedes the FIRST refusal leaves the 2019 cell sitting in the hole between
     them, which is precisely the one src/norms.py walks back to.
     """
-    refused = [
-        year for year in years
-        if published.get(province, {}).get(year) is None
-        and uretim.get(province, {}).get(year) is not None
-        and alan.get(province, {}).get(year)
-        and _density_verdict(uretim[province][year], alan[province][year],
-                             per_tree.get(province, {}).get(year))
-        == "density_above_ceiling"
-    ]
+    refused = []
+    for year in years:
+        if published.get(province, {}).get(year) is not None:
+            continue
+        tons = uretim.get(province, {}).get(year)
+        dekar = alan.get(province, {}).get(year)
+        if tons is None:
+            continue
+        if dekar == 0:
+            # A zero recorded area cannot be divided into, so no verdict is
+            # computed - but the statement it makes is the ceiling's, at its
+            # limit. Only when production was booked AGAINST it: production and
+            # area both at zero say the province grew none that year, which is
+            # a claim about the crop and not about the area column.
+            if tons:
+                refused.append(year)
+        elif dekar and _density_verdict(
+                tons, dekar, per_tree.get(province, {}).get(year)
+        ) == "density_above_ceiling":
+            refused.append(year)
     return max(refused, default=None)
 
 

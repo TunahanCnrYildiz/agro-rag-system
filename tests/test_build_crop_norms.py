@@ -458,6 +458,63 @@ def test_a_passing_year_sandwiched_between_refusals_is_shadowed():
     assert "Muğla" not in out["crops"]["dut"]["yield_kg_da"]
 
 
+def test_a_cell_older_than_a_zero_area_year_is_shadowed_too():
+    """A zero recorded orchard makes the ceiling's own statement in the
+    strongest terms available: the recorded area is not the ground the
+    production came off. That is how the province keeps its books, not what the
+    weather did, so it condemns the earlier derived cells exactly as a ceiling
+    refusal does.
+
+    Zerdali in Afyonkarahisar, from the real exports: 2018 is 341 tons over 28
+    dekars at 41 kg per tree - 297 trees/da, under the 444 ceiling, so the cell
+    gate passes it and norms._pick serves it as 12.179 kg/da. 2019 books 322
+    tons against zero dekars."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2018, "uretim", 341.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "alan", 28.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "verim_agac", 41.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "verim_agac", 42.0),
+    ]
+    out = bcn.build(rows)
+    assert "Afyonkarahisar" not in out["crops"]["zerdali"]["yield_kg_da"]
+
+
+def test_the_zero_area_shadow_carries_the_reason_that_already_exists():
+    """A zero area is treated as a ceiling refusal throughout, so the cells it
+    condemns carry the existing reason. A second shadow reason would name a
+    second concept, and there is only one."""
+    rows = [
+        R("Afyonkarahisar", "Zerdali", 2018, "uretim", 341.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "alan", 28.0),
+        R("Afyonkarahisar", "Zerdali", 2018, "verim_agac", 41.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "uretim", 322.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "alan", 0.0),
+        R("Afyonkarahisar", "Zerdali", 2019, "verim_agac", 42.0),
+    ]
+    record = bcn.build(rows)["meta"]["refused_yield_cells"]
+    assert record["counts"] == {"area_is_zero": 1,
+                                "shadowed_by_ceiling_refusal": 1}
+
+
+def test_a_zero_area_with_no_production_casts_no_shadow():
+    """A GUARD - it passes before this change and must keep passing after it.
+    Both figures at zero make no claim about the denominator: the province grew
+    none of the crop that year. Only a zero area that production was booked
+    against says the area column is wrong, so only that one reaches backwards."""
+    rows = [
+        R("Tokat", "Ayva", 2024, "uretim", 182.0),
+        R("Tokat", "Ayva", 2024, "alan", 155.0),
+        R("Tokat", "Ayva", 2024, "verim_agac", 31.0),
+        R("Tokat", "Ayva", 2025, "uretim", 0.0),
+        R("Tokat", "Ayva", 2025, "alan", 0.0),
+        R("Tokat", "Ayva", 2025, "verim_agac", 31.0),
+    ]
+    out = bcn.build(rows)
+    assert out["crops"]["ayva"]["yield_kg_da"]["Tokat"] == [1174.2, None]
+
+
 def test_publication_lag_casts_no_shadow():
     """THE PRECISION THAT KEEPS THE RULE CHEAP. `no_per_tree_figure` means TUIK
     has not published the per-tree survey for that year yet - it says nothing
