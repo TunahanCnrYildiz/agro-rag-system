@@ -192,6 +192,14 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
 
+    # --- Rate limit --- #
+    # A GLOBAL ceiling on /api/chat, not a per-caller one: behind a
+    # TLS-terminating proxy this service cannot tell its callers apart, and a
+    # limit keyed on a client-settable header would be protection in name only.
+    # 60/minute is invisible to a demo - three people cannot produce sixty chat
+    # turns in a minute - and immediate for a script. 0 disables it.
+    rate_limit_per_minute: int = Field(default=60)
+
     @model_validator(mode="after")
     def _require_openrouter_credentials(self) -> "Settings":
         """Fail loudly at startup rather than with a 401 per request."""

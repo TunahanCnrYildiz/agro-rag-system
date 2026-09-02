@@ -167,3 +167,44 @@ def test_a_submitted_comparison_payload_reaches_the_engine(monkeypatch):
         "message": "karşılaştır",
         "compare": {"first": "domates (sofralik)", "second": "arpa (biralik)"}})
     assert seen["compare"]["first"] == "domates (sofralik)"
+
+
+def test_the_chat_endpoint_refuses_once_the_ceiling_is_crossed(monkeypatch):
+    """The endpoint is public and unauthenticated, so the ceiling is the only
+    thing standing between a script and the model bill."""
+    from src import rate_limit
+    monkeypatch.setattr(main, "_chat_limit", rate_limit.SlidingWindowLimit(2))
+    fake = ChatResult(answer="cevap", recommended_products=[])
+    monkeypatch.setattr(main.engine, "answer",
+                        lambda msg, hist, budget=None, dose=None, compare=None: fake)
+    body = {"message": "soru", "stream": False}
+    assert client.post("/api/chat", json=body).status_code == 200
+    assert client.post("/api/chat", json=body).status_code == 200
+    refused = client.post("/api/chat", json=body)
+    assert refused.status_code == 429
+    assert "istek" in refused.json()["detail"].lower()
+
+
+def test_the_catalog_routes_are_not_rate_limited(monkeypatch):
+    """The ceiling guards the expensive path. These read a JSON file: no model
+    call, no money, and throttling them would only break the app's browsing."""
+    from src import rate_limit
+    monkeypatch.setattr(main, "_chat_limit", rate_limit.SlidingWindowLimit(1))
+    for _ in range(5):
+        assert client.get("/api/products").status_code in (200, 503)
+        assert client.get("/api/articles").status_code in (200, 503)
+
+
+def test_the_active_ceiling_is_announced_at_startup(capsys):
+    from src import rate_limit
+    main._announce_rate_limit(rate_limit.SlidingWindowLimit(60))
+    out = capsys.readouterr().out
+    assert "60" in out and "/api/chat" in out
+
+
+def test_a_disabled_ceiling_is_announced_as_a_warning(capsys):
+    """Silence would make an unlimited public endpoint the quiet option."""
+    from src import rate_limit
+    main._announce_rate_limit(rate_limit.SlidingWindowLimit(0))
+    out = capsys.readouterr().out
+    assert "WARNING" in out
