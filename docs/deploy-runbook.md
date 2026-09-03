@@ -63,7 +63,9 @@ compare cards stay dormant no matter which client talks to it, because the
 running backend has never heard of them.
 
 What that build predates: the three cards themselves, the `/api/chat` rate
-limit, and the two rounds of work that rewrote `data/crop_norms.json`.
+limit, and the crop-norms data layer in its entirety — `data/crop_norms.json`
+does not exist in it. The file was created on 2026-08-19, fifteen days after
+that build, and thirteen commits have rewritten it since.
 Redeploying brings all of that at once, plus three config defaults that moved
 underneath the features and won't announce themselves.
 

@@ -31,7 +31,14 @@ one.
 ### 1. What the live build predates
 
 The deployed build carries none of: the budget, dose and compare cards; the `/api/chat` rate
-limit; the two crop-norms rounds that changed `data/crop_norms.json`.
+limit; the crop-norms data layer at all.
+
+**Corrected after review.** This section first said "the two crop-norms rounds that changed
+`data/crop_norms.json`" — the eighth false prose sentence in four rounds, and written by me
+rather than by an implementer. Measured: `data/crop_norms.json` is ABSENT at `fd40d06`, created
+`77c80c6` on 2026-08-19 — fifteen days after the deployed build — and rewritten by thirteen
+commits since, across four dates. The correction is also the more useful sentence for the
+reader: the deployed backend has no crop-norms data whatsoever, not merely stale data.
 
 ### 2. Three defaults changed underneath the features
 
