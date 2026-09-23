@@ -72,10 +72,15 @@ class _FakeResponse(io.BytesIO):
         return False
 
 
-def _zip_bytes() -> bytes:
+def _zip_bytes(member: str = None) -> bytes:
+    """A zip carrying the member `fetch` expects, unless told otherwise.
+
+    `fetch` validates the member name, so a helper writing some other name
+    would make every download test fail for a reason it is not about.
+    """
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("whatever.csv", "Area Code,Value\n2,1\n")
+        archive.writestr(member or ff.DATASETS["production"].member, "Area Code,Value\n2,1\n")
     return buffer.getvalue()
 
 
@@ -129,6 +134,20 @@ def test_force_downloads_again(cache):
     ff.fetch("production", force=True, opener=opener)
 
     assert len(calls) == 2
+
+
+def test_an_archive_without_the_expected_member_is_rejected(cache):
+    """A valid zip that is not the archive we asked for — FAOSTAT renaming
+    a file, a proxy zipping an error page — must not be adopted as cached.
+    Task 2 opens `Dataset.member` by name and would fail far from here."""
+    def opener(url, timeout=None):
+        return _FakeResponse(_zip_bytes("something_else.csv"),
+                             "Wed, 31 Dec 2025 11:33:28 GMT")
+
+    with pytest.raises(zipfile.BadZipFile):
+        ff.fetch("production", opener=opener)
+
+    assert list(cache.glob("*.zip")) == []
 
 
 def test_a_truncated_download_leaves_no_cached_archive(cache):
@@ -299,7 +318,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/test_fetch_faostat.py -q`
-Expected: PASS, 7 passed
+Expected: PASS, 8 passed
 
 If `from scripts import fetch_faostat` fails because `scripts/` has no `__init__.py`, check how `tests/test_build_crop_norms.py` imports `scripts/build_crop_norms.py` and follow that existing pattern exactly rather than inventing a new one.
 
@@ -338,7 +357,7 @@ Leave the surrounding prose, including the 1.3 GB vector-store comparison, as it
 - [ ] **Step 7: Run the full suite and commit**
 
 Run: `python -m pytest -q`
-Expected: PASS, 1057 passed
+Expected: PASS, 1058 passed
 
 ```bash
 git add scripts/fetch_faostat.py tests/test_fetch_faostat.py .gitignore docs/client-requirements.md
