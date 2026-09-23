@@ -71,9 +71,12 @@ What survives: **143 crop items** (136 of which also have a price),
 **72.335 yield cells** and **33.209 price cells**. Both run 2016–2024.
 Türkiye is area code 223.
 
-**Measured output size: 2,27 MB** — within a rounding error of
-`crop_norms.json`'s 2,7 MB. The world layer costs what the Turkish layer
-already costs.
+**Measured output size: 4,38 MB**, written with `indent=1` the way
+`build_crop_norms.py` writes its own output. Compact separators give 2,28 MB,
+but this file is committed and refreshed about once a year, and a 2 MB single
+line makes that annual diff unreadable; 450.000 short lines diff properly.
+Against `crop_norms.json`'s 2,7 MB, and the 1,3 GB vector store this project
+already ships, the world layer is not a size problem either way.
 
 ### The one-year lag
 
@@ -134,7 +137,7 @@ a rebuild.
 | `scripts/fetch_faostat.py` (new) | Download the two zips to a git-ignored cache. Record URL, `Last-Modified` and byte count for the output's `meta`. |
 | `scripts/build_world_norms.py` (new) | Stream the two archives, apply the drops above, emit `data/world_norms.json`. |
 | `data/crop_fao_map.json` (new) | Our 246 crop ids → FAO item code, or an explicit reason there is none. |
-| `data/world_norms.json` (new, ~2,47 MB) | The output. Committed. |
+| `data/world_norms.json` (new, ~4,38 MB) | The output. Committed. |
 | `tests/test_build_world_norms.py` (new) | The converter, against fixtures. |
 | `tests/test_crop_fao_map.py` (new) | The mapping's completeness and referential integrity. |
 | `docs/client-requirements.md` (modify) | Correct the 43 MB figure to compressed/uncompressed. |
