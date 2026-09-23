@@ -24,7 +24,7 @@ class _FakeResponse(io.BytesIO):
         return False
 
 
-def _zip_bytes(member: str = None) -> bytes:
+def _zip_bytes(member: str | None = None) -> bytes:
     """A zip carrying the member `fetch` expects, unless told otherwise.
 
     `fetch` validates the member name, so a helper writing some other name
@@ -74,6 +74,25 @@ def test_a_second_fetch_does_not_download_again(cache):
     ff.fetch("production", opener=opener)
 
     assert len(calls) == 1
+
+
+def test_a_cached_archive_without_its_provenance_is_fetched_again(cache):
+    """The sidecar is half the cache entry. Returning the zip without it makes
+    `fetch` report success and `describe` then raise, telling the operator to
+    run the script they just ran."""
+    calls = []
+
+    def opener(url, timeout=None):
+        calls.append(url)
+        return _FakeResponse(_zip_bytes(), "Wed, 31 Dec 2025 11:33:28 GMT")
+
+    ff.fetch("production", opener=opener)
+    ff._sidecar_path(ff.DATASETS["production"]).unlink()
+
+    ff.fetch("production", opener=opener)
+
+    assert len(calls) == 2
+    assert ff.describe("production")["bytes"] == len(_zip_bytes())
 
 
 def test_force_downloads_again(cache):

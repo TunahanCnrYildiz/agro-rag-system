@@ -3,8 +3,6 @@ import io
 import zipfile
 from pathlib import Path
 
-import pytest
-
 from scripts import build_world_norms as bwn
 
 PRODUCTION_HEADER = [
@@ -24,10 +22,11 @@ def _production_row(area, item, label, element, year, value, flag="A", cpc="'011
             "Yield", str(year), str(year), "kg/ha", f"{value:.6f}", flag, ""]
 
 
-def _price_row(area, item, label, element, year, value, flag="A"):
+def _price_row(area, item, label, element, year, value, flag="A", months="7021"):
     return [str(area), "'792", f"Area {area}", str(item), "'0111", label,
-            element, "Producer Price", str(year), str(year), "7021", "Annual value",
-            "USD", f"{value:.6f}", flag]
+            element, "Producer Price", str(year), str(year), months,
+            "Annual value" if months == "7021" else "Month", "USD",
+            f"{value:.6f}", flag]
 
 
 def _archive(tmp_path: Path, name: str, header: list[str], rows: list[list[str]]) -> Path:
@@ -141,6 +140,19 @@ def test_local_currency_prices_are_dropped(tmp_path):
     assert prices["15|223"] == {"2024": [0.2841, "A"]}
 
 
+def test_monthly_prices_are_dropped(tmp_path):
+    """The archive carries a row per month beside the annual one. Today only
+    the local-currency element has them, so the element filter hides this — but
+    a monthly USD row would otherwise become the year's price, last row wins."""
+    path = _archive(tmp_path, "prices", PRICE_HEADER, [
+        _price_row(223, 15, "Wheat", "5532", 2024, 284.1),
+        _price_row(223, 15, "Wheat", "5532", 2024, 9999.0, months="7012"),  # December
+    ])
+    prices = bwn.read_prices(path, "prices.csv", {15: {"label": "Wheat"}})
+
+    assert prices["15|223"] == {"2024": [0.2841, "A"]}
+
+
 def test_a_priced_item_with_no_yield_never_enters_the_file(tmp_path):
     """The prices file also prices meat, eggs and milk. Taking the item list
     from the union of both files admits livestock into a crop layer."""
@@ -160,15 +172,20 @@ def test_build_carries_units_sources_and_flag_definitions(tmp_path, monkeypatch)
     prices = _archive(tmp_path, "prices", PRICE_HEADER, [
         _price_row(223, 15, "Wheat", "5532", 2024, 284.1),
     ])
-    monkeypatch.setattr(bwn, "_archive_for", lambda key: (
+    monkeypatch.setattr(bwn, "_archive_for", lambda key, *, force=False: (
         prod if key == "production" else prices,
         "prod.csv" if key == "production" else "prices.csv",
+        {"dataset": key, "url": f"{key}.zip", "last_modified": "z", "bytes": 1},
     ))
 
-    document = bwn.build(sources=[{"dataset": "x", "url": "y", "last_modified": "z", "bytes": 1}])
+    document = bwn.build()
 
     assert document["meta"]["units"] == {"yield": "kg/da", "price": "USD/kg"}
-    assert document["meta"]["sources"][0]["dataset"] == "x"
+    # The provenance describes the archives that were actually read, because it
+    # came back from the same call that produced them.
+    assert [source["dataset"] for source in document["meta"]["sources"]] == [
+        "production", "prices"
+    ]
     assert document["meta"]["flags"]["E"] == "Estimated value"
     assert document["yield"]["15|223"]["2024"] == [300.4, "A"]
     assert document["price"]["15|223"]["2024"] == [0.2841, "A"]
@@ -178,3 +195,29 @@ def test_build_carries_units_sources_and_flag_definitions(tmp_path, monkeypatch)
         "area_aggregates": 0, "item_groups": 0, "nec_items": 0
     }
     assert document["meta"]["generated"]
+
+
+def test_cells_are_ordered_numerically_by_item_then_area(tmp_path, monkeypatch):
+    """`yield` and `price` are most of the file, and this file is committed and
+    refreshed once a year. In archive-row order, FAO reordering its own export
+    moves every line; string order would file `15|223` before `5|9`."""
+    prod = _archive(tmp_path, "prod", PRODUCTION_HEADER, [
+        _production_row(223, 15, "Wheat", "5412", 2024, 3004.0),
+        _production_row(9, 5, "Oats", "5412", 2024, 2000.0),
+        _production_row(9, 15, "Wheat", "5412", 2024, 2500.0),
+        _production_row(223, 5, "Oats", "5412", 2024, 2100.0),
+    ])
+    prices = _archive(tmp_path, "prices", PRICE_HEADER, [
+        _price_row(223, 15, "Wheat", "5532", 2024, 284.1),
+        _price_row(9, 5, "Oats", "5532", 2024, 200.0),
+    ])
+    monkeypatch.setattr(bwn, "_archive_for", lambda key, *, force=False: (
+        prod if key == "production" else prices,
+        "prod.csv" if key == "production" else "prices.csv",
+        {"dataset": key, "url": f"{key}.zip", "last_modified": "z", "bytes": 1},
+    ))
+
+    document = bwn.build()
+
+    assert list(document["yield"]) == ["5|9", "5|223", "15|9", "15|223"]
+    assert list(document["price"]) == ["5|9", "15|223"]

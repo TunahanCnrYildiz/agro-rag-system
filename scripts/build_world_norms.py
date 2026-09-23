@@ -10,6 +10,7 @@ collapse where a person can read it.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import io
 import json
@@ -23,6 +24,7 @@ from src.config import DATA_DIR
 
 YIELD_ELEMENT = "5412"   # Yield, kg/ha — crops only; livestock yield is 5413/5417/5424
 PRICE_ELEMENT = "5532"   # Producer Price, USD/tonne — 5530 is LCU, not comparable
+ANNUAL_MONTHS = "7021"   # The prices archive is monthly too; this code is the year's own row
 FIRST_YEAR = 2016        # TÜİK's window starts here; earlier years cannot be read beside it
 AGGREGATE_AREA_FLOOR = 5000   # `Africa`, `European Union (27)`, `World` …
 ITEM_GROUPS = frozenset({1717, 1720, 1723, 1726, 1729, 1732, 1735, 1738,
@@ -117,10 +119,19 @@ def read_prices(archive: Path, member: str, items: dict[int, dict]):
     The prices archive is not restricted to crops — it prices meat, eggs and
     milk too — so the item list must come from yield and prices must be looked
     up for those items, never the other way round.
+
+    It is not restricted to years either: it carries a row per month beside the
+    annual one. In this vintage the monthly rows all sit under element 5530, so
+    the element filter alone happens to be enough — but only by accident. If FAO
+    ever publishes USD monthly, an unfiltered read would keep whichever month
+    came last in the file as the year's price, silently. Hence the explicit
+    `Months Code` check.
     """
     cells: dict[str, dict[str, list]] = {}
     for row, index in _rows(archive, member):
         if row[index["Element Code"]] != PRICE_ELEMENT:
+            continue
+        if row[index["Months Code"]] != ANNUAL_MONTHS:
             continue
         item_code = int(row[index["Item Code"]])
         if item_code not in items:
@@ -138,14 +149,36 @@ def read_prices(archive: Path, member: str, items: dict[int, dict]):
     return cells
 
 
-def _archive_for(key: str) -> tuple[Path, str]:
+def _archive_for(key: str, *, force: bool = False) -> tuple[Path, str, dict]:
+    """Return the archive, the member to read, and the provenance of that file.
+
+    The provenance comes back from the same call that produced the archive so
+    `meta.sources` cannot end up describing a different download than the one
+    parsed — which is what happens when the two are obtained separately.
+    """
     dataset = fetch_faostat.DATASETS[key]
-    return fetch_faostat.fetch(key), dataset.member
+    archive = fetch_faostat.fetch(key, force=force)
+    return archive, dataset.member, fetch_faostat.describe(key)
 
 
-def build(sources: list[dict]) -> dict:
-    prod_archive, prod_member = _archive_for("production")
-    price_archive, price_member = _archive_for("prices")
+def _ordered(cells: dict[str, dict[str, list]]) -> dict[str, dict[str, list]]:
+    """Sort cells by `(item, area)` numerically, like `items` and `countries`.
+
+    These two sections are almost the whole file, and the whole point of
+    `indent=1` is that next year's refresh produces a readable diff. Archive-row
+    order would move every line whenever FAO reorders its own export.
+    """
+    def key(cell: str) -> tuple[int, int]:
+        item, area = cell.split("|")
+        return int(item), int(area)
+
+    return {cell: cells[cell] for cell in sorted(cells, key=key)}
+
+
+def build(*, force: bool = False) -> dict:
+    prod_archive, prod_member, prod_source = _archive_for("production", force=force)
+    price_archive, price_member, price_source = _archive_for("prices", force=force)
+    sources = [prod_source, price_source]
 
     yields, items, countries, dropped = read_yields(prod_archive, prod_member)
     prices = read_prices(price_archive, price_member, items)
@@ -163,19 +196,19 @@ def build(sources: list[dict]) -> dict:
         },
         "items": {str(code): items[code] for code in sorted(items)},
         "countries": {str(code): countries[code] for code in sorted(countries)},
-        "yield": yields,
-        "price": prices,
+        "yield": _ordered(yields),
+        "price": _ordered(prices),
     }
 
 
 def main() -> None:
     use_utf8_console()
-    sources = []
-    for key in fetch_faostat.DATASETS:
-        fetch_faostat.fetch(key)
-        sources.append(fetch_faostat.describe(key))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--force", action="store_true",
+                        help="re-download the FAOSTAT archives instead of using the cache")
+    args = parser.parse_args()
 
-    document = build(sources)
+    document = build(force=args.force)
     # indent=1 like build_crop_norms.py: this file is committed and refreshed
     # about once a year, and a 2 MB single line makes that diff unreadable.
     OUTPUT.write_text(
@@ -187,6 +220,10 @@ def main() -> None:
     print(f"yield cells: {sum(len(c) for c in document['yield'].values())}")
     print(f"price cells: {sum(len(c) for c in document['price'].values())}")
     print(f"dropped: {document['meta']['dropped']}")
+    # The vintage, not just the run date: a build off a stale cache is otherwise
+    # indistinguishable from a fresh one in this summary.
+    for source in document["meta"]["sources"]:
+        print(f"source: {source['dataset']} — {source['last_modified']}")
     print(f"wrote {OUTPUT} ({OUTPUT.stat().st_size / 1e6:.2f} MB)")
 
 

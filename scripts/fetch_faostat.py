@@ -60,7 +60,10 @@ def fetch(key: str, *, force: bool = False, opener=urllib.request.urlopen) -> Pa
     """Return the cached archive for `key`, downloading it when needed."""
     dataset = DATASETS[key]
     archive = _archive_path(dataset)
-    if archive.exists() and not force:
+    # A cached archive whose sidecar is gone is not usable: `describe` would
+    # raise, telling the operator to run the script that just reported success.
+    # Treat it as a miss and download again, which rewrites both.
+    if archive.exists() and _sidecar_path(dataset).exists() and not force:
         return archive
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
