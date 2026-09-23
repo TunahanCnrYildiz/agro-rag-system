@@ -47,6 +47,17 @@ def test_a_mapped_crop_never_carries_a_reason(crop_map):
             assert "reason" not in entry, crop_id
 
 
+def test_a_flagged_units_mismatch_is_structured_and_explained(crop_map):
+    """Some mappings are the right item on the wrong reporting basis — a dry
+    weight against a fresh one. That hazard lived in prose only, where nothing
+    downstream could read it; `comparable: false` is the machine-readable half,
+    and the note still has to say why."""
+    for crop_id, entry in crop_map.items():
+        if "comparable" in entry:
+            assert isinstance(entry["comparable"], bool), crop_id
+            assert entry.get("note"), crop_id
+
+
 def test_every_mapped_code_exists_in_the_world_file(crop_map, world_items):
     for crop_id, entry in crop_map.items():
         if entry["fao"] is not None:
@@ -69,12 +80,23 @@ def test_no_crop_is_mapped_to_a_residual_fruit_group(crop_map):
     stone fruits, n.e.c.". They survived the world layer's filter only because
     that filter matched the string `n.e.c.` in the label, which these two lack.
 
-    Mapping onto them would attach an unnamed mixture's average to a named
-    crop — the harm the exclusion exists to prevent. The proof they are a
-    filing convention rather than a botanical class: Türkiye reports a 541
-    series and no 542 series at all, while growing both residual pomes
-    (yenidünya, muşmula, üvez) and residual drupes (kızılcık, iğde, hünnap).
-    So one country's 541 is not the same crop as another's.
+    The rule this asserts is NOT "never a residual slot". `barbunya, taze` maps
+    to 414 `Other beans, green`, CPC `01241.90` — the same `.90` construction as
+    541's `01349.20` — and that mapping is correct. The distinction is whether
+    the countries growing the crop file the residual slot separately from its
+    sibling, so that the slot means the same thing in each country:
+
+      - `01241` beans, green: Türkiye reports BOTH halves, 423 `String beans` at
+        1.034-1.132 kg/da and 414 at 1.288-1.375 (measured 2026-09-23, 2016-2024).
+        Two filled slots, and our two fresh-bean ids land on them one to one.
+      - `01349` pome/stone: Türkiye reports 541 at 2.707-2.647 and no 542 series
+        at all, while growing both residual pomes (yenidünya, muşmula, üvez) and
+        residual drupes (kızılcık, iğde, hünnap). One sibling has absorbed what
+        belongs in the other, so Türkiye's 541 is not the same crop as another
+        country's 541, and its average is an unnamed mixture.
+
+    Mapping a named crop onto a slot of the second kind attaches that mixture's
+    average to it — the harm the exclusion exists to prevent.
     """
     offenders = [crop_id for crop_id, entry in crop_map.items()
                  if entry["fao"] in RESIDUAL_GROUPS]

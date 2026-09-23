@@ -16,7 +16,7 @@ ALLOWED = {
         "Reporting basis, not a mis-mapping. FAO 689 is the only dry pepper item "
         "there is (401 is explicitly green), and the two labels match exactly. "
         "The levels do not, because they weigh different things: our provincial "
-        "series runs 991-3.128 kg/da, which is the same band as the four fresh "
+        "series runs 841-3.128 kg/da over 2016-2025, the same band as the four fresh "
         "pepper ids on item 401, so TUIK publishes this yield on a fresh-harvest "
         "weight. FAOSTAT's 689 series for Turkiye is a flat ~234 kg/da, about an "
         "eighth of ours, which is the fresh-to-dry ratio for peppers. Mapping it "
@@ -71,14 +71,21 @@ def _ratios(world, norms, crop_map):
         year = int(shared[0])
         ours = _turkish_median(entry, years, year)
         theirs = cell[str(year)][0]
-        if not ours or not theirs:
+        # `is None`, not falsiness: a reported 0.0 is a measurement that should
+        # be screened, not a missing cell. The world file ships 19 zero yields.
+        if ours is None or theirs is None:
             continue
-        yield crop_id, code, year, theirs, ours, theirs / ours
+        # A zero on our side is a disagreement, not a missing cell, so it has to
+        # reach the band rather than divide.
+        yield crop_id, code, year, theirs, ours, theirs / ours if ours else float("inf")
 
 
 def test_the_screen_actually_covers_something(world, norms, crop_map):
-    """A screen that silently compares nothing would pass forever."""
-    assert sum(1 for _ in _ratios(world, norms, crop_map)) >= 40
+    """A screen that silently compares nothing would pass forever. The floor
+    sits just under the 125 pairs measured on 2026-09-23, so losing a chunk of
+    the comparison — a renamed key, a dropped year — fails here instead of
+    quietly shrinking the screen to nothing."""
+    assert sum(1 for _ in _ratios(world, norms, crop_map)) >= 110
 
 
 def test_no_mapping_disagrees_with_our_own_turkish_figure_by_an_order_of_magnitude(
