@@ -1096,6 +1096,27 @@ def test_every_crop_we_carry_is_decided(crop_map, crop_ids):
     made a decision about, which reads exactly like a crop with no FAO item."""
     missing = [crop_id for crop_id in crop_ids if crop_id not in crop_map]
     assert missing == []
+
+
+RESIDUAL_GROUPS = {541, 542}
+
+
+def test_no_crop_is_mapped_to_a_residual_fruit_group(crop_map):
+    """541 `Other stone fruits` and 542 `Other pome fruits` are residual
+    buckets: their shared CPC parent class 01349 is literally "Pome fruits and
+    stone fruits, n.e.c.". They survived the world layer's filter only because
+    that filter matched the string `n.e.c.` in the label, which these two lack.
+
+    Mapping onto them would attach an unnamed mixture's average to a named
+    crop — the harm the exclusion exists to prevent. The proof they are a
+    filing convention rather than a botanical class: Türkiye reports a 541
+    series and no 542 series at all, while growing both residual pomes
+    (yenidünya, muşmula, üvez) and residual drupes (kızılcık, iğde, hünnap).
+    So one country's 541 is not the same crop as another's.
+    """
+    offenders = [crop_id for crop_id, entry in crop_map.items()
+                 if entry["fao"] in RESIDUAL_GROUPS]
+    assert offenders == []
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
@@ -1139,7 +1160,7 @@ than assuming this whole slice is empty.
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/test_crop_fao_map.py -q`
-Expected: PASS, 11 passed (the two slice tests were replaced by one)
+Expected: PASS, 12 passed (the two slice tests were replaced by one, and the residual-group guard added)
 
 - [ ] **Step 6: Report the final shape**
 
