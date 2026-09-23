@@ -58,6 +58,11 @@ def test_the_field_crops_are_all_decided(crop_map, crop_ids):
         assert crop_id in crop_map, crop_id
 
 
+def test_the_fruits_and_spices_are_all_decided(crop_map, crop_ids):
+    for crop_id in crop_ids[100:196]:
+        assert crop_id in crop_map, crop_id
+
+
 @pytest.mark.parametrize("ids, code", [
     (["durum bugdayi", "bugday, durum bugdayi haric"], 15),
     (["arpa (biralik)", "arpa (diger)"], 44),
