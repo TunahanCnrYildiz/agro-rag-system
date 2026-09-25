@@ -142,17 +142,62 @@ _TRIM = " \t\n\r.,!?;:()\"'-…"
 # End of the verbatim copy. Everything below is specific to countries.
 # --------------------------------------------------------------------------
 
-# English states location with a preposition, not a suffix: "I am in France",
-# "from Kenya". The Turkish branches never fire on these because an English
-# name takes no case ending.
-_EN_PLACE = r"(?:in|from|at)\s+"
+# HAZARD: `from` marks where GOODS came from, not where the user is. A bare
+# `from` used to be admitted here and it placed growers at their supplier -
+# measured before this was fixed: "we bought seed from India" -> India, "I buy
+# eggs from Turkey." -> Türkiye, "we import chicks from Turkey, mostly" ->
+# Türkiye. The boundary rule below is no defence: it stops `from turkey farms`
+# because a second noun follows, but a period, a comma or a closed-class word
+# ends the phrase and the bare `from` match stands. Seed, chicks, litter and
+# fertiliser are bought across borders constantly in this assistant's traffic,
+# so this is the common case, not the corner.
+#
+# `from` survives ONLY where it predicates the USER instead of a purchase:
+# "I am from Kenya", "we're from Brazil". That is an enumerated copula, not a
+# bare preposition, so no sentence about buying can reach it. It is also the
+# English twin of `-lı` in _SUFFIX - "İzmirliyim" is already accepted as a
+# statement of location by the same reasoning.
+#
+# REJECTED: demoting `from` so it fires only when nothing else in the message
+# resolves. "we bought seed from India" has no other country in it, so it would
+# still answer India - the harm itself, left standing.
+#
+# GIVEN UP: "I came from Kenya", "the seed came from Kenya and I am there now".
+# The first is a travel statement that does not say where the user is now; the
+# second does, and is lost. Asking costs a turn, misplacing costs every figure
+# in the answer.
+_EN_ORIGIN = r"(?:i\s+am|i'm|we\s+are|we're)\s+from"
+_EN_PLACE = rf"(?:{_EN_ORIGIN}|in|at)\s+"
 
-# HAZARD: a bare preposition is NOT evidence. `from turkey farms` satisfies
-# `(?:in|from|at)\s+turkey(?!\w)`, because a space is not a word character, and
-# `turkey manure`, `turkey litter` and `turkey farms` are ordinary phrases in an
-# agriculture assistant. `Turkey` is not alone: `from niger seed` (Guizotia
-# abyssinica, a real oilseed) and `chile peppers` are the same shape, and
-# "we bought seed from India" is not a statement of where the user is either.
+# HAZARD, the same rule in Turkish. `_SUFFIX` spells the ablative as well as
+# the locative - `[dt][ae]n?`, where the optional `n` turns "-da" (in) into
+# "-dan" (from) - and the apostrophe branch accepts ANYTHING after the
+# apostrophe, so "Hollanda'dan tohum aldım" resolved to the Netherlands by
+# exactly the shape `from` does in English.
+#
+# THIS MODULE DIVERGES FROM location.py HERE, deliberately. For a PROVINCE the
+# ablative is fair evidence: "İzmir'den geldim" is usually said by someone in
+# İzmir's orbit, and domestic sentences are rarely about importing. For a
+# COUNTRY the ablative is overwhelmingly a purchase or an import. location.py's
+# twin of this line is left exactly as it is.
+#
+# A BARE ablative is refused; an ablative carrying a personal ending is kept.
+# "Hollanda'danım" ("I am from the Netherlands") states where the user belongs
+# the way "Hollandalıyım" does, and `-dan` followed by any word character is
+# not the bare form, so the lookahead below lets it through untouched.
+#
+# COSTS, named rather than implied: "Hollanda'dan yazıyorum" ("writing from the
+# Netherlands") is a genuine statement of location and is now refused, as is
+# "Fransa'dan geldim, buradayım". Refusing a real location costs a question;
+# accepting a supplier places the grower in the wrong country in silence.
+_NOT_ABLATIVE = r"(?![dt][ae]n(?!\w))"
+
+# HAZARD: a bare preposition is NOT evidence either. `from turkey farms`
+# satisfied `(?:in|from|at)\s+turkey(?!\w)`, because a space is not a word
+# character, and `turkey manure`, `turkey litter` and `turkey farms` are
+# ordinary phrases in an agriculture assistant. `Turkey` is not alone:
+# `in niger seed` (Guizotia abyssinica, a real oilseed) and `chile peppers`
+# are the same shape.
 #
 # The rule: an English name places the user only when it CLOSES its noun phrase.
 # "in France", "in France, growing wheat", "in France and I grow wheat" all end
@@ -223,38 +268,67 @@ def _matchers() -> tuple[tuple[int, str, tuple[re.Pattern[str], ...]], ...]:
         suffix = _STRICT_SUFFIX if len(key) <= _SHORT else _SUFFIX
         # An empty negative lookahead always fails, so a branch switched off
         # this way keeps the tuple one shape and _find free of language tests.
-        never = r"(?!)"
+        # It still carries the `name` group every branch is read through.
+        never = r"(?P<name>(?!))"
+        # The country name is captured so _find can compare WHERE each branch
+        # matched. Without it the English branch would report the position of
+        # its preposition and beat a Turkish match on the same word by three
+        # characters.
         built.append((code, key, (
-            re.compile(rf"(?<!\w){k}'"),
-            re.compile(rf"(?<!\w){k}{suffix}(?!\w)" if turkish else never),
-            re.compile(rf"(?<!\w){k}\s+{_PLACE}(?!\w)" if turkish else never),
-            re.compile(rf"(?<!\w){_EN_PLACE}{k}{_EN_BOUNDARY}"),
+            re.compile(rf"(?<!\w)(?P<name>{k})'{_NOT_ABLATIVE}"),
+            re.compile(rf"(?<!\w)(?P<name>{k}){_NOT_ABLATIVE}{suffix}(?!\w)"
+                       if turkish else never),
+            re.compile(rf"(?<!\w)(?P<name>{k})\s+{_PLACE}(?!\w)"
+                       if turkish else never),
+            re.compile(rf"(?<!\w){_EN_PLACE}(?P<name>{k}){_EN_BOUNDARY}"),
         )))
     return tuple(built)
 
 
-def _refuses(text: str) -> bool:
-    """True when the text names a place FAOSTAT has no area for.
+def _refuses(folded: str) -> bool:
+    """True when the ALREADY-FOLDED text names a place FAOSTAT has no area for.
 
     Separate from _find because it is not a failure to match - it is a decision
     not to answer, and the caller must stop rather than look elsewhere.
+
+    Takes folded text, not raw: every caller needs the fold anyway and doing it
+    here as well folded each message twice on a path that runs on every answer.
     """
-    return bool(_NO_AREA.search(_normalize_tr(text)))
+    return bool(_NO_AREA.search(folded))
 
 
-def _find(text: str) -> int | None:
-    """Match a country, tolerating Turkish case suffixes and English
-    prepositions, but never firing inside a longer word and never firing on a
-    crop name.
+def _find(folded: str) -> int | None:
+    """Match a country in ALREADY-FOLDED text, tolerating Turkish case suffixes
+    and English prepositions, but never firing inside a longer word and never
+    firing on a crop name.
 
-    Five forms are accepted, the first four exactly as location.py accepts them.
-    An apostrophe is an unambiguous proper-noun boundary in Turkish, so anything
-    may follow it ("Mısır'dayım", "Fas'ta"). A known case suffix, optionally with
-    a personal ending, carries the ordinary statements ("fransada",
-    "Fransadayim"). A BARE name is accepted only where it cannot be a modifier:
-    as the whole message (the natural reply to "hangi ulkedesiniz?"), or with a
-    place noun immediately after it. The fifth is English, which has no case
-    ending and states location with a preposition instead.
+    Five forms are accepted, the first four as location.py accepts them except
+    for the ablative. An apostrophe is an unambiguous proper-noun boundary in
+    Turkish, so almost anything may follow it ("Mısır'dayım", "Fas'ta") - the
+    one exception is the bare ablative, which marks a supplier rather than a
+    location and is refused in both branches it can reach; see _NOT_ABLATIVE. A
+    known case suffix, optionally with a personal ending, carries the ordinary
+    statements ("fransada", "Fransadayim"). A BARE name is accepted only where
+    it cannot be a modifier: as the whole message (the natural reply to "hangi
+    ulkedesiniz?"), or with a place noun immediately after it. The fifth is
+    English, which has no case ending and states location with a preposition
+    instead - `in` and `at`, and `from` only after a copula.
+
+    THE EARLIEST MATCH WINS, not the longest name. A sentence may name two
+    countries and only one of them is where the user is - "I am in Turkey but I
+    import seed from France", "Mısır'dayım ama Fransa'dan gübre alıyorum" - and
+    returning on the first key that matched ANYWHERE handed those to whichever
+    country had the longer name, which is unrelated to what the user said. So
+    every key is tried and the candidate with the smallest match position is
+    returned. It is the weakest defensible reading of a two-country sentence:
+    people state where they are before they qualify it.
+
+    LONGEST-FIRST STILL DECIDES TIES, and that is the whole reason _ORDERED
+    exists: `Dominik` and `Dominika` both match "Dominika'dayım" at position 0,
+    as do `Nijer` and `Nijerya` on "Nijerya'dayım", because the lenient suffix
+    branch reads the longer name's trailing letter as a case ending. Candidates
+    arrive longest-first and a later one has to be STRICTLY earlier to win, so
+    the longer name keeps the position it shares. Four tests pin this.
 
     WHAT THIS DOES NOT CLOSE, inherited unchanged from location.py: the lenient
     suffix branch still resolves ordinary Turkish words that happen to be a
@@ -262,22 +336,31 @@ def _find(text: str) -> int | None:
     frequency. Do not read this function as having solved the collision problem;
     it solved the branches it names.
     """
-    if _refuses(text):
+    if _refuses(folded):
         return None
-    folded = _normalize_tr(text)
     whole = folded.strip(_TRIM)
-    for code, key, (apostrophe, suffixed, before_place, english) in _matchers():
-        if apostrophe.search(folded):
-            return code
-        if suffixed.search(folded):
-            return code
-        if whole == key:
-            return code
-        if before_place.search(folded):
-            return code
-        if english.search(folded):
-            return code
-    return None
+    best_start: int | None = None
+    best_code: int | None = None
+    for code, key, patterns in _matchers():
+        # The whole message being the name is position 0 by construction.
+        start = 0 if whole == key else None
+        for pattern in patterns:
+            match = pattern.search(folded)
+            # `name` is the country itself, so branches with different
+            # preambles - the English preposition - stay comparable.
+            if match is not None and (start is None or match.start("name") < start):
+                start = match.start("name")
+        if start is None:
+            continue
+        if best_start is None or start < best_start:
+            best_start, best_code = start, code
+        if best_start == 0:
+            # Nothing can beat position 0, and any later key that ties it is
+            # shorter and would lose the tie anyway. This keeps the common case
+            # - the message opens with the country - at its old cost instead of
+            # paying for all 199 keys.
+            break
+    return best_code
 
 
 def extract_country(message: str, history: list[dict] | None = None) -> int | None:
@@ -291,15 +374,16 @@ def extract_country(message: str, history: list[dict] | None = None) -> int | No
     verimi yuksektir"), and reading its own words back as the user's location
     would place growers wherever the last example happened to be set.
     """
-    if _refuses(message):
+    folded = _normalize_tr(message)
+    if _refuses(folded):
         return None
-    found = _find(message)
+    found = _find(folded)
     if found:
         return found
     for turn in reversed(history or []):
         if turn.get("role") != "user":
             continue
-        content = turn.get("content", "")
+        content = _normalize_tr(turn.get("content", ""))
         # The walk stops here, it does not skip past: this turn IS the most
         # recent statement of location, and continuing would answer with a
         # country the user has since moved on from.

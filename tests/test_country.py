@@ -6,6 +6,7 @@ from src.context.country import extract_country
 # 351 is FAOSTAT's `China` AGGREGATE, which this project never resolves to.
 TURKIYE, FRANCE, EGYPT = 223, 68, 59
 CHINA, MOROCCO, INDIA = 41, 143, 100
+KENYA, SPAIN, BRAZIL, NETHERLANDS, ITALY = 114, 203, 21, 150, 106
 
 
 def test_a_turkish_locative_resolves():
@@ -131,9 +132,94 @@ def test_a_turkish_ending_on_an_english_spelling_is_not_a_location():
 
 def test_italy_itself_still_resolves():
     """The other half, as always: the guard above must not cost the country."""
-    assert extract_country("İtalya'dayım") == 106
-    assert extract_country("italyada yasiyorum") == 106
-    assert extract_country("I am in Italy") == 106
+    assert extract_country("İtalya'dayım") == ITALY
+    assert extract_country("italyada yasiyorum") == ITALY
+    assert extract_country("I am in Italy") == ITALY
+
+
+@pytest.mark.parametrize("message", [
+    "we bought seed from India",
+    "I buy eggs from Turkey.",
+    "we import chicks from Turkey, mostly",
+    "I came from Kenya",
+])
+def test_english_from_is_a_supplier_not_a_location(message):
+    """`from X` marks where GOODS came from. All four resolved before this was
+    fixed — India, Türkiye, Türkiye, Kenya — placing growers at their supplier.
+    The compound-noun boundary is no defence: it stops `from turkey farms`, but
+    a period, a comma or a closed-class word ends the phrase and the bare
+    `from` match stands. Seed, chicks and litter cross borders constantly in
+    this assistant's traffic, so this is the common case."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am from Kenya", KENYA),
+    ("I'm from Brazil", BRAZIL),
+    ("we are from Egypt", EGYPT),
+    ("we're from France", FRANCE),
+])
+def test_from_still_places_the_user_when_it_predicates_the_user(message, code):
+    """The boundary drawn around `from`: it is evidence only where it describes
+    the USER rather than a purchase. An enumerated copula cannot be reached by
+    any sentence about buying. This is the English twin of `-lı` in the Turkish
+    suffix, which already accepts "Hollandalıyım" as a statement of location."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message", [
+    "Hollanda'dan tohum aldım",
+    "Hollanda'dan gübre alıyoruz",
+    "hollandadan tohum aldim",
+])
+def test_the_turkish_ablative_alone_is_a_supplier_not_a_location(message):
+    """The Turkish twin of `from`, and the point where this module deliberately
+    diverges from location.py. `-dan/-den` is the ablative, and for a COUNTRY it
+    is overwhelmingly a purchase or an import. location.py keeps it because
+    "İzmir'den geldim" usually is said by someone in İzmir's orbit and domestic
+    sentences are rarely about importing; that twin is left alone."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "Hollanda'danım",
+    "Hollandalıyım",
+    "Hollanda'dayım",
+])
+def test_the_ablative_still_places_the_user_when_it_predicates_the_user(message):
+    """The other side of the line the test above draws. A bare ablative is
+    refused; an ablative carrying a personal ending says where the user belongs,
+    exactly as `-lı` and the locative do. The cost of drawing it here is real
+    and named in country.py: "Hollanda'dan yazıyorum" is a genuine statement of
+    location and is refused."""
+    assert extract_country(message) == NETHERLANDS
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am in Turkey but I import seed from France", TURKIYE),
+    ("Mısır'dayım ama Fransa'dan gübre alıyorum", EGYPT),
+    ("Fransa'dan gübre alıyorum, ben Mısır'dayım", EGYPT),
+])
+def test_a_two_country_sentence_answers_the_user_not_the_supplier(message, code):
+    """All three answered France before this was fixed. Two faults met here:
+    `from`/`-dan` matched a supplier at all, and `_find` returned on the first
+    key that matched ANYWHERE, so among the survivors the LONGER NAME won
+    regardless of where in the sentence it sat."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am in Egypt and my brother is in France", EGYPT),
+    ("I am in Chad but I sell in Kenya", 39),
+    ("Fransa'dayım ama Mısır'da da tarlam var", FRANCE),
+    ("Mısır'dayım, Fransa'da da tarlam var", EGYPT),
+])
+def test_the_earliest_country_wins_not_the_longest_named_one(message, code):
+    """Position alone, with two countries that BOTH match by the same branch, so
+    nothing but the ordering rule can decide. `Fransa` is longer than `Mısır`
+    and `Kenya` longer than `Chad`, and under the old longest-first return each
+    pair answered the same way whichever order the user wrote them in."""
+    assert extract_country(message) == code
 
 
 def test_an_assistant_turn_is_never_evidence():
