@@ -234,7 +234,7 @@ def test_a_per_tree_only_table_is_not_discarded(no_llm, monkeypatch):
     table was indistinguishable from a genuinely empty one."""
     from src import norms
     table = (norms.CropNorm("ayva", "Ayva", None, None,
-                             norms.NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)),)
+                             norms.NormValue(31.0, 2025, "il", "Karabük", "kg/ağaç", 27.0, 28.0)),)
     monkeypatch.setattr("src.norms.province_table", lambda *a, **k: table)
     result = engine.answer(BUDGET_Q, ORDU_HISTORY)
     assert "crops" in result.form

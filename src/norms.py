@@ -105,6 +105,12 @@ class NormValue:
     year: int
     scope: str          # "il" | "tr"
     region: str         # "Manisa" | "Türkiye"
+    # WHICH unit, written down rather than inferred from the field name that
+    # holds it. `CropNorm.price_per_kg` is lira for a Turkish figure and
+    # dollars for a FAOSTAT one, and nothing else in the value says so.
+    # No default: a default would let a price inherit "kg/da" in silence,
+    # and a claim that is almost true is this project's recurring defect.
+    unit: str
     # The spread of the five years BEFORE this one. Not the last five of the
     # series: this figure is the one being prefilled, and a range that contains
     # it cannot say whether it is typical. None when fewer than two of those
@@ -162,7 +168,7 @@ class CropNorm:
     crop: str
     label: str
     yield_kg_da: NormValue | None
-    price_tl_kg: NormValue | None
+    price_per_kg: NormValue | None
     # Defaulted so the four-argument constructions in the tests keep working,
     # and because most crops genuinely do not have one.
     yield_kg_tree: NormValue | None = None
@@ -191,7 +197,8 @@ def _recent_range(series: list, index: int) -> tuple[float | None, float | None]
     return (None, None) if lo == hi else (lo, hi)
 
 
-def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
+def _pick(measure: dict, years: list[int], province: str | None,
+          unit: str) -> NormValue | None:
     """The province's row when the measure has one, otherwise the national row,
     then the most recent non-null year in it."""
     provincial = (measure.get("scope") == "il"
@@ -209,6 +216,7 @@ def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | 
                 year=years[i],
                 scope="il" if provincial else "tr",
                 region=key if provincial else NATIONAL_LABEL,
+                unit=unit,
                 recent_min=low,
                 recent_max=high,
             )
@@ -229,9 +237,9 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
     return CropNorm(
         crop=crop_id,
         label=entry["label"],
-        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
-        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
-        yield_kg_tree=(_pick(entry["yield_kg_tree"], years, province)
+        yield_kg_da=_pick(entry["yield_kg_da"], years, province, "kg/da"),
+        price_per_kg=_pick(entry["price_tl_kg"], years, province, "TL/kg"),
+        yield_kg_tree=(_pick(entry["yield_kg_tree"], years, province, "kg/ağaç")
                        if "yield_kg_tree" in entry else None),
     )
 

@@ -195,7 +195,7 @@ def _figures(row, latest_year: int | None) -> CropFigures:
     # cells for a round; a test pins them together.
     per_tree = row.yield_kg_tree is not None
     yield_value = row.yield_kg_tree if per_tree else row.yield_kg_da
-    price = row.price_tl_kg
+    price = row.price_per_kg
     # A price from an older year is not a smaller number, it is a different
     # currency: P2b measured Ordu's `Arpa (Diğer)` prefilling a 2018 price nine
     # times too low into a bold revenue figure. Yield is left alone - it does

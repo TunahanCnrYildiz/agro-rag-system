@@ -661,10 +661,10 @@ def test_the_original_units_are_untouched():
 def _table():
     return (
         CropNorm("findik", "Fındık",
-                 NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
-                 NormValue(202.26, 2025, "il", "Ordu", None, None)),
+                 NormValue(28.4, 2025, "il", "Ordu", "kg/da", 73.7, 105.6),
+                 NormValue(202.26, 2025, "il", "Ordu", "TL/kg", None, None)),
         CropNorm("misir", "Mısır",
-                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
+                 NormValue(1100.0, 2024, "tr", "Türkiye", "kg/da", 900.0, 1200.0),
                  None),
     )
 
@@ -720,12 +720,12 @@ def _tree_table():
     """Ayva carries a per-tree figure; Mısır does not."""
     return (
         CropNorm("ayva", "Ayva",
-                 NormValue(13419.4, 2025, "il", "Karabük", None, None),
-                 NormValue(19.0, 2025, "il", "Karabük", None, None),
-                 NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)),
+                 NormValue(13419.4, 2025, "il", "Karabük", "kg/da", None, None),
+                 NormValue(19.0, 2025, "il", "Karabük", "TL/kg", None, None),
+                 NormValue(31.0, 2025, "il", "Karabük", "kg/ağaç", 27.0, 28.0)),
         CropNorm("misir", "Mısır",
-                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
-                 NormValue(8.0, 2025, "tr", "Türkiye", None, None)),
+                 NormValue(1100.0, 2024, "tr", "Türkiye", "kg/da", 900.0, 1200.0),
+                 NormValue(8.0, 2025, "tr", "Türkiye", "TL/kg", None, None)),
     )
 
 
@@ -766,8 +766,8 @@ def test_the_hint_survives_a_cell_with_no_five_year_range():
     """It must not depend on the range's existence, or it would vanish on
     exactly the crops with the thinnest history."""
     table = (CropNorm("ayva", "Ayva", None,
-                      NormValue(19.0, 2025, "il", "Karabük", None, None),
-                      NormValue(31.0, 2025, "il", "Karabük", None, None)),)
+                      NormValue(19.0, 2025, "il", "Karabük", "TL/kg", None, None),
+                      NormValue(31.0, 2025, "il", "Karabük", "kg/ağaç", None, None)),)
     spec = budget.form_spec([], table)
     assert spec["crops"][0]["yield"]["recent"] == "ağaç sayısını da girin"
 
@@ -784,12 +784,12 @@ def _collapsed_table():
     cell also carries the temporary tree-count hint - the worst-case line."""
     return (
         CropNorm("erik", "Erik",
-                 NormValue(7.1, 2025, "il", "Bilecik", 449.9, 925.4),
-                 NormValue(30.0, 2025, "il", "Bilecik", None, None),
-                 NormValue(1.0, 2025, "il", "Bilecik", 20.0, 37.0)),
+                 NormValue(7.1, 2025, "il", "Bilecik", "kg/da", 449.9, 925.4),
+                 NormValue(30.0, 2025, "il", "Bilecik", "TL/kg", None, None),
+                 NormValue(1.0, 2025, "il", "Bilecik", "kg/ağaç", 20.0, 37.0)),
         CropNorm("misir", "Mısır",
-                 NormValue(1100.0, 2024, "tr", "Türkiye", 900.0, 1200.0),
-                 NormValue(8.0, 2025, "tr", "Türkiye", None, None)),
+                 NormValue(1100.0, 2024, "tr", "Türkiye", "kg/da", 900.0, 1200.0),
+                 NormValue(8.0, 2025, "tr", "Türkiye", "TL/kg", None, None)),
     )
 
 
@@ -947,8 +947,8 @@ def test_a_price_older_than_the_latest_year_is_absent_not_zero():
     is not a meaningful quantity the way an old yield still is; it is dropped
     entirely rather than shown stale."""
     table = (CropNorm("arpa", "Arpa (Diğer)",
-                       NormValue(1500.0, 2025, "il", "Ordu", 1400.0, 1600.0),
-                       NormValue(1.10, 2018, "il", "Ordu", None, None)),)
+                       NormValue(1500.0, 2025, "il", "Ordu", "kg/da", 1400.0, 1600.0),
+                       NormValue(1.10, 2018, "il", "Ordu", "TL/kg", None, None)),)
     spec = budget.form_spec([], table, latest_year=2025)
     assert spec["crops"][0]["price"] is None
     assert spec["crops"][0]["yield"] is not None
@@ -969,8 +969,8 @@ def test_a_price_range_is_never_shown_even_when_the_norm_carries_one():
     read as a false outlier warning. Yield keeps its range, where a stale
     figure really can be an outlier."""
     table = (CropNorm("x", "X",
-                       NormValue(100.0, 2025, "tr", "Türkiye", 60.0, 90.0),
-                       NormValue(50.0, 2025, "tr", "Türkiye", 20.0, 40.0)),)
+                       NormValue(100.0, 2025, "tr", "Türkiye", "kg/da", 60.0, 90.0),
+                       NormValue(50.0, 2025, "tr", "Türkiye", "TL/kg", 20.0, 40.0)),)
     spec = budget.form_spec([], table, latest_year=2025)
     assert spec["crops"][0]["yield"]["recent"] is not None
     assert spec["crops"][0]["price"]["recent"] is None
@@ -1047,8 +1047,8 @@ def test_the_framing_joins_two_different_notes_with_a_middle_dot():
     never offered as a norm cell), but a fresh yield and a fresh price from
     different provinces or years still can, so the join stays reachable."""
     table = (CropNorm("findik", "Fındık",
-                       NormValue(28.4, 2025, "il", "Ordu", 73.7, 105.6),
-                       NormValue(202.26, 2024, "il", "Ordu", None, None)),)
+                       NormValue(28.4, 2025, "il", "Ordu", "kg/da", 73.7, 105.6),
+                       NormValue(202.26, 2024, "il", "Ordu", "TL/kg", None, None)),)
     inputs, errors = budget.validate({
         "crop": "findik",
         "area": {"value": "5", "unit": "donum"},

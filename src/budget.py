@@ -250,7 +250,7 @@ def _read(spec: FieldSpec, raw: dict,
 # from is a property of the row, not of the field - see _yield_cell.
 _VERIFIED = (
     ("yield_total", lambda row: _yield_cell(row)),
-    ("price", lambda row: _norm_cell(row.price_tl_kg, *_NORM_UNITS["price"], 2,
+    ("price", lambda row: _norm_cell(row.price_per_kg, *_NORM_UNITS["price"], 2,
                                      show_range=False)),
 )
 
@@ -501,7 +501,7 @@ def _crop_rows(table, latest_year: int | None) -> list[dict]:
     """
     rows = []
     for row in table:
-        price = row.price_tl_kg
+        price = row.price_per_kg
         if price is not None and (latest_year is None or price.year != latest_year):
             price = None
         cell = _yield_cell(row)

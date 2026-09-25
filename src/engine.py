@@ -888,7 +888,7 @@ def _budget_result(payload: dict | None, message: str = "",
         from src.context import location
         table = norms.province_table(location.extract_province(message, history))
         latest_year = norms.latest_year()
-        if table and not any(row.yield_kg_da or row.price_tl_kg or row.yield_kg_tree
+        if table and not any(row.yield_kg_da or row.price_per_kg or row.yield_kg_tree
                               for row in table):
             # No province resolved (or the resolved one, and the national
             # fallback, both carry nothing): every row's yield (per-dekar or
