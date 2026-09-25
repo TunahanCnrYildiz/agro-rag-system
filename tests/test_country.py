@@ -131,10 +131,46 @@ def test_a_turkish_ending_on_an_english_spelling_is_not_a_location():
 
 
 def test_italy_itself_still_resolves():
-    """The other half, as always: the guard above must not cost the country."""
+    """The other half, as always: the guard above must not cost the country.
+
+    `Italy'deyim` is the case the guard actually endangered: the branch the fix
+    touched is the Turkish suffix on an ENGLISH spelling, and the apostrophe is
+    the one path that still carries it. The other three assertions test the
+    Turkish spelling twice and an English preposition, none of which the fix
+    goes near."""
     assert extract_country("İtalya'dayım") == ITALY
     assert extract_country("italyada yasiyorum") == ITALY
     assert extract_country("I am in Italy") == ITALY
+    assert extract_country("Italy'deyim") == ITALY
+
+
+@pytest.mark.parametrize("message", [
+    "Franceda yasiyorum",
+    "Germanyde yasiyorum",
+    "Spaindeyim",
+    "Cyprusta",
+])
+def test_the_italy_guard_costs_the_apostropheless_english_forms(message):
+    """The guard is NOT free, and this pins what it charges. Gating the Turkish
+    suffix branches on Turkish spellings killed the apostrophe-less Turkish
+    ending on an English name; all four of these resolved before it. The trade
+    is taken because a Turkish speaker writing without an apostrophe writes
+    Fransa, Almanya, İspanya, Kıbrıs, while the crop collision the gate buys off
+    was measured against real labels. Widening the `turkish` flag again would
+    otherwise pass in silence."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("France'dayım", FRANCE),
+    ("Italy'deyim", ITALY),
+])
+def test_the_apostrophe_path_is_not_gated(message, code):
+    """The other direction of the same boundary: the apostrophe is an
+    unambiguous proper-noun boundary, so it keeps the Turkish ending on an
+    English spelling. Narrowing it would cost the commonest way a Turkish
+    speaker writes a foreign country name."""
+    assert extract_country(message) == code
 
 
 @pytest.mark.parametrize("message", [
@@ -220,6 +256,52 @@ def test_the_earliest_country_wins_not_the_longest_named_one(message, code):
     and `Kenya` longer than `Chad`, and under the old longest-first return each
     pair answered the same way whichever order the user wrote them in."""
     assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I farm in Kenya today", KENYA),
+    ("my field is in Egypt near the delta", EGYPT),
+    ("I am in Egypt for farming", EGYPT),
+    ("My farm is in Spain with clay soil", SPAIN),
+    ("I am in Kenya, near Nakuru", KENYA),
+])
+def test_an_ordinary_english_sentence_is_not_refused_by_the_tail_rule(message, code):
+    """`_EN_TAIL` enumerated conjunctions, pronouns, determiners and auxiliaries
+    but no prepositions and almost no adverbs, so these four resolved to nothing
+    and their users got no figures at all. The cost falls hardest on countries
+    the table holds only in English — Kenya, Brazil, Chad — which have no
+    Turkish branch to fall back on."""
+    assert extract_country(message) == code
+
+
+def test_a_gerund_after_the_country_is_still_refused():
+    """The boundary of the widening above, kept deliberately. Admitting a
+    present participle would admit `turkey growing`, `turkey farming` and
+    `turkey raising` — the compound nouns the tail rule exists to refuse — so
+    "We are based in Brazil growing soy" stays unresolved and the assistant
+    asks. Recorded here so the next reader sees it was a choice."""
+    assert extract_country("We are based in Brazil growing soy") is None
+
+
+@pytest.mark.parametrize("message", [
+    "we work at turkey farms near Konya",
+    "at turkey manure today",
+    "I am in turkey litter business",
+])
+def test_widening_the_tail_did_not_reopen_the_compound_noun(message):
+    """The prepositions and adverbs added to `_EN_TAIL` are closed-class and
+    cannot head a noun phrase, so they cannot be the second noun of a compound.
+    These put one right after the compound to prove the compound still wins."""
+    assert extract_country(message) is None
+
+
+def test_naming_the_trnc_refuses_the_whole_message():
+    """The refusal is message-wide, not location-scoped: the user plainly said
+    France, and still gets nothing. Accepted because the mention cannot be told
+    apart from a statement of location without parsing the sentence, the failure
+    is in the safe direction, and such messages are rare. Pinned so the cost is
+    visible rather than discovered."""
+    assert extract_country("KKTC'de fiyatlar nasıl, ben Fransa'dayım") is None
 
 
 def test_an_assistant_turn_is_never_evidence():

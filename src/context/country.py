@@ -204,18 +204,47 @@ _NOT_ABLATIVE = r"(?![dt][ae]n(?!\w))"
 # the phrase at the country; a compound noun continues it with a second noun,
 # and that second noun is what this refuses. It is the English counterpart of
 # the Turkish rule one screen up - there the evidence is the case ending on the
-# name, here it is that nothing is glued to the end of it - and it costs nothing
-# for the other 198 countries, which is why it is applied to all of them rather
-# than to a hand-kept list of ambiguous names.
+# name, here it is that nothing is glued to the end of it.
+#
+# WHAT IT COSTS, and it is not nothing. This rule is applied to all 199
+# countries rather than to a hand-kept list of ambiguous names, and it buys
+# that uniformity with recall from every one of them: any sentence that
+# continues past the country with a word not listed below resolves to nothing.
+# A country with a Turkish alias can still be reached by the Turkish branches,
+# but Brazil, Chad, Kenya and every other country the table holds only in
+# English have no second branch to fall back on - for them this list IS the
+# module. The list is therefore kept as wide as the collision allows. Five
+# ordinary sentences were measured dead before it was widened; the four this
+# list revives ("I farm in Kenya today", "my field is in Egypt near the delta",
+# "I am in Egypt for farming", "My farm is in Spain with clay soil") are pinned
+# in tests/test_country.py, and the fifth is the paragraph below.
+#
+# STILL REFUSED, knowingly: "We are based in Brazil growing soy". Admitting a
+# present participle would admit `turkey growing`, `turkey farming` and
+# `turkey raising`, which are the compound nouns this rule exists to refuse.
+# A gerund after a country name is genuinely ambiguous and the safe reading is
+# to ask.
 #
 # ENUMERATED, not `\w*`, for the reason _PLACE carries above: these are closed-
 # class English words that cannot head a compound noun, so admitting them cannot
-# re-open the collision. Anything open-class after the name ends the match, and
-# `\s*$` alone is what makes "I am in Turkey" work.
+# re-open the collision. That is the only admission test applied - conjunctions,
+# pronouns, determiners, auxiliaries, prepositions and time/place adverbs all
+# qualify. Anything open-class after the name ends the match, and `\s*$` alone
+# is what makes "I am in Turkey" work.
 _EN_TAIL = (r"(?:and|but|or|so|then|now|too|also|where|which|while|when|because"
             r"|since|if|i|we|my|our|you|your|they|it|this|that|these|those|the"
             r"|is|are|was|were|do|does|did|can|could|will|would|have|has|had"
-            r"|right|currently)")
+            r"|right|currently"
+            # Prepositions. None can head a noun phrase, so none can be the
+            # second noun of a compound: "turkey for", "turkey with" are not
+            # phrases, while "turkey manure" and "turkey farms" still are.
+            r"|for|with|near|on|at|in|of|to|by|from|into|onto|over|under|above"
+            r"|below|between|among|around|across|along|against|behind|beside"
+            r"|beyond|inside|outside|through|throughout|toward|towards|until"
+            r"|upon|via|within|without|after|before|during"
+            # Time and place adverbs.
+            r"|today|tonight|tomorrow|yesterday|here|there|nowadays|again"
+            r"|already|still|just|only|always|usually|mostly|mainly)")
 _EN_BOUNDARY = rf"(?:\s*$|\s*[.,;:!?)\]]|\s+{_EN_TAIL}(?!\w))"
 
 # HAZARD: FAOSTAT has no area for the TRNC, so the table cannot hold one, and
@@ -231,6 +260,16 @@ _EN_BOUNDARY = rf"(?:\s*$|\s*[.,;:!?)\]]|\s+{_EN_TAIL}(?!\w))"
 # through to some other country in the same sentence, or to an older turn, is
 # the same silent misplacement in a different costume. See extract_country,
 # where this also stops the walk back through history.
+#
+# THE REFUSAL IS MESSAGE-WIDE, not location-scoped. Any mention of the TRNC
+# anywhere in a text kills that text's whole result, whether or not the TRNC is
+# the place the user says they are in: "KKTC'de fiyatlar nasıl, ben
+# Fransa'dayım" resolves to nothing, though the user plainly said France. That
+# is a measured cost, accepted because the mention cannot be told apart from a
+# statement of location without parsing the sentence, the failure is in the
+# safe direction, and a message that names the TRNC in passing while stating a
+# different country is rare. Narrowing it means deciding WHICH mention is the
+# location, which is the problem this refusal exists to avoid.
 #
 # Matched on the FOLDED text: "Kuzey Kıbrıs" -> "kuzey kibris", "KKTC" -> "kktc".
 _NO_AREA = re.compile(
@@ -260,6 +299,17 @@ def _matchers() -> tuple[tuple[int, str, tuple[re.Pattern[str], ...]], ...]:
     did: `Italy` + `-an` -> "Italyan cimi", Italian ryegrass. The apostrophe
     ("France'dayim" is how a Turkish speaker writes a foreign name), the whole
     message ("France") and the English preposition stay for every spelling.
+
+    WHAT THAT GATE COSTS, measured and not free: the apostrophe-less Turkish
+    suffix on an ENGLISH spelling is gone. "Franceda yasiyorum", "Germanyde
+    yasiyorum", "Spaindeyim" and "Cyprusta" all resolved before it and resolve
+    to nothing now. The trade is taken because a Turkish speaker writing
+    without an apostrophe writes the Turkish name - Fransa, Almanya, İspanya,
+    Kıbrıs - so these forms are a mixture of two conventions, while the crop
+    collision they bought off was measured against real labels. The apostrophe
+    path is deliberately NOT gated and keeps "France'dayım" and "Italy'deyim"
+    working; tests/test_country.py pins both directions, because widening
+    `turkish` back would otherwise pass in silence.
     """
     built = []
     for key in _ORDERED:
