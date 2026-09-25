@@ -48,3 +48,8 @@ evals/runs/
 # Vector-store archives built for transfer - never commit (GB-scale)
 data/vector_store*.zip
 data/vector_store*.tar.gz
+
+# FAOSTAT bulk archives (45,6 MB, re-downloadable from a fixed URL —
+# see scripts/fetch_faostat.py for why these are not committed the way
+# TÜİK's hand-exported inputs under data/raw/ are)
+data/faostat_cache/

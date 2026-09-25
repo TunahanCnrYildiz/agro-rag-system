@@ -139,13 +139,17 @@ Given by the developer on the client's behalf. **[KAYIT]**
 ### The scale question, measured rather than estimated
 
 The request sounds like a data-collection project. It is not; it is a download.
-Measured 2026-08-11 by `HEAD` against the FAOSTAT bulk endpoints: **[ÖLÇÜLDÜ]**
 
-| Dataset | Size |
-| --- | --- |
-| Production — crops & livestock, normalised, all countries, all years | **32 MB** |
-| Producer prices, normalised | **11 MB** |
-| **Total** | **43 MB** |
+| Dataset | Compressed | Uncompressed |
+| --- | --- | --- |
+| Production — crops & livestock, normalised, all countries, all years | 33,9 MB | 545 MB |
+| Producer prices, normalised | 11,7 MB | 214 MB |
+| **Total** | **45,6 MB** | **759 MB** |
+
+Re-measured 2026-09-23. The 2026-08-11 figures (32 MB / 11 MB / 43 MB) were the
+**compressed** sizes, recorded without that word. The conclusion they supported —
+that this is a download rather than a data-collection project — survives; the
+figures did not, and only the download is 43 MB.
 
 For comparison, this project already carries a **1.3 GB** vector store. The client's
 "whole world, all products" dataset is roughly **one thirtieth** of what is already

@@ -3,6 +3,9 @@
 TÜİK'ten elle indirilen export'lar. Bunlar `scripts/build_crop_norms.py`'ın girdisi;
 betik `data/crop_norms.json`'u bunlardan üretir. Yılda bir kez yenilenir.
 
+Dünya katmanı (FAOSTAT) buraya girmez; onun yenilenmesi dosyanın sonunda,
+**FAOSTAT yenileme** başlığı altında.
+
 Kaynak: https://biruni.tuik.gov.tr/medas/?kn=92&locale=tr
 
 ## MEDAS'ın yapısı (2026-08-17'de ekranda doğrulandı)
@@ -113,3 +116,21 @@ Düzeltmesi bir sonraki yenilemede ekstra bir iş: her ürün grubu için
 niteliği -> Verim, Ölçü birimi -> Kg/Dekar), il export'larının yanına. Bunu
 buraya yazmamızın sebebi, gelecek yıl bu yenilemeyi yapacak kişinin aynı
 boşluğu sıfırdan keşfetmek zorunda kalmaması.
+
+## FAOSTAT yenileme (dünya katmanı, `data/world_norms.json`)
+
+FAOSTAT arşivleri TÜİK export'larının aksine repoda durmaz: sabit bir URL'den
+inerler, `data/faostat_cache/` altında tutulurlar ve `.gitignore`'dadır. Yıllık
+yenileme iki komut:
+
+    python -m scripts.fetch_faostat --force
+    python -m scripts.build_world_norms
+
+`--force` kritik: önbellekte arşiv varsa `fetch` onu olduğu gibi döndürür, yani
+bayrak olmadan geçen yılın verisinden bu yılın tarihiyle damgalı bir dosya
+çıkar. `build_world_norms` de `--force` kabul eder; tek komutla aynı iş görülür.
+
+Çıktıda bakılacak iki şey: `source:` satırlarındaki `Last-Modified` gerçekten
+ilerlemiş mi (ilerlememişse yeni vintage yok, dosyayı commit'lemeye gerek yok),
+ve `items` / `countries` / `dropped` sayıları bir öncekine yakın mı - ani bir
+düşüş FAO'nun bir kalemi yeniden adlandırdığı anlamına gelir.
