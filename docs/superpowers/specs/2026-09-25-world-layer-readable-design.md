@@ -87,6 +87,25 @@ carries the discipline that prevents this and it is reused rather than reinvente
 The plan pins one test per row of that table, in both directions: the crop sentence
 must not resolve to a country, and the locative sentence must.
 
+### One of the 199 "countries" is an aggregate
+
+**[Found while writing this design, 2026-09-25.]** FAOSTAT area **351 `China`** sums
+areas 41 `China, mainland`, 96 `Hong Kong SAR`, 128 `Macao SAR` and 214
+`Taiwan Province of`. Its 2024 series agrees with mainland's within 1% on **94 of the
+105 crops they share**.
+
+It is the same class of thing as `Africa` and `European Union (27)`, which the world
+layer deliberately dropped — it survived because that filter removed area codes
+**≥ 5000** and this one is 351. A sweep comparing every pair of the 199 areas found
+no second case.
+
+**This round does not regenerate the data file for it.** An aggregate nothing resolves
+to does no harm, and rebuilding a 4,38 MB artifact to remove one row would drag the
+previous round's gates back open. Instead the alias table gives `Çin` and `China` to
+**41**, gives 351 no names at all, and records what it is — so `extract_country` can
+never return it. A test pins that. If a later round regenerates the world file for
+another reason, dropping 351 belongs in it.
+
 ## 2. `NormValue` carries its unit, and `price_tl_kg` is renamed
 
 **The field name is currently a lie waiting to happen.** `CropNorm.price_tl_kg` would
