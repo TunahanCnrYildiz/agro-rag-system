@@ -45,12 +45,18 @@ def test_the_fao_label_matches_the_world_file(aliases, world_countries):
 
 def test_no_name_is_claimed_by_two_countries(aliases):
     """An ambiguous name resolves to whichever entry is tried first, which is
-    an arbitrary answer dressed as a confident one."""
+    an arbitrary answer dressed as a confident one.
+
+    Two COUNTRIES may not share a name. One country repeating a name across its
+    own `tr` and `en` is ordinary and must stay allowed: roughly 45 of these are
+    spelled identically in both languages — Panama, Kenya, Malta, Belize, Yemen,
+    Sudan. Forbidding that forces an invented variant into one of the lists and
+    the name people actually type stops matching."""
     seen: dict[str, str] = {}
     for code, entry in aliases.items():
-        for name in entry["tr"] + entry["en"]:
-            key = name.strip().casefold()
-            assert key not in seen, f"{name!r} claimed by {seen.get(key)} and {code}"
+        for key in {name.strip().casefold() for name in entry["tr"] + entry["en"]}:
+            assert seen.get(key, code) == code, \
+                f"{key!r} claimed by {seen.get(key)} and {code}"
             seen[key] = code
 
 
