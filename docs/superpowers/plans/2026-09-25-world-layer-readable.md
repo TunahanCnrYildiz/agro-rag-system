@@ -147,7 +147,24 @@ Note the asymmetry and keep it: the **JSON key stays `price_tl_kg`** — that fi
 PYTHONIOENCODING=utf-8 grep -rn "price_tl_kg" --include="*.py" src tests evals
 ```
 
-Rename **only the attribute access** (`.price_tl_kg`, `price_tl_kg=`). Leave every string literal `"price_tl_kg"` alone — those index the JSON file. `tests/test_build_crop_norms.py` is entirely about the JSON key and should not change at all; if your edit touches it, you renamed too much.
+Rename **only `CropNorm`'s attribute** (`.price_tl_kg`, `price_tl_kg=` on a `CropNorm`).
+Two things keep their name and both are easy to sweep up by mistake:
+
+- **Every string literal `"price_tl_kg"`** indexes the JSON file. `data/crop_norms.json`
+  is TÜİK only and its prices really are lira.
+- **`BudgetInputs.price_tl_kg` in `src/budget.py:145` is a different field on a
+  different type** — the price the user typed into the budget form, which
+  `src/budget.py:739` prints with the word `TL` beside it. It is lira by
+  construction, not by assumption. A foreign user's form will need a currency of
+  its own, and that is the round that decides what a user sees.
+
+`tests/test_build_crop_norms.py` contains **both kinds**: seven JSON-key reads that
+stay, and **two genuine `CropNorm` attribute reads at lines 123 and 288**
+(`n.price_tl_kg` where `n = norms.lookup(...)`) that must be renamed. Leaving those
+two raises `AttributeError` inside a test whose own trailing lines clear
+`norms._load`'s `lru_cache` — the cleanup is skipped, the cache stays poisoned with
+that test's tiny table, and seven further tests in `tests/test_compare_route.py`
+fail for a reason that has nothing to do with them.
 
 - [ ] **Step 5: Run the full suite**
 
