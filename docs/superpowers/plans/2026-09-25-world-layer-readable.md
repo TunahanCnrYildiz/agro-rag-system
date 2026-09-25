@@ -429,6 +429,40 @@ def test_the_same_words_resolve_when_stated_as_a_place(message, code):
     assert extract_country(message) == code
 
 
+@pytest.mark.parametrize("message", [
+    "I use turkey manure on my field",
+    "we buy litter from turkey farms",
+])
+def test_an_english_name_that_is_also_livestock_never_places_the_user(message):
+    """`Turkey` is the English twin of `Mısır`. In an agriculture assistant
+    "turkey manure", "turkey litter" and "turkey farms" are ordinary phrases,
+    and `from turkey farms` satisfies a bare preposition rule. The country
+    name must stay in the table, so the guard belongs here."""
+    assert extract_country(message) is None
+
+
+def test_the_same_word_still_places_the_user_when_it_is_the_country():
+    assert extract_country("I am in Turkey") == TURKIYE
+    assert extract_country("Türkiye'deyim") == TURKIYE
+
+
+@pytest.mark.parametrize("message", [
+    "Kuzey Kıbrıs'tayım",
+    "KKTC'deyim",
+])
+def test_northern_cyprus_is_refused_rather_than_placed(message):
+    """FAOSTAT has no TRNC area, so the table cannot hold one. `Kıbrıs` fires
+    inside `Kuzey Kıbrıs` under any boundary rule, which would hand a Turkish
+    Cypriot grower — a likely user of this product — the Republic's yields
+    while saying nothing. Refusing to place is the honest answer; the
+    assistant then asks."""
+    assert extract_country(message) is None
+
+
+def test_cyprus_itself_still_resolves():
+    assert extract_country("Kıbrıs'tayım") == 50
+
+
 def test_the_current_message_beats_history():
     history = [{"role": "user", "content": "Fransa'dayım"}]
     assert extract_country("Mısır'dayım", history) == EGYPT
@@ -526,10 +560,26 @@ _EN_PLACE = r"(?:in|from|at)\s+"
 - `_find(text)` — the same four branches as `location.py._find` (apostrophe, case suffix, whole message, place noun), plus `re.search(rf"(?<!\w){_EN_PLACE}{k}(?!\w)", folded)`.
 - `extract_country(message, history)` — identical in shape to `extract_province`: the current message first, then user turns backwards. **Assistant turns are never evidence**, exactly as in `location.py`.
 
+**Two hazards the tests above pin, and the mechanism is yours to choose.** The plan
+supplies the contract, not the implementation:
+
+- **`Kuzey Kıbrıs` / `KKTC`.** There is no TRNC area in FAOSTAT, so this is a refusal,
+  not a match. Whatever you write must make `Kıbrıs'tayım` resolve to 50 while
+  `Kuzey Kıbrıs'tayım` resolves to nothing.
+- **English `Turkey`.** `(?:in|from|at)\s+turkey(?!\w)` matches `from turkey farms`,
+  because a space is not a word character. Find a rule that keeps `I am in Turkey`
+  working and drops the livestock phrases. Do not solve it by removing `Turkey`
+  from the table.
+
+Measured and already settled, so do not spend effort re-deriving: `location.py`'s
+existing `(?<!\w)` plus strict-suffix guards already block `fas` inside
+`burkina fasoda` and `uk` inside `arnavutlukta`. Reuse them; the alias table's
+34 substring pairs are handled by the longest-first ordering you inherit.
+
 - [ ] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_country.py -q`
-Expected: PASS, 17 passed
+Expected: PASS, 23 passed
 
 If a collision test fails, **do not weaken it**. The guard it exercises is the reason this module is written the way it is; a failure means the regex is wrong, not the test.
 
