@@ -37,10 +37,10 @@ Broken into its parts:
 
 | # | Request | Status |
 | --- | --- | --- |
-| R1 | Data covering the **whole world**, not only Turkey | **Not started** — scoped 2026-08-11, see §6 |
-| R2 | Broken down **region by region** | **Not started** — country level worldwide, district level for Turkey |
-| R3 | Broken down **product by product** | **Not started** — all products, no subset |
-| R4 | **Last 5 years** | **Not started** — the bulk sets carry the full series |
+| R1 | Data covering the **whole world**, not only Turkey | **DATA BUILT 2026-09-25** (merge `25476be`) — `data/world_norms.json`, 143 crops × 199 countries. No answer surface reads it yet |
+| R2 | Broken down **region by region** | **BUILT to the granularity that is published** — country level worldwide (199), province level for Turkey (81). Nobody publishes sub-national yield for the world |
+| R3 | Broken down **product by product** | **BUILT, and smaller than asked** — FAOSTAT publishes yield for **143** crops worldwide, not "all products". Turkey keeps its 246. `data/crop_fao_map.json` ties the two |
+| R4 | **Last 5 years** | **BUILT, exceeded** — world 2016–2024 (9 years), Turkey 2016–2025 (10). FAOSTAT always trails TÜİK by a year |
 | R5 | "Make a RAG out of it" | **RESOLVED 2026-08-11** — a queryable table is accepted; see §4 and §6 |
 
 **[KAYIT]** No deadline was given, but sooner is better.
@@ -115,13 +115,16 @@ See §6.
 | --- | --- |
 | `specs/2026-08-09-routing-and-context-design.md` | Intent routing; location, season, weather context; fertilization rule table. **Explicitly defers the numeric data layer.** |
 | `specs/2026-08-11-budget-and-crop-choice-design.md` | The `budget` and `crop_choice` routes — the **consumers** of the numeric data. Computes only from numbers the user supplies. **Defers R1–R4 again.** |
-| *(not written)* | **The numeric data layer itself. R1, R2, R3, R4 and the R5 mechanism all live here, and none of it is designed yet.** |
+| `specs/2026-08-17-numeric-data-layer-design.md` | The Turkish half of the numeric layer — TÜİK, 246 crops × 81 provinces. |
+| `specs/2026-09-23-faostat-world-layer-design.md` | **The world half. R1–R4 land here.** Shipped 2026-09-25. |
 
-**Read that last row as the headline.** Two specs have now been written around the
-client's central request without addressing it. Each deferral was individually
-defensible — the routing work had to come first, and the budget route genuinely does
-not need the data to be useful — but the cumulative effect is that R1–R4 have not
-moved since they were asked for.
+**That headline is now spent.** It read, until 2026-09-25, as a warning that two
+specs had been written around the client's central request without addressing it and
+that R1–R4 had not moved since they were asked for. They have moved: the Turkish half
+shipped on 2026-08-19 and the world half on 2026-09-25. What is still deferred is
+narrower and should be named as such — **no answer surface reads the world layer
+yet.** Country resolution, `norms.lookup`'s country scope, and the currency decision
+for the budget and comparison surfaces are the remaining work.
 
 ---
 
@@ -190,3 +193,74 @@ them — is avoided by not adding a fourth reading later without revisiting the 
   wallet. Not covered by `docs/deploy-runbook.md`. **Go-live blocker.**
 - No agronomy reaches a user without review by a qualified agricultural engineer.
   The fertilization table ships empty for this reason.
+
+---
+
+## 8. Hüseyin's edited deck, accepted as the target — 2026-09-25
+
+**[KAYIT]** On 2026-09-25 Hüseyin returned the project deck as a **16-page PDF he had
+edited himself**, saying the project must match it exactly. The client side accepted
+it as the target on the same day. **That PDF, not the 12-slide deck this project
+generated, is now the requirement document.**
+
+**[ÖLÇÜLDÜ]** Ten of its sixteen pages are this project's own slides, several
+verbatim — the three-step flow, the three calculation cards, the dose and comparison
+examples, the knowledge base counts, the catalogue, the four design rules, the
+TÜRKİYE/DÜNYA numeric layer, the verification figures and the limits page. Six pages
+are his: the commercial-benefit page, memory, the mobile season flow, language and
+market, data protection, and a rewritten cover.
+
+Every claim on the six new pages was checked against the code on 2026-09-25:
+
+| Page | Claim | State |
+| --- | --- | --- |
+| 4 | Profile holds where the farmer is and what they grow, and the assistant recalls it each session | **Built.** `mobile-app/src/auth.tsx` carries `province` and `crops`; `app/(tabs)/chat.tsx` prepends them to every conversation |
+| 12 | The profile can be viewed, corrected and deleted, and deletion clears it from the assistant | **Built.** `deleteProfile` plus a "Profili sil" confirmation in `app/profile.tsx`; the profile lives in device storage |
+| 2, 10 | Commercial benefits; answers in the asker's language | **Built** as architecture. The corpus behind those answers is Turkish and English only — an Uzbek question is answered in Uzbek from TR/EN sources |
+| 4 | *"kaç dönüm diye sormaz"* — field size is remembered | **NOT built.** The profile has no area field; each card asks for area again |
+| 4 | *"Her sohbet profili biraz daha netleştirir"* | **NOT built.** The profile is user-edited; nothing refines it from conversation |
+| 5 | **Fertilization and irrigation calendar, generated from the crop's phenological stages and shifted by the weather** | **NOT built — see below** |
+| 15 | "1.050 otomatik test" | Stale; 1.096 as of 2026-09-25 |
+
+### The season calendar is a data-review task, not a programming task
+
+**[ÖLÇÜLDÜ]** The scaffolding exists and the data does not:
+
+- `src/router.py` already routes calendar questions — `_TIME_STEMS` contains
+  `"takvim"` and `"program"` — to the `fert_plan` route.
+- `src/engine.py` already gives that route the province, the season and the
+  coming week's weather.
+- `data/fertplan_table.json` **contains no rows.** `fertplan.available_crops()`
+  returns an empty tuple today.
+- The table's own README states the position: *"The assembly step that would turn
+  rows into a fertilization calendar is not written,"* and *"A row without
+  `reviewed_by` is dropped at load time, so unreviewed agronomy cannot reach a
+  user even if someone adds it here."*
+
+**This is deliberate and it is the binding constraint.** Per §7, the product must
+never present unreviewed agronomy. A per-crop, per-stage fertilization and
+irrigation programme is exactly the kind of advice this project refuses to invent.
+Filling that table requires a **named agricultural engineer** to review each row and
+sign it in `reviewed_by` — the schema drops anything unsigned.
+
+So page 5 cannot be delivered by writing code. It needs, from the client:
+
+1. a fertilization and irrigation table per crop and per phenological stage, and
+2. an agricultural engineer who will put their name and title to it.
+
+Until both arrive, the assembly step is the smaller half of the work and is blocked
+behind them.
+
+### Decision taken
+
+**[KAYIT]** The client side chose to accept the PDF as it stands rather than correct
+it or build page 5 first. Page 5 is **not** labelled as a future step on any
+customer-facing slide — an earlier instruction was explicit that "sıradaki adım"
+notes confuse the reader and do not belong in the deck. It is recorded here instead.
+
+### Two documents have now diverged
+
+**[ÖLÇÜLDÜ]** The generated deck artifact still holds 12 slides and does not contain
+Hüseyin's six pages. Anyone regenerating the PDF from it would silently drop them.
+Whoever next touches the presentation must start from Hüseyin's file, not from the
+artifact, or reconcile the two first.
