@@ -242,12 +242,17 @@ def test_the_fao_label_matches_the_world_file(aliases, world_countries):
 
 def test_no_name_is_claimed_by_two_countries(aliases):
     """An ambiguous name resolves to whichever entry is tried first, which is
-    an arbitrary answer dressed as a confident one."""
+    an arbitrary answer dressed as a confident one.
+
+    Two COUNTRIES may not share a name. One country repeating a name across its
+    own `tr` and `en` is ordinary and must stay allowed: roughly 45 of these are
+    spelled identically in both languages — Panama, Kenya, Malta, Belize, Yemen,
+    Sudan. Forbidding that forces an invented variant into one of the lists and
+    the name people actually type stops matching."""
     seen: dict[str, str] = {}
     for code, entry in aliases.items():
-        for name in entry["tr"] + entry["en"]:
-            key = name.strip().casefold()
-            assert key not in seen, f"{name!r} claimed by {seen.get(key)} and {code}"
+        for key in {name.strip().casefold() for name in entry["tr"] + entry["en"]}:
+            assert seen.get(key, code) == code,                 f"{key!r} claimed by {seen.get(key)} and {code}"
             seen[key] = code
 
 
@@ -300,6 +305,8 @@ One entry per code, in the order that command prints. Four rules:
 
 1. **`fao` is copied exactly** from the listing. A test compares them character for character.
 2. **`tr` is what a Turkish speaker types.** `Fransa`, `Özbekistan`, `Mısır`, `Hollanda`, `Yunanistan`. Where the everyday name differs from the formal one, list both.
+
+   **Where the two languages spell it the same, write the same spelling in both lists.** Panama, Kenya, Malta, Belize, Yemen, Sudan and about forty others are identical in Turkish and English. Put `Panama` in `tr` **and** in `en`. Never reach for an archaic or formal variant to make the lists differ — an earlier draft of this plan forbade the repetition by accident and it produced `British Honduras` for Belize, a name dropped in 1973, so an English speaker typing `Belize` would not have matched.
 3. **`en` is what an English speaker types**, which is often not FAOSTAT's label: FAOSTAT writes `Iran (Islamic Republic of)`, `China, mainland`, `Bolivia (Plurinational State of)`, `Democratic People's Republic of Korea`. Put `Iran`, `China`, `Bolivia`, `North Korea` in `en`. Nobody types a parenthesis.
 4. **A name belongs to exactly one country.** The `test_no_name_is_claimed_by_two_countries` gate is strict on purpose. FAOSTAT splits `China, mainland` (41), `China, Hong Kong SAR` (96), `China, Macao SAR` (128) and `China, Taiwan Province of` (214): give the bare `China` / `Çin` to **mainland, code 41**, and qualify the others (`Hong Kong`, `Makao`).
 
@@ -317,7 +324,7 @@ Do not invent a country that is not in the listing, and do not skip one because 
 - [ ] **Step 5: Run the tests**
 
 Run: `python -m pytest tests/test_country_aliases.py -q`
-Expected: PASS, 12 passed
+Expected: PASS, 11 passed
 
 - [ ] **Step 6: Report what you wrote**
 
