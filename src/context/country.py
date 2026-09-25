@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import re
 from functools import lru_cache
-from pathlib import Path
 
 from src.config import DATA_DIR
 from src.engine import _normalize_tr
@@ -54,7 +53,7 @@ def _load() -> dict[str, tuple[int, bool]]:
     that appears in BOTH lists (`Türkiye` is in both) keeps the Turkish branches.
     """
     try:
-        raw = json.loads(Path(_TABLE).read_text(encoding="utf-8"))
+        raw = json.loads(_TABLE.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             return {}
         folded: dict[str, tuple[int, bool]] = {}
@@ -310,6 +309,11 @@ def _matchers() -> tuple[tuple[int, str, tuple[re.Pattern[str], ...]], ...]:
     path is deliberately NOT gated and keeps "France'dayım" and "Italy'deyim"
     working; tests/test_country.py pins both directions, because widening
     `turkish` back would otherwise pass in silence.
+
+    CACHE: the result is keyed on nothing, so it cannot go stale in production -
+    _FOLDED is built once at import. A test that monkeypatches _FOLDED or
+    _ORDERED must call `_matchers.cache_clear()`, or it will match against the
+    table this ran on first.
     """
     built = []
     for key in _ORDERED:
