@@ -459,6 +459,20 @@ def test_northern_cyprus_is_refused_rather_than_placed(message):
     assert extract_country(message) is None
 
 
+@pytest.mark.parametrize("message, code", [
+    ("Dominika'dayım", 55),
+    ("Dominik Cumhuriyeti'ndeyim", 56),
+    ("Nijer'deyim", 158),
+    ("Nijerya'dayım", 159),
+])
+def test_a_longer_name_wins_over_the_shorter_one_inside_it(message, code):
+    """`Dominik` sits inside `Dominika` and `Nijer` inside `Nijerya`, and the
+    lenient suffix branch would accept the trailing letter as a case ending.
+    `location.py` sorts its keys longest-first for exactly this and nothing
+    pins that ordering; these four do."""
+    assert extract_country(message) == code
+
+
 def test_cyprus_itself_still_resolves():
     assert extract_country("Kıbrıs'tayım") == 50
 
@@ -579,7 +593,7 @@ existing `(?<!\w)` plus strict-suffix guards already block `fas` inside
 - [ ] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_country.py -q`
-Expected: PASS, 23 passed
+Expected: PASS, 27 passed
 
 If a collision test fails, **do not weaken it**. The guard it exercises is the reason this module is written the way it is; a failure means the regex is wrong, not the test.
 
