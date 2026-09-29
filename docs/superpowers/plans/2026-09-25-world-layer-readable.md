@@ -656,12 +656,23 @@ def test_a_province_always_wins_over_a_country():
     assert norm.price_per_kg.unit == "TL/kg"
 
 
-def test_turkiye_as_a_country_serves_tuik_not_faostat():
-    """FAOSTAT carries Türkiye too. It is a cross-check, not a source."""
+def test_turkiye_as_a_country_never_reaches_the_world_layer():
+    """FAOSTAT carries Türkiye (area 223) too, and it is a cross-check rather
+    than a source — so naming Türkiye must not fetch it.
+
+    What comes back is a CropNorm with empty measures, not a FAOSTAT figure,
+    because `data/crop_norms.json`'s national row is empty BY CONSTRUCTION:
+    553 measures carry a "TR" key and not one holds a value.
+    `scripts/build_crop_norms.py` ships it that way on purpose — "a mean of the
+    provinces is a number nobody published". A Turkish user who has not named
+    a province therefore gets nothing and the assistant asks, which is the same
+    thing `location.py` already does and yields better data than an average.
+
+    Do not "fix" this by averaging the provinces."""
     norm = norms.lookup(WHEAT, None, country=TURKIYE)
-    assert norm.yield_kg_da.scope == "tr"
-    assert norm.yield_kg_da.region == "Türkiye"
-    assert norm.price_per_kg.unit == "TL/kg"
+    assert norm is not None
+    for measure in (norm.yield_kg_da, norm.price_per_kg, norm.yield_kg_tree):
+        assert measure is None or measure.scope != "ulke"
 
 
 def test_no_country_and_no_province_is_todays_behaviour():
@@ -738,7 +749,7 @@ def _load_world() -> dict:
     answering, the same rule _load() follows for the Turkish one."""
 ```
 
-Load both files behind `lru_cache` the way `_load()` already does, returning `{}` on any failure. **Add them to whatever fixture clears `_load`'s cache in `tests/conftest.py`** so a test cannot see another test's file.
+Load both files behind `lru_cache` the way `_load()` already does, returning `{}` on any failure. **Clear their caches the way this project already does.** The fixture is `_clear_the_norms_cache` in `tests/test_norms.py`, local to that file by deliberate design — see `docs/superpowers/specs/2026-09-02-refusal-naming-and-cache-fixture-design.md`. Add a matching local fixture to your new test file rather than touching `tests/conftest.py`.
 
 Then a world picker beside `_pick`:
 

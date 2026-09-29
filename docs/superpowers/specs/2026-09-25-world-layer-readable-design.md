@@ -146,6 +146,8 @@ lookup(crop, province, country=None) -> CropNorm | None
 | Country is not Türkiye | FAOSTAT, that country | `"ulke"` |
 | Neither resolves | `None` | — |
 
+**The national row is empty by construction, so the second line of that table serves nothing today.** Measured 2026-09-25: 553 measures in `data/crop_norms.json` carry a `"TR"` key and not one holds a value. `scripts/build_crop_norms.py` ships it that way deliberately — *"a mean of the provinces is a number nobody published"*. A Turkish user who has not named a province therefore receives nothing and the assistant asks them, which is what `location.py` already does for the same reason and yields better data than an average would. The row stays in the table because that is where a national figure would go if TÜİK ever published one; nobody should close the gap by averaging.
+
 **The world layer never overrides TÜİK for Turkey.** FAOSTAT's Türkiye series is a
 cross-check, not a source of answers — settled in the previous spec and unchanged here.
 A Turkish user never receives a `"ulke"` figure.
