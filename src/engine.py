@@ -723,6 +723,142 @@ def _context_block(route: str, message: str, history: list[dict] | None,
     return "\n".join(lines)
 
 
+# FAOSTAT's flag letters, in Turkish. data/world_norms.json's meta.flags carries
+# the English glosses; these are their twins, and they live here because this is
+# the only surface that says them out loud.
+#
+# THERE IS NO ENTRY FOR None, and there must not be. A TÜİK figure carries no
+# flag at all, and a word for "no flag" would read as a provenance claim nobody
+# made. An UNKNOWN letter is printed as itself (see _flag_note) rather than
+# dropped: a flag FAOSTAT adds later must show up as an unexplained letter, not
+# vanish into silence.
+_FAO_FLAGS = {
+    "A": "ulkenin resmi bildirimi",
+    "B": "resmi deger, seride kopus var",
+    "E": "FAO tahmini, ulkenin kendi bildirimi degil",
+    "I": "FAO'nun atadigi deger",
+    "X": "dis kurulustan alinmis deger",
+}
+
+
+def _flag_note(flag: str | None) -> str:
+    """The provenance clause for one FAOSTAT cell, or "" when there is none."""
+    if not flag:
+        return ""
+    return _FAO_FLAGS.get(flag, f"FAOSTAT isareti {flag}")
+
+
+def _world_amount(amount: float) -> str:
+    """One world figure, Turkish-formatted, without rounding it into a lie.
+
+    Yields run to five digits and prices sit below one dollar - measured on the
+    shipped file, the smallest latest price is 0,0088 USD/kg - so a single
+    decimal count cannot serve both: two decimals prints that price as "0,01"
+    and four prints a yield as "597,3500". Split at 1, which is the only place
+    the two ranges meet.
+    """
+    from src.budget import format_qty, format_tr
+    return format_qty(amount) if amount >= 1 else format_tr(amount, 4)
+
+
+def _country_lines(message: str, history: list[dict] | None) -> list[str]:
+    """Where the user is when it is not a Turkish province, and what FAOSTAT
+    publishes for the crop they named there. Empty list when any of that is
+    missing - and it NEVER raises, the way _named_crops does not.
+
+    Read only after `extract_province` came back empty: a province is TÜİK and
+    TÜİK always wins, which is the rule `norms.lookup` states and this caller
+    must not contradict.
+
+    TÜRKİYE AS A COUNTRY IS NOT A COUNTRY HERE. `data/crop_norms.json`'s
+    national row is empty by construction, so a Turkish user who has not named
+    a province resolves to no figure and the assistant asks - exactly today's
+    behaviour, and this function returns [] before it can change it.
+
+    ONE CROP, THE FIRST NAMED. A crop_choice message naming two crops never
+    reaches this block at all: answer() forks it to the comparison card above.
+    So the choice between families only ever decides which of the ids INSIDE
+    one family answers, and that is settled by whichever of them FAOSTAT holds
+    a cell for - `Buğday (Hasıl/Yeşilot)` is green fodder and maps to nothing,
+    `Buğday, Durum Buğdayı Hariç` maps to item 15.
+
+    THE COUNTRY IS PRINTED AS FAOSTAT SPELLS IT - `France`, not `Fransa` - and
+    that is deliberate rather than laziness. The label is part of the figure's
+    provenance and travels on the value itself; translating it here would mint
+    a Turkish name for `Iran (Islamic Republic of)` and `China, mainland` that
+    no file in this repo publishes, and the alias table cannot supply one
+    either - it is folded lowercase and holds several spellings per country.
+    These lines are PROMPT context, not user-facing text, so the model is told
+    in the same line to write the country's Turkish name in its answer.
+    """
+    try:
+        from src import norms
+        from src.context import country as country_ctx
+
+        code = country_ctx.extract_country(message, history)
+        if code is None or code == norms.TURKIYE_AREA:
+            return []
+        families = _named_crops(message)
+        if not families:
+            return []
+        family = _normalize_tr(re.split(r"\s*[(,]", families[0])[0].strip())
+        norm = None
+        for crop_id, label in norms.available_crops():
+            if _normalize_tr(re.split(r"\s*[(,]", label)[0].strip()) != family:
+                continue
+            candidate = norms.lookup(crop_id, None, country=code)
+            if candidate is not None and (candidate.yield_kg_da
+                                          or candidate.price_per_kg):
+                norm = candidate
+                break
+        if norm is None:
+            return []
+
+        measures = [("ortalama verimi", norm.yield_kg_da),
+                    ("ortalama ciftci fiyati", norm.price_per_kg)]
+        figures = []
+        for what, value in measures:
+            # A figure that is not positive is not printed. FAOSTAT publishes
+            # a handful of zero yields and this module's own rule is that a
+            # missing norm is never zero - "ulke ortalama verimi 0 kg/da" in a
+            # prompt is an invitation to answer that nothing grows there.
+            if value is None or value.scope != "ulke" or value.amount <= 0:
+                continue
+            note = _flag_note(value.flag)
+            # THE YEAR IS THE CELL'S OWN and is printed beside every figure,
+            # never once for the block: FAOSTAT ends at 2024 where TÜİK reaches
+            # 2025, and the two measures need not even share a year with each
+            # other - Ghana's sorghum yield is 2024 and its price 2022.
+            figures.append(
+                f"{norm.label} - FAOSTAT ulke {what}: "
+                f"{_world_amount(value.amount)} {value.unit} "
+                f"({value.year}{', ' + note if note else ''})."
+            )
+        if not figures:
+            return []
+
+        region = (norm.yield_kg_da or norm.price_per_kg).region
+        return [
+            f"Kullanici Turkiye disinda: {region} - FAOSTAT'in yazdigi ad, "
+            f"cevabinda ulkenin Turkce adini kullan. TUIK il verisi bu ulke "
+            f"icin yok, hangi ilde oldugunu SORMA.",
+            *figures,
+            # "tahmin" is deliberately NOT used in this sentence, although it
+            # is the natural Turkish word for it: the E flag's own clause above
+            # is the only place that word may appear, so a test can tell an
+            # estimate apart from a country's own report by looking for it.
+            "Bu rakamlar ULKE ORTALAMASIDIR, tarlaya ozel bir rakam degil; her "
+            "rakamin yani sira yili ve kaynagi yazili, baska bir yila veya "
+            "TUIK'e mal etme.",
+        ]
+    except Exception as exc:  # noqa: BLE001
+        # The same bargain _named_crops makes: a failure here costs these lines
+        # and nothing else, and it SAYS SO rather than looking like a country
+        # that simply did not resolve.
+        print(f"[engine] country context failed, continuing without it: {exc}")
+        return []
+
+
 def _crop_choice_block(message: str, history: list[dict] | None,
                        today: date) -> str:
     """Situation lines for the crop-choice route: where, when, and the factors
@@ -744,8 +880,17 @@ def _crop_choice_block(message: str, history: list[dict] | None,
     if province:
         lines.append(f"Kullanicinin ili: {province}.")
     else:
-        lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
-                     "oldugunu sor.")
+        # Only once the province came back empty, and only as a REPLACEMENT for
+        # the line that asks for one: a block that both names France and asks a
+        # French grower which Turkish province he is in contradicts itself.
+        # With no country, or with a country we hold no figure for, nothing
+        # changes - the ask stands exactly as it did.
+        world = _country_lines(message, history)
+        if world:
+            lines.extend(world)
+        else:
+            lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
+                         "oldugunu sor.")
     lines.append("Bu bir urun secimi sorusu. Karari belirleyen faktorleri anlat "
                  "ve eksik olanlari sor: toprak yapisi ve analiz, sulama imkani, "
                  "arazi buyuklugu, onceki urun ve munavebe, pazara mesafe, "

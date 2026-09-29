@@ -160,6 +160,25 @@ class NormValue:
     # years carry a value - one number is not a range.
     recent_min: float | None = None
     recent_max: float | None = None
+    # FAOSTAT's provenance letter for THIS cell - "A" a country's own report,
+    # "E" FAO's estimate, "X" an outside organization, "B" a series break, "I"
+    # imputed; data/world_norms.json's meta.flags glosses all five. 41,3% of the
+    # shipped yield cells carry "E", so a world figure printed without it would
+    # be attributed to a country that never reported it.
+    #
+    # None for every TÜİK figure: that file publishes no per-cell flag. None
+    # therefore means "this source carries no flag", NEVER "official" - a
+    # surface that prints a word for None would be inventing provenance.
+    #
+    # WHY A FIELD RATHER THAN RE-READING THE CELL AT THE POINT OF USE. Reaching
+    # back into the file would mean rebuilding the "<item>|<area>" key and
+    # re-running _pick_world's walk to the most recent non-null year, so the
+    # rule deciding WHICH year answers would exist in two places. They agree
+    # until one changes, and then a figure from one year prints a flag from
+    # another, silently and provably wrong. far_below_recent's docstring records
+    # what that cost the last time two surfaces decided one measure separately.
+    # Defaulted, and last, so every existing positional construction stands.
+    flag: str | None = None
 
 
 # ONE FIFTH, AND THIS NUMBER IS TUNED RATHER THAN ARGUED. Measured over the
@@ -301,6 +320,11 @@ def _pick_world(cells: dict | None, area: int, unit: str) -> NormValue | None:
                 scope="ulke",
                 region=region,
                 unit=unit,
+                # cell is [amount, flag]. A cell short of a second element, or
+                # carrying something that is not a letter, yields None rather
+                # than a guess: an unflagged figure is printed as unflagged.
+                flag=(cell[1] if len(cell) >= 2 and isinstance(cell[1], str)
+                      and cell[1].strip() else None),
             )
     return None
 

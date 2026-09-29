@@ -1530,6 +1530,118 @@ def test_a_crop_choice_failure_degrades_to_an_empty_block(monkeypatch):
         "crop_choice", "Bu yıl ne eksem?", None, date(2026, 8, 11)) == ""
 
 
+# --------------------------------------------------------------------------- #
+# The world layer reaches the crop_choice block
+# --------------------------------------------------------------------------- #
+# These read the SHIPPED data/world_norms.json, the way tests/test_norms_world.py
+# does. The figures and flags below are what that file holds today; if it is
+# ever rebuilt and one of them moves, the assertion that fails names the cell -
+# pick another country with the same flag rather than dropping the assertion.
+def test_a_country_figure_reaches_the_prompt_with_its_source():
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "France" in block
+    assert "kg/da" in block
+    assert "USD/kg" in block
+    # Where it came from, beside the number: the source and the cell's own year.
+    assert "FAOSTAT" in block
+    assert "2024" in block
+
+
+def test_a_foreign_grower_is_not_asked_for_a_turkish_province():
+    """The country line REPLACES the ask, it does not sit beside it. A block
+    that names France and still says "ask which il he is in" would have the
+    assistant asking a French grower for a Turkish province."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "BILINMIYOR" not in block
+    # The factors are unchanged - the country costs the location line, nothing else.
+    assert "toprak" in block and "ONERME" in block
+
+
+def test_a_world_figure_says_when_it_is_an_estimate():
+    """41,3% of the shipped world yield cells carry FAOSTAT's `E` flag - the
+    figure is FAO's estimate, not a country's report. This project prints a
+    number with where it came from or does not print it.
+
+    Ghana's sorghum yield is such a cell. The caution line deliberately avoids
+    the word "tahmin" so that finding it here means the FLAG reached the
+    sentence, not the boilerplate."""
+    block = engine._crop_choice_block("Gana'dayım, sorgum ekiyorum",
+                                      None, date(2026, 9, 25))
+    assert "Ghana" in block
+    assert "125,99 kg/da (2024, FAO tahmini" in block
+
+
+def test_a_figure_from_an_outside_source_is_not_called_an_estimate():
+    """`E` is not the only flag that means "not the country's own report", and
+    the two must not be collapsed. Nigeria's sorghum yield is `X`, a figure
+    FAOSTAT took from an outside organization - said as that, not as a FAO
+    estimate."""
+    block = engine._crop_choice_block("Nijerya'dayım, sorgum ekiyorum",
+                                      None, date(2026, 9, 25))
+    assert "106,56 kg/da (2024, dis kurulustan alinmis deger)" in block
+    assert "tahmin" not in block.lower()
+
+
+def test_each_world_measure_carries_its_own_year():
+    """FAOSTAT ends at 2024 where TÜİK reaches 2025, and its two measures need
+    not even agree with each other: Ghana's sorghum yield is 2024 and its price
+    2022. One year printed for the block would misdate one of them."""
+    block = engine._crop_choice_block("Gana'dayım, sorgum ekiyorum",
+                                      None, date(2026, 9, 25))
+    assert "(2024," in block
+    assert "0,4644 USD/kg (2022," in block
+
+
+def test_a_turkish_user_still_gets_tuik():
+    block = engine._crop_choice_block("Konya'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "Konya" in block
+    assert "France" not in block
+    assert "FAOSTAT" not in block
+
+
+def test_an_unresolved_country_asks_rather_than_guessing():
+    block = engine._crop_choice_block("buğday mı ekmeliyim", None,
+                                      date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "FAOSTAT" not in block
+
+
+def test_turkiye_named_as_a_country_still_asks_for_the_province():
+    """`data/crop_norms.json`'s national row is empty BY CONSTRUCTION, so a
+    Turkish user who has not named a province gets no figure and the assistant
+    asks - exactly as it did before the world layer existed. Türkiye must never
+    fall through to FAOSTAT's own area 223."""
+    block = engine._crop_choice_block("Türkiye'deyim, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "FAOSTAT" not in block
+
+
+def test_a_country_with_no_crop_named_is_unchanged():
+    """The country's NAME only exists on a figure - it is FAOSTAT's label,
+    carried on the value - so a question that names no crop has nothing to
+    print and keeps today's behaviour."""
+    block = engine._crop_choice_block("Fransa'dayım, bu yıl ne eksem?", None,
+                                      date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "France" not in block
+
+
+def test_a_country_layer_failure_costs_only_its_own_lines(monkeypatch):
+    """A context line is a convenience. The country layer failing must cost the
+    country lines and leave the province ask, the season and the factors."""
+    monkeypatch.setattr("src.context.country.extract_country",
+                        lambda m, h=None: (_ for _ in ()).throw(RuntimeError("boom")))
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "toprak" in block and "ONERME" in block
+    assert "FAOSTAT" not in block
+
+
 def test_crop_choice_never_gets_a_framing_sentence():
     """`crop_choice` has no reviewed programme behind it, so it gets no framing
     suffix. This passes today by virtue of the `route != "fert_plan"` guard; it is
