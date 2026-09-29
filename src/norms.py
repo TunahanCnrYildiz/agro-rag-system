@@ -31,6 +31,9 @@ from pathlib import Path
 from src.config import DATA_DIR
 
 _PATH = DATA_DIR / "crop_norms.json"
+_WORLD = DATA_DIR / "world_norms.json"
+_FAO_MAP = DATA_DIR / "crop_fao_map.json"
+TURKIYE_AREA = 223   # FAOSTAT carries Türkiye; TÜİK is better and wins. See _resolve.
 
 NATIONAL_KEY = "TR"
 NATIONAL_LABEL = "Türkiye"
@@ -93,6 +96,46 @@ def _load() -> dict:
                             for m in _OPTIONAL_MEASURES if m in crop)):
                 crops[crop_id] = crop
         return {"years": years, "crops": crops}
+    except Exception:  # noqa: BLE001 - a broken data file must not break answering
+        return {}
+
+
+@lru_cache(maxsize=1)
+def _load_world() -> dict:
+    """The world layer, or an empty mapping. A broken file must not break
+    answering, the same rule _load() follows for the Turkish one.
+
+    Kept as the raw structure (meta/items/countries/yield/price) rather than
+    reshaped into crop_norms.json's shape: the two files have different axes
+    - a Turkish measure is a scope plus a year-indexed list, a world one is a
+    "<item>|<area>" key plus a year-string-keyed dict - and forcing one shape
+    onto the other would hide that difference instead of representing it.
+    """
+    try:
+        raw = json.loads(Path(_WORLD).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return {}
+        if not all(isinstance(raw.get(k), dict) for k in ("yield", "price", "countries")):
+            return {}
+        return raw
+    except Exception:  # noqa: BLE001 - a broken data file must not break answering
+        return {}
+
+
+@lru_cache(maxsize=1)
+def _load_fao_map() -> dict:
+    """Turkish crop id -> {"fao": item code or None, ...}, or an empty mapping.
+
+    Returns the inner "map" table rather than the whole file: every caller
+    wants one crop's entry, and the "generated" key that sits beside "map" in
+    the file is provenance for a diff, not something a lookup needs.
+    """
+    try:
+        raw = json.loads(Path(_FAO_MAP).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return {}
+        table = raw.get("map")
+        return table if isinstance(table, dict) else {}
     except Exception:  # noqa: BLE001 - a broken data file must not break answering
         return {}
 
@@ -223,8 +266,73 @@ def _pick(measure: dict, years: list[int], province: str | None,
     return None
 
 
+def _pick_world(cells: dict | None, area: int, unit: str) -> NormValue | None:
+    """The most recent year in one `"<item>|<area>"` series.
+
+    `cells` is that series already: a year-string -> [amount, flag] mapping,
+    with its own year axis rather than the Turkish file's - FAOSTAT ends at
+    2024 where TÜİK reaches 2025, and the year returned must be the cell's
+    own, never borrowed from `years` the way `_pick` uses it.
+
+    No `recent_min`/`recent_max`: the five-year spread printed beside a Turkish
+    figure comes from the same source as the figure. Mixing a FAOSTAT range
+    into a surface built for TÜİK's would put two different things behind one
+    label, so the range is left None until a surface asks for it.
+    """
+    if not isinstance(cells, dict) or not cells:
+        return None
+    countries = _load_world().get("countries", {})
+    country_entry = countries.get(str(area))
+    region = country_entry.get("label") if isinstance(country_entry, dict) else None
+    if not isinstance(region, str):
+        return None
+    for year_str in sorted(cells, key=lambda y: int(y), reverse=True):
+        cell = cells.get(year_str)
+        if (isinstance(cell, list) and len(cell) >= 1
+                and isinstance(cell[0], (int, float)) and not isinstance(cell[0], bool)
+                and math.isfinite(cell[0])):
+            try:
+                year = int(year_str)
+            except (TypeError, ValueError):
+                continue
+            return NormValue(
+                amount=float(cell[0]),
+                year=year,
+                scope="ulke",
+                region=region,
+                unit=unit,
+            )
+    return None
+
+
+def _resolve_world(crop_id: str, entry: dict, country: int) -> CropNorm:
+    """One crop's figures from the world layer, for one country.
+
+    `entry` is the Turkish crop_norms.json entry, kept only for its label -
+    the crop is named the same way whichever layer answers for it. A crop
+    with no FAO mapping, or a mapping with no cell for this area, comes back
+    as a CropNorm whose measures are None rather than as None itself: the
+    crop exists, the figure does not, and the caller prefills what it can.
+    """
+    mapping = _load_fao_map().get(crop_id)
+    fao_item = mapping.get("fao") if isinstance(mapping, dict) else None
+    yield_val = None
+    price_val = None
+    if fao_item is not None:
+        world = _load_world()
+        key = f"{fao_item}|{country}"
+        yield_val = _pick_world(world.get("yield", {}).get(key), country, "kg/da")
+        price_val = _pick_world(world.get("price", {}).get(key), country, "USD/kg")
+    return CropNorm(
+        crop=crop_id,
+        label=entry["label"],
+        yield_kg_da=yield_val,
+        price_per_kg=price_val,
+    )
+
+
 def _resolve(crop_id: str, entry: dict, years: list[int],
-             province: str | None) -> CropNorm:
+             province: str | None, country: int | None = None) -> CropNorm:
     """One crop's norms for one province.
 
     Shared by lookup() and province_table() so the two cannot drift: the budget
@@ -234,6 +342,11 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
     between the two functions could never surface as the server rejecting a
     figure it had itself just sent.
     """
+    # A province beats a country beats nothing. Türkiye as a country resolves
+    # to the national TÜİK row, never to FAOSTAT's area 223 - that series is a
+    # cross-check and the previous spec settled it.
+    if province is None and country is not None and country != TURKIYE_AREA:
+        return _resolve_world(crop_id, entry, country)
     return CropNorm(
         crop=crop_id,
         label=entry["label"],
@@ -244,18 +357,22 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
     )
 
 
-def lookup(crop: str, province: str | None) -> CropNorm | None:
+def lookup(crop: str, province: str | None, country: int | None = None) -> CropNorm | None:
     """Norms for a crop, or None when the file does not carry it.
 
     A measure that resolves to nothing is None on the result rather than absent,
     so the caller prefills the fields it can and leaves the rest to the user.
+
+    `country` is a FAOSTAT area code, consulted only when `province` resolves
+    to nothing - a province is always TÜİK and always wins. See _resolve for
+    why Türkiye as a country still serves TÜİK, not FAOSTAT's own area 223.
     """
     data = _load()
     entry = data.get("crops", {}).get(crop)
     if entry is None:
         return None
     years = data["years"]
-    return _resolve(crop, entry, years, province)
+    return _resolve(crop, entry, years, province, country)
 
 
 def latest_year() -> int | None:
