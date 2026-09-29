@@ -88,9 +88,78 @@ def test_a_substance_in_an_ambiguous_name_is_not_a_location(message):
     `and`, the comma and the full stop all did, and `phosphorus in turkey and
     chicken manure` resolved to Türkiye under every version of that list.
 
-    What separates them is the capital letter, so that is what the rule reads
-    now. The first three resolved to Türkiye, Niger and Chile before it."""
+    One of the two things that separates them is the capital letter, and it is
+    the one these seven need. The first three resolved to Türkiye, Niger and
+    Chile before it. The capitalised half of the class is a different rule
+    entirely — see the compound-noun test below."""
     assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "the protein in Sudan grass is high",
+    "we compared yields in Guinea grass",
+    "the oil in Brazil nuts",
+    "kaolin in China clay",
+    "capsaicin in Chile peppers",
+    "the oil in Niger seed",
+    "we work at Turkey farms",
+    "I raise birds in Turkey houses",
+    "in India ink",
+    "in Panama hats",
+    "the protein in sudan grass",
+])
+def test_a_capitalised_compound_noun_is_not_a_location(message):
+    """The class the capital letter does NOT close, because in this domain the
+    compound noun is capitalised too. `Sudan grass`, `Guinea grass`, `Brazil
+    nut`, `China clay`, `Chile pepper` and `Niger seed` are the standard
+    orthography for a plant named after a proper noun, not typos, and this is
+    where an agriculture assistant's English traffic lives.
+
+    Measured with the capitalisation gate alone and nothing else: 276, 90, 21,
+    41, 40, 158, 223, 223, 100, 166, 276. The gate refuses none of them. What
+    refuses them is the head noun — an open-class noun immediately after the
+    name means the country is MODIFYING it, not stating where anyone is.
+
+    The two rules fail on disjoint inputs, which is why this one was added
+    beside the capital rather than in place of it: the lowercase test above
+    needs the capital, these eleven need the head noun."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "in Kenya seed is expensive",
+    "in Turkey oil prices rose",
+])
+def test_the_head_noun_rule_costs_the_bare_noun_that_follows(message):
+    """What the head-noun rule charges, pinned so it stays visible. A location
+    sentence whose next word happens to be one of the listed nouns standing on
+    its own is refused. Both of these are real shapes and both resolved before.
+    Taken because the compound reading dominates each of those words in this
+    assistant's traffic and the failure is in the safe direction — and it is why
+    the list is short and nominal."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("My farm is in Spain with clay soil", SPAIN),
+    ("I am in Brazil and we sell Brazil nuts", BRAZIL),
+    ("we sell Brazil nuts, I am in Brazil", BRAZIL),
+])
+def test_the_head_noun_must_sit_immediately_after_the_name(message, code):
+    """Adjacency is load-bearing, exactly as it is for the Turkish place nouns.
+    `clay` and `nuts` are both on the list and all three of these still resolve:
+    the first has a preposition between the name and the noun, and the other two
+    mention the compound somewhere ELSE in a message that plainly says where the
+    user is. Refusing per KEY rather than per MENTION would answer nothing to
+    both of those."""
+    assert extract_country(message) == code
+
+
+def test_a_refused_mention_does_not_eat_a_good_one_later():
+    """Per-mention refusal has to keep WALKING. `in turkey houses` is refused by
+    the head noun, and the branch must go on to the next occurrence rather than
+    give the sentence up - stopping at the first match answered nothing here."""
+    assert extract_country("I work in turkey houses but I am in Turkey") == TURKIYE
 
 
 @pytest.mark.parametrize("message", [
@@ -112,18 +181,18 @@ def test_the_capitalisation_rule_costs_the_lowercase_typist(message):
 
 
 @pytest.mark.parametrize("message, code", [
-    ("I am in Turkey", TURKIYE),
-    ("I live in Brazil", BRAZIL),
-    ("my farm is in Georgia", 73),
-    ("I am in Chile", 40),
-    ("Mali'deyim", 133),
-    ("Peru'dayım", 170),
-    ("TURKEY", TURKIYE),
+    ("i am in india", INDIA),
+    ("i am in panama", 166),
+    ("i am in morocco", MOROCCO),
+    ("i am in japan", 110),
 ])
-def test_the_same_ambiguous_names_resolve_when_capitalised(message, code):
-    """The other half, as always. All twelve stay reachable - the rule asks for a
-    capital letter, not for a different word. "TURKEY" counts: all-caps is a
-    shout, not a common noun."""
+def test_a_compound_only_hazard_is_closed_without_gating_the_name(message, code):
+    """`India ink`, `Panama hats`, `Morocco leather` and `Japan wax` are all
+    compound nouns of the hazardous shape, and the head-noun rule refuses all
+    four (see the compound test above for the first two). None of these names is
+    an ordinary English noun on its own, so none of them is gated on a capital -
+    which is what adding them to the ambiguous list would have cost. Refusing at
+    the right axis costs their lowercase typists nothing."""
     assert extract_country(message) == code
 
 
@@ -394,8 +463,14 @@ def test_a_gerund_after_the_country_no_longer_costs_the_sentence(message, code):
     farming`, and charged every innocent sentence of the same shape for it —
     all three of these resolved to nothing. Capitalisation separates the two
     classes directly, so `in turkey growing` is still refused (see the lowercase
-    test above) while these are not. Strictly better than the trade it
-    replaces."""
+    test above) while these are not.
+
+    A TRADE, not the "strict improvement" an earlier version of this docstring
+    claimed. The same relaxation admitted "we work at Turkey farms" -> 223 and
+    "I raise birds in Turkey houses" -> 223, which the tail rule had been
+    refusing. The head-noun rule takes that half back and deliberately does not
+    re-refuse the gerund: `growing` and `farming` are the same words as "I am in
+    Turkey farming wheat", which is exactly the class being defended here."""
     assert extract_country(message) == code
 
 
