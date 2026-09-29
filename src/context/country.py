@@ -411,7 +411,15 @@ def _matchers() -> tuple[
         # characters.
         built.append((code, key, cap, (
             re.compile(rf"(?<!\w)(?P<name>{k})'{_NOT_ABLATIVE}"),
-            re.compile(rf"(?<!\w)(?P<name>{k}){_NOT_ABLATIVE}{suffix}(?!\w)"
+            # `(?!['\w])` and not `(?!\w)`: an apostrophe here means the real
+            # proper noun runs on and a SHORTER key has eaten its trailing vowel
+            # as a case suffix. "Dominika'dan tohum aldim" matched key `dominik`
+            # + `a` and stopped at the apostrophe, never reaching the `'dan` that
+            # _NOT_ABLATIVE refuses - so a purchase read as a location AND as the
+            # wrong country (56 Dominican Republic for 55 Dominica; 158 Niger for
+            # 159 Nigeria). Turkish attaches the apostrophe BEFORE the suffix on a
+            # proper noun ("Ankara'da"), never after, so nothing legitimate is lost.
+            re.compile(rf"(?<!\w)(?P<name>{k}){_NOT_ABLATIVE}{suffix}(?!['\w])"
                        if turkish else never),
             re.compile(rf"(?<!\w)(?P<name>{k})\s+{_PLACE}(?!\w)"
                        if turkish else never),

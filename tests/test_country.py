@@ -438,3 +438,32 @@ def test_naming_the_trnc_refuses_the_whole_message():
 def test_an_assistant_turn_is_never_evidence():
     history = [{"role": "assistant", "content": "Fransa'da buğday verimi yüksektir"}]
     assert extract_country("peki bizde?", history) is None
+
+
+@pytest.mark.parametrize("message", [
+    "Dominika'dan tohum aldım",
+    "Dominika'den tohum aldım",
+    "Nijerya'dan tohum aldım",
+    "Nijerya'den tohum aldım",
+])
+def test_a_shorter_key_cannot_eat_a_longer_name_and_miss_its_ablative(message):
+    """The worst shape this module can produce: a purchase read as a location
+    AND as the wrong country.
+
+    `dominik` matched inside `Dominika` by eating the trailing `a` as a case
+    suffix and stopping at the apostrophe, so it never reached the `'dan` that
+    the ablative guard refuses — answering 56 Dominican Republic for a sentence
+    about buying seed from 55 Dominica. Same shape for `nijer` inside `Nijerya`.
+    Measured across every alias in an ablative purchase frame: 452 refused
+    correctly, these four were the whole of the damage."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Dominika'dayım", 55),
+    ("Nijerya'dayım", 159),
+])
+def test_the_apostrophe_guard_does_not_cost_the_genuine_locative(message, code):
+    """The other half. Turkish attaches the apostrophe BEFORE the suffix on a
+    proper noun, so refusing a suffix match that runs into one loses nothing."""
+    assert extract_country(message) == code
