@@ -240,7 +240,7 @@ _EN_IN = r"(?:in|at)\s+"
 # accepting a supplier places the grower in the wrong country in silence.
 _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 
-# HAZARD: a bare preposition is NOT evidence either, because twelve English
+# HAZARD: a bare preposition is NOT evidence either, because eleven English
 # country names are also ordinary English nouns - and in an agriculture
 # assistant they are ordinary WORKING nouns. `from turkey farms` satisfied
 # `(?:in|from|at)\s+turkey(?!\w)` because a space is not a word character, and
@@ -273,8 +273,8 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # ONE RULE THAT SEPARATES THEM is the one English itself uses: proper nouns are
 # CAPITALISED. `Turkey` is the country and `turkey` is the bird, and the same
 # line divides `Chile`/`chile`, `China`/`china`, `Brazil`/`brazil`,
-# `Niger`/`niger`. So for these twelve names ONLY, the name must also appear
-# Capitalised in the ORIGINAL text; the other 187 keep their old behaviour
+# `Niger`/`niger`. So for these eleven names ONLY, the name must also appear
+# Capitalised in the ORIGINAL text; the other 188 keep their old behaviour
 # unchanged, because `Egypt`, `France` and `Kenya` are not words.
 #
 # IT IS ONLY ONE OF TWO RULES, and that is the correction this revision exists
@@ -295,7 +295,7 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # WHAT THE CAPITAL LETTER COSTS, measured:
 #  * A user who types all-lowercase gets a refusal where they used to get a
 #    placement: "i am in turkey" resolves to nothing. That is the safe direction
-#    - the assistant asks - and it falls on twelve names out of 199, not on the
+#    - the assistant asks - and it falls on eleven names out of 199, not on the
 #    table. It is the price this rule was chosen knowing about.
 #  * It buys NOTHING against the capitalised compound noun, per the ten measured
 #    figures above. Everything refused there is refused by _EN_HEAD, and if
@@ -309,10 +309,20 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 #    _EN_HEAD takes the second half back and deliberately does NOT re-refuse the
 #    gerund - see the REJECTED note there.
 #
-# `Mali` and `Peru` are spelled the same in Turkish, so they are ONE key and the
-# requirement reaches their Turkish branches too: "malide yasiyorum" is refused
-# where "Mali'deyim" is not. For `mali`, which is also the Turkish adjective for
-# fiscal, that direction is a gain rather than a cost.
+# `Mali` is spelled the same in Turkish, so it is ONE key and the requirement
+# reaches its Turkish branches too: "malide yasiyorum" is refused where
+# "Mali'deyim" is not. `mali` is also the Turkish adjective for fiscal, so that
+# direction is a gain rather than a cost. `Sudan` is the same shape and is here
+# for the same reason: sudangrass is a standard forage, measured "the protein in
+# sudan grass" -> 276 before this revision, with the name lowercase and ungated.
+#
+# `peru` AND `cuba` WERE REMOVED, having been listed with no ambiguity to justify
+# the charge. Neither is an ordinary English noun, and the gate was costing their
+# lowercase forms for nothing: measured before the removal, "i am in peru",
+# "perudayim" and "i am in cuba" all resolved to nothing, and they resolve to
+# 170, 170 and 49 now. `peru` is one key across both languages like `mali`, so
+# the charge had reached the Turkish branches as well. The compound nouns they do
+# appear in - `Peru balsam` - are _EN_HEAD's business, not this gate's.
 #
 # HAND-KEPT, and it has to be: this is a claim about English vocabulary, and no
 # property of the alias table can derive it. A new alias that is also an English
@@ -321,8 +331,8 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # TESTED ON THE ORIGINAL TEXT, not the folded text: _normalize_tr lowercases, so
 # the signal is gone by the time the branches run. _find therefore takes both.
 _AMBIGUOUS_EN = frozenset({
-    "brazil", "chad", "chile", "china", "cuba", "georgia",
-    "guinea", "jordan", "mali", "niger", "peru", "turkey",
+    "brazil", "chad", "chile", "china", "georgia",
+    "guinea", "jordan", "mali", "niger", "sudan", "turkey",
 })
 
 # HAZARD, and the one the capitalisation gate above does not touch: a country
@@ -358,7 +368,7 @@ _AMBIGUOUS_EN = frozenset({
 # Brazil growing soy" (21, measured), which is the class the tail whitelist was
 # already charged with killing. The head-noun list stays nominal.
 #
-# APPLIED TO EVERY KEY, not just the twelve above. `India`, `Panama`, `Morocco`
+# APPLIED TO EVERY KEY, not just the eleven above. `India`, `Panama`, `Morocco`
 # and `Japan` are not ordinary English nouns and are NOT gated on a capital, but
 # `India ink`, `Panama hats`, `Morocco leather` and `Japan wax` are all compound
 # nouns of exactly this shape - measured, "in India ink" -> 100 and "in Panama
@@ -431,22 +441,23 @@ def _matchers() -> tuple[
     longer where the time goes.
 
     WHERE THE TIME GOES NOW, and it is no longer the cache. Measured on one
-    machine in one run, so these figures are comparable with each other and with
-    nothing else: 1.29 ms for a message that matches nothing, 1.34 ms for a
-    two-country sentence, 0.22 ms when the message opens with the country and
-    _find can break at position 0. The cost is the five scans of the text per
-    key in _find, not the six patterns built here; the head-noun and
-    capitalisation tests add no scan at all, because they are anchored at a
-    position a branch has already found.
+    machine over four runs of 400 calls, so these figures are comparable with
+    each other and with nothing else: 1.24-1.34 ms for a message that matches
+    nothing, 1.29-1.37 ms for a two-country sentence, 0.21-0.22 ms when the
+    message opens with the country and _find can break at position 0. The cost is
+    the five scans of the text per key in _find, not the six patterns built here;
+    the head-noun and capitalisation tests add no scan at all, because they are
+    anchored at a position a branch has already found.
 
     THE 1.4 ms QUOTED ABOVE FOR THE PROVINCE TWIN IS HISTORICAL, from the same
-    2026-09-25 run as the 272 ms, and it is not this machine. Measured here in
-    the run above, location.extract_province costs 0.28 ms on the same no-match
-    message, so this module is ~4.6x its twin rather than under it. That is the
-    honest shape: 199 keys and five branches against 81 keys and four, on a
-    module consulted once per answer. Nothing here is a regression to chase -
-    two revisions of guards moved it from 1.22 to 1.29 ms - but do not read the
-    old 1.4 ms as headroom this still fits inside.
+    2026-09-25 run as the 272 ms, and it is not this machine. Measured here
+    alongside the figures above, location.extract_province costs 0.28 ms on the
+    same no-match message, so this module is ~4.5x its twin rather than under it.
+    That is the honest shape: 199 keys and five branches against 81 keys and
+    four, on a module consulted once per answer. Nothing here is a regression to
+    chase - the two revisions of guards before this one moved it from 1.22 to
+    ~1.3 ms, and this one did not move it - but do not read the old 1.4 ms as
+    headroom this still fits inside.
 
     Keys stay longest-first and that IS still load-bearing, for the 34 substring
     pairs - see _find, where longest-first decides ties. The order WITHIN the
@@ -457,14 +468,12 @@ def _matchers() -> tuple[
     THE ORIGIN BRANCH IS SEPARATE from the other four because it is ranked below
     them, not because it matches differently; see _EN_IN and _find.
 
-    THE CAPITALISATION TEST IS None FOR ALL BUT TWELVE KEYS. It is a whole-text
-    precondition rather than part of a branch: the branches read folded text and
-    the case is already gone there. First letter upper, the rest any case, so
-    "TURKEY" counts as capitalised - all-caps is a shout, not a common noun.
-
-    THE HEAD-NOUN TEST IS BUILT FOR EVERY KEY, and unlike the capitalisation it
-    is a precondition on a matched OCCURRENCE rather than on the text; see
-    _admits.
+    THE CAPITALISATION TEST IS None FOR ALL BUT ELEVEN KEYS, and the head-noun
+    test is built for every key. Both are preconditions on a matched OCCURRENCE
+    rather than part of a branch: the branches read folded text, where the case
+    is already gone, and neither test belongs inside a pattern that four branches
+    share. First letter upper, the rest any case, so "TURKEY" counts as
+    capitalised - all-caps is a shout, not a common noun.
 
     A name spelled in ENGLISH gets neither the Turkish case suffix nor the
     Turkish place noun. Nobody writes "Germanyde" or "France bolgesinde" - the
@@ -499,16 +508,20 @@ def _matchers() -> tuple[
         # this way keeps the tuple one shape and _find free of language tests.
         # It still carries the `name` group every branch is read through.
         never = r"(?P<name>(?!))"
-        # Only the twelve ambiguous names carry the test; the rest get None and
-        # are never asked. `key` is ASCII for all twelve, so the capital can be
+        # Only the eleven ambiguous names carry the test; the rest get None and
+        # are never asked. `key` is ASCII for all eleven, so the capital can be
         # taken straight off it - no Turkish letter needs unfolding.
+        #
+        # The lookbehind is kept although _find only ever anchors this pattern at
+        # a position a branch already cleared one for: the whole-text fallback
+        # below uses .search, and that one needs it.
         cap = (re.compile(rf"(?<!\w){key[0].upper()}(?i:{re.escape(key[1:])})(?!\w)")
                if key in _AMBIGUOUS_EN else None)
         # Anchored at the name, never searched: _find matches it at the position
         # a branch reported, so "Brazil nuts" mentioned elsewhere in the message
-        # cannot refuse an "I am in Brazil" that stands on its own. The
-        # lookbehind is redundant at such a position and kept only so the pattern
-        # reads like its four neighbours.
+        # cannot refuse an "I am in Brazil" that stands on its own. That is the
+        # same per-occurrence rule the capitalisation test now follows, and for
+        # the same reason - see _find.
         head = re.compile(rf"(?<!\w){k}\s+{_EN_HEAD}(?!\w)")
         # The country name is captured so _find can compare WHERE each branch
         # matched. Without it the English branch would report the position of
@@ -549,19 +562,43 @@ def _refuses(folded: str) -> bool:
     return bool(_NO_AREA.search(folded))
 
 
-def _admits(head: re.Pattern[str], folded: str, pos: int) -> bool:
+def _admits(cap: re.Pattern[str] | None, head: re.Pattern[str],
+            folded: str, original: str, aligned: bool, pos: int) -> bool:
     """True when the country name AT `pos` may place the user.
 
-    Asked of ONE OCCURRENCE rather than of the whole text per key, which is the
-    difference between refusing a phrase and refusing a name. "I am in Brazil and
-    we sell Brazil nuts" says plainly where the user is; a whole-text head
-    refusal would drop the key and answer nothing to it. Measured: 21 either way
-    round, "we sell Brazil nuts, I am in Brazil" included.
+    Both tests are asked HERE, of one occurrence, rather than of the whole text
+    per key. Whole-text was measured wrong in both directions:
 
-    Matched on `folded`, where the head words are ASCII and the position is the
-    same position the branches report.
+      * it let one capital licence every lowercase mention, and English
+        capitalises the first word of a sentence, so a message that opens by
+        naming the country supplies its own licence for every mention after it.
+        Measured with the head noun already in place and the capital still tested
+        whole-text: "Turkey is a big producer. The protein in turkey for feed is
+        high." -> 223 and "Chile is long. The capsaicin in chile for sauce is
+        high." -> 40, both refused now. The head noun cannot reach these - `for
+        feed` and `for sauce` put a preposition where its noun would be - and
+        "Turkey litter is cheap, how much should I spread" is an ordinary message
+        for this assistant, not a corner case.
+      * the mirror image for the head noun: "I am in Brazil and we sell Brazil
+        nuts" says plainly where the user is, and a whole-text head refusal would
+        drop the key and answer nothing.
+
+    POSITIONS ARE ONLY COMPARABLE WHEN THE FOLD IS LENGTH-PRESERVING, which is
+    what `aligned` carries. _TR_FOLD is 1:1 by construction and maps U+0130
+    (`İ`) to ASCII `I` BEFORE .lower() runs, which is the one character whose
+    lowercase would otherwise be two - "İstanbul" -> "istanbul", 8 to 8. So the
+    fallback below is not expected to fire; it is here because that is a property
+    of another module's table, and if it ever stops holding this must degrade to
+    the old whole-text test rather than read the wrong character. The head noun
+    needs no fallback: it is matched on `folded`, against its own position.
     """
-    return head.match(folded, pos) is None
+    if head.match(folded, pos) is not None:
+        return False
+    if cap is None:
+        return True
+    if aligned:
+        return cap.match(original, pos) is not None
+    return cap.search(original) is not None
 
 
 def _find(folded: str, original: str) -> int | None:
@@ -570,17 +607,18 @@ def _find(folded: str, original: str) -> int | None:
     firing on a crop name.
 
     TAKES THE TEXT TWICE, folded and as the user wrote it. The branches need the
-    fold; the twelve names that are also ordinary English nouns need the capital
+    fold; the eleven names that are also ordinary English nouns need the capital
     letter, which the fold destroys. Folding stayed where it is - in
     extract_country, done once per text - and the original is passed alongside it
     rather than re-derived, because these two strings must describe the same text
     and a second fold here would be a second chance for them not to. See
     _AMBIGUOUS_EN.
 
-    THE HEAD-NOUN REFUSAL SITS ON EVERY MATCH, not on every key: it is asked of
-    the OCCURRENCE a branch found, so a compound noun mentioned elsewhere cannot
-    condemn a sentence that says where the user is. See _admits. The
-    capitalisation test is still a whole-text precondition on the key.
+    TWO PRECONDITIONS SIT ON EVERY MATCH, not on every key: the capital letter
+    for those eleven names, and the head-noun refusal for all 199. Both are
+    asked of the OCCURRENCE a branch found, so a later mention cannot licence an
+    earlier one and an earlier one cannot condemn a later one. See _admits, which
+    names what whole-text testing was measured to cost in each direction.
 
     Five forms are accepted, the first four as location.py accepts them except
     for the ablative. An apostrophe is an unambiguous proper-noun boundary in
@@ -627,18 +665,14 @@ def _find(folded: str, original: str) -> int | None:
     # Where `whole` actually begins, so a message that opens with whitespace or a
     # quote mark still hands _admits the position of its first letter.
     lead = len(folded) - len(folded.lstrip(_TRIM))
+    aligned = len(folded) == len(original)
     best_start: int | None = None
     best_code: int | None = None
     origin_start: int | None = None
     origin_code: int | None = None
     for code, key, cap, head, patterns, origin in _matchers():
-        # An ambiguous name that never appears capitalised is not this country
-        # in this text, by ANY branch - the whole key drops out here rather than
-        # each branch testing it.
-        if cap is not None and not cap.search(original):
-            continue
         start = None
-        if whole == key and _admits(head, folded, lead):
+        if whole == key and _admits(cap, head, folded, original, aligned, lead):
             start = lead
         for pattern in patterns:
             # EVERY occurrence, not just the first: _admits can refuse one and
@@ -657,7 +691,7 @@ def _find(folded: str, original: str) -> int | None:
                 # `name` is the country itself, so branches with different
                 # preambles - the English preposition - stay comparable.
                 found = match.start("name")
-                if _admits(head, folded, found):
+                if _admits(cap, head, folded, original, aligned, found):
                     # Left to right, so the first ADMITTED match is the earliest
                     # this branch can offer.
                     if start is None or found < start:
@@ -679,7 +713,7 @@ def _find(folded: str, original: str) -> int | None:
         pos = 0
         while (match := origin.search(folded, pos)) is not None:
             found = match.start("name")
-            if _admits(head, folded, found):
+            if _admits(cap, head, folded, original, aligned, found):
                 if origin_start is None or found < origin_start:
                     origin_start, origin_code = found, code
                 break

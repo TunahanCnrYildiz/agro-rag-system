@@ -155,29 +155,67 @@ def test_the_head_noun_must_sit_immediately_after_the_name(message, code):
     assert extract_country(message) == code
 
 
-def test_a_refused_mention_does_not_eat_a_good_one_later():
-    """Per-mention refusal has to keep WALKING. `in turkey houses` is refused by
-    the head noun, and the branch must go on to the next occurrence rather than
-    give the sentence up - stopping at the first match answered nothing here."""
-    assert extract_country("I work in turkey houses but I am in Turkey") == TURKIYE
-
-
 @pytest.mark.parametrize("message", [
     "i am in turkey",
     "i live in brazil",
     "my farm is in georgia",
     "malide yasiyorum",
+    "sudanda yasiyorum",
 ])
 def test_the_capitalisation_rule_costs_the_lowercase_typist(message):
     """What the rule charges, pinned so it is visible rather than discovered. A
     user who types all-lowercase is refused where they used to be placed. It
-    falls on twelve names out of 199 - the ones that are also ordinary nouns -
+    falls on eleven names out of 199 - the ones that are also ordinary nouns -
     and the failure is in the safe direction: the assistant asks.
 
     "malide yasiyorum" is there because `Mali` is spelled the same in both
     lists, so the requirement reaches its Turkish branches too. `mali` is also
     the Turkish adjective for fiscal, so that one is a gain as much as a cost."""
     assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "Turkey is a big producer. The protein in turkey for feed is high.",
+    "Chile is long. The capsaicin in chile for sauce is high.",
+    "Turkey litter is cheap. The nitrogen in turkey litter is high.",
+    "I use Turkey brand feed in turkey houses",
+])
+def test_one_capital_does_not_licence_every_lowercase_mention(message):
+    """The capital is read AT THE MENTION, not anywhere in the message. English
+    capitalises the first word of a sentence, so a message that opens by naming
+    the country supplies its own licence for every lowercase mention after it.
+
+    THE FIRST TWO ARE WHAT PIN THIS RULE: measured with the head noun already in
+    place and the capital still tested whole-text, they resolved to 223 and 40,
+    because `for feed` and `for sauce` put a preposition where the head noun
+    would have been. The last two resolved to 223 on the same reading of the
+    capital and are refused by the head noun as well, so they belong here for the
+    shape rather than as the pin. "Turkey litter is cheap, how much should I
+    spread" is an ordinary message for this assistant."""
+    assert extract_country(message) is None
+
+
+def test_a_refused_mention_does_not_eat_a_good_one_later():
+    """Per-mention refusal has to keep WALKING, whichever rule did the refusing.
+    `in turkey houses` fails both the head noun and the capital, and the branch
+    must go on to the next occurrence rather than give the sentence up -
+    stopping at the first match answered nothing here."""
+    assert extract_country("I work in turkey houses but I am in Turkey") == TURKIYE
+
+
+@pytest.mark.parametrize("message, code", [
+    ("i am in peru", 170),
+    ("perudayim", 170),
+    ("Peru'dayım", 170),
+    ("i am in cuba", 49),
+])
+def test_a_name_with_no_ambiguity_is_not_charged_for_one(message, code):
+    """`peru` and `cuba` were gated on a capital with nothing to justify it -
+    neither is an ordinary English noun. The first three resolved to nothing
+    while they were listed, and `peru` is one key across both languages like
+    `mali`, so the charge reached the Turkish branches too. The compound they do
+    appear in, `Peru balsam`, is the head-noun rule's business."""
+    assert extract_country(message) == code
 
 
 @pytest.mark.parametrize("message, code", [
@@ -193,6 +231,34 @@ def test_a_compound_only_hazard_is_closed_without_gating_the_name(message, code)
     an ordinary English noun on its own, so none of them is gated on a capital -
     which is what adding them to the ambiguous list would have cost. Refusing at
     the right axis costs their lowercase typists nothing."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Sudan'dayım", 276),
+    ("I am in Sudan", 276),
+])
+def test_sudan_still_resolves_when_it_is_the_country(message, code):
+    """`sudan` joined the ambiguous list because sudangrass is a standard forage
+    and "the protein in sudan grass" resolved to 276 with the name lowercase and
+    ungated. Like `Mali` it is one key across both languages, so the charge -
+    pinned above as "sudanda yasiyorum" - reaches the Turkish branches too."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am in Turkey", TURKIYE),
+    ("I live in Brazil", BRAZIL),
+    ("my farm is in Georgia", 73),
+    ("I am in Chile", 40),
+    ("Mali'deyim", 133),
+    ("Sudan'dayım", 276),
+    ("TURKEY", TURKIYE),
+])
+def test_the_same_ambiguous_names_resolve_when_capitalised(message, code):
+    """The other half, as always. All eleven stay reachable - the rule asks for a
+    capital letter, not for a different word. "TURKEY" counts: all-caps is a
+    shout, not a common noun."""
     assert extract_country(message) == code
 
 
