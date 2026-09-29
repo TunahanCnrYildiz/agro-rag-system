@@ -71,6 +71,76 @@ def test_an_english_name_that_is_also_livestock_never_places_the_user(message):
     assert extract_country(message) is None
 
 
+@pytest.mark.parametrize("message", [
+    "the protein in turkey for feed",
+    "the oil in niger for biodiesel",
+    "capsaicin in chile for sauce",
+    "phosphorus in turkey and chicken manure",
+    "we work at turkey farms near Konya",
+    "at turkey manure today",
+    "I am in turkey litter business",
+])
+def test_a_substance_in_an_ambiguous_name_is_not_a_location(message):
+    """The shape a TAIL rule can never refuse, and the reason there is no longer
+    a tail rule. "the protein in turkey for feed" and "my field is in Egypt near
+    the delta" have the SAME tail, so every word admitted to close a noun phrase
+    resolved the first sentence too: measured, `for`, `near`, `with`, `today`,
+    `and`, the comma and the full stop all did, and `phosphorus in turkey and
+    chicken manure` resolved to Türkiye under every version of that list.
+
+    What separates them is the capital letter, so that is what the rule reads
+    now. The first three resolved to Türkiye, Niger and Chile before it."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "i am in turkey",
+    "i live in brazil",
+    "my farm is in georgia",
+    "malide yasiyorum",
+])
+def test_the_capitalisation_rule_costs_the_lowercase_typist(message):
+    """What the rule charges, pinned so it is visible rather than discovered. A
+    user who types all-lowercase is refused where they used to be placed. It
+    falls on twelve names out of 199 - the ones that are also ordinary nouns -
+    and the failure is in the safe direction: the assistant asks.
+
+    "malide yasiyorum" is there because `Mali` is spelled the same in both
+    lists, so the requirement reaches its Turkish branches too. `mali` is also
+    the Turkish adjective for fiscal, so that one is a gain as much as a cost."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am in Turkey", TURKIYE),
+    ("I live in Brazil", BRAZIL),
+    ("my farm is in Georgia", 73),
+    ("I am in Chile", 40),
+    ("Mali'deyim", 133),
+    ("Peru'dayım", 170),
+    ("TURKEY", TURKIYE),
+])
+def test_the_same_ambiguous_names_resolve_when_capitalised(message, code):
+    """The other half, as always. All twelve stay reachable - the rule asks for a
+    capital letter, not for a different word. "TURKEY" counts: all-caps is a
+    shout, not a common noun."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message", [
+    "I am in Indianapolis",
+    "I am in Chadian territory",
+    "we are in Guineafowl sheds",
+])
+def test_the_english_branch_still_ends_at_a_word_boundary(message):
+    """Deleting the tail rule must not delete the word boundary with it. The
+    tail rule's alternatives all required end-of-string, punctuation or a space,
+    so the right-hand `(?!\\w)` was implicit; removing the rule outright would
+    match `in India` inside "in Indianapolis" and `in Chad` inside "in Chadian".
+    The lookbehind only guards the left edge."""
+    assert extract_country(message) is None
+
+
 def test_the_same_word_still_places_the_user_when_it_is_the_country():
     assert extract_country("I am in Turkey") == TURKIYE
     assert extract_country("Türkiye'deyim") == TURKIYE
@@ -298,34 +368,62 @@ def test_the_earliest_country_wins_not_the_longest_named_one(message, code):
     ("My farm is in Spain with clay soil", SPAIN),
     ("I am in Kenya, near Nakuru", KENYA),
 ])
-def test_an_ordinary_english_sentence_is_not_refused_by_the_tail_rule(message, code):
-    """`_EN_TAIL` enumerated conjunctions, pronouns, determiners and auxiliaries
-    but no prepositions and almost no adverbs, so these four resolved to nothing
-    and their users got no figures at all. The cost falls hardest on countries
-    the table holds only in English — Kenya, Brazil, Chad — which have no
-    Turkish branch to fall back on."""
+def test_an_ordinary_english_sentence_still_resolves(message, code):
+    """The recall half of the English branch. A tail rule enumerating the words
+    allowed to follow a country name killed all five of these at one width and
+    resolved `in turkey for feed` at the other; reading the capital letter
+    instead costs neither.
+
+    The old docstring here claimed Kenya, Brazil and Chad are held "only in
+    English" and so have no second branch. Measured from `_FOLDED`, all three
+    have a Turkish alias — `kenya`, `cad`, `brezilya` — and exactly ONE of the
+    199 entries has an empty `tr` list: FAOSTAT's `China` aggregate, 351, whose
+    `en` list is empty too. The claim was true of a spelling and false of a
+    country."""
     assert extract_country(message) == code
 
 
-def test_a_gerund_after_the_country_is_still_refused():
-    """The boundary of the widening above, kept deliberately. Admitting a
-    present participle would admit `turkey growing`, `turkey farming` and
-    `turkey raising` — the compound nouns the tail rule exists to refuse — so
-    "We are based in Brazil growing soy" stays unresolved and the assistant
-    asks. Recorded here so the next reader sees it was a choice."""
-    assert extract_country("We are based in Brazil growing soy") is None
-
-
-@pytest.mark.parametrize("message", [
-    "we work at turkey farms near Konya",
-    "at turkey manure today",
-    "I am in turkey litter business",
+@pytest.mark.parametrize("message, code", [
+    ("We are based in Brazil growing soy", BRAZIL),
+    ("I am in Brazil growing soy", BRAZIL),
+    ("I work in Kenya growing maize", KENYA),
 ])
-def test_widening_the_tail_did_not_reopen_the_compound_noun(message):
-    """The prepositions and adverbs added to `_EN_TAIL` are closed-class and
-    cannot head a noun phrase, so they cannot be the second noun of a compound.
-    These put one right after the compound to prove the compound still wins."""
-    assert extract_country(message) is None
+def test_a_gerund_after_the_country_no_longer_costs_the_sentence(message, code):
+    """The gerund refusal is GONE, and this pins that it went. The tail rule
+    refused a present participle to keep out `turkey growing` and `turkey
+    farming`, and charged every innocent sentence of the same shape for it —
+    all three of these resolved to nothing. Capitalisation separates the two
+    classes directly, so `in turkey growing` is still refused (see the lowercase
+    test above) while these are not. Strictly better than the trade it
+    replaces."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I'm from Turkey but I farm in Germany", 79),
+    ("I am from Kenya but I live in France", FRANCE),
+])
+def test_a_stated_current_location_outranks_where_the_user_is_from(message, code):
+    """`I am from X` is the weakest of the five branches and is read only when no
+    `in`/`at` branch matched anywhere in the text. Both of these answered the
+    ORIGIN once `from` was admitted — Türkiye and Kenya — because the copula sits
+    earlier in the sentence than the `in`-clause and the earliest match wins.
+    Preferring the later match instead would have sent "I am in Turkey but I
+    import seed from France" back to France."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message, code", [
+    ("I am from Kenya", KENYA),
+    ("I am from Morocco originally", MOROCCO),
+])
+def test_origin_alone_still_places_the_user(message, code):
+    """Ranking origin below `in`/`at` must not demote it out of existence: with
+    no other branch matching, there is nothing to outrank it. The second
+    sentence was dead under the tail rule, whose adverb list had `already`,
+    `still` and `mostly` but not `originally` — one of the six ordinary
+    sentences that rule was costing, where the fix report counted five."""
+    assert extract_country(message) == code
 
 
 def test_naming_the_trnc_refuses_the_whole_message():
