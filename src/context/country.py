@@ -182,14 +182,38 @@ _EN_PLACE = rf"(?:{_EN_ORIGIN}|in|at)\s+"
 #
 # A BARE ablative is refused; an ablative carrying a personal ending is kept.
 # "Hollanda'danım" ("I am from the Netherlands") states where the user belongs
-# the way "Hollandalıyım" does, and `-dan` followed by any word character is
-# not the bare form, so the lookahead below lets it through untouched.
+# the way "Hollandalıyım" does. What tells them apart is the lookahead's own
+# trailing `(?!\w)`: the bare ablative ENDS the word, while "Hollanda'danım"
+# continues into `ım`, so the lookahead fails to match and lets it through.
+#
+# THE BUFFER `n` IS PART OF THE ABLATIVE, and omitting it let 22 aliases walk
+# straight through this guard. Turkish inserts a buffer consonant between a
+# 3rd-person possessive and a case ending, so the ablative of `Dominik
+# Cumhuriyeti` is `Cumhuriyeti'nden`, never `Cumhuriyeti'den`. The first version
+# of this lookahead spelled exactly four strings - `dan`, `den`, `tan`, `ten` -
+# so it met the buffer `n` and failed, and the whole `… Adaları`,
+# `… Cumhuriyeti`, `Rusya Federasyonu`, `Birleşik Arap Emirlikleri`, `Amerika
+# Birleşik Devletleri`, `Fransız Polinezyası`, `Fildişi Sahili`, `Çin Anakarası`
+# family placed the grower at their supplier: measured, "Dominik
+# Cumhuriyeti'nden tohum aldım" -> 56, "Rusya Federasyonu'ndan tohum aldım" ->
+# 185, "Solomon Adaları'ndan fide aldım" -> 25, "Birleşik Arap Emirlikleri'nden
+# aldım" -> 225, while the single-word "Hollanda'dan tohum aldım" was refused
+# correctly all along - which is why the gap hid.
+#
+# `[yn]?` is how _SUFFIX already spells its own optional buffer, kept the same
+# shape here on purpose. `y` cannot precede `-dan` in any Turkish word, so
+# admitting it costs nothing and the two lines stay readable side by side.
+#
+# ONLY THE APOSTROPHE BRANCH WAS AFFECTED. _SUFFIX cannot spell `nden` at all -
+# `[dt][ae]n?` has no slot for a leading `n` - so the apostrophe-less
+# "dominik cumhuriyetinden tohum aldim" never matched anything and still
+# resolves to nothing. Confirmed, not assumed.
 #
 # COSTS, named rather than implied: "Hollanda'dan yazıyorum" ("writing from the
 # Netherlands") is a genuine statement of location and is now refused, as is
 # "Fransa'dan geldim, buradayım". Refusing a real location costs a question;
 # accepting a supplier places the grower in the wrong country in silence.
-_NOT_ABLATIVE = r"(?![dt][ae]n(?!\w))"
+_NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 
 # HAZARD: a bare preposition is NOT evidence either. `from turkey farms`
 # satisfied `(?:in|from|at)\s+turkey(?!\w)`, because a space is not a word

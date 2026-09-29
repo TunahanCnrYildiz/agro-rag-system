@@ -218,6 +218,39 @@ def test_the_turkish_ablative_alone_is_a_supplier_not_a_location(message):
 
 
 @pytest.mark.parametrize("message", [
+    "Dominik Cumhuriyeti'nden tohum aldım",
+    "Rusya Federasyonu'ndan tohum aldım",
+    "Solomon Adaları'ndan fide aldım",
+    "Birleşik Arap Emirlikleri'nden aldım",
+    "Amerika Birleşik Devletleri'nden tohum aldım",
+    "Fransız Polinezyası'ndan fide aldım",
+    "Fildişi Sahili'nden kakao aldım",
+    "Çin Anakarası'ndan gübre alıyoruz",
+])
+def test_the_ablative_with_a_buffer_n_is_also_a_supplier(message):
+    """One per family shape, because the first version of the guard spelled
+    exactly `dan|den|tan|ten` and every one of these walked straight through it:
+    measured, 56, 185, 25 and 225 for the first four. Turkish puts a buffer `n`
+    between a 3rd-person possessive and a case ending, so the ablative of
+    `Dominik Cumhuriyeti` is `Cumhuriyeti'nden`, and 22 of the Turkish aliases
+    are possessive-final compounds of exactly this kind. "Hollanda'dan tohum
+    aldım" was refused correctly all along, which is why the gap hid."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Dominik Cumhuriyeti'ndeyim", 56),
+    ("Rusya Federasyonu'ndayım", 185),
+    ("Solomon Adaları'ndayım", 25),
+])
+def test_the_buffer_n_locative_still_places_the_user(message, code):
+    """The other side of the line: widening the lookahead to the buffer `n` must
+    not swallow `-nda/-nde`, which is the locative on the same names and the
+    ordinary way their growers say where they are."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message", [
     "Hollanda'danım",
     "Hollandalıyım",
     "Hollanda'dayım",
