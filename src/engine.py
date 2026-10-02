@@ -688,6 +688,27 @@ def _context_block(route: str, message: str, history: list[dict] | None,
     Weather is best-effort by design (see src/context/weather.py) - its absence
     removes one line and never blocks the answer. The province is asked for in
     chat rather than guessed: a wrong province produces confidently wrong timing.
+
+    `fert_plan` DOES NOT CONSULT THE WORLD LAYER, and that is a decision rather
+    than an oversight - a foreign grower asking a fertiliser question is still
+    told his province is unknown and still asked for it. Written down here
+    because `crop_choice` right below does the opposite, so the asymmetry would
+    otherwise look like one branch having been forgotten.
+
+    The reason is that there is nothing to put in the ask's place. The world
+    layer carries two measures, yield and producer price (see
+    data/world_norms.json), and neither answers a fertiliser question: there is
+    no dose, no soil-analysis norm and no phenology in it. `weather.forecast` is
+    keyed on the 81 Turkish provinces and has no row for anywhere else, and
+    `_framing_suffix` ties a fert_plan answer with rows behind it to a reviewed
+    TURKISH programme. Suppressing the ask would therefore delete the one
+    sentence that keeps the answer general, and put nothing where it was - the
+    model would be left free to read Turkish doses as if they applied.
+
+    So the cost is named rather than removed: a grower outside Türkiye is asked
+    one question he cannot answer on this route, and the assistant's advice stays
+    general. That costs a turn. Printing a country's yield beside a fertiliser
+    dose would cost the dose's provenance.
     """
     # Deferred: src/context/location.py imports _normalize_tr from THIS module at
     # load time, so a top-level import here is a real cycle.
@@ -732,11 +753,26 @@ def _context_block(route: str, message: str, history: list[dict] | None,
 # made. An UNKNOWN letter is printed as itself (see _flag_note) rather than
 # dropped: a flag FAOSTAT adds later must show up as an unexplained letter, not
 # vanish into silence.
+#
+# EVERY GLOSS SAYS ONLY WHAT ITS LETTER SAYS. Two of them used to say more:
+#
+#  * `B` was glossed "resmi deger, seride kopus var". FAOSTAT's own meta.flags
+#    reads "Time series break" and nothing else - the letter marks a
+#    discontinuity in the series, not who produced the cell, so calling the
+#    value official was a provenance claim the flag does not make. Harmless on
+#    the shipped file and only there: measured 2026-10-02 against
+#    data/world_norms.json, all 43 `B` cells are in the price table, none of
+#    them is the latest non-null year of its series, so `_pick_world` returns
+#    none of them today. A rebuild that lands one last would print the claim.
+#  * `I` was glossed "FAO'nun atadigi deger" for "Value imputed by a receiving
+#    agency" - which narrows "a receiving agency" to FAO and softens "imputed"
+#    to "assigned". Same file, 3 `I` cells, all in the price table and none
+#    latest, so this one is unreachable today too.
 _FAO_FLAGS = {
     "A": "ulkenin resmi bildirimi",
-    "B": "resmi deger, seride kopus var",
+    "B": "seride kopus var, deger onceki yillarla karsilastirilamaz",
     "E": "FAO tahmini, ulkenin kendi bildirimi degil",
-    "I": "FAO'nun atadigi deger",
+    "I": "veriyi alan kurulusun tamamladigi deger",
     "X": "dis kurulustan alinmis deger",
 }
 
@@ -756,9 +792,29 @@ def _world_amount(amount: float) -> str:
     decimal count cannot serve both: two decimals prints that price as "0,01"
     and four prints a yield as "597,3500". Split at 1, which is the only place
     the two ranges meet.
+
+    NO THOUSANDS SEPARATOR, and this is the part that matters for a figure a
+    language model reads. `format_tr` writes Turkish convention - thousands dot,
+    decimal comma - so `format_qty(4000.0)` is "4.000", which under English
+    convention reads as four, not four thousand. That is a 1000x error with
+    nothing in the string to disambiguate it, because a whole number has no
+    decimal comma following to mark the dot as a group separator. It is not a
+    corner either: measured 2026-10-02 over data/world_norms.json, 3.104 of the
+    8.453 latest yield cells are >= 1000 and 206 of those are whole numbers, the
+    exact "4.000" shape. Dropping the separator leaves "4000" and "47889,02",
+    which read the same under both conventions.
+    `.replace(".", "")` is safe rather than blunt: `format_tr` emits "." ONLY as
+    the group separator - the decimals go after a comma - so there is no other
+    dot in the string to eat.
+
+    FIXED HERE AND NOT IN src/budget.py: `format_tr` and `format_qty` write the
+    budget form and the comparison card, which are read by a person on a screen
+    where the Turkish convention is right and the surrounding text supplies the
+    convention. This is the only surface whose reader is the model.
     """
     from src.budget import format_qty, format_tr
-    return format_qty(amount) if amount >= 1 else format_tr(amount, 4)
+    text = format_qty(amount) if amount >= 1 else format_tr(amount, 4)
+    return text.replace(".", "")
 
 
 # The shapes in which a user says THEY ARE in a country, as opposed to merely
@@ -1036,17 +1092,49 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
 
         region = (norm.yield_kg_da or norm.price_per_kg).region
         return [
-            f"Kullanici Turkiye disinda: {region} - FAOSTAT'in yazdigi ad, "
-            f"cevabinda ulkenin Turkce adini kullan. TUIK il verisi bu ulke "
-            f"icin yok, hangi ilde oldugunu SORMA.",
+            # THE FAOSTAT LABEL IS ASKED FOR IN THE ANSWER TOO, in parentheses
+            # beside the Turkish name, and that is not decoration. Several
+            # FAOSTAT areas collapse to ONE Turkish name - `Congo` and
+            # `Democratic Republic of the Congo` are both "Kongo", `China` and
+            # `China, mainland` are both "Çin" - so a prompt that is right about
+            # which area the figure came from can still produce an answer that
+            # names the wrong country, with nothing in the answer to tell. The
+            # label travels into the answer so the reader can see which one.
+            #
+            # The label is NOT repeated a second time in this sentence: it
+            # already stands at the head of the line, and `Netherlands (Kingdom
+            # of the)` printed again inside parentheses nests them.
+            f"Kullanici Turkiye disinda: {region} - FAOSTAT'in yazdigi ad. "
+            f"Cevabinda ulkenin Turkce adini kullan ve yanina parantez icinde "
+            f"FAOSTAT'in bu adini aynen ekle. TUIK il verisi bu ulke icin yok, "
+            f"hangi ilde oldugunu SORMA.",
             *figures,
-            # "tahmin" is deliberately NOT used in this sentence, although it
-            # is the natural Turkish word for it: the E flag's own clause above
-            # is the only place that word may appear, so a test can tell an
+            # "tahmin" is deliberately NOT used in these two sentences, although
+            # it is the natural Turkish word for it: the E flag's own clause
+            # above is the only place that word may appear, so a test can tell an
             # estimate apart from a country's own report by looking for it.
+            #
+            # "kaynagi belliyse" RATHER THAN "kaynagi", because the older
+            # unconditional wording was false for part of its own output. An
+            # unflagged cell and an unknown letter both exist - _pick_world
+            # returns flag=None for a cell FAOSTAT ships without one, and
+            # _flag_note prints an unrecognised letter as itself - so the
+            # parenthesis beside such a figure is just "(2024)". A line promising
+            # a source beside every number would have the model look for one that
+            # is not there, or invent it.
             "Bu rakamlar ULKE ORTALAMASIDIR, tarlaya ozel bir rakam degil; her "
-            "rakamin yani sira yili ve kaynagi yazili, baska bir yila veya "
-            "TUIK'e mal etme.",
+            "rakamin yani sira kendi yili, kaynagi belliyse kaynagi da yazili - "
+            "rakami baska bir yila veya TUIK'e mal etme.",
+            # THE TWO FIGURES MUST NOT BE MULTIPLIED, and the caution line above
+            # does not close this on its own: it immunises each figure against
+            # being read as field-specific, and says nothing about their product.
+            # Verim and fiyat sit on adjacent lines, so 597,35 x 0,2313 is one
+            # step away and reads as 138 USD/da of income - a gross figure with
+            # no cost side at all, which is exactly the shape a farmer acts on.
+            # This project's own budget route exists because money answers need
+            # both sides; see src/budget.py.
+            "Verimle fiyati carpip donum basi gelir hesaplama ve yazma: masraf "
+            "tarafi bu satirlarda yok, boyle bir carpim kazanc gibi okunur.",
         ]
     except Exception as exc:  # noqa: BLE001
         # The same bargain _named_crops makes: a failure here costs these lines

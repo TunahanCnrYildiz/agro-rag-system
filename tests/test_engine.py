@@ -1763,6 +1763,73 @@ def test_the_assistant_naming_a_country_is_not_a_location():
     assert "France" not in block
 
 
+# --------------------------------------------------------------------------- #
+# How the figures themselves are written
+# --------------------------------------------------------------------------- #
+def test_a_large_yield_carries_no_thousands_separator():
+    """Turkish convention writes the thousands separator as a dot, so
+    `format_qty(4000.0)` is "4.000" - which under English convention reads as
+    four. These lines are read by a language model, so the separator goes:
+    measured over data/world_norms.json, 3.104 of the 8.453 latest yield cells
+    are >= 1000 and 206 of those are whole numbers, the exact "4.000" shape."""
+    block = engine._crop_choice_block("Hollanda'dayım, domates ekeyim mi",
+                                      None, date(2026, 9, 25))
+    assert "47889,02 kg/da" in block
+    assert "47.889" not in block
+
+
+def test_the_b_flag_does_not_claim_the_value_is_official():
+    """FAOSTAT's `B` is a time-series break and says nothing about who produced
+    the cell; data/world_norms.json's own meta.flags reads "Time series break".
+    The gloss used to add "resmi deger" to it.
+
+    Asserted on the table rather than through a block, because all 43 `B` cells
+    in the shipped file sit in earlier years of the price series and none is the
+    latest non-null year of its series, so `_pick_world` returns none of them -
+    this gloss is unreachable today and Critical the moment a rebuild lands one
+    last."""
+    assert engine._flag_note("B") == ("seride kopus var, deger onceki yillarla "
+                                      "karsilastirilamaz")
+    assert "resmi" not in engine._flag_note("B")
+
+
+def test_the_i_flag_does_not_narrow_the_receiving_agency_to_fao():
+    """"Value imputed by a receiving agency" - not FAO specifically, and not
+    "assigned". 3 cells in the shipped file, none of them latest."""
+    assert "FAO" not in engine._flag_note("I")
+
+
+def test_the_figures_may_not_be_multiplied_into_a_revenue_number():
+    """Yield and price sit on adjacent lines, so 597,35 x 0,2313 is one step
+    from a 138 USD/da gross-income figure with no cost side - exactly the shape
+    a farmer acts on. The ULKE ORTALAMASI caution immunises each figure against
+    being read as field-specific and says nothing about their product."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "carpip" in block and "masraf" in block
+
+
+def test_the_caution_line_does_not_promise_a_source_beside_every_number():
+    """`_pick_world` returns flag=None for a cell FAOSTAT ships unflagged and
+    `_flag_note` prints an unknown letter as itself, so the parenthesis beside a
+    figure can be nothing but its year. A line promising a source beside every
+    number would have the model look for one that is not there."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "kaynagi belliyse" in block
+
+
+def test_the_answer_is_asked_to_keep_the_faostat_label():
+    """Several FAOSTAT areas collapse to one Turkish name - `Congo` and
+    `Democratic Republic of the Congo` are both "Kongo", `China` and `China,
+    mainland` both "Çin" - so a prompt that is right about the area can still
+    produce an answer naming the wrong country, with nothing in the answer to
+    tell."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "parantez icinde FAOSTAT'in bu adini aynen ekle" in block
+
+
 def test_crop_choice_never_gets_a_framing_sentence():
     """`crop_choice` has no reviewed programme behind it, so it gets no framing
     suffix. This passes today by virtue of the `route != "fert_plan"` guard; it is
