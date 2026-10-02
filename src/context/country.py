@@ -85,11 +85,21 @@ def _load() -> dict[str, tuple[int, bool]]:
 _FOLDED = _load()
 
 # Longest first. This is load-bearing here in a way it only nearly was for
-# provinces: the table has 34 substring pairs (`Mali` in `Somali`, `Oman` in
+# provinces: the table has 78 substring pairs (`Mali` in `Somali`, `Oman` in
 # `Romanya`, `Dominik` in `Dominika`, `Nijer` in `Nijerya`), and the lenient
 # suffix branch below would read the trailing letter of the longer name as a
 # case ending. Trying the longer key first is what makes "Nijerya'dayım"
 # Nigeria rather than Niger.
+#
+# 35 OF THE 78 POINT AT TWO DIFFERENT COUNTRIES, and only those can make the
+# order decide an ANSWER rather than a spelling; the other 43 are one country's
+# own aliases (`Antigua` inside `Antigua ve Barbuda`, both 8) and are harmless
+# whichever key wins. Both figures are counted from _FOLDED by
+# test_the_substring_pair_count_the_ordering_is_justified_by, so they cannot go
+# stale again: this comment and the _matchers docstring both read 34 until
+# 2026-10-02, and no counting basis of the shipped table gives 34 - the nearest
+# is the 35 above. The table had not drifted either; it was already 78/35 when
+# the figure was first written at c6d1c3a.
 _ORDERED = sorted(_FOLDED, key=len, reverse=True)
 
 
@@ -459,7 +469,7 @@ def _matchers() -> tuple[
     ~1.3 ms, and this one did not move it - but do not read the old 1.4 ms as
     headroom this still fits inside.
 
-    Keys stay longest-first and that IS still load-bearing, for the 34 substring
+    Keys stay longest-first and that IS still load-bearing, for the 78 substring
     pairs - see _find, where longest-first decides ties. The order WITHIN the
     branch tuple is not: _find takes the earliest match across all of them, so
     the old "apostrophe before the lenient suffix" ordering no longer decides

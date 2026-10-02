@@ -628,3 +628,24 @@ def test_the_ablative_guard_holds_on_a_typographic_apostrophe(apostrophe):
     for name, code in (("Dominika", 55), ("Nijerya", 159)):
         assert extract_country(f"{name}{apostrophe}dan tohum aldım") is None
         assert extract_country(f"{name}{apostrophe}dayım") == code
+
+
+def test_the_substring_pair_count_the_ordering_is_justified_by():
+    """Pins the two figures the longest-first comment rests on, so they cannot
+    go stale the way they already did once.
+
+    Both read 34 until 2026-10-02, and no counting basis of the shipped table
+    gives 34: there are 78 substring pairs, 35 of which name two DIFFERENT
+    countries - and only those 35 let the ordering decide an answer rather than
+    a spelling. The table had not drifted, so 34 was never right.
+
+    If a new alias moves either number, update the comment above `_ORDERED` and
+    the `_matchers` docstring in the same commit. Keeping those two prose claims
+    honest is what this test is for, not the particular integers."""
+    from src.context.country import _FOLDED
+
+    keys = list(_FOLDED)
+    pairs = [(lo, sh) for lo in keys for sh in keys if sh != lo and sh in lo]
+    differ = [p for p in pairs if _FOLDED[p[0]][0] != _FOLDED[p[1]][0]]
+    assert len(pairs) == 78
+    assert len(differ) == 35
