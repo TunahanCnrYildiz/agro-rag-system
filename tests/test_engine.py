@@ -1739,6 +1739,55 @@ def test_a_stated_foreign_location_still_replaces_the_question():
     assert "France" in block
 
 
+@pytest.mark.parametrize("message", [
+    # The copula fused to the name's own suffix.
+    "Fransa'dayım, buğday mı ekmeliyim",
+    "Fransadayim, bugday mi ekmeliyim",
+    # The dominant Turkish pattern: case ending on the NAME, person on the VERB.
+    # An earlier revision of this guard refused all four of these.
+    "Fransa'da yaşıyorum, buğday mı ekmeliyim",
+    "Fransa'da çiftçilik yapıyorum, buğday mı ekmeliyim",
+    "Fransa'da yaşayan bir çiftçiyim, buğday mı ekmeliyim",
+    "Fransada ciftciyim, bugday mi ekmeliyim",
+])
+def test_a_locative_with_a_first_person_predicate_is_a_stated_location(message):
+    """Turkish puts the case ending on the place and the person on the verb far
+    more often than it fuses them into "Fransa'dayım". A guard that demanded the
+    copula on the NAME refused every sentence below - real sentences a grower in
+    France would write, all of which `extract_country` resolves to France."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert "France" in block
+    assert "597,35 kg/da" in block
+    assert "BILINMIYOR" not in block
+
+
+@pytest.mark.parametrize("text", ["I live in France", "I am in France"])
+def test_the_english_branch_is_unchanged_by_the_turkish_widening(text):
+    """Asserted on `_states_location` rather than through a block: the crop
+    lexicon is Turkish, so "should I plant wheat" names no crop and the block
+    would have nothing to print for a reason that has nothing to do with this
+    guard."""
+    assert engine._states_location(text, engine._code_aliases(68))
+
+
+@pytest.mark.parametrize("text,code", [
+    # The locative's own letters, in three endings that are not a locative.
+    ("Almanya'ya buğday sattım", 79),          # dative, and `sattım` is 1sg
+    ("Hollanda'dan tohum aldım", 150),         # ablative
+    ("Hollanda'daki seralar çok iyi", 150),    # locative + the relativiser -ki
+    # A locative with no first-person predicate in reach.
+    ("Fransa'da ekim zamanı geçti mi", 68),
+    ("Amerika'da tohum fiyatları nasıl, ben ne eksem", 231),
+    # A plan rather than a location; see _TR_VOLITIONAL.
+    ("Hollanda'da sera kurmak istiyorum", 150),
+])
+def test_the_widened_branch_still_refuses_what_is_not_a_location(text, code):
+    """The widening may not be a first-person-verb test: all three of the
+    sentences CRITICAL 3 refuses contain one. What it reads is the CASE ENDING,
+    and these are the endings and shapes that must stay out."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
 def test_a_country_stated_earlier_in_the_conversation_still_counts():
     """`extract_country` returns the most RECENT mention, which need not be the
     turn that stated where the user is. Every user turn is asked, so a location

@@ -839,22 +839,34 @@ def _world_amount(amount: float) -> str:
 # loses the country lines and keeps the ask - which is byte-for-byte the block
 # this branch produced before the world layer existed.
 #
-# THE TURKISH FORM IS A CASE SUFFIX PLUS A FIRST-PERSON COPULA, nothing less:
-# "Fransa'dayım", "Ganadayim", "Fransalıyım". The copula is exactly what
-# separates the three sentences above - `Almanyaya` is a dative with no person on
-# it, `Hollanda'daki` is a locative carrying the relativiser `-ki`, and
-# `Amerika'da` is a bare locative modifying `fiyatları`. The apostrophe is
-# optional because Turkish speakers omit it ("Ganadayim") and country.py's own
-# suffix branch accepts both.
+# WHAT DISTINGUISHES THEM IS THE CASE ENDING ON THE NAME, not the presence of a
+# first-person verb - all three of the sentences above contain one (`sattim`,
+# `istiyorum`, `ekeyim`). So the name has to be in the LOCATIVE:
 #
-# WHAT IT COSTS, measured: a first-person location stated with a VERB instead of
-# a copula is refused. "Fransa'da yasiyorum" and "Fransa'da ciftcilik yapiyorum"
-# printed France's figures on e021bca and get the province question now. Reading
-# them would mean deciding which clause a first-person verb belongs to - the same
-# verb appears in "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - and
-# that is the parse this module does not do. Refusing a real foreign grower costs
-# one question he can answer by saying where he is; admitting the three sentences
-# above costs every figure in the answer and the question with it.
+#   Fransa'da yasiyorum              locative                        admitted
+#   Almanya'ya bugday sattim         DATIVE, and `sattim` is 1sg     refused
+#   Hollanda'dan tohum aldim         ABLATIVE                        refused
+#   Hollanda'daki gibi ... istiyorum locative + the relativiser -ki  refused
+#   Amerika'da bugday fiyatlari nasil  locative, no 1st-person head  refused
+#
+# REJECTED: a first-person verb anywhere in the sentence, with no case test. It
+# admits all three of the sentences this guard exists to refuse.
+#
+# TWO TURKISH BRANCHES, because the copula attaches in two places:
+#
+#  * _SELF_TR - the copula FUSED to the name's own suffix: "Fransa'dayım",
+#    "Ganadayim", "Fransalıyım". The suffix runs straight into `-yım`.
+#  * _TR_LOCATIVE plus _first_person_follows - the dominant Turkish pattern,
+#    which puts the case ending on the NAME and the person on the VERB:
+#    "Fransa'da yaşıyorum", "Fransa'da çiftçilik yapıyorum", "Fransa'da yaşayan
+#    bir çiftçiyim", "Fransada çiftçiyim". An earlier revision of this guard had
+#    only the first branch and refused every one of these - real sentences a
+#    grower in France would write, measured resolving to France in
+#    `extract_country` and then losing every figure here.
+#
+# The apostrophe is optional in both, because Turkish speakers omit it
+# ("Ganadayim", "Fransada ciftciyim") and country.py's own suffix branch accepts
+# either.
 #
 # REJECTED: accepting the place-noun form src/context/location.py accepts
 # ("Fransa kosullarinda"). For a province it is how growers state where they are;
@@ -873,6 +885,92 @@ def _world_amount(amount: float) -> str:
 # introduce a country that was not resolved - and the shapes below state a
 # location whichever spelling they sit on.
 _SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
+
+# The locative, and it must END THE WORD - that `(?!\w)` is what separates the
+# three cases in the table above that share the letters `da`:
+#   "fransa'da yasiyorum"  -> `da` then a space      admitted here
+#   "hollanda'daki gibi"   -> `da` then `k`          refused
+#   "hollanda'dan tohum"   -> `da` then `n`          refused (ablative)
+# It also keeps the two branches disjoint: "fransadayim" is `da` then `y`, so it
+# fails here and is caught by _SELF_TR, which is where it belongs.
+_TR_LOCATIVE = r"'?[dt][ae](?!\w)"
+
+# First-person endings, word-final on folded text. DELIBERATELY NARROW, and the
+# two obvious widenings were measured and rejected against a 14-accept /
+# 12-refuse Turkish corpus (2026-10-02):
+#
+#  * the bare nominal `-im/-um/-iz`: 4 wrong admissions. Turkish is full of
+#    ordinary nouns with that ending, and three of them are agricultural -
+#    "Amerika'da tohum fiyatlari nasil, ben ne eksem" (tohum), "Fransa'da ekim
+#    zamani gecti mi" (ekim), "Fransa'da verim yuksek diye duydum" (verim).
+#  * the aorist `-arim/-erim`: 2 wrong admissions, for the same reason one letter
+#    along - "Fransa'da durum bugdayi yetisir mi" (durum). It buys no accept in
+#    the corpus, so it costs two refusals for nothing.
+#
+# The `y` in `y[iu][mz]` is what makes it safe where a bare `[iu][mz]` is not:
+# `ciftciyim` matches, `tohum` and `durum` and `verim` do not.
+_TR_FIRST_PERSON = re.compile(
+    r"(?:[iu]yor[iu][mz]|y[iu][mz]|[dt][iu]m|[ae]c[ae]g[iu][mz])$")
+
+# HAZARD: `iste-` is first-person and is not a location. "Hollanda'da sera kurmak
+# istiyorum" is a plan, and it is the apostrophe-less twin of one of the three
+# sentences this guard exists to refuse. Measured: without this line that sentence
+# is admitted, and it is the only thing this line changes in the corpus.
+#
+# It SKIPS the word rather than failing the clause, so a sentence that states a
+# location and then wants something ("Fransa'da yasiyorum, bugday ekmek
+# istiyorum") is still read off its first predicate.
+#
+# NOT EXTENDED to the hearsay verbs. "Fransa'da verim yuksek diye duydum" is the
+# same shape - the locative belongs to the embedded clause, not to the speaker -
+# and it is refused today by the window below rather than by a word list. Adding
+# `duy-`, `oku-`, `gor-` would be a list with no measured failure left to justify
+# it, so it is left out; see the window's own note for what happens if the window
+# is ever widened.
+_TR_VOLITIONAL = re.compile(r"ist[ei]")
+
+# THREE WORDS, AND THIS NUMBER IS MEASURED. Over the same corpus, varying only
+# this (2026-10-02):
+#
+#   window   accepted   wrongly admitted
+#     1        5/14           0/12
+#     2        8/14           0/12
+#     3       10/14           0/12
+#     4       12/14           1/12   <- "Fransa'da verim yuksek diye duydum"
+#     5       13/14           1/12
+#     6       13/14           1/12
+#
+# Three is the widest setting that admits NOTHING from the refuse set, and it
+# covers every mandated sentence: the longest of them, "Fransa'da yasayan bir
+# ciftciyim", puts its predicate exactly three words out.
+#
+# WHAT FOUR WOULD BUY AND COST, since the curve is still climbing: two more
+# accepts ("Fransa'da uzun suredir ciftcilik yapiyorum", "Fransa'da bu yil bugday
+# ekecegim") against the first wrong admission, the hearsay sentence above. A
+# word count cannot separate those - the gain and the harm sit at the same
+# distance - so the safe side is taken and the cost is named below.
+#
+# WHAT THREE COSTS, measured, 4 of the 14: the two sentences just named, plus
+# "Fransa'da bir ciftligim var" and "Fransa'da kucuk bir arazide ciftcilik
+# yapiyorum". The first two are out of reach of the window; `ciftligim` is out of
+# reach of _TR_FIRST_PERSON, whose `-gim` is the bare nominal ending rejected
+# above. All four get the province question instead of France's figures.
+_TR_CLAUSE_WORDS = 3
+
+# The scan stops at a clause boundary as well as at the word count, because the
+# clause - not a span of three words - is the unit a predicate belongs to.
+#
+# IT IS NOT LOAD-BEARING AT THREE, and saying so is the point: measured over the
+# refuse set, boundary on and off are identical at windows 3 and 4, differ first
+# at 5 (it refuses "Hollanda'da sera kurmak istiyorum"), and at 6 it is the only
+# thing refusing "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - one
+# of the three sentences this guard exists to refuse. It is kept because that is
+# what makes _TR_CLAUSE_WORDS safe to widen, not because it earns its place today.
+_TR_CLAUSE = re.compile(r"[,;:.!?\n]")
+
+# Trailing punctuation would otherwise defeat the `$` in _TR_FIRST_PERSON:
+# "yasiyorum," is a word in `clause.split()` and does not end in `m`.
+_TR_WORD_TRIM = "'\"()-,;:.!?…"
 
 # The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
 # preposition says where something is, not where the USER is. "I buy seed from
@@ -909,6 +1007,28 @@ def _code_aliases(code: int) -> tuple[str, ...]:
                  if area == code)
 
 
+def _first_person_follows(folded: str, pos: int) -> bool:
+    """Whether the clause opening at `pos` has a first-person predicate in its
+    first `_TR_CLAUSE_WORDS` words.
+
+    `pos` is the end of a locative that ended its word, so this answers "is the
+    thing in that place the SPEAKER" - see _TR_CLAUSE_WORDS for the measured
+    width and what it costs.
+
+    EVERY OCCURRENCE IS ASKED by the caller, not just the first: "Fransa'da
+    fiyatlar yuksek, Fransa'da yasiyorum" has two locatives and only the second
+    one carries the speaker.
+    """
+    clause = _TR_CLAUSE.split(folded[pos:], maxsplit=1)[0]
+    for word in clause.split()[:_TR_CLAUSE_WORDS]:
+        word = word.strip(_TR_WORD_TRIM)
+        if _TR_VOLITIONAL.match(word):
+            continue
+        if _TR_FIRST_PERSON.search(word):
+            return True
+    return False
+
+
 def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
     """Whether `text` says the SPEAKER is in the country `aliases` names.
 
@@ -924,6 +1044,10 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
         key = re.escape(name)
         if re.search(rf"(?<!\w){key}{_SELF_TR}", folded):
             return True
+        # The second Turkish branch: case ending on the name, person on the verb.
+        for match in re.finditer(rf"(?<!\w){key}{_TR_LOCATIVE}", folded):
+            if _first_person_follows(folded, match.end()):
+                return True
         if re.search(rf"{_SELF_EN}{key}(?!\w)", folded):
             return True
     return False
