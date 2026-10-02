@@ -608,3 +608,23 @@ def test_the_apostrophe_guard_does_not_cost_the_genuine_locative(message, code):
     """The other half. Turkish attaches the apostrophe BEFORE the suffix on a
     proper noun, so refusing a suffix match that runs into one loses nothing."""
     assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("apostrophe", ["'", "\u2019", "\u2018", "\u02bc"])
+def test_the_ablative_guard_holds_on_a_typographic_apostrophe(apostrophe):
+    r"""The guard is spelled with an ASCII apostrophe — `(?!['\w])` — and only
+    reaches a phone's apostrophe because `_TR_FOLD` in src/engine.py folds
+    U+2019, U+2018 and U+02BC to ASCII before any branch runs.
+
+    That coupling crosses a module boundary and nothing pinned it: the guard
+    lives here, the fold that feeds it lives in the engine, and the engine's
+    comment justifies the mapping by the PROVINCE matcher's apostrophe rule,
+    which predates this guard. Drop a mapping there, or respell the guard with a
+    literal `'`, and the two-fault bug returns on the delivery surface only —
+    iOS and Android Turkish layouts emit U+2019, so the desktop demo would keep
+    passing while every phone read a purchase as a location and named the wrong
+    country. Measured: all four spellings refuse the supplier and keep the
+    locative."""
+    for name, code in (("Dominika", 55), ("Nijerya", 159)):
+        assert extract_country(f"{name}{apostrophe}dan tohum aldım") is None
+        assert extract_country(f"{name}{apostrophe}dayım") == code
