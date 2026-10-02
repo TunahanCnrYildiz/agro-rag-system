@@ -852,6 +852,13 @@ def _world_amount(amount: float) -> str:
 # REJECTED: a first-person verb anywhere in the sentence, with no case test. It
 # admits all three of the sentences this guard exists to refuse.
 #
+# THE CASE ENDING IS NOT ENOUGH EITHER - THE TENSE MATTERS TOO. A locative plus a
+# first-person PAST verb says something was DONE there, not that the speaker is
+# there, and that is the same class again: "Amerika'da bugday aldim, ben bugday
+# mi eksem", "Fransa'da staj yaptim", "Hollanda'da fuara katildim". So the
+# predicate test below reads the present continuous and the copula only; see
+# _TR_FIRST_PERSON for the four tenses measured out of it.
+#
 # TWO TURKISH BRANCHES, because the copula attaches in two places:
 #
 #  * _SELF_TR - the copula FUSED to the name's own suffix: "Fransa'dayım",
@@ -895,77 +902,106 @@ _SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
 # fails here and is caught by _SELF_TR, which is where it belongs.
 _TR_LOCATIVE = r"'?[dt][ae](?!\w)"
 
-# First-person endings, word-final on folded text. DELIBERATELY NARROW, and the
-# two obvious widenings were measured and rejected against a 14-accept /
-# 12-refuse Turkish corpus (2026-10-02):
+# First-person endings, word-final on folded text. PRESENT CONTINUOUS AND THE
+# COPULA ONLY, because those are the tenses "where I am" is said in. THIS SET,
+# not the window below, is what holds the refuse set out - see _TR_CLAUSE_WORDS.
 #
-#  * the bare nominal `-im/-um/-iz`: 4 wrong admissions. Turkish is full of
-#    ordinary nouns with that ending, and three of them are agricultural -
-#    "Amerika'da tohum fiyatlari nasil, ben ne eksem" (tohum), "Fransa'da ekim
-#    zamani gecti mi" (ekim), "Fransa'da verim yuksek diye duydum" (verim).
-#  * the aorist `-arim/-erim`: 2 wrong admissions, for the same reason one letter
-#    along - "Fransa'da durum bugdayi yetisir mi" (durum). It buys no accept in
-#    the corpus, so it costs two refusals for nothing.
+# Measured 2026-10-02 against a Turkish corpus of 6 accepts and 17 refusals,
+# adding one ending at a time and changing nothing else. All six accepts pass
+# with the set as it stands, so every one of these costs refusals and buys
+# nothing:
 #
-# The `y` in `y[iu][mz]` is what makes it safe where a bare `[iu][mz]` is not:
-# `ciftciyim` matches, `tohum` and `durum` and `verim` do not.
-_TR_FIRST_PERSON = re.compile(
-    r"(?:[iu]yor[iu][mz]|y[iu][mz]|[dt][iu]m|[ae]c[ae]g[iu][mz])$")
+#   ending added           wrongly admitted
+#   -dim/-tim  (past)           5/17
+#   -im/-um/-iz (nominal)       9/17
+#   -arim/-erim (aorist)        2/17
+#   -acagim/-ecegim (future)    0/17
+#
+#  * the PAST `-dim/-tim` reads a FINISHED ACTION in a place as being in that
+#    place, which is the whole class CRITICAL 3 exists to refuse. The five it
+#    admitted: "Amerika'da bugday aldim, ben bugday mi eksem" - the Turkish
+#    farmer citing a US price, exactly the shape - plus "Hollanda'da sera
+#    gordum, domates ekeyim mi", "Fransa'da staj yaptim, bugday ekeyim mi",
+#    "Fransa'da okudum" and "Hollanda'da fuara katildim". Worse than a one-turn
+#    error, because the caller asks every user turn: one "Fransa'da staj yaptım"
+#    in the first turn kept the grower in France for the rest of the conversation.
+#  * the bare nominal `-im/-um/-iz` admits the five above and four more, because
+#    Turkish is full of ordinary nouns with that ending and three of them are
+#    agricultural - "Amerika'da tohum fiyatlari nasil" (tohum), "Fransa'da ekim
+#    zamani gecti mi" (ekim), "Fransa'da verim yuksek diye duydum" (verim). The
+#    `y` in `y[iu][mz]` is exactly what keeps those out while `ciftciyim` passes.
+#  * the aorist `-arim/-erim` fails for the same reason one letter along -
+#    "Fransa'da durum bugdayi yetisir mi" (durum).
+#  * the FUTURE `-acagim/-ecegim` admits NOTHING in this corpus, so it is left
+#    out on the argument rather than on a measurement: a plan to plant somewhere
+#    is not a statement of being there. It also buys no accept - the one sentence
+#    that would need it, "Fransa'da bu yil bugday ekecegim", sits outside the
+#    window below in any case. If a future accept ever turns up, this is the
+#    entry to revisit, and it is the cheapest of the four to re-measure.
+_TR_FIRST_PERSON = re.compile(r"(?:[iu]yor[iu][mz]|y[iu][mz])$")
 
 # HAZARD: `iste-` is first-person and is not a location. "Hollanda'da sera kurmak
 # istiyorum" is a plan, and it is the apostrophe-less twin of one of the three
-# sentences this guard exists to refuse. Measured: without this line that sentence
-# is admitted, and it is the only thing this line changes in the corpus.
+# sentences this guard exists to refuse. Measured 2026-10-02: without this line
+# that sentence is admitted - one of the 17 refusals, and the only one this line
+# changes.
 #
 # It SKIPS the word rather than failing the clause, so a sentence that states a
 # location and then wants something ("Fransa'da yasiyorum, bugday ekmek
 # istiyorum") is still read off its first predicate.
 #
-# NOT EXTENDED to the hearsay verbs. "Fransa'da verim yuksek diye duydum" is the
-# same shape - the locative belongs to the embedded clause, not to the speaker -
-# and it is refused today by the window below rather than by a word list. Adding
-# `duy-`, `oku-`, `gor-` would be a list with no measured failure left to justify
-# it, so it is left out; see the window's own note for what happens if the window
-# is ever widened.
+# NOT EXTENDED to the hearsay verbs `duy-`, `oku-`, `gor-`. They were the shape
+# "Fransa'da verim yuksek diye duydum" and "Hollanda'da sera gordum" take - the
+# locative belongs to an embedded clause or a finished action, not to the speaker
+# - and all of them are refused now by _TR_FIRST_PERSON dropping the past tense,
+# which is a tense rule rather than a word list. Adding them would be a list with
+# no measured failure left to justify it.
 _TR_VOLITIONAL = re.compile(r"ist[ei]")
 
-# THREE WORDS, AND THIS NUMBER IS MEASURED. Over the same corpus, varying only
-# this (2026-10-02):
+# THREE WORDS: THE SMALLEST THAT REACHES EVERY ACCEPT, not the widest that is
+# safe. Measured 2026-10-02 over the same corpus, varying only this and counting
+# the six Turkish accepts (the two English ones are _SELF_EN's and no window
+# affects them):
 #
 #   window   accepted   wrongly admitted
-#     1        5/14           0/12
-#     2        8/14           0/12
-#     3       10/14           0/12
-#     4       12/14           1/12   <- "Fransa'da verim yuksek diye duydum"
-#     5       13/14           1/12
-#     6       13/14           1/12
+#     1        4/6            0/17
+#     2        5/6            0/17
+#     3        6/6            0/17
+#     4        6/6            0/17
+#     5        6/6            0/17
+#     6        6/6            0/17
 #
-# Three is the widest setting that admits NOTHING from the refuse set, and it
-# covers every mandated sentence: the longest of them, "Fransa'da yasayan bir
-# ciftciyim", puts its predicate exactly three words out.
+# Three is where the accept column tops out: the longest mandated sentence,
+# "Fransa'da yasayan bir ciftciyim", puts its predicate exactly three words out.
+# Nothing is bought above it.
 #
-# WHAT FOUR WOULD BUY AND COST, since the curve is still climbing: two more
-# accepts ("Fransa'da uzun suredir ciftcilik yapiyorum", "Fransa'da bu yil bugday
-# ekecegim") against the first wrong admission, the hearsay sentence above. A
-# word count cannot separate those - the gain and the harm sit at the same
-# distance - so the safe side is taken and the cost is named below.
+# IT IS NOT THE WINDOW THAT HOLDS THE REFUSE SET OUT - the ending set is, and the
+# zeroes all the way down that column say so. An earlier revision of this comment
+# carried a table where widening to 4 admitted a refusal; that was measured with
+# `-dim/-tim` in _TR_FIRST_PERSON, and dropping it took the leak with it. Three
+# is kept anyway, because a window wider than the sentences it serves is cost
+# with no benefit, and because the boundary note below shows what a wider one
+# would start to lean on.
 #
-# WHAT THREE COSTS, measured, 4 of the 14: the two sentences just named, plus
-# "Fransa'da bir ciftligim var" and "Fransa'da kucuk bir arazide ciftcilik
-# yapiyorum". The first two are out of reach of the window; `ciftligim` is out of
-# reach of _TR_FIRST_PERSON, whose `-gim` is the bare nominal ending rejected
-# above. All four get the province question instead of France's figures.
+# WHAT THREE COSTS, measured: a location sentence whose predicate sits further
+# out - "Fransa'da uzun suredir ciftcilik yapiyorum" (4 words),
+# "Fransa'da kucuk bir arazide ciftcilik yapiyorum" (5) - gets the province
+# question instead of France's figures. So does "Fransa'da bir ciftligim var",
+# for a different reason: `ciftligim` carries the bare nominal ending
+# _TR_FIRST_PERSON rejects, and `var` is not first person at all.
 _TR_CLAUSE_WORDS = 3
 
 # The scan stops at a clause boundary as well as at the word count, because the
 # clause - not a span of three words - is the unit a predicate belongs to.
 #
 # IT IS NOT LOAD-BEARING AT THREE, and saying so is the point: measured over the
-# refuse set, boundary on and off are identical at windows 3 and 4, differ first
-# at 5 (it refuses "Hollanda'da sera kurmak istiyorum"), and at 6 it is the only
-# thing refusing "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - one
-# of the three sentences this guard exists to refuse. It is kept because that is
-# what makes _TR_CLAUSE_WORDS safe to widen, not because it earns its place today.
+# 17 refusals, boundary on and off are identical at window 3. It starts earning
+# its place at 4 (without it, "Hollanda'da sera gordum" and "Fransa'da staj
+# yaptim" reach across the comma into the next clause's predicate), at 5 it also
+# refuses "Hollanda'da sera kurmak istiyorum", and at 6 it is the only thing
+# refusing "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - one of the
+# three sentences this guard exists to refuse. It is kept because that is what
+# makes _TR_CLAUSE_WORDS safe to widen, not because it earns its place today.
 _TR_CLAUSE = re.compile(r"[,;:.!?\n]")
 
 # Trailing punctuation would otherwise defeat the `$` in _TR_FIRST_PERSON:
@@ -1053,6 +1089,34 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
     return False
 
 
+def _one_fao_item(crop_ids: list[str]) -> bool:
+    """Whether every one of these crop ids that maps to FAOSTAT at all maps to
+    the SAME item - i.e. whether they all read one cell.
+
+    Asked of a crop FAMILY, to decide whether the family's name describes the
+    figure or only half of it. See the call site for the five families that fail
+    this and what printing the family name cost them.
+
+    An id with no FAO mapping is not counted: `Buğday (Hasıl/Yeşilot)` is green
+    fodder and maps to nothing, so it cannot disagree with item 15 about what a
+    wheat cell holds.
+
+    A BROKEN OR EMPTY MAP RETURNS True, and that is unreachable rather than a
+    chosen default: `norms._resolve_world` reads the same table and produces no
+    figure at all without an item, so the caller has already returned [] before
+    this can be asked.
+    """
+    from src import norms
+    table = norms._load_fao_map()
+    items = set()
+    for crop_id in crop_ids:
+        mapping = table.get(crop_id)
+        item = mapping.get("fao") if isinstance(mapping, dict) else None
+        if item is not None:
+            items.add(item)
+    return len(items) <= 1
+
+
 def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     """Where the user is when it is not a Turkish province, and what FAOSTAT
     publishes for the crop they named there. Empty list when any of that is
@@ -1085,20 +1149,29 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     It does not matter for the FIGURE, because the two ids read the same cell -
     which is why the printed name is the FAMILY's and not the id's; see below.
 
-    THE PRINTED CROP NAME IS THE FAMILY'S, NEVER THE ID'S LABEL. This is the
-    same `data/crop_fao_map.json` note read as the constraint it is: the id's
-    label narrows a figure the FAO item does not split. Printing it produced
-    `Buğday, Durum Buğdayı Hariç - FAOSTAT ulke ortalama verimi: 597,35 kg/da`
-    for France, where item 15 is ALL wheat durum included, and `Domates
-    (Salçalık) - ... 47.889,02 kg/da` for the Netherlands, where item 388 is all
-    tomatoes and overwhelmingly fresh. A paraphrase of either - "Fransa'da durum
-    dışı buğdayın verimi 597 kg/da" - is a claim the map explicitly disclaims.
-    The family name (`Buğday`, `Domates`) is the broadest Turkish name in play
-    and the one the crop detector actually matched, so it overstates nothing.
-    REJECTED: keeping the id's label and adding a sentence saying the FAO item is
-    broader. It needs the model to carry a qualification through a paraphrase,
-    which is the thing prompt text is worst at; the family name needs it to carry
-    nothing.
+    THE PRINTED CROP NAME MUST DESCRIBE THE CELL, WHICH IS SOMETIMES THE
+    FAMILY'S NAME AND SOMETIMES THE ID'S. Both halves of this were got wrong in
+    turn, and the two failures point opposite ways:
+
+      * The id's label can be NARROWER than the cell. `Buğday, Durum Buğdayı
+        Hariç - FAOSTAT ulke ortalama verimi: 597,35 kg/da` for France, where
+        item 15 is all wheat durum included, and `Domates (Salçalık) - ...
+        47.889,02 kg/da` for the Netherlands, where item 388 is all tomatoes and
+        overwhelmingly fresh. A paraphrase - "Fransa'da durum dışı buğdayın
+        verimi 597 kg/da" - is a claim data/crop_fao_map.json disclaims in
+        writing, on both items.
+      * The family's name can be BROADER than the cell. Five of the 187 families
+        map to TWO items, so the figure belongs to half the family: measured,
+        `Fasulye - ... 241,36 kg/da` for France is its DRY bean where its fresh
+        bean is 1242,07 the same year.
+
+    So the name is chosen per family by `_one_fao_item`, not by a rule about
+    names. See the call site, which carries the five families and their figures.
+
+    REJECTED: keeping the id's label everywhere and adding a sentence saying the
+    FAO item is broader. It needs the model to carry a qualification through a
+    paraphrase, which is the thing prompt text is worst at; a name that describes
+    the cell needs it to carry nothing.
 
     THE COUNTRY IS PRINTED AS FAOSTAT SPELLS IT - `France`, not `Fransa` - and
     that is deliberate rather than laziness. The label is part of the figure's
@@ -1171,18 +1244,23 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
             name for name in _named_crops(message)
             if _normalize_tr(re.split(r"\s*[(,]", name)[0].strip()) not in aliases
         )
+        # AND THE FORK UPSTREAM COSTS MORE THAN ONE SENTENCE. answer() sends a
+        # message naming TWO crops to the comparison card before this function is
+        # reached, and that card is province-only - so a real Egyptian wheat
+        # grower writing "Mısır'dayım, buğday mı ekmeliyim" never arrives here at
+        # all and gets `crop_compare.NO_PROVINCE`, which asks for a Turkish
+        # province. The fork is older than this branch and is not this change's
+        # to move; it is written down because the drop above is not the only
+        # place a Turkish country name costs an Egyptian grower his figures, and
+        # a reader of this guard alone would conclude it was.
         if not families:
             return []
-        # The family's OWN name is what gets printed, not the id's label - see
-        # the docstring for the two FAO items whose ids narrow a figure FAOSTAT
-        # does not split. Split and stripped the same way the match below is, so
-        # the printed name and the matched name cannot drift apart.
-        crop_name = re.split(r"\s*[(,]", families[0])[0].strip()
-        family = _normalize_tr(crop_name)
+        family_name = re.split(r"\s*[(,]", families[0])[0].strip()
+        family = _normalize_tr(family_name)
+        matched = [(crop_id, label) for crop_id, label in norms.available_crops()
+                   if _normalize_tr(re.split(r"\s*[(,]", label)[0].strip()) == family]
         norm = None
-        for crop_id, label in norms.available_crops():
-            if _normalize_tr(re.split(r"\s*[(,]", label)[0].strip()) != family:
-                continue
+        for crop_id, _label in matched:
             candidate = norms.lookup(crop_id, None, country=code)
             if candidate is not None and (candidate.yield_kg_da
                                           or candidate.price_per_kg):
@@ -1190,6 +1268,33 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
                 break
         if norm is None:
             return []
+
+        # WHICH NAME GOES BESIDE THE FIGURE, and it is NOT unconditionally the
+        # family's. The family name is right only when every mapped id in the
+        # family reads the SAME FAO cell, which is the wheat and tomato case -
+        # item 15 does not split durum from other wheat and item 388 does not
+        # split table from processing tomatoes, so `Buğday` and `Domates` describe
+        # the cell exactly and the id's own label would narrow it.
+        #
+        # FIVE FAMILIES SPAN TWO ITEMS, measured 2026-10-02 over
+        # data/crop_fao_map.json and data/crop_norms.json - 187 families, 5 of
+        # them: `Fasulye` (176 dry / 423 fresh), `Soğan` (403 / 402), `Bezelye`
+        # (187 / 417), `Bakla` (181 / 420), `Biber` (401 fresh / 689 dried). There
+        # the bare family name is WORSE than the id's label, because the figure
+        # itself belongs to half the family. `available_crops()` is sorted by
+        # label, so which half answers is label order, not the question: measured,
+        # "Fransa'dayim, fasulye ekeyim mi" printed `Fasulye - … 241,36 kg/da`,
+        # which is France's DRY bean, where its fresh bean in the same year is
+        # 1242,07 - five times as much, and a bare Turkish "fasulye" in a planting
+        # question is usually the fresh one. `Soğan` printed 3363,2 (dry) against
+        # 2105,36 fresh, `Bezelye` 292,48 (dry) against 637,42.
+        #
+        # So the two failures are opposite and both real: the id's label can be
+        # narrower than the cell, and the family name can be broader than it. The
+        # test is the mapping, asked per family, and it keeps each name on a cell
+        # it actually describes.
+        crop_name = family_name if _one_fao_item(
+            [crop_id for crop_id, _label in matched]) else norm.label
 
         measures = [("ortalama verimi", norm.yield_kg_da),
                     ("ortalama ciftci fiyati", norm.price_per_kg)]

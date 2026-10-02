@@ -1666,6 +1666,20 @@ def test_a_country_named_like_a_crop_does_not_supply_that_crop():
     assert "toprak" in block and "ONERME" in block
 
 
+def test_two_crops_never_reach_the_country_block_at_all():
+    """The guard above is not the only place a Turkish country name costs an
+    Egyptian grower his figures, and this pins the other one so a reader of the
+    guard alone does not conclude it was.
+
+    answer() forks a message naming TWO crops to the comparison card BEFORE
+    `_country_lines` is reached, and that card is province-only. So a real
+    Egyptian wheat grower writing "Mısır'dayım, buğday mı ekmeliyim" names two
+    crops - `Mısır` and `Buğday` - and is asked for a Turkish province by a
+    route this branch never touches. The fork is older than the world layer and
+    is not this change's to move."""
+    assert len(engine._named_crops("Mısır'dayım, buğday mı ekmeliyim")) == 2
+
+
 def test_a_country_not_named_like_a_crop_still_asks_nothing_of_the_crop():
     """The guard above drops the FAMILY NAME the resolved country answers to,
     not crop detection as a whole. France is not a crop, so a France question
@@ -1705,6 +1719,42 @@ def test_the_tomato_item_is_not_narrowed_to_the_processing_id_either():
                                       None, date(2026, 9, 25))
     assert "Domates - FAOSTAT ulke ortalama verimi:" in block
     assert "Salçalık" not in block
+
+
+@pytest.mark.parametrize("message,named", [
+    # dry 176 / fresh 423 - France's dry bean is 241,36 and its fresh bean
+    # 1242,07 in the same year, so the bare family name is five times wrong.
+    ("Fransa'dayım, fasulye ekeyim mi", "Fasulye, Kuru"),
+    ("Fransa'dayım, soğan ekeyim mi", "Soğan (Kuru)"),          # 403 / 402
+    ("Fransa'dayım, bezelye ekeyim mi", "Bezelye, Kuru"),       # 187 / 417
+    ("Fransa'dayım, bakla ekeyim mi", "Bakla, Kuru (Yemlik)"),  # 181 / 420
+    ("Fransa'dayım, biber ekeyim mi", "Biber (Dolmalık)"),      # 401 / 689
+])
+def test_a_family_spanning_two_fao_items_keeps_the_id_label(message, named):
+    """The family name is only right when every mapped id in the family reads the
+    SAME cell. Measured over the shipped tables, 5 of 187 families map to two
+    items - a dry one and a fresh one - and `available_crops()` is label-sorted,
+    so which half answers is label order rather than the question.
+
+    Printing the bare family name there was the opposite failure to the one it
+    fixed: not a name narrower than the figure, but a figure that belongs to half
+    the name. `Fasulye - ... 241,36 kg/da` is France's DRY bean under a word a
+    Turkish planting question usually means fresh by."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert f"{named} - FAOSTAT ulke ortalama verimi:" in block
+
+
+def test_one_fao_item_separates_the_two_kinds_of_family():
+    """The test that decides it, asserted directly so a rebuild of
+    data/crop_fao_map.json that merges or splits an item fails here by name
+    rather than through a block."""
+    # Both wheat ids share item 15; the fodder id maps to nothing and cannot
+    # disagree.
+    assert engine._one_fao_item(["bugday, durum bugdayi haric",
+                                 "bugday (hasil/yesilot)"]) is True
+    # Dry and fresh bean are items 176 and 423.
+    assert engine._one_fao_item(["fasulye, kuru", "fasulye, taze"]) is False
+    assert engine._one_fao_item([]) is True
 
 
 # --------------------------------------------------------------------------- #
@@ -1778,6 +1828,7 @@ def test_the_english_branch_is_unchanged_by_the_turkish_widening(text):
     # A locative with no first-person predicate in reach.
     ("Fransa'da ekim zamanı geçti mi", 68),
     ("Amerika'da tohum fiyatları nasıl, ben ne eksem", 231),
+    ("Fransa'da durum buğdayı yetişir mi", 68),
     # A plan rather than a location; see _TR_VOLITIONAL.
     ("Hollanda'da sera kurmak istiyorum", 150),
 ])
@@ -1786,6 +1837,41 @@ def test_the_widened_branch_still_refuses_what_is_not_a_location(text, code):
     sentences CRITICAL 3 refuses contain one. What it reads is the CASE ENDING,
     and these are the endings and shapes that must stay out."""
     assert not engine._states_location(text, engine._code_aliases(code))
+
+
+@pytest.mark.parametrize("message,code", [
+    # The shape, and the one this guard exists for: a Turkish farmer citing a
+    # foreign price.
+    ("Amerika'da bugday aldim, ben bugday mi eksem", 231),
+    ("Hollanda'da sera gordum, domates ekeyim mi", 150),
+    ("Fransa'da staj yaptim, bugday ekeyim mi", 68),
+    ("Fransa'da okudum", 68),
+    ("Hollanda'da fuara katildim", 150),
+])
+def test_a_locative_with_a_past_tense_verb_is_not_a_stated_location(message, code):
+    """The case ending is not enough on its own - the TENSE matters too. A
+    locative plus a first-person PAST verb says something was DONE there, not
+    that the speaker is there, and all five of these were admitted while
+    `_TR_FIRST_PERSON` carried `-dim/-tim`.
+
+    Worse than a one-turn error, because `_country_lines` asks every user turn:
+    one "Fransa'da staj yaptım" in the first turn kept the grower in France for
+    the rest of the conversation. Dropping the branch costs nothing measured -
+    none of the six Turkish accepts needs it."""
+    assert not engine._states_location(message, engine._code_aliases(code))
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "FAOSTAT" not in block
+
+
+def test_a_past_tense_turn_does_not_place_the_grower_for_the_whole_chat():
+    """The history half of the same defect: every user turn is asked, so a
+    finished action named once would carry the rest of the conversation."""
+    history = [{"role": "user", "content": "Fransa'da staj yaptım"}]
+    block = engine._crop_choice_block("buğday mı ekmeliyim", history,
+                                      date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "France" not in block
 
 
 def test_a_country_stated_earlier_in_the_conversation_still_counts():
