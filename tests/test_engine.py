@@ -1642,6 +1642,127 @@ def test_a_country_layer_failure_costs_only_its_own_lines(monkeypatch):
     assert "FAOSTAT" not in block
 
 
+# --------------------------------------------------------------------------- #
+# A country whose Turkish name is also a crop name
+# --------------------------------------------------------------------------- #
+def test_a_country_named_like_a_crop_does_not_supply_that_crop():
+    """`Mısır` is BOTH the Turkish name for Egypt and the label for maize, so
+    the crop detector read the country word as a crop and the block printed
+    Egypt's maize yield and price for a question that names no crop at all -
+    one crop's figures and nothing else under a "BELIRLI BIR URUN ONERME"
+    instruction, on no basis.
+
+    Measured on e021bca, this same sentence produced:
+        Mısır - FAOSTAT ulke ortalama verimi: 758,53 kg/da (2024, ...)
+        Mısır - FAOSTAT ulke ortalama ciftci fiyati: 0,4702 USD/kg (2023, ...)
+    """
+    block = engine._crop_choice_block("Mısır'dayım, bu yıl ne eksem?", None,
+                                      date(2026, 9, 25))
+    assert "FAOSTAT" not in block
+    assert "758" not in block
+    assert "Egypt" not in block
+    # It falls back to the ordinary block, it does not lose the route.
+    assert "BILINMIYOR" in block
+    assert "toprak" in block and "ONERME" in block
+
+
+def test_a_country_not_named_like_a_crop_still_asks_nothing_of_the_crop():
+    """The guard above drops the FAMILY NAME the resolved country answers to,
+    not crop detection as a whole. France is not a crop, so a France question
+    naming no crop keeps its old behaviour - which is what
+    test_a_country_with_no_crop_named_is_unchanged already pins - and a France
+    question naming wheat still gets wheat.
+
+    This case sits beside the Mısır one deliberately: without it the guard could
+    be satisfied by refusing every country, and the two tests would both pass.
+    """
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "France" in block
+    assert "597,35 kg/da" in block
+
+
+# --------------------------------------------------------------------------- #
+# The printed crop name may not be narrower than the FAO item
+# --------------------------------------------------------------------------- #
+def test_the_printed_crop_name_is_the_family_not_the_narrower_id():
+    """data/crop_fao_map.json says FAOSTAT does not split durum from other wheat
+    and that both Turkish wheat ids share item 15. Printing the id's own label
+    beside the number - `Buğday, Durum Buğdayı Hariç - ... 597,35 kg/da` - put a
+    narrowing on a figure the map explicitly disclaims, and a paraphrase of it
+    ("Fransa'da durum dışı buğdayın verimi") is a claim nobody made."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "Buğday - FAOSTAT ulke ortalama verimi: 597,35 kg/da" in block
+    assert "Durum" not in block
+
+
+def test_the_tomato_item_is_not_narrowed_to_the_processing_id_either():
+    """The same note on item 388: FAOSTAT does not split table from processing
+    tomatoes, and the Dutch figure is overwhelmingly fresh. `Domates (Salçalık)`
+    beside 47889,02 kg/da said processing tomato."""
+    block = engine._crop_choice_block("Hollanda'dayım, domates ekeyim mi",
+                                      None, date(2026, 9, 25))
+    assert "Domates - FAOSTAT ulke ortalama verimi:" in block
+    assert "Salçalık" not in block
+
+
+# --------------------------------------------------------------------------- #
+# A country only replaces the province question when the user is in it
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("message", [
+    # A buyer, not a location: dative, no person on it.
+    "gecen yil Almanyaya bugday sattim, bu yil bugday mi eksem",
+    # A greenhouse he admires: locative carrying the relativiser -ki.
+    "Hollanda'daki gibi sera kurmak istiyorum, domates ekeyim mi",
+    # A price reference: bare locative modifying "fiyatları".
+    "Amerika'da buğday fiyatları nasıl, ben buğday ekeyim mi",
+])
+def test_merely_naming_a_country_keeps_the_province_question(message):
+    """All three are plausibly TURKISH farmers. Measured on e021bca, each one
+    was told "Kullanici Turkiye disinda", handed that country's figures, and
+    lost the province question - so the assistant stopped asking the one thing
+    it needs to answer at all."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "Turkiye disinda" not in block
+    assert "FAOSTAT" not in block
+
+
+def test_a_stated_foreign_location_still_replaces_the_question():
+    """The point of the country lines, and it has to survive the guard above: a
+    grower who says he is in France must not be asked which Turkish province he
+    is in."""
+    block = engine._crop_choice_block("Fransa'dayım, buğday mı ekmeliyim",
+                                      None, date(2026, 9, 25))
+    assert "BILINMIYOR" not in block
+    assert "France" in block
+
+
+def test_a_country_stated_earlier_in_the_conversation_still_counts():
+    """`extract_country` returns the most RECENT mention, which need not be the
+    turn that stated where the user is. Every user turn is asked, so a location
+    given two turns ago still carries the figures."""
+    history = [{"role": "user", "content": "Fransa'dayım, merhaba"},
+               {"role": "assistant", "content": "Merhaba."}]
+    block = engine._crop_choice_block("buğday mı ekmeliyim", history,
+                                      date(2026, 9, 25))
+    assert "France" in block
+    assert "BILINMIYOR" not in block
+
+
+def test_the_assistant_naming_a_country_is_not_a_location():
+    """Assistant turns are skipped, the way country.extract_country skips them:
+    the assistant names countries while answering, and reading its own examples
+    back would place the grower wherever the last one was set."""
+    history = [{"role": "assistant",
+                "content": "Fransa'dayım diyen çiftçiler için verim yüksektir."}]
+    block = engine._crop_choice_block("buğday mı ekmeliyim", history,
+                                      date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "France" not in block
+
+
 def test_crop_choice_never_gets_a_framing_sentence():
     """`crop_choice` has no reviewed programme behind it, so it gets no framing
     suffix. This passes today by virtue of the `route != "fert_plan"` guard; it is

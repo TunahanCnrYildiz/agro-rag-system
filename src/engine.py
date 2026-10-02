@@ -761,6 +761,118 @@ def _world_amount(amount: float) -> str:
     return format_qty(amount) if amount >= 1 else format_tr(amount, 4)
 
 
+# The shapes in which a user says THEY ARE in a country, as opposed to merely
+# naming one. Lives here rather than in src/context/country.py because that
+# module resolves a country from five different shapes and returns only an area
+# code - nothing it exposes says WHICH shape answered, or where in the text it
+# matched - and that module is not this change's to alter.
+#
+# WHAT GOES WRONG WITHOUT THIS TEST, measured on e021bca:
+#
+#   "gecen yil Almanyaya bugday sattim, bu yil bugday mi eksem"
+#       -> Germany: "Kullanici Turkiye disinda", Germany's wheat figures, and
+#          the province question gone.
+#   "Hollanda'daki gibi sera kurmak istiyorum, domates ekeyim mi"  -> Netherlands
+#   "Amerika'da buğday fiyatları nasıl, ben buğday ekeyim mi"      -> USA
+#
+# All three are plausibly Turkish farmers, and the country each one names is a
+# buyer, a greenhouse they admire and a price reference. The recall that resolves
+# them belongs to src/context/country.py; what belongs HERE is that a resolved
+# country was allowed to REPLACE the province question. So it may only do that
+# when the country is the user's own stated location, and every other mention
+# loses the country lines and keeps the ask - which is byte-for-byte the block
+# this branch produced before the world layer existed.
+#
+# THE TURKISH FORM IS A CASE SUFFIX PLUS A FIRST-PERSON COPULA, nothing less:
+# "Fransa'dayım", "Ganadayim", "Fransalıyım". The copula is exactly what
+# separates the three sentences above - `Almanyaya` is a dative with no person on
+# it, `Hollanda'daki` is a locative carrying the relativiser `-ki`, and
+# `Amerika'da` is a bare locative modifying `fiyatları`. The apostrophe is
+# optional because Turkish speakers omit it ("Ganadayim") and country.py's own
+# suffix branch accepts both.
+#
+# WHAT IT COSTS, measured: a first-person location stated with a VERB instead of
+# a copula is refused. "Fransa'da yasiyorum" and "Fransa'da ciftcilik yapiyorum"
+# printed France's figures on e021bca and get the province question now. Reading
+# them would mean deciding which clause a first-person verb belongs to - the same
+# verb appears in "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - and
+# that is the parse this module does not do. Refusing a real foreign grower costs
+# one question he can answer by saying where he is; admitting the three sentences
+# above costs every figure in the answer and the question with it.
+#
+# REJECTED: accepting the place-noun form src/context/location.py accepts
+# ("Fransa kosullarinda"). For a province it is how growers state where they are;
+# for a country "Fransa kosullarinda bugday ekilir mi" is a Turkish grower asking
+# about France, which is the same class as the three sentences this guard exists
+# to refuse.
+#
+# REJECTED: adding the country lines and keeping a SOFTENED ask beside them. The
+# ask is for a Turkish province, and there is no softening of that question which
+# is not still wrong to put to a grower in France - which is the contradiction
+# the replacement was introduced to avoid in the first place.
+#
+# NOT GATED ON WHETHER THE ALIAS IS SPELLED IN TURKISH, which country.py does
+# gate its own suffix branch on. This test can only NARROW a code that module has
+# already returned, so a Turkish suffix admitted on an English spelling cannot
+# introduce a country that was not resolved - and the shapes below state a
+# location whichever spelling they sit on.
+_SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
+
+# The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
+# preposition says where something is, not where the USER is. "I buy seed from
+# India" and "the protein in Turkey feed" are the shapes that rule exists for,
+# and country.py's own _EN_ORIGIN comment records measuring them. Only an
+# enumerated first-person subject counts here, and `from` is admitted beside
+# `in`/`at` because after one of these subjects it predicates the speaker
+# ("I am from Kenya") rather than a purchase.
+_SELF_EN = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
+            r"|i\s+farm|we\s+farm)(?:\s+based)?\s+(?:in|at|from)\s+")
+
+# Same trim set src/context/country.py uses, for the same one reason: a message
+# that is NOTHING BUT the country name is the natural reply to "hangi
+# ulkedesiniz?", and that reply is a statement of location even though it carries
+# no suffix at all.
+_SELF_TRIM = " \t\n\r.,!?;:()\"'-…"
+
+
+def _code_aliases(code: int) -> tuple[str, ...]:
+    """Every folded name the FAO area `code` answers to.
+
+    Read out of src/context/country.py's own folded table rather than rebuilt
+    from data/country_aliases.json: the two guards below and that module must
+    agree on what counts as a name for this country, and a second copy of the
+    fold would be a second thing to keep in step.
+
+    An EMPTY TABLE yields no aliases, which is how that module degrades when its
+    data file is broken - and then both guards below refuse, the country lines
+    are dropped and the province question stands. That is the same direction
+    country._load chose for itself.
+    """
+    from src.context import country as country_ctx
+    return tuple(name for name, (area, _turkish) in country_ctx._FOLDED.items()
+                 if area == code)
+
+
+def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
+    """Whether `text` says the SPEAKER is in the country `aliases` names.
+
+    One text, not a conversation: the caller decides which texts to ask about.
+    """
+    folded = _normalize_tr(text or "")
+    if not folded:
+        return False
+    whole = folded.strip(_SELF_TRIM)
+    for name in aliases:
+        if whole == name:
+            return True
+        key = re.escape(name)
+        if re.search(rf"(?<!\w){key}{_SELF_TR}", folded):
+            return True
+        if re.search(rf"{_SELF_EN}{key}(?!\w)", folded):
+            return True
+    return False
+
+
 def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     """Where the user is when it is not a Turkish province, and what FAOSTAT
     publishes for the crop they named there. Empty list when any of that is
@@ -778,9 +890,35 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     ONE CROP, THE FIRST NAMED. A crop_choice message naming two crops never
     reaches this block at all: answer() forks it to the comparison card above.
     So the choice between families only ever decides which of the ids INSIDE
-    one family answers, and that is settled by whichever of them FAOSTAT holds
-    a cell for - `Buğday (Hasıl/Yeşilot)` is green fodder and maps to nothing,
-    `Buğday, Durum Buğdayı Hariç` maps to item 15.
+    one family answers.
+
+    WHICH ID INSIDE THE FAMILY ANSWERS IS NOT ALWAYS DECIDED BY THE DATA, and an
+    earlier revision of this docstring claimed it was - "settled by whichever of
+    them FAOSTAT holds a cell for". That holds where exactly one id in the family
+    maps to an FAO item: `Buğday (Hasıl/Yeşilot)` is green fodder and maps to
+    nothing, `Buğday, Durum Buğdayı Hariç` maps to item 15. It does NOT hold
+    where two ids SHARE one item, which data/crop_fao_map.json says happens -
+    item 15 carries the note that FAOSTAT does not split durum from other wheat
+    and both Turkish wheat ids point at it, and item 388 carries the same note
+    for table against processing tomatoes. There the loop below returns whichever
+    id `norms.available_crops()` happens to reach first, which is label order.
+    It does not matter for the FIGURE, because the two ids read the same cell -
+    which is why the printed name is the FAMILY's and not the id's; see below.
+
+    THE PRINTED CROP NAME IS THE FAMILY'S, NEVER THE ID'S LABEL. This is the
+    same `data/crop_fao_map.json` note read as the constraint it is: the id's
+    label narrows a figure the FAO item does not split. Printing it produced
+    `Buğday, Durum Buğdayı Hariç - FAOSTAT ulke ortalama verimi: 597,35 kg/da`
+    for France, where item 15 is ALL wheat durum included, and `Domates
+    (Salçalık) - ... 47.889,02 kg/da` for the Netherlands, where item 388 is all
+    tomatoes and overwhelmingly fresh. A paraphrase of either - "Fransa'da durum
+    dışı buğdayın verimi 597 kg/da" - is a claim the map explicitly disclaims.
+    The family name (`Buğday`, `Domates`) is the broadest Turkish name in play
+    and the one the crop detector actually matched, so it overstates nothing.
+    REJECTED: keeping the id's label and adding a sentence saying the FAO item is
+    broader. It needs the model to carry a qualification through a paraphrase,
+    which is the thing prompt text is worst at; the family name needs it to carry
+    nothing.
 
     THE COUNTRY IS PRINTED AS FAOSTAT SPELLS IT - `France`, not `Fransa` - and
     that is deliberate rather than laziness. The label is part of the figure's
@@ -798,10 +936,69 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         code = country_ctx.extract_country(message, history)
         if code is None or code == norms.TURKIYE_AREA:
             return []
-        families = _named_crops(message)
+        aliases = _code_aliases(code)
+
+        # GUARD: a resolved country may only REPLACE the province question when
+        # the user said that is where they are. See _SELF_TR for the three
+        # measured sentences this refuses and what the refusal costs.
+        #
+        # EVERY USER TURN IS ASKED, not only the one `extract_country` resolved
+        # from, and that leniency is deliberate. The code that came back is the
+        # most RECENT mention; a statement of location made earlier in the same
+        # conversation is still the user's. "Fransa'dayım" / "Fransa'da fiyatlar
+        # nasıl" / "buğday mı eksem" resolves France off the middle turn, which
+        # is not a location statement, while the first turn plainly is - and
+        # stopping at the resolving turn would throw that conversation away.
+        # It cannot admit the wrong country: only `code`'s own aliases are
+        # tested, so a France statement can never licence Germany.
+        #
+        # Assistant turns are skipped for the reason country.extract_country
+        # skips them: the assistant names countries while answering, and reading
+        # its own words back would place the grower wherever its last example was.
+        said = [message] + [turn.get("content", "")
+                            for turn in reversed(history or [])
+                            if turn.get("role") == "user"]
+        if not any(_states_location(text, aliases) for text in said):
+            return []
+
+        # GUARD: a country whose Turkish name is ALSO a crop name must not supply
+        # that crop. Measured on e021bca, "Mısır'dayım, bu yıl ne eksem?" - which
+        # names no crop at all - printed Egypt's MAIZE yield and price, because
+        # `Mısır` is the label for maize as well as the Turkish name for Egypt.
+        # That handed the model one crop's figures and nothing else for an open
+        # "what should I plant", against the same block's own
+        # "BELIRLI BIR URUN ONERME", and on no basis whatever. Worse, `Mısır`
+        # printed directly under `Egypt` reads as Egypt's own name, so the model
+        # may report the maize yield as the country's.
+        #
+        # WHAT IS DROPPED is a family whose name folds to a name this RESOLVED
+        # country answers to - not any country's name. `Fas` inside `Fasulye` and
+        # `Hindistan` inside `Hindistan Cevizi` are untouched, because the family
+        # names are `Fasulye` and `Hindistan Cevizi` and neither is an alias of
+        # Morocco or India. Only the whole-name collisions go, which on the
+        # shipped tables means `Mısır`.
+        #
+        # THE SPAN WOULD BE BETTER AND IS NOT AVAILABLE: dropping only the
+        # OCCURRENCE the country resolver consumed needs to know where it
+        # matched, and src/context/country.py returns an area code and nothing
+        # else. So the cost is a measured over-refusal: "Mısır'dayım, mısır mı
+        # ekmeliyim" names Egypt and maize, and loses the figures for both,
+        # falling back to the province question. That is the same outcome
+        # `test_a_country_with_no_crop_named_is_unchanged` already accepts for a
+        # country named with no crop, and it is the safe direction - a question
+        # instead of a figure nobody asked for.
+        families = tuple(
+            name for name in _named_crops(message)
+            if _normalize_tr(re.split(r"\s*[(,]", name)[0].strip()) not in aliases
+        )
         if not families:
             return []
-        family = _normalize_tr(re.split(r"\s*[(,]", families[0])[0].strip())
+        # The family's OWN name is what gets printed, not the id's label - see
+        # the docstring for the two FAO items whose ids narrow a figure FAOSTAT
+        # does not split. Split and stripped the same way the match below is, so
+        # the printed name and the matched name cannot drift apart.
+        crop_name = re.split(r"\s*[(,]", families[0])[0].strip()
+        family = _normalize_tr(crop_name)
         norm = None
         for crop_id, label in norms.available_crops():
             if _normalize_tr(re.split(r"\s*[(,]", label)[0].strip()) != family:
@@ -830,7 +1027,7 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
             # 2025, and the two measures need not even share a year with each
             # other - Ghana's sorghum yield is 2024 and its price 2022.
             figures.append(
-                f"{norm.label} - FAOSTAT ulke {what}: "
+                f"{crop_name} - FAOSTAT ulke {what}: "
                 f"{_world_amount(value.amount)} {value.unit} "
                 f"({value.year}{', ' + note if note else ''})."
             )
@@ -885,6 +1082,12 @@ def _crop_choice_block(message: str, history: list[dict] | None,
         # French grower which Turkish province he is in contradicts itself.
         # With no country, or with a country we hold no figure for, nothing
         # changes - the ask stands exactly as it did.
+        #
+        # AND ONLY WHEN THE USER SAID THAT IS WHERE HE IS. Replacing the ask on
+        # any mention of any country was measured wrong three times over - see
+        # _SELF_TR, which names the sentences and what refusing them costs.
+        # _country_lines returns [] for those now, so they land in the else
+        # branch below and get the ask back, unchanged.
         world = _country_lines(message, history)
         if world:
             lines.extend(world)
