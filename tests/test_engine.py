@@ -2023,6 +2023,11 @@ def test_an_object_locative_does_not_open_the_country_block(message, code):
     "Fransa'da yaşayan bir çiftçiyim",
     "Fransa'da çalışan bir işçiyim",
     "Fransa'da yaşayan bir çiftçiyiz",
+    # A phone's apostrophe, U+2019. `_normalize_tr` folds it to `'`, so this
+    # branch gets it for free - pinned because the other guards on this path
+    # have their own test for the same character and a reader should not have to
+    # assume a third one inherits it.
+    "Fransa’da yaşayan bir çiftçiyim",
 ])
 def test_a_relative_clause_predicating_the_speaker_is_a_stated_location(text):
     """The one participle shape that attaches the place to the SUBJECT: the
