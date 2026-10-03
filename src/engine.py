@@ -1533,8 +1533,15 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         # There the cell has its OWN name and FAOSTAT publishes it, so the choice
         # is not between two wrong Turkish names - see _shared_item_label.
         crop_ids = [crop_id for crop_id, _label in matched]
-        crop_name = (family_name if _one_fao_item(crop_ids)
-                     else _shared_item_label(crop_ids, norm.crop) or norm.label)
+        if _one_fao_item(crop_ids):
+            crop_name, item_label = family_name, None
+        else:
+            # Kept, rather than folded into the expression below, because the
+            # line after `*figures` must know whether the name beside the figure
+            # is FAOSTAT's English one or a Turkish label - the two need opposite
+            # instructions, and `crop_name` alone cannot tell them apart.
+            item_label = _shared_item_label(crop_ids, norm.crop)
+            crop_name = item_label or norm.label
 
         measures = [("ortalama verimi", norm.yield_kg_da),
                     ("ortalama ciftci fiyati", norm.price_per_kg)]
@@ -1578,6 +1585,36 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
             f"FAOSTAT'in bu adini aynen ekle. TUIK il verisi bu ulke icin yok, "
             f"hangi ilde oldugunu SORMA.",
             *figures,
+            # THE CROP NAME GETS THE COUNTRY NAME'S OWN INSTRUCTION, and only in
+            # the one case that needs it. `_shared_item_label` prints FAOSTAT's
+            # English name for the cell - `Chillies and peppers, green (Capsicum
+            # spp. and Pimenta spp.)` - because no file here publishes a Turkish
+            # name for an FAO item, which is the same reason the country line
+            # prints `France`. But the country line also TELLS the model what to
+            # do with that name, and this one did not: a name chosen for
+            # provenance was handed over with no instruction, so the English
+            # label could reach a Turkish grower verbatim.
+            #
+            # IT IS CONDITIONAL, and that is the point. In every other case the
+            # name beside the figure is already Turkish - `Buğday` from the
+            # family or `Domates (Salçalık)` from the id - and asking for
+            # "FAOSTAT's name in parentheses" there would have the model invent
+            # one. Only `item_label` is FAOSTAT's own.
+            #
+            # THE SECOND SENTENCE IS NOT DECORATION: this name is printed
+            # precisely because the item is BROADER than any one Turkish variety
+            # - item 401 is shared by four Turkish peppers - so a model that
+            # translates it back to the narrowest variety undoes the fix.
+            #
+            # The nested parentheses in the ANSWER are a cost accepted here the
+            # way the country line already accepts them for `Netherlands
+            # (Kingdom of the)`: the alternative is an answer that cannot say
+            # which cell the number came from.
+            *([f"Rakamlarin yanindaki urun adi FAOSTAT'in kendi kalem adi, "
+               f"Ingilizce. Cevabinda urunun Turkce adini kullan ve yanina "
+               f"parantez icinde FAOSTAT'in bu adini aynen ekle. Bu kalem "
+               f"birden fazla Turkce cesidi birlikte sayar, rakami tek bir "
+               f"ceside mal etme."] if item_label else []),
             # "tahmin" is deliberately NOT used in these two sentences, although
             # it is the natural Turkish word for it: the E flag's own clause
             # above is the only place that word may appear, so a test can tell an

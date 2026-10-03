@@ -1818,6 +1818,45 @@ def test_an_item_shared_by_several_ids_is_named_by_faostat(message, item_label,
     assert not_named not in block
 
 
+_FAO_NAME_RULE = "urunun Turkce adini kullan"
+
+
+@pytest.mark.parametrize("message", [
+    "Fransa'dayım, biber ekeyim mi",    # item 401, four ids
+    "Fransa'dayım, bakla ekeyim mi",    # item 181, two
+    "Fransa'dayım, fasulye ekeyim mi",  # item 176, two
+])
+def test_faostats_own_crop_name_carries_an_instruction(message):
+    """The country name has been told what to do with it since this block was
+    written - "write the Turkish name, add FAOSTAT's in parentheses". The crop
+    name had not, and it is English for the same reason and by the same choice,
+    so `Chillies and peppers, green (Capsicum spp. and Pimenta spp.)` could
+    reach a Turkish grower verbatim.
+
+    The second half of the rule matters as much as the first: this name is
+    printed BECAUSE the item is broader than any one Turkish variety, so an
+    answer that translates it back to the narrowest one undoes the fix."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert _FAO_NAME_RULE in block
+    assert "tek bir ceside mal etme" in block
+
+
+@pytest.mark.parametrize("message,named", [
+    # The family name reads the cell exactly - every mapped wheat id is item 15.
+    ("Fransa'dayım, buğday ekeyim mi", "Buğday"),
+    # The answering id's label reads an item no other Turkish id shares.
+    ("Hollanda'dayım, domates ekeyim mi", "Domates"),
+])
+def test_a_turkish_crop_name_gets_no_faostat_instruction(message, named):
+    """The instruction is CONDITIONAL, and this is the half that makes it safe.
+    Where the printed name is already Turkish, asking for "FAOSTAT's name in
+    parentheses" would have the model invent one - there is no FAO item name on
+    these lines to add."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert f"{named} - FAOSTAT ulke ortalama verimi:" in block
+    assert _FAO_NAME_RULE not in block
+
+
 def test_one_fao_item_separates_the_two_kinds_of_family():
     """The test that decides it, asserted directly so a rebuild of
     data/crop_fao_map.json that merges or splits an item fails here by name
