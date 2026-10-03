@@ -55,6 +55,34 @@ def _families() -> tuple[tuple[str, str], ...]:
     return tuple(sorted(out.items(), key=lambda item: -len(item[0])))
 
 
+# Turkish plant names that CONTAIN a family name and are a DIFFERENT plant, and
+# that the table has no family of its own for - so the containment rule below
+# cannot drop the inner match on its own, because nothing matched outside it.
+#
+# `hindistan cevizi` is the coconut. Measured 2026-10-03: a user writing
+# "hindistan cevizi ekmek istiyorum" was told `Ceviz` - the walnut - and the
+# world layer printed France's WALNUT yield and price under it. The two plants
+# share nothing but four letters.
+#
+# WHY A LIST AND NOT A RULE. The table's own labels already supply the covering
+# span wherever the longer name is a crop we carry: `tatlı patates` covers
+# `patates` because both are families, which is the mechanism the docstring
+# below describes. This list is only for longer names the table does NOT carry,
+# and it cannot be derived from the table for exactly that reason. It is a list
+# of measured collisions, so it is extended on evidence and not on suspicion.
+#
+# `Malta Eriği` IS in the table - as the parenthetical variant of `Yenidünya` -
+# and is NOT in this list, because it does not leak: the family is `Erik` and
+# Turkish softens the k, so `erigi` never matches the `erik` pattern. It is
+# named here so the next reader does not add it blind; country.py's own
+# docstring names both collisions and only one of them is live.
+_NOT_THIS_PLANT = ("hindistan cevizi",)
+
+# Not a family name and cannot become one: `_families` folds real labels, which
+# are never empty (`if family:` there) and never carry a space-free sentinel.
+_COVER_ONLY = "\x00cover"
+
+
 def named_crops(message: str) -> tuple[str, ...]:
     """Every crop family this message names, in the order they appear.
 
@@ -72,6 +100,10 @@ def named_crops(message: str) -> tuple[str, ...]:
     least one of its occurrences is not covered by another matched family's
     span, and the result is ordered by each surviving family's earliest
     surviving occurrence.
+
+    A span may also come from _NOT_THIS_PLANT, which is a different plant the
+    table holds no family for: it covers the family inside it and is never
+    itself returned.
     """
     folded = _normalize_tr(message or "")
     if not folded:
@@ -82,6 +114,10 @@ def named_crops(message: str) -> tuple[str, ...]:
         pattern = rf"(?<!\w){re.escape(folded_family)}(?:{_TR_SUFFIXES})?(?!\w)"
         for match in re.finditer(pattern, folded):
             occurrences.append((match.start(), match.end(), folded_family, display))
+    for phrase in _NOT_THIS_PLANT:
+        pattern = rf"(?<!\w){re.escape(phrase)}(?:{_TR_SUFFIXES})?(?!\w)"
+        for match in re.finditer(pattern, folded):
+            occurrences.append((match.start(), match.end(), _COVER_ONLY, ""))
 
     def covered(occurrence: tuple[int, int, str, str]) -> bool:
         start, end, family, _display = occurrence
@@ -92,7 +128,7 @@ def named_crops(message: str) -> tuple[str, ...]:
     earliest_free_start: dict[str, int] = {}
     for occurrence in occurrences:
         start, _end, family, display = occurrence
-        if covered(occurrence):
+        if family == _COVER_ONLY or covered(occurrence):
             continue
         displays[family] = display
         if family not in earliest_free_start or start < earliest_free_start[family]:

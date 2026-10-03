@@ -165,6 +165,33 @@ def test_a_crop_covered_once_and_free_once_is_still_named():
         "Kara buğday mı buğday mı?") == ("Kara Buğday", "Buğday")
 
 
+@pytest.mark.parametrize("message", [
+    "Hindistan cevizi ekmek istiyorum",
+    "hindistan cevizi",
+    "Hindistan cevizini merak ediyorum",
+])
+def test_a_different_plant_covers_the_family_inside_it(message):
+    """The containment rule above only drops an occurrence another MATCHED
+    FAMILY covers, so a longer plant name the table carries no family for
+    covered nothing. Measured 2026-10-03: "hindistan cevizi ekmek istiyorum"
+    named `Ceviz` - the walnut - and the world layer printed France's WALNUT
+    yield and price for a coconut question.
+
+    `Hindistan Cevizi` is not a family and cannot become one: it appears in the
+    table only inside an EXCLUSION clause (`Diğer Sert Kabuklu Meyveler (…
+    Hindistan Cevizi Hariç)`), which the family split throws away. So the
+    covering span has to be named outright - see `_NOT_THIS_PLANT`."""
+    assert crop_compare.named_crops(message) == ()
+
+
+def test_the_walnut_itself_is_still_found():
+    """The guard may not be satisfied by refusing walnut everywhere: a free
+    occurrence outside the coconut's span still names the crop."""
+    assert crop_compare.named_crops("Ceviz ekmek istiyorum") == ("Ceviz",)
+    assert crop_compare.named_crops(
+        "Hindistan cevizi mi ceviz mi?") == ("Ceviz",)
+
+
 def _table():
     return norms.province_table("Konya")
 

@@ -649,3 +649,27 @@ def test_the_substring_pair_count_the_ordering_is_justified_by():
     differ = [p for p in pairs if _FOLDED[p[0]][0] != _FOLDED[p[1]][0]]
     assert len(pairs) == 78
     assert len(differ) == 35
+
+
+def test_area_zero_would_be_an_answer_not_a_miss(monkeypatch):
+    """`extract_country` returned an FAO area code through a truthiness test, so
+    area 0 would have been read as "nobody said where they are" and fallen
+    through to the history walk - and then to None.
+
+    No shipped table holds area 0, so this is a pin on the CONTRACT rather than
+    on a live defect: the function returns a code or None, and 0 is a code. Both
+    call sites are covered - the current message and a history turn."""
+    import src.context.country as country_ctx
+
+    monkeypatch.setattr(country_ctx, "_find", lambda folded, original: 0)
+    assert extract_country("Fransa'dayım") == 0
+
+    calls = []
+
+    def only_history(folded, original):
+        calls.append(folded)
+        return 0 if len(calls) > 1 else None
+
+    monkeypatch.setattr(country_ctx, "_find", only_history)
+    assert extract_country("buğday mı ekmeliyim",
+                           [{"role": "user", "content": "Fransa'dayım"}]) == 0

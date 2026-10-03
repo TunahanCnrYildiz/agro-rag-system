@@ -12,9 +12,20 @@ State of)`.
 
 THE COLLISION THIS MODULE EXISTS TO SURVIVE. Turkish country names sit inside
 crop names. Measured against our 246 crop labels: `Mısır` IS the label for
-maize, `Fas` sits inside `Fasulye`, `Çin` inside `İçin` - one of the commonest
-words in the language - `Hindistan` inside `Hindistan Cevizi`, and `Malta`
-inside `Malta Eriği`. A substring match answers Morocco to "fasulye ektim".
+maize, `Fas` sits inside `Fasulye`, and `Çin` inside `İçin` - one of the
+commonest words in the language. `Hindistan` and `Malta` collide a step further
+out: NEITHER `Hindistan Cevizi` NOR `Malta Eriği` is a crop label here, and an
+earlier revision of this paragraph called them labels. Both are substrings of
+one - `Diğer Sert Kabuklu Meyveler (… Hindistan Cevizi Hariç)`, where the name
+appears in an EXCLUSION clause, and `Yenidünya (Malta Eriği)`, where it is a
+parenthetical variant - and both sit in the part the family split throws away,
+so the families are `Diğer Sert Kabuklu Meyveler` and `Yenidünya`. The country
+names still have to be refused inside them, which is what this module does; the
+distinction matters because a reader looking for a `Hindistan Cevizi` family
+will not find one, and because the crop detector's own blind spot is the mirror
+image of it (see `crop_compare._NOT_THIS_PLANT`: with no such family, nothing
+covered `Ceviz` inside it and a coconut question was answered with walnut
+figures). A substring match answers Morocco to "fasulye ektim".
 location.py already solved this shape of problem for provinces and its guards
 are reused here rather than reinvented: a name resolves only with a case
 suffix, as the whole message, or before a place noun, and a short name needs
@@ -747,8 +758,12 @@ def extract_country(message: str, history: list[dict] | None = None) -> int | No
     folded = _normalize_tr(message)
     if _refuses(folded):
         return None
+    # `is not None`, not truthiness: _find returns an FAO AREA CODE, and 0 is a
+    # code like any other as far as this function's contract goes. No shipped
+    # table holds area 0, so this changes nothing today - which is the reason to
+    # write it correctly rather than to leave the code saying something false.
     found = _find(folded, message)
-    if found:
+    if found is not None:
         return found
     for turn in reversed(history or []):
         if turn.get("role") != "user":
@@ -761,7 +776,8 @@ def extract_country(message: str, history: list[dict] | None = None) -> int | No
         if _refuses(content):
             return None
         # Both forms of the SAME turn, for the reason _find's docstring gives.
+        # `is not None` for the reason given above.
         found = _find(content, raw)
-        if found:
+        if found is not None:
             return found
     return None
