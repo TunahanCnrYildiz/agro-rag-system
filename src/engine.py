@@ -859,19 +859,25 @@ def _world_amount(amount: float) -> str:
 # predicate test below reads the present continuous and the copula only; see
 # _TR_FIRST_PERSON for the four tenses measured out of it.
 #
-# TWO TURKISH BRANCHES, because the copula attaches in two places:
+# THREE TURKISH BRANCHES, because the copula attaches in two places and one
+# shape needs naming outright:
 #
 #  * _SELF_TR - the copula FUSED to the name's own suffix: "Fransa'dayım",
 #    "Ganadayim", "Fransalıyım". The suffix runs straight into `-yım`.
 #  * _TR_LOCATIVE plus _first_person_follows - the dominant Turkish pattern,
 #    which puts the case ending on the NAME and the person on the VERB:
-#    "Fransa'da yaşıyorum", "Fransa'da çiftçilik yapıyorum", "Fransa'da yaşayan
-#    bir çiftçiyim", "Fransada çiftçiyim". An earlier revision of this guard had
-#    only the first branch and refused every one of these - real sentences a
-#    grower in France would write, measured resolving to France in
-#    `extract_country` and then losing every figure here.
+#    "Fransa'da yaşıyorum", "Fransa'da çiftçilik yapıyorum", "Fransada
+#    çiftçiyim". An earlier revision of this guard had only the first branch and
+#    refused every one of these - real sentences a grower in France would write,
+#    measured resolving to France in `extract_country` and then losing every
+#    figure here.
+#  * _TR_RELATIVE_SELF - "Fransa'da yaşayan bir çiftçiyim". The second branch
+#    reached this one only by looking three words out, and that width also let
+#    through eleven measured sentences where the locative belongs to an OBJECT
+#    ("Fransa'da üretilen tohum kullanıyorum"). The width is two now and this
+#    sentence is admitted by its shape instead.
 #
-# The apostrophe is optional in both, because Turkish speakers omit it
+# The apostrophe is optional in all three, because Turkish speakers omit it
 # ("Ganadayim", "Fransada ciftciyim") and country.py's own suffix branch accepts
 # either.
 #
@@ -903,19 +909,21 @@ _SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
 _TR_LOCATIVE = r"'?[dt][ae](?!\w)"
 
 # First-person endings, word-final on folded text. PRESENT CONTINUOUS AND THE
-# COPULA ONLY, because those are the tenses "where I am" is said in. THIS SET,
-# not the window below, is what holds the refuse set out - see _TR_CLAUSE_WORDS.
+# COPULA ONLY, because those are the tenses "where I am" is said in. This set and
+# the window below BOTH hold part of the refuse set out, and neither covers for
+# the other - see _TR_CLAUSE_WORDS, where the table that said the window was free
+# is corrected.
 #
-# Measured 2026-10-02 against a Turkish corpus of 6 accepts and 17 refusals,
-# adding one ending at a time and changing nothing else. All six accepts pass
-# with the set as it stands, so every one of these costs refusals and buys
-# nothing:
+# Measured 2026-10-03 against the corpus the test suite carries in full - 6
+# Turkish accepts and 27 refusals - adding one ending at a time and changing
+# nothing else. All six accepts pass with the set as it stands, so every one of
+# these costs refusals and buys nothing:
 #
 #   ending added           wrongly admitted
-#   -dim/-tim  (past)           5/17
-#   -im/-um/-iz (nominal)       9/17
-#   -arim/-erim (aorist)        2/17
-#   -acagim/-ecegim (future)    0/17
+#   -dim/-tim  (past)           5/27
+#   -im/-um/-iz (nominal)      10/27
+#   -arim/-erim (aorist)        1/27
+#   -acagim/-ecegim (future)    0/27
 #
 #  * the PAST `-dim/-tim` reads a FINISHED ACTION in a place as being in that
 #    place, which is the whole class CRITICAL 3 exists to refuse. The five it
@@ -925,13 +933,17 @@ _TR_LOCATIVE = r"'?[dt][ae](?!\w)"
 #    "Fransa'da okudum" and "Hollanda'da fuara katildim". Worse than a one-turn
 #    error, because the caller asks every user turn: one "Fransa'da staj yaptım"
 #    in the first turn kept the grower in France for the rest of the conversation.
-#  * the bare nominal `-im/-um/-iz` admits the five above and four more, because
+#  * the bare nominal `-im/-um/-iz` admits the five above and five more, because
 #    Turkish is full of ordinary nouns with that ending and three of them are
 #    agricultural - "Amerika'da tohum fiyatlari nasil" (tohum), "Fransa'da ekim
 #    zamani gecti mi" (ekim), "Fransa'da verim yuksek diye duydum" (verim). The
 #    `y` in `y[iu][mz]` is exactly what keeps those out while `ciftciyim` passes.
-#  * the aorist `-arim/-erim` fails for the same reason one letter along -
-#    "Fransa'da durum bugdayi yetisir mi" (durum).
+#    It also reaches one of the object-locative eleven, "Fransa'da uretilen tohum
+#    kullaniyorum", on `tohum` - which the window refuses on distance alone, so
+#    that sentence is held out twice over and neither hold is redundant.
+#  * the aorist `-arim/-erim` fails for the same reason one letter along: the
+#    agricultural noun `verim` ENDS in those very letters, so
+#    "Fransa'da verim yuksek diye duydum" is read as a first-person verb.
 #  * the FUTURE `-acagim/-ecegim` admits NOTHING in this corpus, so it is left
 #    out on the argument rather than on a measurement: a plan to plant somewhere
 #    is not a statement of being there. It also buys no accept - the one sentence
@@ -942,9 +954,17 @@ _TR_FIRST_PERSON = re.compile(r"(?:[iu]yor[iu][mz]|y[iu][mz])$")
 
 # HAZARD: `iste-` is first-person and is not a location. "Hollanda'da sera kurmak
 # istiyorum" is a plan, and it is the apostrophe-less twin of one of the three
-# sentences this guard exists to refuse. Measured 2026-10-02: without this line
-# that sentence is admitted - one of the 17 refusals, and the only one this line
-# changes.
+# sentences this guard exists to refuse.
+#
+# IT NO LONGER EARNS ITS PLACE AT THE SHIPPED WIDTH, and that is said here rather
+# than left for the next reader to discover. Re-measured 2026-10-03 over the 27
+# refusals, varying only this line: at _TR_CLAUSE_WORDS = 2 it changes nothing,
+# because `istiyorum` is the THIRD word of "Hollanda'da sera kurmak istiyorum"
+# and the window never reaches it. At 3, 4, 5 and 6 it is worth exactly that one
+# sentence, every time. The earlier revision of this comment claimed the measured
+# admission unconditionally; it was true at the width of the day and is kept, in
+# corrected form, because it is what makes the window safe to widen - the same
+# bargain _TR_CLAUSE below is kept on.
 #
 # It SKIPS the word rather than failing the clause, so a sentence that states a
 # location and then wants something ("Fransa'da yasiyorum, bugday ekmek
@@ -958,55 +978,117 @@ _TR_FIRST_PERSON = re.compile(r"(?:[iu]yor[iu][mz]|y[iu][mz])$")
 # no measured failure left to justify it.
 _TR_VOLITIONAL = re.compile(r"ist[ei]")
 
-# THREE WORDS: THE SMALLEST THAT REACHES EVERY ACCEPT, not the widest that is
-# safe. Measured 2026-10-02 over the same corpus, varying only this and counting
-# the six Turkish accepts (the two English ones are _SELF_EN's and no window
-# affects them):
+# TWO WORDS. Measured 2026-10-03 over the corpus the test suite now carries in
+# full - 27 refusals and 6 Turkish accepts (the two English ones are _SELF_EN's
+# and no window affects them) - varying only this:
 #
 #   window   accepted   wrongly admitted
-#     1        4/6            0/17
-#     2        5/6            0/17
-#     3        6/6            0/17
-#     4        6/6            0/17
-#     5        6/6            0/17
-#     6        6/6            0/17
+#     1        5/6            0/27
+#     2        6/6            0/27
+#     3        6/6            7/27
+#     4        6/6           10/27
+#     5        6/6           10/27
+#     6        6/6           10/27
 #
-# Three is where the accept column tops out: the longest mandated sentence,
-# "Fransa'da yasayan bir ciftciyim", puts its predicate exactly three words out.
-# Nothing is bought above it.
+# WHAT THE WINDOW CANNOT SEE is WHOSE the locative is. This scan reads the first
+# first-person predicate in reach and never asks whether the place attaches to
+# the SUBJECT or to an OBJECT, so an intervening participle phrase rides in free:
+# "Fransa'da uretilen tohum kullaniyorum" has a first-person verb and the seed,
+# not the speaker, is in France. Eleven such sentences were measured; seven of
+# them reach a predicate at word 3 and three more at word 4, which is the whole
+# of that column above. They are in
+# `test_a_locative_that_belongs_to_an_object_is_not_a_stated_location`.
 #
-# IT IS NOT THE WINDOW THAT HOLDS THE REFUSE SET OUT - the ending set is, and the
-# zeroes all the way down that column say so. An earlier revision of this comment
-# carried a table where widening to 4 admitted a refusal; that was measured with
-# `-dim/-tim` in _TR_FIRST_PERSON, and dropping it took the leak with it. Three
-# is kept anyway, because a window wider than the sentences it serves is cost
-# with no benefit, and because the boundary note below shows what a wider one
-# would start to lean on.
+# SO THE WINDOW IS NOT THE REFUSE SET'S ONLY KEEPER ANY MORE, which is the
+# correction to the revision this comment replaces. That one measured 0/17 all
+# the way down the column and concluded the ending set held everything out and
+# the width was free; its refuse set simply had no participle sentence in it. On
+# the corpus with those eleven, two is the only width that is both free and
+# complete.
 #
-# WHAT THREE COSTS, measured: a location sentence whose predicate sits further
-# out - "Fransa'da uzun suredir ciftcilik yapiyorum" (4 words),
-# "Fransa'da kucuk bir arazide ciftcilik yapiyorum" (5) - gets the province
-# question instead of France's figures. So does "Fransa'da bir ciftligim var",
-# for a different reason: `ciftligim` carries the bare nominal ending
-# _TR_FIRST_PERSON rejects, and `var` is not first person at all.
-_TR_CLAUSE_WORDS = 3
+# TWO REACHES EVERY ACCEPT because _TR_RELATIVE_SELF below carries the one
+# sentence it cannot: "Fransa'da yasayan bir ciftciyim" puts its predicate three
+# words out, and it is admitted by SHAPE rather than by distance. That split is
+# deliberate - the sentence the old window 3 bought is the one participle shape
+# that attaches to the subject, so it is cheaper to name the shape than to widen
+# the window for all of them.
+#
+# WHAT TWO COSTS beyond what three already cost, measured: nothing in the accept
+# set. Still refused, as at three: a location sentence whose predicate sits
+# further out - "Fransa'da uzun suredir ciftcilik yapiyorum" (4 words),
+# "Fransa'da kucuk bir arazide ciftcilik yapiyorum" (5) - and
+# "Fransa'da bir ciftligim var", for a different reason: `ciftligim` carries the
+# bare nominal ending _TR_FIRST_PERSON rejects, and `var` is not first person at
+# all. NEW AT TWO, measured: "Fransa'da ben bugday ekiyorum" and "Fransa'da iki
+# yildir ciftciyim", both predicate at word 3, both admitted at three. They are
+# real statements of location and the loss is real - and it is not recoverable by
+# a window, because they stand at exactly the distance
+# "Fransa'da uretilen tohum kullaniyorum" stands at. The width cannot tell a
+# speaker from a seed; only a shape can, which is what _TR_RELATIVE_SELF does for
+# the one shape that was mandated. Admitting these two would mean naming their
+# shapes too, and a refusal that hands a Turkish grower another country's figures
+# for the whole conversation is the dearer of the two errors.
+_TR_CLAUSE_WORDS = 2
 
 # The scan stops at a clause boundary as well as at the word count, because the
-# clause - not a span of three words - is the unit a predicate belongs to.
+# clause - not a span of two words - is the unit a predicate belongs to.
 #
-# IT IS NOT LOAD-BEARING AT THREE, and saying so is the point: measured over the
-# 17 refusals, boundary on and off are identical at window 3. It starts earning
-# its place at 4 (without it, "Hollanda'da sera gordum" and "Fransa'da staj
-# yaptim" reach across the comma into the next clause's predicate), at 5 it also
-# refuses "Hollanda'da sera kurmak istiyorum", and at 6 it is the only thing
+# IT IS NOT LOAD-BEARING AT TWO, and saying so is the point. Re-measured
+# 2026-10-03 over the 27 refusals, boundary on against off at each width:
+#
+#   window   with boundary   without
+#     2         0/27          0/27
+#     3         7/27          7/27
+#     4        10/27         12/27
+#     5        10/27         12/27
+#     6        10/27         14/27
+#
+# It starts earning its place at 4, where without it "Fransa'da staj yaptim,
+# bugday ekeyim mi" and "Hollanda'da sera gordum, domates ekeyim mi" reach across
+# the comma into the next clause's predicate, and at 6 it is also the only thing
 # refusing "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - one of the
-# three sentences this guard exists to refuse. It is kept because that is what
-# makes _TR_CLAUSE_WORDS safe to widen, not because it earns its place today.
+# three sentences this guard exists to refuse - and "Almanya'da calisan bir
+# arkadasim var, ona soruyorum". It is kept because that is what makes
+# _TR_CLAUSE_WORDS safe to widen, not because it earns its place today.
 _TR_CLAUSE = re.compile(r"[,;:.!?\n]")
 
 # Trailing punctuation would otherwise defeat the `$` in _TR_FIRST_PERSON:
 # "yasiyorum," is a word in `clause.split()` and does not end in `m`.
 _TR_WORD_TRIM = "'\"()-,;:.!?…"
+
+# THE THIRD TURKISH BRANCH, and the only one that reads a SHAPE rather than a
+# distance: locative on the name, then a participle in `-yan/-yen/-an/-en`, then
+# `bir`, then a first-person NOMINAL predicate. "Fransa'da yasayan bir
+# ciftciyim", "Fransa'da calisan bir isciyim".
+#
+# WHY A SHAPE AND NOT A WIDER WINDOW. This sequence is the one participle phrase
+# that attaches the place to the SPEAKER: the relative clause modifies the noun
+# the first person is predicated of, so "the farmer living in France" IS the
+# speaker. Every other participle sentence measured attaches the place to an
+# OBJECT - "Fransa'da uretilen tohum kullaniyorum", where the seed is in France -
+# and _TR_CLAUSE_WORDS cannot separate the two because they sit at the same
+# distance. So this branch exists to hold the one accept that _TR_CLAUSE_WORDS = 2
+# gives up, and it adds nothing else: measured 2026-10-03, it admits 1 of the 6
+# accepts and 0 of the 27 refusals on its own.
+#
+# WHAT HOLDS THE OBJECT SENTENCES OUT IS THE FIXED LENGTH, measured, and NOT the
+# `bir` or the nominal ending. The sequence is exactly three words, so the
+# first-person word must stand immediately after the participle (or after `bir`),
+# and in every object sentence a noun stands there instead: "Fransa'da uretilen
+# TOHUM kullaniyorum". Re-measured 2026-10-03 over the 27 refusals, three looser
+# forms of this pattern - `bir` optional, the present continuous allowed, and
+# both - each admit 0/27 as well. So the two narrowings do NOT earn their place
+# on this corpus and are kept on the argument instead: what licenses this branch
+# is a relative clause predicating the speaker, `bir X-yim` is that clause, and a
+# pattern that reads "participle then any first-person word" would be claiming
+# something the measurement does not support. If a future accept needs a looser
+# form, this is where to look, and the table above is what to re-take.
+#
+# "Almanya'da calisan bir arkadasim var, ona soruyorum" is the nearest miss in
+# the refuse set, and it is refused by the ending: `arkadasim` is the bare
+# nominal `-im`, which _TR_FIRST_PERSON rejects for its own measured reasons and
+# the `y` in `y[iu][mz]` here inherits.
+_TR_RELATIVE_SELF = r"\s+\w+[ae]n\s+bir\s+\w*y[iu][mz](?!\w)"
 
 # The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
 # preposition says where something is, not where the USER is. "I buy seed from
@@ -1084,6 +1166,10 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
         for match in re.finditer(rf"(?<!\w){key}{_TR_LOCATIVE}", folded):
             if _first_person_follows(folded, match.end()):
                 return True
+        # The third: the one participle shape that places the SPEAKER rather than
+        # an object. Read by shape, not by distance - see _TR_RELATIVE_SELF.
+        if re.search(rf"(?<!\w){key}{_TR_LOCATIVE}{_TR_RELATIVE_SELF}", folded):
+            return True
         if re.search(rf"{_SELF_EN}{key}(?!\w)", folded):
             return True
     return False
@@ -1117,19 +1203,108 @@ def _one_fao_item(crop_ids: list[str]) -> bool:
     return len(items) <= 1
 
 
+def _shared_item_label(crop_ids: list[str], answering: str) -> str | None:
+    """FAOSTAT's own name for the item `answering` reads, but ONLY when more than
+    one of `crop_ids` reads that same item. None otherwise.
+
+    THE QUESTION _one_fao_item ASKS IS ABOUT THE FAMILY; this one is about the
+    CELL, and the two are not the same question. `_one_fao_item` says whether the
+    family's name describes the figure. It can say no - the family spans two
+    items - and the answering id's own label STILL be narrower than the cell,
+    because that one item is shared by several Turkish ids. `Biber` spans items
+    401 and 689, so the family name is too broad; and item 401 is shared by four
+    Turkish peppers, so `Biber (Dolmalık)` beside 401's figure is too narrow. The
+    third case is neither name, and this is the test for it.
+
+    Measured 2026-10-03 over the shipped tables - 187 families against every
+    FAOSTAT area, 8425 (family, country) rows that produce a figure - 331 rows
+    were in that third case, over three families: `Biber` (item 401, four ids),
+    `Bakla` (181, two) and `Fasulye` (176, two). `Bakla, Kuru (Yemlik)` was the
+    worst of them, because data/crop_fao_map.json's own note on item 181 says
+    FAOSTAT does not separate food-grade broad beans from feed-grade ones - so
+    the printed name was contradicted by the map that supplied the figure.
+
+    THE LABEL COMES FROM data/world_norms.json's `items` TABLE, which carries
+    FAOSTAT's name for every item it ships figures for - `{"401": {"label":
+    "Chillies and peppers, green ..."}}`. It is English, and that is the same
+    choice the country name on the first line makes for the same reason: the name
+    is part of the figure's provenance, and no file here publishes a Turkish name
+    for an FAOSTAT item.
+
+    A MISSING LABEL RETURNS None and the caller falls back to the id's label.
+    Measured: of every item with a yield or price cell in the shipped world
+    layer, zero are absent from the `items` table and zero carry an empty label,
+    so this path is unreachable today - and the fallback is the narrow name
+    rather than [] because a figure with a name that is too precise still answers
+    the question, where no figure at all does not.
+    """
+    from src import norms
+    table = norms._load_fao_map()
+
+    def item_of(crop_id: str) -> object:
+        mapping = table.get(crop_id)
+        return mapping.get("fao") if isinstance(mapping, dict) else None
+
+    item = item_of(answering)
+    if item is None:
+        return None
+    if sum(1 for crop_id in crop_ids if item_of(crop_id) == item) <= 1:
+        return None
+    entry = norms._load_world().get("items", {}).get(str(item))
+    label = entry.get("label") if isinstance(entry, dict) else None
+    return label or None
+
+
 def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     """Where the user is when it is not a Turkish province, and what FAOSTAT
-    publishes for the crop they named there. Empty list when any of that is
-    missing - and it NEVER raises, the way _named_crops does not.
+    publishes for the crop they named there. Empty list when the location itself
+    is missing - and it NEVER raises, the way _named_crops does not.
 
     Read only after `extract_province` came back empty: a province is TÜİK and
     TÜİK always wins, which is the rule `norms.lookup` states and this caller
     must not contradict.
 
+    A STATED LOCATION ALONE IS WORTH A LINE, with no figure under it. An earlier
+    revision returned [] whenever there was no figure to print and justified it
+    in this docstring by saying "the country's NAME only exists on a figure - it
+    is FAOSTAT's label, carried on the value". THAT IS FALSE, and it cost the
+    worst turn in the route: a grower answered "hangi ildesiniz?" with
+    "Fransa'dayım" and was asked the same question straight back, because he had
+    named no crop and the country line went with the figures. The name is in
+    data/world_norms.json's `countries` table - `{"68": {"label": "France",
+    "m49": "250"}}` - and needs no figure to exist. So the location line stands
+    on its own, and the three ways a figure can be missing - no crop named, no
+    cell for the crop in this country, nothing positive in the cell - all now
+    print it without figures instead of falling back to the province question.
+
+    THE FIGURE-LESS LINE DOES NOT SAY "FAOSTAT" and does not ask the answer to
+    carry FAOSTAT's spelling, which the full first line does. The parenthesis
+    there exists because several FAOSTAT areas collapse to one Turkish name
+    (`Congo`, `Çin`) and a figure must be attributable to the right one. With no
+    figure there is nothing to attribute, so the instruction would be noise - and
+    it would put the word FAOSTAT in a block holding no FAOSTAT figure.
+
     TÜRKİYE AS A COUNTRY IS NOT A COUNTRY HERE. `data/crop_norms.json`'s
     national row is empty by construction, so a Turkish user who has not named
     a province resolves to no figure and the assistant asks - exactly today's
     behaviour, and this function returns [] before it can change it.
+
+    A COUNTRY STICKS FOR THE WHOLE CONVERSATION AND THERE IS NO WAY TO TAKE IT
+    BACK. `said` below is every user turn, not just this one, so once a grower
+    has stated his country anywhere in the history, every later turn carries it -
+    and that is deliberate (see the guard's own comment: `extract_country`
+    returns the most RECENT mention, which need not be the turn that stated where
+    he is, so stopping at the resolving turn would throw the conversation away).
+
+    The cost is that nothing retracts it. A user who writes "Fransa'dayım" and
+    then "aslında Konya'dayım" is served by TÜİK, because a resolved province
+    wins before this function is called at all - but one who corrects himself to
+    another COUNTRY, or who was placed abroad by a sentence he did not mean that
+    way, keeps the first country for as long as the conversation lasts. There is
+    no "I am not there any more" to write. Shortening the window to the resolving
+    turn was measured and rejected for the reason above; the live protection is
+    `_states_location`, which is why its refuse set is measured as carefully as
+    it is. A new session is the only reset.
 
     ONE CROP, THE FIRST NAMED. A crop_choice message naming two crops never
     reaches this block at all: answer() forks it to the comparison card above.
@@ -1214,6 +1389,36 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         if not any(_states_location(text, aliases) for text in said):
             return []
 
+        # FROM HERE THE LOCATION IS SETTLED, SO THE PROVINCE QUESTION IS WRONG
+        # WHATEVER ELSE IS MISSING. This is the whole return value when there is
+        # no figure to print, and it is returned at all three of the exits below
+        # rather than []. The figure is a bonus; the location is the finding.
+        #
+        # The worst turn it fixes: "hangi ildesiniz?" answered with
+        # "Fransa'dayım" used to get "Kullanicinin ili BILINMIYOR - cevabinda
+        # hangi ilde oldugunu sor" - the same question straight back, because no
+        # crop was named and the country line travelled with the figures.
+        #
+        # The name is read from the `countries` table, which is the same string
+        # `region` carries on a value, so the two paths cannot drift apart; see
+        # the docstring for why this line says less than the full one.
+        country_entry = norms._load_world().get("countries", {}).get(str(code))
+        country_label = (country_entry.get("label")
+                         if isinstance(country_entry, dict) else None)
+        if not country_label:
+            # Unreachable while the world layer answers at all - `_load_world`
+            # refuses a file without a `countries` dict, and every area with a
+            # cell is in it. Without a name there is no line to print, so this
+            # degrades to the old behaviour rather than to a nameless sentence.
+            return []
+        located = [
+            f"Kullanici Turkiye disinda: {country_label}. Cevabinda ulkenin "
+            f"Turkce adini kullan. TUIK il verisi bu ulke icin yok, hangi ilde "
+            f"oldugunu SORMA. Bu blokta bu ulke icin verim veya fiyat rakami "
+            f"YOK - kendin rakam yazma, gerekirse kullanicinin kendi "
+            f"rakamlarini sor.",
+        ]
+
         # GUARD: a country whose Turkish name is ALSO a crop name must not supply
         # that crop. Measured on e021bca, "Mısır'dayım, bu yıl ne eksem?" - which
         # names no crop at all - printed Egypt's MAIZE yield and price, because
@@ -1254,20 +1459,41 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         # place a Turkish country name costs an Egyptian grower his figures, and
         # a reader of this guard alone would conclude it was.
         if not families:
-            return []
+            return located
         family_name = re.split(r"\s*[(,]", families[0])[0].strip()
         family = _normalize_tr(family_name)
         matched = [(crop_id, label) for crop_id, label in norms.available_crops()
                    if _normalize_tr(re.split(r"\s*[(,]", label)[0].strip()) == family]
-        norm = None
+        # A CANDIDATE CARRYING BOTH MEASURES IS PREFERRED OVER AN EARLIER ONE
+        # CARRYING ONE. The loop used to stop at the first id with `yield or
+        # price`, which is label order, so a family whose dry id has only a yield
+        # answered with that yield and no price while a sibling id held both.
+        # Measured 2026-10-03 over the shipped tables - 187 families against every
+        # FAOSTAT area, 8425 (family, country) rows that produce a figure at all -
+        # 33 rows are in exactly that position, `Bakla` and `Bezelye` across most
+        # of them.
+        #
+        # ONLY THE TIE IS BROKEN DIFFERENTLY. If no candidate carries both, the
+        # first with either one still answers, which is the old behaviour
+        # unchanged; and a candidate with both is still taken in label order, so
+        # nothing here invents a preference between two complete ids.
+        #
+        # IT MOVES THE FIGURE AS WELL AS THE SECOND LINE, because a different id
+        # can read a different FAO cell - that is the point, not a side effect:
+        # one cell answering both questions is a coherent pair, where a yield from
+        # one cell beside no price at all leaves the block half-built for no
+        # reason the data gives.
+        candidates = []
         for crop_id, _label in matched:
             candidate = norms.lookup(crop_id, None, country=code)
             if candidate is not None and (candidate.yield_kg_da
                                           or candidate.price_per_kg):
-                norm = candidate
-                break
+                candidates.append(candidate)
+        norm = next((c for c in candidates
+                     if c.yield_kg_da and c.price_per_kg),
+                    candidates[0] if candidates else None)
         if norm is None:
-            return []
+            return located
 
         # WHICH NAME GOES BESIDE THE FIGURE, and it is NOT unconditionally the
         # family's. The family name is right only when every mapped id in the
@@ -1293,8 +1519,22 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         # narrower than the cell, and the family name can be broader than it. The
         # test is the mapping, asked per family, and it keeps each name on a cell
         # it actually describes.
-        crop_name = family_name if _one_fao_item(
-            [crop_id for crop_id, _label in matched]) else norm.label
+        #
+        # AND THERE IS A THIRD CASE, WHERE NEITHER NAME DESCRIBES THE CELL. The
+        # family test above is asked of the family; it can fail - the family spans
+        # two items - and the answering id's label still be narrower than the one
+        # item it reads, because several Turkish ids share that item. `Biber`
+        # spans 401 and 689, so the family name is too broad, and item 401 is
+        # shared by four Turkish peppers, so `Biber (Dolmalık)` is too narrow:
+        # measured, "Fransa'dayim, biber ekmek istiyorum" printed
+        # `Biber (Dolmalık) - … 1502,9 kg/da` for a cell FAOSTAT calls "Chillies
+        # and peppers, green". 331 of the 8425 rows are in this case, across
+        # `Biber` (401, four ids), `Bakla` (181, two) and `Fasulye` (176, two).
+        # There the cell has its OWN name and FAOSTAT publishes it, so the choice
+        # is not between two wrong Turkish names - see _shared_item_label.
+        crop_ids = [crop_id for crop_id, _label in matched]
+        crop_name = (family_name if _one_fao_item(crop_ids)
+                     else _shared_item_label(crop_ids, norm.crop) or norm.label)
 
         measures = [("ortalama verimi", norm.yield_kg_da),
                     ("ortalama ciftci fiyati", norm.price_per_kg)]
@@ -1317,7 +1557,7 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
                 f"({value.year}{', ' + note if note else ''})."
             )
         if not figures:
-            return []
+            return located
 
         region = (norm.yield_kg_da or norm.price_per_kg).region
         return [
