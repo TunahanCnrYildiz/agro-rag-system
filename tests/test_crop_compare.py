@@ -90,6 +90,54 @@ TABLE = {
             "price_tl_kg": {"scope": "il", "Konya": [18.0, 22.0, 26.0, 31.0],
                             "TR": [None, None, None, None]},
         },
+        # THE NEXT FOUR CARRY THEIR SHIPPED LABELS VERBATIM, because
+        # `_not_this_plant` is DERIVED from the labels and a fixture that
+        # paraphrases them tests a different rule. They are the two places a
+        # label writes a plant name other than its own family:
+        #  * an exclusion clause - this one is where `Hindistan Cevizi` lives,
+        #    and the family split throws the clause away.
+        "diger sert kabuklu meyveler (yabani yenilebilir sert kabuklu "
+        "meyveler, yer fistigi ve hindistan cevizi haric)": {
+            "label": "Diğer Sert Kabuklu Meyveler (Yabani Yenilebilir Sert "
+                     "Kabuklu Meyveler, Yer Fıstığı Ve Hindistan Cevizi Hariç)",
+            "yield_kg_da": {"scope": "il", "Konya": [90.0, 95.0, 100.0, 105.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [40.0, 45.0, 50.0, 55.0],
+                            "TR": [None, None, None, None]},
+        },
+        #  * a parenthetical variant - physalis is not a cherry, and `Kiraz`
+        #    below is what it was leaking.
+        "altin cilek (yer kirazi)": {
+            "label": "Altın Çilek (Yer Kirazı)",
+            "yield_kg_da": {"scope": "il", "Konya": [700.0, 720.0, 740.0, 760.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [50.0, 55.0, 60.0, 65.0],
+                            "TR": [None, None, None, None]},
+        },
+        "kiraz": {
+            "label": "Kiraz",
+            "yield_kg_da": {"scope": "il", "Konya": [400.0, 420.0, 440.0, 460.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [30.0, 34.0, 38.0, 42.0],
+                            "TR": [None, None, None, None]},
+        },
+        #  * and the negative case the rule must reach the same answer on:
+        #    `Malta Eriği` is a parenthetical variant too and leaks NOTHING,
+        #    because the family is `Erik` and Turkish softens the k.
+        "yenidunya (malta erigi)": {
+            "label": "Yenidünya (Malta Eriği)",
+            "yield_kg_da": {"scope": "il", "Konya": [500.0, 520.0, 540.0, 560.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [22.0, 24.0, 26.0, 28.0],
+                            "TR": [None, None, None, None]},
+        },
+        "erik": {
+            "label": "Erik",
+            "yield_kg_da": {"scope": "il", "Konya": [600.0, 620.0, 640.0, 660.0],
+                            "TR": [None, None, None, None]},
+            "price_tl_kg": {"scope": "il", "Konya": [16.0, 18.0, 20.0, 22.0],
+                            "TR": [None, None, None, None]},
+        },
     },
 }
 
@@ -103,9 +151,11 @@ def table(tmp_path, monkeypatch):
     monkeypatch.setattr(norms, "_PATH", path)
     norms._load.cache_clear()
     crop_compare._families.cache_clear()
+    crop_compare._not_this_plant.cache_clear()
     yield
     norms._load.cache_clear()
     crop_compare._families.cache_clear()
+    crop_compare._not_this_plant.cache_clear()
 
 
 def test_two_crops_are_found_in_a_comparison_question():
@@ -169,6 +219,12 @@ def test_a_crop_covered_once_and_free_once_is_still_named():
     "Hindistan cevizi ekmek istiyorum",
     "hindistan cevizi",
     "Hindistan cevizini merak ediyorum",
+    # The same shape through the other source, found this wave: physalis is not
+    # a cherry, and this one leaked `Kiraz` with France's cherry figures under
+    # it. One wave looked at this exact shape, took `Malta Eriği` out of the
+    # hand list correctly, and did not count the set.
+    "yer kirazı ekmek istiyorum",
+    "Yer kirazı",
 ])
 def test_a_different_plant_covers_the_family_inside_it(message):
     """The containment rule above only drops an occurrence another MATCHED
@@ -177,11 +233,43 @@ def test_a_different_plant_covers_the_family_inside_it(message):
     named `Ceviz` - the walnut - and the world layer printed France's WALNUT
     yield and price for a coconut question.
 
-    `Hindistan Cevizi` is not a family and cannot become one: it appears in the
-    table only inside an EXCLUSION clause (`Diğer Sert Kabuklu Meyveler (…
-    Hindistan Cevizi Hariç)`), which the family split throws away. So the
-    covering span has to be named outright - see `_NOT_THIS_PLANT`."""
+    NEITHER NAME IS A FAMILY AND NEITHER CAN BECOME ONE. `Hindistan Cevizi`
+    appears only inside an EXCLUSION clause and `Yer Kirazı` only as a
+    PARENTHETICAL VARIANT, and the family split throws both away. Those are the
+    two places a label writes a plant name other than its own family, and
+    `_not_this_plant()` harvests both - the fixture above carries the real labels
+    so this test exercises the derivation and not a hand list."""
     assert crop_compare.named_crops(message) == ()
+
+
+def test_the_covering_names_are_derived_from_the_table_not_listed():
+    """The rule, asserted directly, because its predecessor was a hand list of
+    ONE whose comment said the rule "cannot be derived from the table" - and the
+    class it left open had three more live members, one of them hiding behind a
+    comma inside `Frenk İnciri (Hint, Mısır İnciri)`.
+
+    Three properties matter more than the membership, and the fixture above is
+    built to exercise all three. A name that IS a family of its own is dropped,
+    so `Tatlı Patates` keeps answering through the ordinary containment rule. A
+    harvested name containing no family at all is dropped, which is how `Malta
+    Eriği` reaches the same answer the old comment reached by argument. And a
+    name whose only contained family is the family of the label it came FROM is
+    dropped: `durum buğdayı` is a genuine buğday, so covering it would turn a
+    correct answer into no answer. The shipped table hides that third case
+    because `Durum Buğdayı` is a family there; this fixture does not carry it,
+    which is how the case was found at all."""
+    derived = crop_compare._not_this_plant()
+    assert "hindistan cevizi" in derived
+    assert "yer kirazi" in derived
+    # A family of its own: harvested, then dropped for that reason.
+    assert "tatli patates" not in derived
+    # Harvested from `Buğday, Durum Buğdayı Hariç`, and the only family it
+    # contains is that label's own. A subtype, not a different plant.
+    assert "durum bugdayi" not in derived
+    # Harvested from a parenthetical variant and carrying no family inside it.
+    assert "malta erigi" not in derived
+    # Longest first, the way `_families` is sorted and for the same reason.
+    assert list(derived) == sorted(derived, key=lambda name: -len(name))
 
 
 def test_the_walnut_itself_is_still_found():
@@ -190,6 +278,9 @@ def test_the_walnut_itself_is_still_found():
     assert crop_compare.named_crops("Ceviz ekmek istiyorum") == ("Ceviz",)
     assert crop_compare.named_crops(
         "Hindistan cevizi mi ceviz mi?") == ("Ceviz",)
+    assert crop_compare.named_crops("Kiraz ekmek istiyorum") == ("Kiraz",)
+    assert crop_compare.named_crops(
+        "Yer kirazı mı kiraz mı?") == ("Kiraz",)
 
 
 def _table():

@@ -1681,6 +1681,37 @@ def test_a_country_layer_failure_costs_only_its_own_lines(monkeypatch):
     assert "FAOSTAT" not in block
 
 
+@pytest.mark.parametrize("message,not_in_block", [
+    # The coconut, found first and the only one an earlier wave closed. France's
+    # WALNUT yield was printed for it.
+    ("Fransa'dayım, hindistan cevizi ekeyim mi", "Ceviz"),
+    # Physalis is not a cherry. France's cherry yield was 461,73 kg/da.
+    ("Fransa'dayım, yer kirazı ekeyim mi", "Kiraz"),
+    # Persimmon is not an apple. France's apple yield was 3722,57 kg/da.
+    ("Fransa'dayım, cennet elması ekeyim mi", "Elma"),
+    # Prickly pear is neither maize nor fig, and it reached the world layer by
+    # two doors at once: `Mısır` is also the Turkish name of Egypt. It hides
+    # behind a comma inside `Frenk İnciri (Hint, Mısır İnciri)`, which is why
+    # reading the labels found the other two and not this one.
+    ("Fransa'dayım, mısır inciri ekeyim mi", "FAOSTAT"),
+])
+def test_a_plant_the_table_has_no_family_for_gets_no_other_crops_figures(
+        message, not_in_block):
+    """THE WHOLE CLASS, against the SHIPPED table, which is the measurement the
+    wave that closed the coconut did not take. It looked at this exact shape -
+    it took `Malta Eriği` out of the hand list, correctly and for the right
+    reason - and then closed the finding on one example without counting the
+    set. A sweep of all 246 labels found three more, two of them live figures.
+
+    The country line still prints, because the user did say where he is; what
+    must not print is another plant's yield and price under his question."""
+    block = engine._crop_choice_block(message, None, date(2026, 9, 25))
+    assert "Turkiye disinda: France" in block
+    assert "kg/da" not in block
+    assert "USD/kg" not in block
+    assert not_in_block not in block
+
+
 # --------------------------------------------------------------------------- #
 # A country whose Turkish name is also a crop name
 # --------------------------------------------------------------------------- #
@@ -1804,11 +1835,11 @@ def test_an_item_shared_by_several_ids_is_named_by_faostat(message, item_label,
     family spans two items - and the answering id's own label STILL be narrower
     than the one item it reads, because several Turkish ids share that item.
 
-    Measured 2026-10-03 over the shipped tables: 331 of the 8425
-    (family, country) rows that produce a figure were in this case, over three
-    families. `Biber (Dolmalık) - FAOSTAT ulke ortalama verimi: 1502,9 kg/da`
-    named one of four peppers for a cell FAOSTAT calls "Chillies and peppers,
-    green".
+    Measured 2026-10-03 over the shipped tables: 321 of the 8425
+    (family, country) rows that produce a figure are in this case, over three
+    families, and the count is pinned by the test below. `Biber (Dolmalık) -
+    FAOSTAT ulke ortalama verimi: 1502,9 kg/da` named one of four peppers for a
+    cell FAOSTAT calls "Chillies and peppers, green".
 
     The name printed is FAOSTAT's own, out of data/world_norms.json's `items`
     table - the only name in this repo that describes that cell."""
@@ -1816,6 +1847,58 @@ def test_an_item_shared_by_several_ids_is_named_by_faostat(message, item_label,
     assert f"{item_label}" in block
     assert f"{item_label}" in block.split(" - FAOSTAT ulke ortalama verimi:")[0]
     assert not_named not in block
+
+
+def test_the_world_layer_row_counts_the_two_comments_rest_on():
+    """Pins the three figures `_shared_item_label` and the candidate preference
+    are justified by, because one of them had already gone stale in the commit
+    that shipped it.
+
+    Both comments said 331 rows were in the third case. 331 is the count for the
+    FIRST candidate with either measure - the loop as it stood BEFORE the
+    candidate preference landed in the same commit - and the shipped code asks
+    about a different id for ten of those rows, which leaves 321. The number
+    described behaviour nobody ships.
+
+    This is the same job `test_the_substring_pair_count_the_ordering_is_justified
+    _by` does in tests/test_country.py: if a data refresh moves any of these, the
+    two comments in src/engine.py move in the same commit. The integers are not
+    the point; the prose staying honest is."""
+    import re as _re
+    from src import norms
+
+    world = norms._load_world()
+    areas = sorted({int(key.split("|")[1])
+                    for measure in ("yield", "price")
+                    for key in world.get(measure, {})})
+    families: dict[str, list[str]] = {}
+    for crop_id, label in norms.available_crops():
+        family = _re.split(r"\s*[(,]", label)[0].strip()
+        families.setdefault(family, []).append(crop_id)
+
+    rows = third_case = both_measures_moved_it = 0
+    for crop_ids in families.values():
+        one_item = engine._one_fao_item(crop_ids)
+        for area in areas:
+            found = [norm for crop_id in crop_ids
+                     if (norm := norms.lookup(crop_id, None, country=area))
+                     is not None and (norm.yield_kg_da or norm.price_per_kg)]
+            if not found:
+                continue
+            rows += 1
+            if one_item:
+                continue
+            first = found[0]
+            answering = next((n for n in found
+                              if n.yield_kg_da and n.price_per_kg), first)
+            if engine._shared_item_label(crop_ids, answering.crop):
+                third_case += 1
+            if answering is not first:
+                both_measures_moved_it += 1
+
+    assert rows == 8425
+    assert third_case == 321
+    assert both_measures_moved_it == 33
 
 
 _FAO_NAME_RULE = "urunun Turkce adini kullan"
@@ -1842,16 +1925,26 @@ def test_faostats_own_crop_name_carries_an_instruction(message):
 
 
 @pytest.mark.parametrize("message,named", [
-    # The family name reads the cell exactly - every mapped wheat id is item 15.
+    # THE FAMILY-NAME BRANCH: `_one_fao_item` holds, every mapped wheat id is
+    # item 15, so `Buğday` describes the cell and the id's label would narrow it.
     ("Fransa'dayım, buğday ekeyim mi", "Buğday"),
-    # The answering id's label reads an item no other Turkish id shares.
-    ("Hollanda'dayım, domates ekeyim mi", "Domates"),
+    # THE ID-LABEL BRANCH: `_one_fao_item` fails - `Soğan` spans items 403 and
+    # 402, `Bezelye` 187 and 417 - and no other Turkish id shares the item the
+    # answering one reads, so `_shared_item_label` returns None and the id's own
+    # Turkish label is printed. Measured 2026-10-03.
+    #
+    # THESE TWO PARAMETERS USED TO BE WHEAT AND TOMATO, which are the SAME
+    # branch: `_one_fao_item` is True for both (items 15 and 388, each read by
+    # every mapped id in its family), so the comment calling tomato "the
+    # answering id's label" was wrong and the branch it described was untested.
+    ("Fransa'dayım, soğan ekeyim mi", "Soğan (Taze)"),
+    ("Fransa'dayım, bezelye ekeyim mi", "Bezelye, Taze"),
 ])
 def test_a_turkish_crop_name_gets_no_faostat_instruction(message, named):
     """The instruction is CONDITIONAL, and this is the half that makes it safe.
     Where the printed name is already Turkish, asking for "FAOSTAT's name in
     parentheses" would have the model invent one - there is no FAO item name on
-    these lines to add."""
+    these lines to add. Both branches that print a Turkish name are here."""
     block = engine._crop_choice_block(message, None, date(2026, 9, 25))
     assert f"{named} - FAOSTAT ulke ortalama verimi:" in block
     assert _FAO_NAME_RULE not in block
@@ -1868,6 +1961,10 @@ def test_one_fao_item_separates_the_two_kinds_of_family():
     # Dry and fresh bean are items 176 and 423.
     assert engine._one_fao_item(["fasulye, kuru", "fasulye, taze"]) is False
     assert engine._one_fao_item([]) is True
+    # Tomato is the family-name branch too, not the id-label one. Pinned because
+    # a test docstring claimed the opposite and nothing failed.
+    assert engine._one_fao_item(["domates (sofralik)",
+                                 "domates (salcalik)"]) is True
 
 
 def test_shared_item_label_asks_about_the_cell_not_the_family():
@@ -1962,6 +2059,11 @@ def test_a_stated_foreign_location_still_replaces_the_question():
     "Fransa'da çiftçilik yapıyorum, buğday mı ekmeliyim",
     "Fransa'da yaşayan bir çiftçiyim, buğday mı ekmeliyim",
     "Fransada ciftciyim, bugday mi ekmeliyim",
+    # The stated subject pronoun, bought back this wave - see
+    # _TR_SUBJECT_PRONOUN. Turkish drops `ben` by default and states it for
+    # emphasis, so this is the third sentence above with one extra word, and
+    # that word used to push the predicate out of the two-word window.
+    "Fransa'da ben buğday ekiyorum, buğday mı ekmeliyim",
 ])
 def test_a_locative_with_a_first_person_predicate_is_a_stated_location(message):
     """Turkish puts the case ending on the place and the person on the verb far
@@ -2062,6 +2164,10 @@ def test_an_object_locative_does_not_open_the_country_block(message, code):
     "Fransa'da yaşayan bir çiftçiyim",
     "Fransa'da çalışan bir işçiyim",
     "Fransa'da yaşayan bir çiftçiyiz",
+    # The third member of _TR_RESIDENT_PARTICIPLES. Pinned so the whitelist has
+    # no member nothing measures - that was how the branch this replaces came to
+    # carry a claim its own corpus could not test.
+    "Fransa'da oturan bir çiftçiyim",
     # A phone's apostrophe, U+2019. `_normalize_tr` folds it to `'`, so this
     # branch gets it for free - pinned because the other guards on this path
     # have their own test for the same character and a reader should not have to
@@ -2080,23 +2186,124 @@ def test_a_relative_clause_predicating_the_speaker_is_a_stated_location(text):
     assert engine._states_location(text, engine._code_aliases(68))
 
 
+# THE SHAPE BRANCH'S OWN NEAR MISSES, and the reason this list exists at all:
+# the wave that introduced that branch measured it against a refuse set in which
+# ONE sentence out of 27 could reach its pattern, so its "0/27 refusals" was an
+# empty measurement rather than a guarantee. Every sentence here reaches the
+# branch's prefix - locative, a word ending in `-an/-en`, `bir` - so the tables
+# in src/engine.py can fail. Sixteen of the 42 refusals the suite now carries do.
+#
+# Measured 2026-10-03 against the branch as it shipped at 12aba9e: TWELVE of
+# these fifteen were admitted, and the first seven are the class
+# `_TR_CLAUSE_WORDS = 2` had just been narrowed to close - the locative belongs
+# to the uncle, not to the speaker, and the user was placed abroad for the whole
+# conversation.
+_SHAPE_NEAR_MISSES = [
+    # (a) the `-Im` word is a POSSESSED NOUN and not a predicate: the clause runs
+    # on to its own `var`/`gördüm`. Every stem here ends in `y`, which is what
+    # the old `\w*y[iu][mz]` could not tell from the copula `-yIm` - and
+    # "Almanya'da çalışan bir arkadaşım var" above stayed out only because
+    # `arkadaş` does not. Held by the clause-final rule.
+    ("Fransa'da çalışan bir dayım var, ona soruyorum", 68),
+    ("Almanya'da yaşayan bir dayım var, ona soruyorum", 79),
+    ("Mısır'da oturan bir dayım var", 59),
+    ("Fransa'da bulunan bir köyüm var", 68),
+    ("Fransa'da doğan bir tayım var", 68),
+    ("Hollanda'da çıkan bir yayım var", 150),
+    ("Fransa'da yapılan bir sayım gördüm", 68),
+    # (b) the participle's own event happens in the country; the speaker need not
+    # be there. "Tanınan bir çiftçiyim" says he is KNOWN in France. Held by the
+    # participle whitelist.
+    ("Fransa'da tanınan bir çiftçiyim", 68),
+    ("Fransa'da bilinen bir üreticiyim", 68),
+    ("Fransa'da aranan bir suçluyum", 68),
+    ("Hollanda'da satılan bir tohumcuyum", 150),
+    ("Fransa'da ödüllendirilen bir üreticiyim", 68),
+    # (c) `\w+[ae]n` was never a participle test - an ordinary noun ending in
+    # -an/-en fills the slot just as well. Held by the whitelist.
+    ("Fransa'da orman bir zenginliktir, ben çiftçiyim", 68),
+    ("Fransa'da üretilen bir tohum kullanıyorum", 68),
+    ("Fransa'da uygulanan bir yöntemi deniyorum", 68),
+]
+
+
+@pytest.mark.parametrize("text,code", _SHAPE_NEAR_MISSES)
+def test_the_shape_branch_refuses_what_only_looks_like_its_shape(text, code):
+    """THE SHAPE BRANCH WAS NOT A FIRST-PERSON TEST AND ITS REFUSE SET COULD NOT
+    SAY SO. `\\w*y[iu][mz]` matches any noun whose stem ends in `y` carrying the
+    bare possessive: `dayım`, `sayım`, `tayım`, `köyüm`, `yayım`. "Fransa'da
+    çalışan bir dayım var" has no first-person predicate at all and was read as a
+    statement of location.
+
+    Two narrowings hold these out and they fail on DISJOINT inputs, so both are
+    kept: the clause after the locative must be exactly `<participle> bir
+    <predicate>` (a Turkish copular predicate ends its clause, a possessed noun
+    does not), and the participle must be one of _TR_RESIDENT_PARTICIPLES. The
+    first holds group (a), the second groups (b) and (c)."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+@pytest.mark.parametrize("text,code", [
+    ("Fransa'da çalışan bir dayım var, ona soruyorum", 68),
+    ("Fransa'da tanınan bir çiftçiyim", 68),
+])
+def test_a_shape_near_miss_does_not_open_the_country_block(text, code):
+    """The block half, for the two groups above, and the reason this finding was
+    Critical rather than Minor: since the wave that made a stated country print a
+    location line with no figure, a wrong admission here is no longer invisible.
+    It tells the model outright not to ask which province the user is in, and
+    `_country_lines` asks every user turn, so it sticks for the conversation."""
+    block = engine._crop_choice_block(text, None, date(2026, 9, 25))
+    assert "BILINMIYOR" in block
+    assert "Turkiye disinda" not in block
+
+
 @pytest.mark.parametrize("text", [
-    # What window 2 costs that window 3 did not, measured 2026-10-03. Both are
-    # real statements of location and both are given up knowingly: they stand at
-    # exactly the distance "Fransa'da üretilen tohum kullanıyorum" stands at, so
-    # no width can admit these and refuse that.
-    "Fransa'da ben buğday ekiyorum",
+    # What window 2 costs that window 3 did not. One sentence, not two: the
+    # other, "Fransa'da ben buğday ekiyorum", is an ACCEPT now - see
+    # _TR_SUBJECT_PRONOUN. This one is given up knowingly, because it stands at
+    # exactly the distance "Fransa'da üretilen tohum kullanıyorum" stands at and
+    # has no pronoun to skip, so no width can admit it and refuse that.
     "Fransa'da iki yıldır çiftçiyim",
-    # What window 3 already cost, unchanged - predicate at word 4 and 5.
+])
+def test_the_measured_cost_of_the_narrowed_window(text):
+    """Pinned as a COST, not as a correct answer, and narrowed this wave to the
+    one sentence the narrowing actually cost. The docstring it replaces called
+    four sentences the price of window 2; two of them were refused at window 3
+    as well (they are below) and one has since been bought back."""
+    assert not engine._states_location(text, engine._code_aliases(68))
+
+
+@pytest.mark.parametrize("text", [
+    # Predicate at word 4 and at word 5. Refused at window 3 as well, so these
+    # are NOT what the narrowing to 2 cost - they were in the same test as the
+    # sentence above and the docstring did not separate them.
     "Fransa'da uzun süredir çiftçilik yapıyorum",
     "Fransa'da küçük bir arazide çiftçilik yapıyorum",
 ])
-def test_the_measured_cost_of_the_narrowed_window(text):
-    """Pinned as a COST, not as a correct answer. These four get the province
-    question instead of France's figures, and this test exists so the next pass
-    can see the price of the narrowing rather than rediscover it. If a width or
-    a shape ever admits one of them, this test is the one to change - and the
-    eleven above are what it must not take with it."""
+def test_a_predicate_beyond_any_measured_window_is_a_standing_cost(text):
+    """Pinned as a cost that no width on this guard's own table ever paid for.
+    Admitting these needs window 4, and window 4 admits 24 of the 42 refusals."""
+    assert not engine._states_location(text, engine._code_aliases(68))
+
+
+@pytest.mark.parametrize("text", [
+    # The clause-final rule: `ve` is not a clause boundary, so this clause is
+    # five words and the shape does not match. The comma form of the same
+    # sentence IS an accept, because `_TR_CLAUSE` ends the clause there.
+    "Fransa'da yaşayan bir çiftçiyim ve buğday ekiyorum",
+    # The whitelist: a residence participle nobody measured is a refusal.
+    "Fransa'da yerleşen bir çiftçiyim",
+])
+def test_the_measured_cost_of_the_shape_branchs_two_narrowings(text):
+    """The price of closing the twelve above, written down rather than left for
+    the next pass to find. Both are real statements of location.
+
+    `yerleşen` is the honest shape of the whitelist's cost: the list has three
+    members because three are measured, and a fourth that no accept needed would
+    be a member on suspicion. The morphological rule that would replace the list
+    - refuse the PASSIVE participle - does not work, because `bulunan` is passive
+    and does place its subject."""
     assert not engine._states_location(text, engine._code_aliases(68))
 
 
