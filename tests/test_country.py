@@ -450,11 +450,14 @@ def test_from_still_places_the_user_when_it_predicates_the_user(message, code):
     the USER rather than a purchase. An enumerated copula cannot be reached by
     any sentence about buying.
 
-    `from` AND `-lı` HAVE SINCE PARTED COMPANY, and this docstring used to point
-    at `-lı` as its twin. This function still RESOLVES "Hollandalıyım" - naming a
-    country is what it is for - but engine's guard no longer places a speaker on
-    it, because a nationality says where he is from. Whether `from` should follow
-    it is open and recorded; see `_NATIONALITY_REFUSALS` in tests/test_engine.py."""
+    `from` AND `-lı` HAVE BOTH FALLEN ON THE ENGINE SIDE AND NEITHER HAS FALLEN
+    HERE, which is the final shape of a docstring that has been corrected twice.
+    `engine._states_location` no longer places a speaker on either one: an origin
+    says where he is FROM, and a Dutch grower farming in Antalya says both
+    truthfully while standing in Türkiye. This function still RESOLVES them -
+    naming a country is what it is for, and resolving a name is a different
+    question from placing a speaker. See `_NATIONALITY_REFUSALS` and
+    `_ENGLISH_ORIGIN_REFUSALS` in tests/test_engine.py for the two decisions."""
     assert extract_country(message) == code
 
 

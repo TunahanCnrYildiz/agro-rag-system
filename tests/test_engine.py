@@ -1564,6 +1564,43 @@ def test_only_the_route_that_can_read_a_country_asks_for_one():
     assert "Turkiye disinda" not in engine._ASK_LOCATION
 
 
+def test_answering_the_country_invitation_is_re_asked_on_fert_plan():
+    """THE LOOP THE SAME-ROUTE FIX LEFT OPEN, nailed rather than closed.
+
+    `_ASK_LOCATION` reaches `crop_choice` only, so the question and its answer
+    live on one route - but ROUTING IS PER MESSAGE, and the same conversation
+    crosses routes. A grower invited to write his country, who does so, and who
+    then asks when to fertilise, is routed to `fert_plan` and asked for a TURKISH
+    PROVINCE: the one question he cannot answer, one turn after answering the one
+    we told him to answer.
+
+    THIS WAVE CREATED IT. Before the invitation existed the `fert_plan` ask was
+    the only ask and there was nothing for it to contradict; the ask itself is
+    unchanged and byte-identical to main's. So this is not a regression in
+    `fert_plan`, it is a new contradiction between two routes.
+
+    NOT FIXED HERE, AND THE REASON IS NOT COST. Widening `_country_lines` to
+    `fert_plan` would replace the province question with nothing: that route
+    serves a fertilisation and irrigation plan, and FAOSTAT publishes neither -
+    it publishes yield and price, which is what `crop_choice` needs. The world
+    layer reaching `fert_plan` is a separate round with its own data question.
+    Pinned so the next wave finds the behaviour written down instead of
+    rediscovering it from a user report."""
+    history = [{"role": "assistant", "content": engine._ASK_LOCATION},
+               {"role": "user", "content": "Fransa'dayım"}]
+    crop = engine._context_block("crop_choice", "buğday mı ekmeliyim",
+                                 history, date(2026, 9, 25))
+    fert = engine._context_block("fert_plan", "buğdaya ne zaman gübre versem",
+                                 history, date(2026, 9, 25))
+    # The country was read, so crop_choice stops asking.
+    assert "Turkiye disinda: France" in crop
+    assert "BILINMIYOR" not in crop
+    # And the very next turn asks him for a province anyway.
+    assert "hangi ilde oldugunu sor" in fert
+    assert "BILINMIYOR" in fert
+    assert "France" not in fert
+
+
 def test_the_label_fold_is_one_function_and_not_six_copies():
     """`re.split(r"\\s*[(,]", label)[0].strip()` was written out SIX times - three
     in src/engine.py, two in src/crop_compare.py, and a sixth added one wave ago
@@ -2178,6 +2215,51 @@ _SUFFIX_NEAR_MISSES = [
 ]
 
 
+# THE NAME'S RIGHT BOUNDARY - the THIRD way `_SELF_TR`'s one decision can fail,
+# and the refuse set could not reach it until these four were written. `(?<!\w)`
+# anchors the LEFT side of the alias; nothing anchors the right side of the NAME,
+# so a token that merely STARTS with an alias and runs on into the locative
+# letters would be read as that country. Measured over the 95 that shipped: 0 of
+# them are of this shape, so the branch's 0/95 said nothing at all about its
+# right boundary - the fifth instance of this guard's standing defect, found by
+# asking what the zero could have failed on.
+#
+# The decision is SOUND, and that was measured independently before these were
+# written: the project's own Turkish corpus (data/vector_store/chroma.sqlite3,
+# 81 426 documents) matches this pattern in 0 documents under all 418 folded
+# aliases, and of the tokens that end in the locative-plus-person letters not one
+# has a country alias as its prefix. What was missing was the evidence, which is
+# what these four are.
+_NAME_BOUNDARY_REFUSALS = [
+    # A DISTRICT OF AYDIN. `çin` is China's alias and `Çine` is a Turkish town,
+    # so this is a Turkish grower who would have been placed in China - the
+    # dearest sentence of the four, and `extract_country` refuses it too.
+    ("Çine'deyim, buğday mı ekmeliyim", 41),
+    # NIGERIA, SCORED AGAINST NIGER'S ALIASES. `nijer` is a strict prefix of
+    # `nijerya`, so an unanchored name would place a Nigerian grower in Niger.
+    ("Nijerya'dayım, mısır ekeyim mi", 158),
+    # The Treasury, not Mali: `mali` + `yedeyim`.
+    ("Maliyedeyim, bu yıl ne eksem", 133),
+    # A tent, not Chad: `çad` + `ırdayım`.
+    ("Çadırdayım, sabah tarlaya inerim", 39),
+]
+
+
+@pytest.mark.parametrize("text,code", _NAME_BOUNDARY_REFUSALS)
+def test_the_name_has_a_right_boundary_too(text, code):
+    """Each of these hands the guard the aliases of a country whose name is a
+    strict PREFIX of a word in the sentence, and the word ends in the locative's
+    own letters plus the person - so a rule that anchored the left side of the
+    name and then scanned to the end of the token would admit all four.
+
+    "Çine'deyim" is the one that matters: `Çine` is a district of Aydın and
+    `çin` is China, so the sentence is a Turkish grower who would have been told
+    "Kullanici Turkiye disinda: China" and asked no province. The other three
+    say the same thing about Nigeria against Niger's aliases, the Treasury
+    against Mali's, and a tent against Chad's."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
 _NATIONALITY_REFUSALS = [
     ("Hollandalıyım, buğday mı ekmeliyim", 150),
     ("Fransalıyım", 68),
@@ -2260,50 +2342,123 @@ def test_possessing_something_that_is_not_land_is_not_a_location(text, code):
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
+_DECLARED_ENGLISH_ACCEPTS = [
+    # THE CONDITIONAL AND THE FUTURE. Both have refused Turkish twins and the
+    # asymmetry is not repaired.
+    ("If I am in France next year, should I plant wheat", 68),
+    ("I am in India tomorrow", 100),
+    # A COUNTRY'S NAME AS THE FIRST WORD OF A LONGER FOREIGN PLACE NAME, two US
+    # towns named after countries. The level below the `Georgia` decision in
+    # `country._NOT_THIS_PLACE`, and admitted for the same reason as the two
+    # above: refusing them means reading the tail.
+    ("my farm is in Lebanon, Ohio", 121),
+    ("my farm is in Peru, Indiana", 170),
+]
+
 _ENGLISH_ACCEPTS = [
-    "I live in France",
-    "I am in France",
-    "I farm in France",
-    "we are based in France",
+    ("I live in France", 68),
+    ("I am in France", 68),
+    ("I farm in France", 68),
+    ("we are based in France", 68),
     # The subject is a possessed noun rather than a pronoun, but it is the
     # speaker's own holding.
-    "my farm is in France",
-    "my field is in France",
+    ("my farm is in France", 68),
+    ("my field is in France", 68),
     # TEMPORARY PRESENCE, and it is pinned as an ACCEPT on purpose rather than
     # left out as the gap a previous review called it. See _SELF_EN: the Turkish
     # twin "Fransa'dayım, fuara geldim" is admitted and cannot be refused
     # without reading the rest of the sentence, which is the inference this wave
     # deleted - and a grower who IS in France this week is in France.
-    "I am in France for the fair",
-    "I am in France this week",
-    "we are in France visiting a supplier",
-    "I'm in France on holiday",
-]
+    ("I am in France for the fair", 68),
+    ("I am in France this week", 68),
+    ("we are in France visiting a supplier", 68),
+    ("I'm in France on holiday", 68),
+] + _DECLARED_ENGLISH_ACCEPTS
 
 
-@pytest.mark.parametrize("text", _ENGLISH_ACCEPTS)
-def test_the_english_branch_admits_a_self_declaration(text):
+@pytest.mark.parametrize("text,code", _ENGLISH_ACCEPTS)
+def test_the_english_branch_admits_a_self_declaration(text, code):
     """Asserted on `_states_location` rather than through a block: the crop
     lexicon is Turkish, so "should I plant wheat" names no crop and the block
     would have nothing to print for a reason that has nothing to do with this
     guard."""
-    assert engine._states_location(text, engine._code_aliases(68))
+    assert engine._states_location(text, engine._code_aliases(code))
+
+
+@pytest.mark.parametrize("text,code", _DECLARED_ENGLISH_ACCEPTS)
+def test_the_conditional_the_future_and_a_longer_place_name_are_declared_accepts(
+        text, code):
+    """FOUR ADMISSIONS THAT ARE A DECISION, NOT AN OVERSIGHT, and the reason is
+    one measurement: refusing any of them requires reading the TAIL of the
+    sentence, and the tail was measured and rejected on this branch.
+
+    `if`/`when`/`unless` do not fit in a fixed-width lookbehind, so the
+    conditional has to be found by scanning left; `tomorrow` and `, Ohio` are the
+    tail outright. The wave before this one measured every candidate tail word as
+    damaging - `and`, the comma and the full stop included - because "my field is
+    in Egypt for..." and "the protein in turkey for..." have the same tail. A
+    tail rule here is the inference that produced four Criticals, re-entering by
+    a side door.
+
+    AND THE DAMAGE IS SMALL, which is what separates these from the `from` arm
+    dropped in the same wave. A grower asking "If I am in France next year,
+    should I plant wheat" IS THINKING ABOUT FRANCE, and FAOSTAT's French figures
+    are the right context for that question; "I am from the Netherlands, my farm
+    is in Antalya" said the opposite - the field is in Antalya - and was told not
+    to ask which province.
+
+    THE TURKISH TWINS ARE REFUSED AND THAT ASYMMETRY STANDS. "Fransa'daysam ne
+    ekerim" and "Fransa'da olsaydım buğday ekerdim" cost nothing to refuse
+    because `'daysam` does not fill `[dt][ae]y[iu][mz]` - Turkish carries the
+    conditional in the morphology, and English has no equivalent to read without
+    the tail. The two branches agree about a speaker who STATES where he is; they
+    differ about one who supposes it, and only Turkish gets that for free."""
+    assert engine._states_location(text, engine._code_aliases(code))
+    assert not engine._states_location("Fransa'daysam ne ekerim",
+                                       engine._code_aliases(68))
+    assert not engine._states_location("Fransa'da olsaydım buğday ekerdim",
+                                       engine._code_aliases(68))
 
 
 # THE ENGLISH BRANCH IS ONE OF TWO SURVIVORS, so its refuse set is measured the
 # way the Turkish side's is - with the number of inputs that could break each
-# DECISION beside the zero, not the number that reach the branch:
+# DECISION beside the zero, not the number that reach the branch. THERE ARE THREE
+# DECISIONS AND NOT TWO:
 #
-#   refusals                                                          25
+#   refusals                                                          35
 #   admitted                                                           0
-#   naming a country extract_country resolves (the rest test nothing) 21
-#   in this branch's own `<subject> ... in <name>` frame, so able to
-#     break the PERSON decision                                       13
-#   first-person subject beside a preposition, so able to break the
-#     ADJACENCY decision                                               8
+#   naming a country extract_country resolves (the rest test nothing) 31
+#   any subject, then `in`/`at`, then the NAME, so able to break the
+#     PERSON decision                                                 13
+#   a first-person subject in the sentence and a bare `in`/`at` in
+#     front of the NAME, so able to break the ADJACENCY decision        5
+#   a whitelisted subject, then `from`, then the NAME, so able to
+#     break the PREPOSITION decision                                  10
 #
-# Class (e) is new this wave and it is the class that makes the 13 possible:
-# before it, three sentences carried the whole person decision.
+# Class (e) is the class that makes the 13 possible: before it, three sentences
+# carried the whole person decision. Class (f) is the same thing for the
+# preposition decision, which had NO refusal able to break it while `from` was
+# admitted - that is what shipped the Critical this wave closes.
+
+# (f) AN ORIGIN, NOT A LOCATION. `from` after a whitelisted subject was admitted
+# until this wave, licensed by a zero no refusal could break - and the first of
+# these is the sentence that settled it: the user says his farm is in Antalya and
+# was placed in the Netherlands with "hangi ilde oldugunu SORMA" beside it. All
+# ten resolve a country, so none is refused by country.py first, and all ten
+# carry a FIRST-PERSON subject, so the only decision they can break is the
+# preposition one.
+_ENGLISH_ORIGIN_REFUSALS = [
+    ("I am from the Netherlands, my farm is in Antalya", 150),
+    ("We are from India but we farm in Konya", 100),
+    ("I live in Antalya but I am from the Netherlands", 150),
+    ("we are from the Netherlands, our greenhouse is in Antalya", 150),
+    ("I am from Kenya", 114),
+    ("I'm from Kenya", 114),
+    ("we are from France", 68),
+    ("we're from Egypt", 59),
+    ("I am from Brazil", 21),
+    ("I am from the Netherlands", 150),
+]
 _ENGLISH_NOT_A_LOCATION = [
     # (a) merely naming
     ("the yield in France is high", 68),
@@ -2341,7 +2496,33 @@ _ENGLISH_NOT_A_LOCATION = [
     ("their field is in France", 68),
     ("my brother farms in France", 68),
     ("the company is based in France", 68),
-]
+] + _ENGLISH_ORIGIN_REFUSALS
+
+
+@pytest.mark.parametrize("text,code", _ENGLISH_ORIGIN_REFUSALS)
+def test_an_english_origin_is_not_a_location(text, code):
+    """`from` STATES AN ORIGIN AND AN ORIGIN IS NOT A LOCATION - the English twin
+    of `test_a_nationality_is_not_a_location`, decided on the same rule two
+    commits later.
+
+    "I am from Kenya" was `_SELF_EN`'s own written justification for admitting
+    `from` beside `in`/`at`, and it is the translation of "Hollandalıyım": a
+    grower says it truthfully while standing somewhere else, so placing him on it
+    is an INFERENCE. The sentence that settled it is the first one here - the
+    user writes that his farm is in Antalya IN THE SAME SENTENCE and was still
+    placed in the Netherlands, with "hangi ilde oldugunu SORMA" printed beside
+    the Dutch average, for the whole conversation.
+
+    IT SURVIVED THE `-lI` DECISION BY ONE COMMIT BECAUSE ITS ZERO WAS VACUOUS: 0
+    of the 25 refusals put a whitelisted subject immediately before `from`, and
+    the two that carried the word `from` at all - "I buy seed from France", "we
+    import fertiliser from Germany" - are refused by the SUBJECT decision, so
+    nothing in the set could fail the preposition decision. These ten are that
+    set, and the count beside the preposition decision is now 10 rather than 0.
+
+    `extract_country` still RESOLVES all ten. Resolving a name and placing a
+    speaker are different questions; see tests/test_country.py."""
+    assert not engine._states_location(text, engine._code_aliases(code))
 
 
 @pytest.mark.parametrize("text,code", _ENGLISH_NOT_A_LOCATION)
@@ -2359,27 +2540,68 @@ def test_the_english_branch_refuses_what_is_not_a_self_declaration(text, code):
 
 def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
     """THE NUMBERS BESIDE _SELF_EN'S ZERO, pinned so they cannot go stale - this
-    branch has had four stale denominators written above it on this branch alone.
+    branch has had five stale or vacuous denominators written above it.
 
     A reach count is only a guarantee when it counts the inputs that could break
-    THE DECISION UNDER TEST. For this branch there are two decisions - the
-    subject must be first-person, and the preposition must stand between that
-    subject and the name - so there are two counts, and they are taken here
-    rather than asserted in prose."""
+    THE DECISION UNDER TEST. THIS BRANCH MAKES THREE DECISIONS, not two: the
+    subject must be first-person, the preposition must stand between that subject
+    and the name, and the preposition must be one that means PRESENCE. The third
+    had no count at all while `from` was admitted, and that is how an origin
+    arm survived the `-lı` decision by a commit.
+
+    EACH COUNT IS ANCHORED ON THE NAME, and that is a correction rather than a
+    restatement. The old person count matched `<subject> ... in <anything>` and
+    the old adjacency count was "a first-person word somewhere AND a preposition
+    somewhere": over this set the first returns 17 and the second 18, because
+    nine of the ten origin refusals carry a second clause with a Turkish PROVINCE
+    in it - "my farm is in Antalya" satisfies both and tests neither. A count
+    that cannot fail is the defect this guard has been reviewed for five times,
+    so each count here asks what a rule with ONE decision relaxed would admit:
+
+      PERSON      - any subject in the frame, then `in`/`at`, then the name.
+      ADJACENCY   - a first-person subject anywhere, and a BARE `in`/`at`
+                    immediately before the name. That is country.py's own looser
+                    rule, which is what this branch is narrower than.
+      PREPOSITION - the REAL subject whitelist, then `from`, then the name. Read
+                    out of `engine._EN_SUBJECT` rather than copied, so widening
+                    the subject list cannot leave this count measuring the old
+                    one.
+
+    The person and adjacency counts are UNCHANGED by the ten sentences class (f)
+    added, and that is itself the finding: every origin refusal has a
+    first-person subject in the branch's own frame, so the preposition is the
+    only decision they can break."""
     from src.context import country as country_ctx
-    frame = re.compile(r"(?<!\w)(?:\w+(?:\s+\w+)?)\s+"
-                       r"(?:is|are|am|'m|live|lives|farm|farms)"
-                       r"(?:\s+based)?\s+(?:in|at|from)\s+")
+    any_subject = (r"(?<!\w)\w+(?:\s+\w+)?\s+"
+                   r"(?:is|are|am|'m|live|lives|farm|farms)"
+                   r"(?:\s+based)?\s+(?:in|at)\s+")
+    bare_prep = r"(?<!\w)(?:in|at)\s+"
+    origin = engine._EN_SUBJECT + r"from\s+"
     first_person = re.compile(r"(?<!\w)(?:i|we)(?:\s|')")
-    texts = [text for text, _code in _ENGLISH_NOT_A_LOCATION]
-    folded = [engine._normalize_tr(text) for text in texts]
-    assert len(texts) == 25
-    assert sum(1 for text in texts
-               if country_ctx.extract_country(text, None) is not None) == 21
-    assert sum(1 for text in folded if frame.search(text)) == 13
-    assert sum(1 for text in folded
-               if first_person.search(text)
-               and re.search(r"\b(?:in|at|from|to)\b", text)) == 8
+
+    def before_the_name(prefix, text, code):
+        folded = engine._normalize_tr(text)
+        return any(re.search(rf"{prefix}{re.escape(name)}(?!\w)", folded)
+                   for name in engine._code_aliases(code))
+
+    assert len(_ENGLISH_NOT_A_LOCATION) == 35
+    assert sum(1 for text, _code in _ENGLISH_NOT_A_LOCATION
+               if country_ctx.extract_country(text, None) is not None) == 31
+    assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
+               if before_the_name(any_subject, text, code)) == 13
+    assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
+               if first_person.search(engine._normalize_tr(text))
+               and before_the_name(bare_prep, text, code)) == 5
+    assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
+               if before_the_name(origin, text, code)) == 10
+    # And the count the origin class exists for was ZERO on the set that shipped
+    # the Critical: nothing in the old twenty-five could break the preposition
+    # decision.
+    old = [pair for pair in _ENGLISH_NOT_A_LOCATION
+           if pair not in _ENGLISH_ORIGIN_REFUSALS]
+    assert len(old) == 25
+    assert sum(1 for text, code in old
+               if before_the_name(origin, text, code)) == 0
 
 
 _WIDENED_BRANCH_REFUSALS = [
@@ -2686,26 +2908,62 @@ def test_the_reach_count_beside_the_surviving_branchs_zero():
     branch rather than the number that could BREAK the decision under test.
 
     `_SELF_TR`'s decision is "the person suffix sits on the country's own name,
-    with nothing in between". An input can break that decision only by carrying a
-    `-yIm`-shaped word somewhere ELSE - a looser reading would admit exactly
-    those. 42 of the 95 refusals do, and the words are `dayim`, `tayim`,
-    `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ciftciyim`,
-    `ureticiyim`, `sucluyum`, `tohumcuyum` and `ekmeliyim` - possessed nouns,
-    optatives and
-    other people's agent nouns, plus the optative `ekmeliyim` that three of the
-    nationality refusals carry. Measured here rather than asserted in a comment,
-    because the comment above `_SELF_TR` quotes this number."""
+    with nothing in between", and it has THREE ways to fail, so it needs three
+    counts rather than one.
+
+    LEFT OF THE NAME, AND SOMEWHERE ELSE IN THE SENTENCE: an input can break the
+    decision by carrying a `-yIm`-shaped word on another word, because a looser
+    reading that scanned the clause would admit exactly those. 44 of the 99
+    refusals do, and the words are `dayim`, `tayim`, `koyum`, `sayim`, `payim`,
+    `soyum`, `yayim`, `ekeyim`, `kurayim`, `ciftciyim`, `ureticiyim`, `sucluyum`,
+    `tohumcuyum` and `ekmeliyim` - possessed nouns, optatives and other people's
+    agent nouns. FOURTEEN FORMS: the comment above `_SELF_TR` used to list
+    thirteen of them and the missing one is `yayim`, which is why the restricted
+    count is asserted here too - over the thirteen it returns 39, not 42, so the
+    number was right and the enumeration was short.
+
+    RIGHT OF THE NAME: a token that merely STARTS with an alias and runs on into
+    the locative letters. 4 of the 99 are of that shape and 0 of the 95 that
+    shipped were, which is why `_NAME_BOUNDARY_REFUSALS` exists.
+
+    The third way - the locative's own letters followed by something that is not
+    `-yIm` - is `_SUFFIX_NEAR_MISSES` and is counted by its own test."""
     person = re.compile(r"y[iu][mz]$")
-    reach = []
+    listed = {"dayim", "tayim", "koyum", "sayim", "payim", "soyum", "yayim",
+              "ekeyim", "kurayim", "ekmeliyim", "ciftciyim", "ureticiyim",
+              "sucluyum", "tohumcuyum"}
+
+    def elsewhere(forms):
+        reach = []
+        for text, code in _TURKISH_REFUSALS:
+            names = engine._code_aliases(code)
+            words = [raw.strip(" '\"()-,;:.!?…")
+                     for raw in engine._normalize_tr(text).split()]
+            if any((word in forms if forms else person.search(word))
+                   and not any(word.startswith(name) for name in names)
+                   for word in words):
+                reach.append(text)
+        return reach
+
+    assert len(elsewhere(None)) == 44, elsewhere(None)
+    assert len(elsewhere(listed)) == 44
+    assert len(elsewhere(listed - {"yayim"})) == 41
+
+    boundary = []
     for text, code in _TURKISH_REFUSALS:
-        names = engine._code_aliases(code)
-        words = [raw.strip(" '\"()-,;:.!?…")
-                 for raw in engine._normalize_tr(text).split()]
-        if any(person.search(word) and not any(word.startswith(name)
-                                               for name in names)
-               for word in words):
-            reach.append(text)
-    assert len(reach) == 42, reach
+        folded = engine._normalize_tr(text)
+        for name in engine._code_aliases(code):
+            key = re.escape(name)
+            if (re.search(rf"(?<!\w){key}[\w']*[dt][ae]y[iu][mz](?!\w)", folded)
+                    and not re.search(
+                        engine._guard_regex("suffix", engine._SELF_TR, key),
+                        folded)):
+                boundary.append(text)
+                break
+    assert len(boundary) == 4, boundary
+    assert sorted(boundary) == sorted(text for text, _code
+                                      in _NAME_BOUNDARY_REFUSALS)
+
     assert [text for text, code in _TURKISH_REFUSALS
             if engine._states_location(text, engine._code_aliases(code))] == []
 
@@ -3071,7 +3329,7 @@ _TURKISH_REFUSALS = (_MERELY_NAMING + _WIDENED_BRANCH_REFUSALS
                      + _SHAPE_NEAR_MISSES_CLOSED + _ACTION_LOCATIVES
                      + _WINDOW_PERSON_NEAR_MISSES + _POSSESSION_NEAR_MISSES
                      + _PAST_TENSE_REFUSALS + _SUFFIX_NEAR_MISSES
-                     + _NATIONALITY_REFUSALS)
+                     + _NATIONALITY_REFUSALS + _NAME_BOUNDARY_REFUSALS)
 
 
 def test_the_corpus_the_guards_numbers_are_quoted_over():
@@ -3087,11 +3345,17 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
 
     THE ACCEPT COLUMN FELL FROM 41 TO 3 and that is the wave's whole subject:
     the 39 sentences it lost are listed in `_SURRENDERED_ACCEPTS` and pinned as
-    costs there, not deleted. The refusal column ROSE from 86 to 95 - deleting
-    rules cannot admit anything, so all 86 still refuse; five of the nine new
+    costs there, not deleted. The refusal column ROSE from 86 to 99 - deleting
+    rules cannot admit anything, so all 86 still refuse; five of the thirteen new
     ones are `_SUFFIX_NEAR_MISSES`, built to break the one decision the
-    surviving Turkish pattern makes, and four are `_NATIONALITY_REFUSALS`, the
-    `-lI` arm that was dropped after this wave.
+    surviving Turkish pattern makes, four are `_NATIONALITY_REFUSALS`, the
+    `-lI` arm that was dropped after this wave, and four are
+    `_NAME_BOUNDARY_REFUSALS`, the third way that one decision can fail.
+
+    THE ENGLISH COLUMNS MOVED IN THE SAME WAVE: 25 refusals to 35, because the
+    `from` arm was dropped and `_ENGLISH_ORIGIN_REFUSALS` is the class it used to
+    admit; and 10 accepts to 14, because the conditional, the future and the two
+    US towns are now DECLARED accepts rather than unwritten ones.
 
     THE 50 PINNED COSTS ARE DELIBERATELY OUTSIDE BOTH NUMBERS: a cost is a
     sentence the guard refuses and we wish it did not, so a looser rule that
@@ -3099,9 +3363,12 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     denominator would inflate every column with sentences the number is not
     about."""
     assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 3
-    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 95
-    assert len(_ENGLISH_ACCEPTS) == 10
-    assert len(_ENGLISH_NOT_A_LOCATION) == 25
+    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 99
+    assert len(set(_ENGLISH_ACCEPTS)) == len(_ENGLISH_ACCEPTS) == 14
+    assert len(set(_ENGLISH_NOT_A_LOCATION)) == len(_ENGLISH_NOT_A_LOCATION) == 35
+    assert len(_ENGLISH_ORIGIN_REFUSALS) == 10
+    assert len(_DECLARED_ENGLISH_ACCEPTS) == 4
+    assert len(_NAME_BOUNDARY_REFUSALS) == 4
     assert len(_BARE_NAMES) == 8
     assert len(_SURRENDERED_ACCEPTS) == 39
     assert len(_STANDING_COSTS) == 11
@@ -3119,9 +3386,9 @@ def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
     leaked = [text for text, code in _TURKISH_REFUSALS
               if engine._states_location(text, engine._code_aliases(code))]
     assert leaked == []
-    english_out = [text for text in _ENGLISH_ACCEPTS
+    english_out = [text for text, code in _ENGLISH_ACCEPTS
                    if not engine._states_location(text,
-                                                  engine._code_aliases(68))]
+                                                  engine._code_aliases(code))]
     assert english_out == []
     english_in = [text for text, code in _ENGLISH_NOT_A_LOCATION
                   if engine._states_location(text, engine._code_aliases(code))]
@@ -3129,7 +3396,7 @@ def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
 
 
 def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
-    """THE RE-MEASUREMENT THE BRIEF ASKED FOR, and it is not the same assertion
+    r"""THE RE-MEASUREMENT THE BRIEF ASKED FOR, and it is not the same assertion
     as the one above. Deleting a rule cannot admit anything, but it CAN move
     which rule refuses a sentence - a refusal the verb whitelist used to hold
     now falls to whatever is left. So each surviving pattern is scored on its
@@ -3137,17 +3404,23 @@ def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
     unit: if either one were carrying a class only the other refused, a later
     change to that one would open it silently.
 
-    Measured: each pattern admits 0 of the 95 by itself."""
-    for name, pattern in (("_SELF_TR", engine._SELF_TR),
-                          ("_SELF_EN", engine._SELF_EN)):
+    Measured: each pattern admits 0 of the 99 Turkish and 0 of the 35 English by
+    itself.
+
+    THE COMPOSITION IS READ OUT OF `engine._GUARDS` AND BUILT BY
+    `engine._guard_regex`, NOT REBUILT HERE. This test used to spell out
+    `rf"(?<!\w){key}{pattern}"` and `rf"{pattern}{key}(?!\w)"` itself, which made
+    it a copy of the block under test: a change to the composition - a boundary
+    added on the English side, say - would have left it green while it measured a
+    regex nobody ships. That is this guard's standing defect applied to its own
+    test, and the guard has been reviewed five times for exactly that shape."""
+    assert len(engine._GUARDS) == 2
+    for name, side, pattern in engine._GUARDS:
         for text, code in _TURKISH_REFUSALS + _ENGLISH_NOT_A_LOCATION:
             folded = engine._normalize_tr(text)
             for alias in engine._code_aliases(code):
                 key = re.escape(alias)
-                if name == "_SELF_TR":
-                    hit = re.search(rf"(?<!\w){key}{pattern}", folded)
-                else:
-                    hit = re.search(rf"{pattern}{key}(?!\w)", folded)
+                hit = re.search(engine._guard_regex(side, pattern, key), folded)
                 assert not hit, (name, text)
 
 

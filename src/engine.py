@@ -925,13 +925,14 @@ def _world_amount(amount: float) -> str:
 #   "Fransa'dayim" - and `_ASK_LOCATION` now asks for exactly that spelling,
 #   which is why the question text changed in the same commit as the deletion.
 #
-# THE REFUSE SET IS 95 AND 0 OF IT IS ADMITTED. Deleting rules cannot admit
+# THE REFUSE SET IS 99 AND 0 OF IT IS ADMITTED. Deleting rules cannot admit
 # anything, so every one of the 86 refusals the five waves earned still refuses;
-# five of the nine new ones are the suffix's own near misses, listed below, and
-# four are the `-lI` nationality dropped after this wave. Re-measured
+# five of the thirteen new ones are the suffix's own near misses, listed below,
+# four are the `-lI` nationality dropped after this wave, and four are the name's
+# RIGHT boundary (see below again). Re-measured
 # PER BRANCH rather than as a pair, because deleting a rule moves which rule
 # refuses a sentence even when it admits nothing: each surviving pattern admits
-# 0 of the 95 on its own, so neither is carrying a class only the other held.
+# 0 of the 99 on its own, so neither is carrying a class only the other held.
 #
 # REJECTED: keeping the bare-name branch - "Fransa" alone, counted as a location
 # because the assistant had just asked where the user is. The idea is right and
@@ -966,11 +967,48 @@ def _world_amount(amount: float) -> str:
 # branch. The decision is "the person suffix sits on the NAME, with nothing in
 # between". What could break it is a `-yIm`-shaped word somewhere ELSE in the
 # sentence, because a rule that read the clause instead of the name would admit
-# those. Measured over the 95 refusals: 42 carry one - `dayim`, `tayim`,
-# `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ekmeliyim`,
+# those. Measured over the 99 refusals: 44 carry one - `dayim`, `tayim`,
+# `koyum`, `sayim`, `payim`, `soyum`, `yayim`, `ekeyim`, `kurayim`, `ekmeliyim`,
 # `ciftciyim`, `ureticiyim`, `sucluyum`, `tohumcuyum` - and _SELF_TR admits 0 of
-# the 95. That is the measurement the five deleted rules never had: the 42 are
+# the 99. That is the measurement the five deleted rules never had: the 44 are
 # exactly the inputs a looser reading of this one decision would get wrong.
+# FOURTEEN FORMS, AND THE LIST USED TO NAME THIRTEEN: restricted to the thirteen
+# it printed the count is 39, not 42, and the form it left out is `yayim`
+# ("Hollanda'da cikan bir yayim var"). The number was derived by a test and the
+# enumeration was prose, so only the prose went stale - and the enumeration is
+# the half a reader uses.
+#
+# AND THE NAME HAS A RIGHT BOUNDARY TOO, which is the third way this one decision
+# can fail and the refuse set could not reach it until now. `(?<!\w)<alias>`
+# anchors the LEFT side; nothing anchors the right side of the NAME, so a token
+# that merely STARTS with an alias and runs on into the locative letters would be
+# read as that country. Measured: 4 of the 99 refusals are of that shape, 0 of
+# them admitted, and before they were written down the count was 0 - so this
+# branch's zero said nothing about its right boundary. The four, and each is a
+# sentence a grower could type:
+#   Cine'deyim          `cin` + `e'deyim`  - a district of Aydin, not China
+#   Nijerya'dayim       `nijer` + `ya'dayim` - Nigeria, handed Niger's aliases
+#   Maliyedeyim         `mali` + `yedeyim` - the Treasury, not Mali
+#   Cadirdayim          `cad` + `irdayim`  - a tent, not Chad
+# The project's own Turkish corpus was swept for the leak as well
+# (data/vector_store/chroma.sqlite3, 81 426 documents, all 418 folded aliases):
+# 0 documents match this pattern at all, and of the tokens that end in the
+# locative-plus-person letters not one has a country alias as its prefix. So the
+# decision was already sound; what was missing was the evidence.
+#
+# REJECTED HERE, RECORDED AS A LEAD: the `-n` buffer, `'?n?[dt][ae]y[iu][mz]`.
+# A Turkish compound name carrying a 3sg possessive takes it, so 18 countries
+# cannot be placed in their full official name - "Rusya Federasyonu'ndayim",
+# "Cin Halk Cumhuriyeti'ndeyim", "Amerika Birlesik Devletleri'ndeyim" and 15
+# more, every one of which `extract_country` resolves and this guard refuses.
+# Sized: 198 of 198 named countries ARE placeable through some short alias in
+# `_ASK_LOCATION`'s own shape ("Rusya'dayim", "ABD'deyim"), so the hole bites
+# only the user who types the full compound, and he has a short form available.
+# The widening leaks 0 of the 99 - AND THAT ZERO IS THE VACUOUS KIND THIS GUARD
+# HAS BEEN BURNED BY FIVE TIMES: 0 of the 99 refusals put an `n` between the
+# name and the locative at all, so not one of them could have broken the
+# decision the widening would make. A widening cannot be licensed by this refuse
+# set, so it waits for refusals built against it rather than riding in on a zero.
 #
 # AND THE SUFFIX'S OWN NEAR MISSES, the other way one decision can fail - the
 # letters `[dt][ae]` followed by something that is not `-yIm`. All five refused,
@@ -1003,9 +1041,33 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 # preposition says where something is, not where the USER is. "I buy seed from
 # India" and "the protein in Turkey feed" are the shapes that rule exists for,
 # and country.py's own _EN_ORIGIN comment records measuring them. Only an
-# enumerated first-person subject counts here, and `from` is admitted beside
-# `in`/`at` because after one of these subjects it predicates the speaker
-# ("I am from Kenya") rather than a purchase.
+# enumerated first-person subject counts here, and the preposition after it must
+# be `in` or `at`.
+#
+# `from` USED TO BE ADMITTED BESIDE THEM AND IS NOW REFUSED, on the same rule
+# that dropped `-lI` from _SELF_TR: `from` STATES AN ORIGIN, AND AN ORIGIN IS NOT
+# A LOCATION. "I am from Kenya" is this branch's own old justification and it is
+# the English translation of "Hollandaliyim" - a grower says it truthfully while
+# standing somewhere else, so placing him on it is an INFERENCE, which is the
+# thing this guard stopped making. The sentence that settled it:
+#
+#   "I am from the Netherlands, my farm is in Antalya"
+#
+# was admitted, resolved 150, and printed "Kullanici Turkiye disinda: Netherlands
+# (Kingdom of the) ... hangi ilde oldugunu SORMA" to a grower who had written
+# where his field is IN THE SAME SENTENCE - and `_country_lines` asks every user
+# turn, so it stuck for the whole conversation. The arm survived the `-lI`
+# decision by one commit because the zero that licensed it was taken over inputs
+# that could not break it: 0 of the 25 refusals put a whitelisted subject
+# immediately before `from`, and the two that carried the word `from` at all were
+# refused by the SUBJECT decision instead. That is the fifth instance of the
+# family named above _SELF_TR, and the refuse set now has a class for it.
+#
+# Dropping it cost nothing measurable: 0 of the 14 pinned accepts use `from`,
+# and 0 of the 25 refusals were being held by it. `extract_country` still
+# RESOLVES "I am from Kenya" - resolving a name and placing a speaker are
+# different questions and only the second one is this guard's, which is the same
+# split the `-lI` decision drew.
 #
 # `my farm is in` / `my field is in` / `our farm is in` are the same whitelist
 # logic one step along: the subject is a possessed noun rather than a pronoun,
@@ -1014,25 +1076,48 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 # uncle lives in France" are refused, because the thing possessed is somebody
 # else.
 #
-# ITS REFUSE SET IS 25 NOW, AND IT HAD NONE AT ALL TWO WAVES AGO. It is one of
+# ITS REFUSE SET IS 35 NOW, AND IT HAD NONE AT ALL TWO WAVES AGO. It is one of
 # the two surviving branches, so it is measured the way the Turkish side is,
-# with the reach counts beside the zero rather than the entry counts:
+# with the reach counts beside the zero rather than the entry counts. THERE ARE
+# THREE DECISIONS HERE AND NOT TWO - the subject, the adjacency, and WHICH
+# PREPOSITION COUNTS AS PRESENCE - and the third one had no count beside it at
+# all while `from` was admitted. Each is counted against the NAME, because a
+# count taken over the sentence instead inflates on a second clause that says
+# nothing about the decision:
 #
-#   refusals                                                         25
+#   refusals                                                         35
 #   admitted by the branch                                            0
-#   naming a country extract_country resolves (the rest test nothing) 21
-#   PUTTING A SUBJECT IN THIS BRANCH'S OWN FRAME -                    13
-#     `<subject> is/are/lives/farms (based) in <name>` - these are the
-#     only inputs that can break the PERSON decision: "he is in France",
-#     "my son is in France", "our customer is in France", "the farm is in
-#     France", "his farm is in France", "their field is in France",
-#     "the company is based in France" and six more.
-#   PUTTING A FIRST-PERSON SUBJECT BESIDE A PREPOSITION -              8
-#     the only inputs that can break the ADJACENCY decision: "I buy seed
-#     from France", "I sell wheat in Germany", "I studied in France",
-#     "I went to a fair in the Netherlands" and four more. The branch
-#     refuses them because the subject is not followed by the preposition
-#     - a verb and an object stand in between.
+#   naming a country extract_country resolves (the rest test nothing) 31
+#   ANY SUBJECT, THEN `in`/`at`, THEN THE NAME -                      13
+#     the only inputs that can break the PERSON decision: "he is in
+#     France", "my son is in France", "our customer is in France", "the
+#     farm is in France", "his farm is in France", "their field is in
+#     France", "the company is based in France" and six more.
+#   A FIRST-PERSON SUBJECT IN THE SENTENCE AND A BARE `in`/`at` IN
+#   FRONT OF THE NAME -                                                5
+#     the only inputs that can break the ADJACENCY decision: "I sell
+#     wheat in Germany", "I studied in France", "I went to a fair in
+#     the Netherlands", "I saw a greenhouse in the Netherlands", "I am
+#     looking for a buyer in Germany". The branch refuses them because
+#     the subject is not followed by the preposition - a verb and an
+#     object stand in between.
+#   A WHITELISTED SUBJECT, THEN `from`, THEN THE NAME -               10
+#     the only inputs that can break the PREPOSITION decision, and this
+#     count was 0 until `from` was dropped: "I am from Kenya", "we are
+#     from France", "I am from the Netherlands, my farm is in Antalya",
+#     "We are from India but we farm in Konya" and six more.
+#
+# THE ADJACENCY COUNT READ 8 BEFORE AND READS 5 NOW, and nothing leaked: the
+# old count was "a first-person word anywhere in the sentence AND a preposition
+# anywhere in the sentence", which "I buy seed from France" satisfies while being
+# refused by the SUBJECT decision. Over the 35 that wording returns 18, because
+# every origin refusal carries both halves - a number that cannot fail and
+# therefore says nothing. The count above asks instead what a rule WITHOUT the
+# adjacency requirement would admit: a bare `in`/`at` in front of the name, which
+# is exactly country.py's own looser rule. Same for the person count, which is
+# what a rule with a WIDER subject list would admit; it reads 13 on both sets,
+# and that is the finding - the origin class all has first-person subjects, so it
+# breaks the preposition decision and nothing else.
 #
 # TEMPORARY PRESENCE IS ADMITTED, AND THAT IS A DECISION, not a gap. "I am in
 # France for the fair", "I am in France this week", "we are in France visiting a
@@ -1047,10 +1132,47 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 # wrong about it is only that `_country_lines` makes it stick for the whole
 # conversation, which is that function's own recorded open item and not this
 # pattern's to fix. Pinned as accepts in `_ENGLISH_ACCEPTS`, not as a gap.
-_SELF_EN = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
-            r"|i\s+farm|we\s+farm|my\s+farm\s+is|our\s+farm\s+is"
-            r"|my\s+field\s+is|my\s+fields\s+are)(?:\s+based)?"
-            r"\s+(?:in|at|from)\s+")
+#
+# AND SO ARE THE CONDITIONAL, THE FUTURE AND THE FIRST WORD OF A LONGER FOREIGN
+# PLACE NAME. Four more accepts, declared on the same rule as temporary presence
+# and for one measured reason: REFUSING THEM NEEDS THE TAIL OF THE SENTENCE, and
+# reading the tail is what this branch's history rejected with a table. The four:
+#
+#   If I am in France next year, should I plant wheat      68
+#   I am in India tomorrow                                100
+#   my farm is in Lebanon, Ohio                           121
+#   my farm is in Peru, Indiana                           170
+#
+# `if`/`when`/`unless` do not fit in a fixed-width lookbehind, and `tomorrow` or
+# `, Ohio` is the tail - and EVERY candidate tail word was measured damaging,
+# `and`, the comma and the full stop included, because "my field is in Egypt
+# for..." and "the protein in turkey for..." have the same tail. Bringing the
+# tail back brings back the inference the wave before this one deleted.
+#
+# The damage is also small, and this is where they differ from the `from` arm
+# above: a grower asking "If I am in France next year, should I plant wheat" IS
+# THINKING ABOUT FRANCE, and FAOSTAT's French figures are the right context for
+# that question. The `from` sentence is the opposite - there the user said his
+# field is in Antalya and was told not to ask which province.
+#
+# THE TURKISH SIDE IS ASYMMETRIC HERE AND THAT IS NOT REPAIRED: "Fransa'daysam
+# ne ekerim" and "Fransa'da olsaydim bugday ekerdim" are refused for free,
+# because `'daysam` and `'da` do not fill `[dt][ae]y[iu][mz]` - Turkish puts the
+# conditional in the morphology and English has no equivalent to read. The two
+# branches agree about a speaker who states where he is; they disagree about one
+# who supposes it, and only the Turkish one gets that for nothing.
+# `my farm is in Lebanon, Ohio` is the one level down from the `Georgia` decision
+# in `country._NOT_THIS_PLACE`: FAOSTAT has no US-state area, and US towns named
+# after countries are the same hazard with a comma instead of a word boundary.
+_EN_SUBJECT = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
+               r"|i\s+farm|we\s+farm|my\s+farm\s+is|our\s+farm\s+is"
+               r"|my\s+field\s+is|my\s+fields\s+are)(?:\s+based)?\s+")
+
+# Split from the preposition so the reach counts above can be taken against the
+# REAL subject list rather than a copy of it: the preposition decision's count is
+# measured by composing this with `from`, and a second copy of the subject list
+# in the test would drift from this one silently.
+_SELF_EN = _EN_SUBJECT + r"(?:in|at)\s+"
 
 # THE LOCATION QUESTION, in one place because it is asked from two routes and
 # must read the same in both. It used to be written out twice, as
@@ -1080,9 +1202,63 @@ _SELF_EN = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
 # USED BY `crop_choice` ONLY. `fert_plan` asks for the province in its own words
 # and does not invite a country, because `_country_lines` has one caller and it
 # is not that route - see the comment at that call site.
+#
+# SO THE INVITATION IS RE-ASKED ACROSS ROUTES, AND THIS WAVE CREATED THAT. The
+# same-route loop is closed: a `fert_plan` user is never told to write
+# "Fransa'dayim", and that route's string is byte-identical to main's. But
+# ROUTING IS PER MESSAGE. A grower invited to name his country on a `crop_choice`
+# turn, who answers "Fransa'dayim" and then asks when to fertilise, is routed to
+# `fert_plan` and asked for a TURKISH PROVINCE - the question he cannot answer,
+# one turn after answering the one we asked him to. Measured in one conversation
+# and pinned in `test_answering_the_country_invitation_is_re_asked_on_fert_plan`;
+# before this wave the invitation did not exist, so the contradiction is new even
+# though the `fert_plan` ask is not.
+#
+# IT IS NOT FIXED BY WIDENING `_country_lines` TO `fert_plan`, because that is a
+# separate round rather than a line of code: `fert_plan` serves a fertilisation
+# and irrigation plan and FAOSTAT publishes neither, so there is nothing for the
+# world layer to say on that route - only a province question to stop asking,
+# with nothing to put in its place. See the call site in `_context_block`.
+#
+# AND THE RECOVERY THIS QUESTION CARRIES IS MEASURED IN ONE LINK OF THREE. The
+# whole compensation for the 39 surrendered accepts is this instruction, and the
+# chain is: (1) the model must relay the example rather than paraphrase it,
+# (2) the user must comply, (3) the spelling must generalise to his own country.
+# Only (3) is measurable in this repo and it measures 198 of 198 countries
+# placeable in this shape, robust to wrong vowel harmony and to the phone's
+# U+2019. (1) AND (2) ARE UNMEASURED - they are prompt behaviour and belong in
+# the eval harness - so the sentence below is where 39 accepts went, and nothing
+# here tests that they come back.
 _ASK_LOCATION = ("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu "
                  "sor; yurt disindaysa ulkesini Fransa'dayim gibi yazmasini "
                  "iste, tavsiyeni genel tut.")
+
+# The two patterns and WHICH SIDE OF THE NAME each one sits on. `_SELF_TR` is a
+# suffix, `_SELF_EN` a prefix, so the word boundary goes on the name's free side
+# in each case - and that composition is what `_states_location` actually
+# searches for, which is why it has one reader (`_guard_regex`) rather than being
+# spelled out at every place that needs it. The per-pattern test used to
+# re-compose both itself: a change to the COMPOSITION - adding a boundary on the
+# English side, say - would have left that test green while it measured a regex
+# nobody ships, which is this guard's own standing defect in miniature.
+_GUARDS: tuple[tuple[str, str, str], ...] = (
+    ("_SELF_TR", "suffix", _SELF_TR),
+    ("_SELF_EN", "prefix", _SELF_EN),
+)
+
+
+def _guard_regex(side: str, pattern: str, key: str) -> str:
+    """The regex one guard pattern searches for around the escaped name `key`.
+
+    `side` is "suffix" when the pattern follows the name and "prefix" when it
+    precedes it; the boundary assertion goes on whichever side of the NAME the
+    pattern does not already cover. Read `_GUARDS` for both, and do not pass a
+    pattern that is not in it - the boundaries here are the only thing stopping
+    an alias from matching inside a longer word, and they are decided per side.
+    """
+    if side == "suffix":
+        return rf"(?<!\w){key}{pattern}"
+    return rf"{pattern}{key}(?!\w)"
 
 
 def _code_aliases(code: int) -> tuple[str, ...]:
@@ -1122,10 +1298,9 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
         return False
     for name in aliases:
         key = re.escape(name)
-        if re.search(rf"(?<!\w){key}{_SELF_TR}", folded):
-            return True
-        if re.search(rf"{_SELF_EN}{key}(?!\w)", folded):
-            return True
+        for _label, side, pattern in _GUARDS:
+            if re.search(_guard_regex(side, pattern, key), folded):
+                return True
     return False
 
 
