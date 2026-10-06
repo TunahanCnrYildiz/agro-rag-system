@@ -855,29 +855,55 @@ def _world_amount(amount: float) -> str:
 # THE CASE ENDING IS NOT ENOUGH EITHER - THE TENSE MATTERS TOO. A locative plus a
 # first-person PAST verb says something was DONE there, not that the speaker is
 # there, and that is the same class again: "Amerika'da bugday aldim, ben bugday
-# mi eksem", "Fransa'da staj yaptim", "Hollanda'da fuara katildim". So the
-# predicate test below reads the present continuous and the copula only; see
-# _TR_FIRST_PERSON for the four tenses measured out of it.
+# mi eksem", "Fransa'da staj yaptim", "Hollanda'da fuara katildim".
 #
-# THREE TURKISH BRANCHES, because the copula attaches in two places and one
-# shape needs naming outright:
+# AND THE TENSE IS NOT ENOUGH EITHER, WHICH IS WHY THIS IS A WHITELIST NOW.
+# Four waves in a row patched this guard at four different layers - the window,
+# the shape, the bare name, the tense - and every one of them closed a class and
+# left another open, because all four asked the same wrong question: "is a
+# country name mentioned here in a shape I have not refused yet". The question
+# that has to be asked is "does this text say the SPEAKER is there", and a
+# refuse-list can never answer it: the ways of mentioning a country without
+# being in it are open-ended, and the ways of saying you are in one are not.
+#
+# So the test is INVERTED. Only patterns that predicate the SPEAKER are
+# admitted; everything else is refused and the assistant asks which province the
+# user is in. The classes the fourth wave left open, measured at 78b72a2 and all
+# of them closed by the inversion rather than by a new refusal:
+#
+#   _states_location("Mısır", aliases(59))            -> True   (K1, 4 spellings)
+#   "Fransa'da çalışan bir dayım, ona soruyorum"       -> True   (K2, 10 measured)
+#   "Fransa'da fuara katiliyorum"                     -> True   (I1, 20 measured)
+#   "Almanya'da buğday satıyorum, bu yıl ne eksem"     -> True   + German figures
+#
+# The last set is the whole TURKISH EXPORTER / BUYER class: a grower in Türkiye
+# describing his market or his supplier abroad was handed that country's figures
+# and lost the province question for the rest of the conversation.
+#
+# FIVE TURKISH BRANCHES AND ONE ENGLISH, each one a shape that predicates the
+# speaker and nothing else:
 #
 #  * _SELF_TR - the copula FUSED to the name's own suffix: "Fransa'dayım",
 #    "Ganadayim", "Fransalıyım". The suffix runs straight into `-yım`.
-#  * _TR_LOCATIVE plus _first_person_follows - the dominant Turkish pattern,
-#    which puts the case ending on the NAME and the person on the VERB:
-#    "Fransa'da yaşıyorum", "Fransa'da çiftçilik yapıyorum", "Fransada
-#    çiftçiyim". An earlier revision of this guard had only the first branch and
-#    refused every one of these - real sentences a grower in France would write,
-#    measured resolving to France in `extract_country` and then losing every
-#    figure here.
-#  * _TR_RESIDENT_PARTICIPLES - "Fransa'da yaşayan bir çiftçiyim". The second
-#    branch reached this one only by looking three words out, and that width also
-#    let through eleven measured sentences where the locative belongs to an
-#    OBJECT ("Fransa'da üretilen tohum kullanıyorum"). The width is two now and
-#    this sentence is admitted by its shape instead.
+#  * _TR_SELF_VERBS - the locative plus a first-person RESIDENCE OR CULTIVATION
+#    verb: "Fransa'da yaşıyorum", "Fransa'da buğday ekiyorum", "Fransa'da
+#    çiftçilik yapıyorum". The verb is whitelisted, which is the inversion's
+#    main edge: a first-person present-continuous verb of COMMERCE or TRAVEL in
+#    the same slot attaches the place to the market, the supplier or the trip.
+#  * _TR_AGENT_PERSON - the locative plus a first-person copula on an AGENT
+#    NOUN: "Fransada çiftçiyim", "Fransa'da bir üreticiyim".
+#  * _TR_RESIDENT_PARTICIPLES - "Fransa'da yaşayan bir çiftçiyim", the one
+#    participle shape that attaches the place to the SUBJECT.
+#  * _TR_OWNED_LAND - "Fransa'da tarlam var", "Fransa'da bir çiftliğim var":
+#    owning worked land in a place is a statement about the owner.
+#  * _SELF_EN - the English self-declaration, "I live in X", "my farm is in X".
 #
-# The apostrophe is optional in all three, because Turkish speakers omit it
+# AND ONE BRANCH THAT IS NOT A SHAPE AT ALL, _ASKED_WHERE: a message that is
+# NOTHING BUT the country name states a location only because the assistant has
+# just asked where the user is. See _ASKED_WHERE for why that gate is not
+# optional and what it cost to leave off.
+#
+# The apostrophe is optional in all of them, because Turkish speakers omit it
 # ("Ganadayim", "Fransada ciftciyim") and country.py's own suffix branch accepts
 # either.
 #
@@ -908,68 +934,162 @@ _SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
 # fails here and is caught by _SELF_TR, which is where it belongs.
 _TR_LOCATIVE = r"'?[dt][ae](?!\w)"
 
-# First-person endings, word-final on folded text. PRESENT CONTINUOUS AND THE
-# COPULA ONLY, because those are the tenses "where I am" is said in. This set and
-# the window below BOTH hold part of the refuse set out, and neither covers for
-# the other - see _TR_CLAUSE_WORDS, where the table that said the window was free
-# is corrected.
+# THE TWO FIRST-PERSON PREDICATES, SPLIT, because the inversion treats them
+# differently and the revision this replaces treated them as one regex,
+# `(?:[iu]yor[iu][mz]|y[iu][mz])$`. A COPULA on a noun says the speaker IS
+# something in that place; a VERB says the speaker DOES something there, and
+# doing something in a place is not being in it. So the copular half is admitted
+# on a noun shape and the verbal half only on a whitelisted verb.
 #
-# Re-measured 2026-10-03 against the corpus the test suite carries in full - 8
-# Turkish accepts and 42 refusals - adding one ending at a time and changing
-# nothing else. All eight accepts pass with the set as it stands, so every one of
-# these costs refusals and buys nothing:
+# Re-measured 2026-10-06 over the corpus the suite carries in full - 41 Turkish
+# accepts and 86 refusals, both pinned by
+# `test_the_corpus_the_guards_ablation_tables_are_taken_over` so these
+# denominators cannot go stale again:
 #
-#   ending added           wrongly admitted
-#   -dim/-tim  (past)           5/42
-#   -im/-um/-iz (nominal)      10/42
-#   -arim/-erim (aorist)        1/42
-#   -acagim/-ecegim (future)    0/42
+#   the window branch, varied one test at a time   accepts  wrongly admitted
+#     shipped                                        41/41        0/86
+#     verb whitelist off (any -Iyor- verb)           41/41       20/86
+#     person test loose (`y[iu][mz]$`, as at 78b72a2) 41/41        8/86
+#     both off (the branch exactly as at 78b72a2)    41/41       28/86
 #
-# The leaking sentences are the same ones as at the previous, smaller corpus -
-# the fifteen refusals added this wave reach this set through none of the four
-# endings, because every one of them is held by the shape branch's own two
-# narrowings instead.
+# EVERY ZERO IN THIS MODULE NOW CARRIES THE NUMBER OF INPUTS THAT COULD HAVE
+# BROKEN IT, because twice on this branch a guard was closed on a zero taken
+# from a refuse set that could not reach the rule under test - first "0/27"
+# where 1 of the 27 reached the pattern, then "0/42" where NONE of the 42
+# reached the shipped gate. Of the 86 refusals: 81 put a clause after a
+# locative, 20 put a first-person present-continuous verb inside the window, 8
+# put a `-yIm`-shaped word inside it, 26 reach the shape branch's loose prefix,
+# 10 reach its shipped gate and 16 reach the land branch's `<possessed> var`.
 #
-#  * the PAST `-dim/-tim` reads a FINISHED ACTION in a place as being in that
-#    place, which is the whole class CRITICAL 3 exists to refuse. The five it
-#    admitted: "Amerika'da bugday aldim, ben bugday mi eksem" - the Turkish
-#    farmer citing a US price, exactly the shape - plus "Hollanda'da sera
-#    gordum, domates ekeyim mi", "Fransa'da staj yaptim, bugday ekeyim mi",
-#    "Fransa'da okudum" and "Hollanda'da fuara katildim". Worse than a one-turn
-#    error, because the caller asks every user turn: one "Fransa'da staj yaptım"
-#    in the first turn kept the grower in France for the rest of the conversation.
-#  * the bare nominal `-im/-um/-iz` admits the five above and five more, because
-#    Turkish is full of ordinary nouns with that ending and three of them are
-#    agricultural - "Amerika'da tohum fiyatlari nasil" (tohum), "Fransa'da ekim
-#    zamani gecti mi" (ekim), "Fransa'da verim yuksek diye duydum" (verim). The
-#    `y` in `y[iu][mz]` is exactly what keeps those out while `ciftciyim` passes.
-#    It also reaches one of the object-locative eleven, "Fransa'da uretilen tohum
-#    kullaniyorum", on `tohum` - which the window refuses on distance alone, so
-#    that sentence is held out twice over and neither hold is redundant.
-#  * the aorist `-arim/-erim` fails for the same reason one letter along: the
-#    agricultural noun `verim` ENDS in those very letters, so
-#    "Fransa'da verim yuksek diye duydum" is read as a first-person verb.
-#  * the FUTURE `-acagim/-ecegim` admits NOTHING in this corpus, so it is left
-#    out on the argument rather than on a measurement: a plan to plant somewhere
-#    is not a statement of being there. It also buys no accept - the one sentence
-#    that would need it, "Fransa'da bu yil bugday ekecegim", sits outside the
-#    window below in any case. If a future accept ever turns up, this is the
-#    entry to revisit, and it is the cheapest of the four to re-measure.
-_TR_FIRST_PERSON = re.compile(r"(?:[iu]yor[iu][mz]|y[iu][mz])$")
+# WHY THE COPULA IS NARROWED TO AGENT NOUNS IN `-cI`. `y[iu][mz]$` cannot tell
+# the copula `-yIm` on a vowel-final stem (`çiftçi` + `-yim`) from the bare
+# possessive `-Im` on a `y`-final stem (`dayı` + `-m`) - they are the same five
+# letters, and that is the whole of K2: "Fransa'da çalışan bir dayım, ona
+# soruyorum" has no first-person predicate anywhere in it and placed the user in
+# France for the rest of the conversation. No lexicon-free test separates the
+# two readings, but the DERIVATIONAL suffix does separate the words that matter:
+# Turkish agent nouns end in `-cI`/`-çI` (folded `c[iu]`), so `ciftciyim`,
+# `isciyim`, `ureticiyim`, `bagciyim`, `ogrenciyim` all match and `dayim`,
+# `sayim`, `tayim`, `koyum`, `yayim`, `payim`, `soyum` all do not.
+#
+# WHAT THAT COSTS, measured: a first-person nominal predicate that is not an
+# agent noun. "Fransa'da emekliyim" (retired) and "Fransa'da yeniyim" (new here)
+# are accepts at 78b72a2 and refusals now. Both are real statements of location
+# and both are given up, because the alternative is the possessed noun walking
+# back in - and a possessed noun is the commonest Turkish way to mention a
+# relative, a village or a publication abroad.
+#
+# THE OLD TENSE TABLE IS SUBSUMED, not deleted: the four endings it measured out
+# - past `-dim/-tim` (5/42), bare nominal `-im/-um/-iz` (10/42), aorist
+# `-arim/-erim` (1/42), future `-acagim/-ecegim` (0/42) - are all refused by the
+# two patterns below without a tense test, because none of them is a whitelisted
+# verb in the present continuous or an agent noun with a copula. The reasoning
+# is kept because it is the record of why "a first-person ending" was never the
+# right test: `tohum`, `ekim` and `verim` are ordinary agricultural NOUNS that
+# end in the aorist's and the nominal's letters.
+_TR_AGENT_PERSON = re.compile(r"c[iu]y[iu][mz]$")
+
+# The present continuous with the stem captured, so the stem can be whitelisted.
+# `yaşıyorum` -> `yas`, `oturuyorum` -> `otur`, `çiftçilik yapıyorum` -> `yap`.
+# Non-greedy, so the shortest stem that leaves a legal ending wins - which is
+# the real morpheme boundary for every verb in the list below.
+_TR_VERBAL_PERSON = re.compile(r"^(.*?)[iu]yor[iu][mz]$")
+
+# VERBS WHOSE FIRST-PERSON PRESENT ENTAILS THE SPEAKER IS THERE: residence
+# (`yaşa-`, `otur-`, `çalış-`) and working the land (`ek-`, `dik-`, `yetiştir-`,
+# `üret-`, `sula-`, `buda-`, `besle-`). Folded stems, as _TR_VERBAL_PERSON cuts
+# them.
+#
+# THE AXIS, and why this is a list and not a tense or a width: the twenty I1
+# sentences all put a first-person present-continuous verb within two words of
+# the locative, and every one of those verbs is COMMERCE, SEARCH or TRAVEL -
+# `satıyorum`, `alıyorum`, `arıyorum`, `katılıyorum`, `geziyorum`,
+# `kiralıyorum`, `soruyorum`, `görüyorum`. "Almanya'da buğday satıyorum" is said
+# by a Turkish exporter in Türkiye far more often than by a grower in Germany,
+# and the locative attaches to the market. No width and no tense separates that
+# sentence from "Almanya'da buğday ekiyorum"; only the verb does.
+#
+# EVERY MEMBER IS PINNED BY ITS OWN ACCEPT in
+# test_each_whitelisted_self_verb_is_a_stated_location, because a member nothing
+# pins is a member nothing measures - the rule this project learned from
+# _TR_RESIDENT_PARTICIPLES. Measured: the whitelist is worth 20 of the 86
+# refusals - dropping it admits every one of the twenty that reach this branch
+# with a first-person present-continuous verb - and costs 0 of the 41 accepts.
+# But that 20 is earned by `yap` and by what the list LEAVES OUT; the six stems
+# `dik`, `yetistir`, `uret`, `sul`, `bud`, `besl` rest on the ARGUMENT above
+# rather than on a measurement, because no refusal in the corpus contains
+# `dikiyorum` or `buduyorum` and a "0/86 for adding one of them" would be the
+# empty measurement this wave exists to stop repeating.
+#
+# WHAT THE LIST REFUSES AND SHOULD BE READ AS COSTS, all accepts at 78b72a2:
+#   "Fransa'da zeytin topluyorum"      `topl-` also heads "bilgi topluyorum"
+#   "Fransa'da sera işletiyorum"       `işlet-` can be run from anywhere
+#   "Fransa'da traktör kullanıyorum"   `kullan-` is _OBJECT_LOCATIVES' own verb
+#   "Fransa'da okuyorum"               studying is the present twin of a pinned
+#                                      past-tense refusal, "Fransa'da okudum"
+# The third is the one that cannot be bought back at any price: "Fransa'da
+# üretilen tohum kullanıyorum" is the leading object-locative sentence, so
+# admitting `kullan-` reopens the class the window was narrowed for.
+_TR_SELF_VERBS = frozenset({
+    "yas", "otur", "calis", "ek", "dik", "yetistir", "uret", "sul", "bud",
+    "besl",
+})
+
+# `yap-` TAKES ITS MEANING FROM ITS OBJECT, so it is admitted only after one of
+# these. "Fransa'da çiftçilik yapıyorum" is a statement of location; "Fransa'da
+# staj yapıyorum", "Fransa'da ihracat yapıyorum" and "Fransa'da tatil
+# yapıyorum" are three of the twenty I1 sentences and are refused by this gate
+# alone. The object must be the word immediately before the verb, and it is read
+# WITHOUT spending the window, the way `ben` is - see _first_person_follows.
+_TR_SELF_ACTIVITIES = frozenset({
+    "ciftcilik", "tarim", "ekim", "uretim", "bagcilik", "seracilik",
+    "hayvancilik", "hasat",
+})
+
+# OWNING WORKED LAND IN A PLACE IS A STATEMENT ABOUT THE OWNER, and this is the
+# one branch whose predicate is `var` rather than a person ending: "Fransa'da
+# tarlam var", "Fransa'da 30 dönüm arazim var". It is worth 7 of the 37 accepts
+# and it is the shape a foreign grower is likeliest to open with.
+#
+# THE NOUN IS WHITELISTED AND THAT IS NOT OPTIONAL: `<possessed noun> var` is
+# also exactly how a relative abroad is mentioned, which is K2's class - of the
+# 86 refusals, 16 reach this branch's shape, among them `bir dayım var`,
+# `bir arkadaşım var`, `müşterim var` and `bir ortağım var`. With the list the
+# branch admits 0 of those 16; without it, all of them. Land is enumerable where
+# kinship is not, so the list is on the admitting side.
+#
+# IT IS WORTH 7 ACCEPTS AND 0 REFUSALS: 34/41 without it, 41/41 with it, 0/86
+# either way.
+#
+# A THIRD PERSON'S LAND IS REFUSED BY THE SAME LIST: "Fransa'da dayımın tarlası
+# var" carries `tarlasi`, not `tarlam`, so the possessive person does the work
+# no window could.
+_TR_OWNED_LAND = frozenset({
+    "tarlam", "tarlalarim", "arazim", "arazilerim", "ciftligim",
+    "ciftliklerim", "bahcem", "bahcelerim", "seram", "seralarim", "bagim",
+    "baglarim", "bostanim",
+})
 
 # HAZARD: `iste-` is first-person and is not a location. "Hollanda'da sera kurmak
 # istiyorum" is a plan, and it is the apostrophe-less twin of one of the three
 # sentences this guard exists to refuse.
 #
-# IT NO LONGER EARNS ITS PLACE AT THE SHIPPED WIDTH, and that is said here rather
-# than left for the next reader to discover. Re-measured 2026-10-03 over the 42
-# refusals, varying only this line: at _TR_CLAUSE_WORDS = 2 it changes nothing
-# (8/8 accepts, 0/42 either way), because `istiyorum` is the THIRD word of
-# "Hollanda'da sera kurmak istiyorum" and the window never reaches it. At 3, 4, 5
-# and 6 it is worth exactly that one sentence, every time. The earlier revision
-# of this comment claimed the measured admission unconditionally; it was true at
-# the width of the day and is kept, in corrected form, because it is what makes
-# the window safe to widen - the same bargain _TR_CLAUSE below is kept on.
+# IT NO LONGER EARNS ITS PLACE AT ANY WIDTH, and that is the inversion's doing
+# rather than a change here. Re-measured 2026-10-06 over 41 accepts and 86
+# refusals, varying only this line: with it and without it the guard scores
+# 41/41 and 0/86 at width 2 and 41/41 and 4/86 at widths 3 to 6 - identical in
+# every cell. The reason is that `istiyorum` is no longer
+# refused by distance: its stem `ist` is not in _TR_SELF_VERBS, so the verb
+# whitelist refuses "Hollanda'da sera kurmak istiyorum" wherever the window
+# reaches - `ist` is not in _TR_SELF_VERBS. The previous revision of this
+# comment measured the same line as worth exactly one refusal at widths 3 to 6,
+# and that was true of a guard that read a tense.
+#
+# IT IS KEPT, as window ECONOMY rather than as a refusal, and the claim is
+# downgraded rather than the line deleted: skipping a word that cannot be the
+# predicate leaves the window for the word that can, which is the same argument
+# _TR_SUBJECT_PRONOUN is kept on. It costs 0 accepts and 0 refusals measured
+# either way, so nothing here rests on it - and nothing is claimed for it.
 #
 # It SKIPS the word WITHOUT SPENDING THE WINDOW, so a sentence that states a
 # location and then wants something ("Fransa'da yasiyorum, bugday ekmek
@@ -979,45 +1099,53 @@ _TR_FIRST_PERSON = re.compile(r"(?:[iu]yor[iu][mz]|y[iu][mz])$")
 # NOT EXTENDED to the hearsay verbs `duy-`, `oku-`, `gor-`. They were the shape
 # "Fransa'da verim yuksek diye duydum" and "Hollanda'da sera gordum" take - the
 # locative belongs to an embedded clause or a finished action, not to the speaker
-# - and all of them are refused now by _TR_FIRST_PERSON dropping the past tense,
-# which is a tense rule rather than a word list. Adding them would be a list with
-# no measured failure left to justify it.
+# - and the whitelist refuses all of them by not holding them. A refusal list
+# beside an admission list would be two places to look for the same answer.
 _TR_VOLITIONAL = re.compile(r"ist[ei]")
 
-# TWO WORDS. Re-measured 2026-10-03 over the corpus the test suite now carries in
-# full - 42 refusals and 8 Turkish accepts (the two English ones are _SELF_EN's
-# and no window affects them) - varying only this:
+# TWO WORDS. Re-measured 2026-10-06 over 41 Turkish accepts and 86 refusals (the
+# six English accepts are _SELF_EN's and no window affects them), varying only
+# this:
 #
 #   window   accepted   wrongly admitted
-#     1        6/8            0/42
-#     2        8/8            0/42
-#     3        8/8           19/42
-#     4        8/8           24/42
-#     5        8/8           24/42
-#     6        8/8           24/42
+#     1       23/41          0/86
+#     2       41/41          0/86
+#     3       41/41          4/86
+#     4       41/41          4/86
+#     5       41/41          4/86
+#     6       41/41          4/86
 #
-# THE COLUMN GREW BECAUSE THE REFUSE SET DID, not because the window changed:
-# the fifteen sentences added this wave are the shape branch's own near misses
-# (see _TR_RESIDENT_PARTICIPLES), and twelve of them also have a predicate within
-# three or four words, so every widened row gained them.
+# THE REFUSE COLUMN COLLAPSED AGAINST THE PREVIOUS REVISION'S (19, 24, 24, 24 at
+# widths 3 to 6 over 42) and it is not because the width got safer: the verb
+# whitelist and the agent-noun copula now refuse those sentences by shape, so
+# widening the window no longer reaches a predicate it will accept. The WHOLE
+# width-3 row is four sentences whose third word is an agent-noun copula
+# belonging to someone else - "Fransa'da tanınan bir çiftçiyim", "Fransa'da
+# bilinen bir üreticiyim", "Hollanda'da satılan bir tohumcuyum", "Fransa'da
+# ödüllendirilen bir üreticiyim" - which the shape branch's participle whitelist
+# holds at width 2.
+#
+# AND WIDTH 1 COSTS 18 ACCEPTS NOW where it cost 2 before, because the verb
+# whitelist moved the burden onto the OBJECT: "Fransa'da buğday ekiyorum" and
+# "Fransa'da çiftçilik yapıyorum" put their predicate at word two, and a farmer
+# naming what he grows is the commonest accept there is. The width is cheap to
+# hold and expensive to narrow, which it was not before.
 #
 # WHAT THE WINDOW CANNOT SEE is WHOSE the locative is. This scan reads the first
-# first-person predicate in reach and never asks whether the place attaches to
-# the SUBJECT or to an OBJECT, so an intervening participle phrase rides in free:
+# admissible predicate in reach and never asks whether the place attaches to the
+# SUBJECT or to an OBJECT, so an intervening participle phrase rides in free:
 # "Fransa'da uretilen tohum kullaniyorum" has a first-person verb and the seed,
-# not the speaker, is in France. Eleven such sentences were measured; seven of
-# them reach a predicate at word 3 and three more at word 4. They are in
-# `test_a_locative_that_belongs_to_an_object_is_not_a_stated_location`. The rest
-# of the window-3 row is the fifteen added this wave, in `_SHAPE_NEAR_MISSES` -
-# the same defect one phrase along, since `bir dayim var` is a noun phrase with
-# the place attached to the uncle.
+# not the speaker, is in France. Eleven such sentences are in
+# `test_a_locative_that_belongs_to_an_object_is_not_a_stated_location`; the
+# fifteen in `_SHAPE_NEAR_MISSES` are the same defect one phrase along, since
+# `bir dayim var` is a noun phrase with the place attached to the uncle.
 #
-# SO THE WINDOW IS NOT THE REFUSE SET'S ONLY KEEPER ANY MORE, which is the
-# correction to the revision this comment replaces. That one measured 0/17 all
-# the way down the column and concluded the ending set held everything out and
-# the width was free; its refuse set simply had no participle sentence in it. On
-# the corpus with those eleven, two is the only width that is both free and
-# complete.
+# THE WINDOW IS NOT THE REFUSE SET'S ONLY KEEPER AND IT IS NO LONGER ITS MAIN
+# ONE. An earlier revision measured 0/17 all the way down this column and
+# concluded the ending set held everything and the width was free; its refuse set
+# had no participle sentence in it. Two is still the only width that is both free
+# and complete, and the honest reading of the small refuse column above is that
+# the width is now the cheapest of three rules rather than the load-bearing one.
 #
 # THAT OLD 17-REFUSAL SET IS FULLY ACCOUNTED FOR, and a worry recorded by an
 # earlier wave ("the 17th sentence is not written down anywhere") is closed
@@ -1059,25 +1187,27 @@ _TR_VOLITIONAL = re.compile(r"ist[ei]")
 #
 # Still refused, as at three and for other reasons: a location sentence whose
 # predicate sits further out - "Fransa'da uzun suredir ciftcilik yapiyorum" (4
-# words), "Fransa'da kucuk bir arazide ciftcilik yapiyorum" (5) - and "Fransa'da
-# bir ciftligim var", because `ciftligim` carries the bare nominal ending
-# _TR_FIRST_PERSON rejects and `var` is not first person at all.
+# words), "Fransa'da kucuk bir arazide ciftcilik yapiyorum" (5).
+#
+# "Fransa'da bir ciftligim var" USED TO BE NAMED HERE AS A WIDTH LOSS and is an
+# accept now, through _TR_OWNED_LAND rather than through a width: `ciftligim`
+# carries the bare possessive and `var` is not first person at all, so no window
+# could ever have reached it. It needed a shape, like the participle sentence.
 _TR_CLAUSE_WORDS = 2
 
 # The scan stops at a clause boundary as well as at the word count, because the
 # clause - not a span of two words - is the unit a predicate belongs to.
 #
-# IT IS LOAD-BEARING AT TWO NOW, which reverses what this comment said one wave
-# ago, and the thing it holds is an ACCEPT rather than a refusal. Re-measured
-# 2026-10-03 over 8 accepts and the 42 refusals, boundary on against off at each
-# width:
+# IT IS LOAD-BEARING AT TWO, and the thing it holds is an ACCEPT rather than a
+# refusal. Re-measured 2026-10-06 over 37 accepts and 92 refusals, boundary on
+# against off at each width:
 #
-#   window   with boundary        without
-#     2      8/8   0/42        7/8   0/42
-#     3      8/8  19/42        8/8  19/42
-#     4      8/8  24/42        8/8  27/42
-#     5      8/8  24/42        8/8  28/42
-#     6      8/8  24/42        8/8  29/42
+#   window   with boundary          without
+#     2      41/41   0/86        40/41   0/86
+#     3      41/41   4/86        41/41   4/86
+#     4      41/41   4/86        41/41   5/86
+#     5      41/41   4/86        41/41   5/86
+#     6      41/41   4/86        41/41   5/86
 #
 # THE LOST ACCEPT AT TWO is "Fransa'da yasayan bir ciftciyim, bugday mi
 # ekmeliyim": the shape branch requires the clause after the locative to be
@@ -1085,16 +1215,15 @@ _TR_CLAUSE_WORDS = 2
 # the message. So this regex is what lets the shape branch read a sentence that
 # continues past the statement of location - which is most of them.
 #
-# ON THE REFUSE SIDE it still starts earning its place at 4, where without it
-# "Fransa'da staj yaptim, bugday ekeyim mi" and "Hollanda'da sera gordum,
-# domates ekeyim mi" reach across the comma into the next clause's predicate,
-# plus "Fransa'da orman bir zenginliktir, ben ciftciyim" added this wave; and at
-# 6 it is also the only thing refusing "Amerika'da bugday fiyatlari nasil, ben
-# bugday ekeyim mi" - one of the three sentences this guard exists to refuse -
-# and "Almanya'da calisan bir arkadasim var, ona soruyorum".
+# ON THE REFUSE SIDE it starts earning its place at 4, where without it
+# "Fransa'da orman bir zenginliktir, ben ciftciyim" reaches across the comma into
+# the next clause's `ciftciyim`, and at 5 "Almanya'da calisan bir arkadasim var,
+# ona soruyorum" does the same. The past-tense sentences this comment used to
+# name here no longer need it at any width: the verb whitelist refuses `yaptim`
+# and `gordum` wherever the scan reaches them.
 _TR_CLAUSE = re.compile(r"[,;:.!?\n]")
 
-# Trailing punctuation would otherwise defeat the `$` in _TR_FIRST_PERSON:
+# Trailing punctuation would otherwise defeat the `$` in the two person tests:
 # "yasiyorum," is a word in `clause.split()` and does not end in `m`.
 _TR_WORD_TRIM = "'\"()-,;:.!?…"
 
@@ -1106,11 +1235,12 @@ _TR_WORD_TRIM = "'\"()-,;:.!?…"
 # the narrowing; it was not, and this is the cheaper half of that price bought
 # back.
 #
-# MEASURED FREE 2026-10-03 over 8 accepts and 42 refusals (the enlarged set, not
-# the one the earlier probe used): accepts 8/8, wrongly admitted 0/42. Skipping
-# it is safe for the reason skipping `ist[ei]` is not obviously safe: `ben` is a
-# single closed-class word with no noun that spells the same, where `ist[ei]` is
-# a prefix match on a verb stem.
+# MEASURED FREE AND WORTH ONE ACCEPT, re-measured 2026-10-06 over 41 accepts and
+# 86 refusals: with the skip 41/41 and 0/86, without it 40/41 and 0/86, and the
+# refuse column identical at every width from 2 to 6. Skipping it is safe for
+# the reason skipping `ist[ei]` is not obviously safe: `ben` is a single
+# closed-class word with no noun that spells the same, where `ist[ei]` is a
+# prefix match on a verb stem.
 #
 # "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi" - one of the three
 # sentences this guard exists to refuse - is unaffected, because its `ben` sits
@@ -1156,36 +1286,54 @@ _TR_SUBJECT_PRONOUN = "ben"
 #     "Fransa'da taninan bir ciftciyim" says he is known in France, not that he
 #     is there. `taninan`, `bilinen`, `aranan`, `satilan` all do this.
 #
-# SO THE BRANCH IS REBUILT ON TWO NARROWINGS THAT FAIL ON DISJOINT INPUTS, which
-# is this project's own rule for keeping two rules instead of swapping one for
-# the other. Measured 2026-10-03 over 8 accepts and 42 refusals, 16 of which
-# reach this branch's prefix (`-an/-en` then `bir`) and so can test it at all.
-# The suite carries every one of them, which is how the table is re-taken:
-# accepts in `test_a_locative_with_a_first_person_predicate_is_a_stated_location`
-# and `test_a_relative_clause_predicating_the_speaker_is_a_stated_location`,
-# refusals in `test_the_widened_branch_still_refuses_what_is_not_a_location`,
-# `_OBJECT_LOCATIVES`, `test_a_locative_with_a_past_tense_verb_...`,
-# `test_merely_naming_a_country_keeps_the_province_question` and
-# `_SHAPE_NEAR_MISSES`:
+# AND THE REVISION AFTER THAT ONE - two narrowings plus the shared
+# `_TR_FIRST_PERSON` of the day, now split into the two tests above -
+# CLOSED ONE CLASS AND LEFT ITS TWIN OPEN. Clause-final was credited with
+# holding the `bir dayim var` group, and it does: `var` makes that clause four
+# words. Take the verb away or close the clause with a comma and the clause is
+# exactly three words again, with `calisan` in the whitelist and `dayim`
+# matching the inherited `y[iu][mz]$`:
+#
+#   "Fransa'da calisan bir dayim, ona soruyorum"       -> True at 78b72a2
+#   "Almanya'da oturan bir dayim, bu yil ne eksem"     -> True at 78b72a2
+#   "Fransa'da oturan bir dayim. Bu yil bugday mi eksem" -> True at 78b72a2
+#
+# Ten such sentences are measured (`_SHAPE_NEAR_MISSES_CLOSED` in
+# tests/test_engine.py) and all ten reach the SHIPPED gate - which is what the
+# "both (shipped) 0/42" row of the table this replaces could not: NONE of its 42
+# refusals reached the gate it scored, so that zero could not fail.
+#
+# SO THE BRANCH CARRIES THREE NARROWINGS. Re-measured 2026-10-06 over 41 accepts
+# and 86 refusals, 26 of which reach this branch's LOOSE prefix (`-an/-en` then
+# `bir`) and 10 its SHIPPED gate:
 #
 #   shape branch form                          accepts   wrongly admitted
-#   both narrowings off (the old branch)          8/8          12/42
-#   whitelist only, clause-final off              8/8           3/42
-#   clause-final only, any `-an/-en` word         8/8           5/42
-#   both (shipped)                                8/8           0/42
+#   all three off (the branch at 78b72a2)        41/41         22/86
+#   participle whitelist off                     41/41          4/86
+#   clause-final off                             41/41          0/86
+#   person test loose (`y[iu][mz]$`)             41/41         10/86
+#   all three on (shipped)                       41/41          0/86
 #
-#  * CLAUSE-FINAL (the clause after the locative is exactly these three words)
-#    closes class one - the three `bir dayim var` sentences the whitelist alone
-#    leaves. A Turkish copular predicate ENDS its clause; a possessed noun is
-#    followed by its own predicate - `bir dayim VAR`, `bir sayim GORDUM`. It does
-#    not close class two, where the sentence does end on the `-yIm` word.
-#  * THE PARTICIPLE WHITELIST closes class two - the five `taninan bir ciftciyim`
-#    sentences clause-final alone leaves - and does not close class one, because
-#    `calisan` and `oturan` are in it and "bir dayim var" follows them happily.
+#  * THE AGENT-NOUN PERSON TEST is the narrowing that earns its place here now,
+#    and it is worth 10 of the 86: the ten comma-closed `bir dayim` sentences
+#    satisfy both of the other two. `c[iu]y[iu][mz]$` admits `ciftciyim` and
+#    `isciyim` and refuses `dayim`, `tayim`, `koyum`, `sayim` - see
+#    _TR_AGENT_PERSON for why no lexicon-free test does better.
+#  * THE PARTICIPLE WHITELIST holds four `taninan bir ciftciyim` sentences, where
+#    the participle's event happens in the country and the speaker need not be
+#    there. It is the only one of the three the WINDOW also depends on: those
+#    same four are the whole width-3 row at _TR_CLAUSE_WORDS.
+#  * CLAUSE-FINAL IS WORTH NOTHING ON THIS CORPUS, 0 of 86, and that is a
+#    correction to the row above it in the table this replaces. It held the `bir
+#    dayim var` group there; the agent-noun test holds that group now, so the two
+#    no longer fail on disjoint inputs. It is KEPT rather than removed, because
+#    it costs 0 accepts and a second hold on the class K2 lives in is worth
+#    having on a branch that has been got wrong four times - but nothing in this
+#    module rests on it and this comment no longer claims it does.
 #
-# The two leak sets above are DISJOINT and together are the whole 12. Neither
-# rule covers for the other, so both are kept; the three waves before this one
-# each replaced a rule here and each closed one class while reopening another.
+# All three are kept; the four waves before this one each replaced a rule here
+# and each closed one class while reopening another. 4 + 0 + 10 = 14 against 22
+# for all three off, so the three holds overlap on 8 sentences.
 #
 # WHY THE PARTICIPLES ARE A LIST. The obvious rule is morphological - refuse the
 # PASSIVE participle, since `satilan`/`uretilen`/`taninan`/`bilinen` are all
@@ -1197,15 +1345,16 @@ _TR_SUBJECT_PRONOUN = "ben"
 # because no natural first-person sentence needed it and a member nothing pins is
 # a member nothing measures.
 #
-# THE PERSON TEST IS INHERITED, NOT COPIED. `_TR_FIRST_PERSON` is the measured
-# test on this path and it owns the nominal-`-Im` / personal-`-yIm` distinction
-# and the tense table behind it; the old branch wrote its own loose copy of the
-# `y[iu][mz]` half and that copy is where the defect lived. There is now one
-# first-person test in this module.
+# THE PERSON TEST IS SHARED, NOT COPIED. `_TR_AGENT_PERSON` is the copular test
+# for both branches that read one, so the nominal-`-Im` / agent-`-cIyIm`
+# distinction lives in one place. The revision before the last one wrote its own
+# loose copy of `y[iu][mz]` here and that copy was where the defect lived; the
+# last one inherited a shared test that could not make the distinction at all.
 #
-# WHAT THE TWO NARROWINGS COST, measured and given up knowingly:
+# WHAT THE THREE NARROWINGS COST, measured and given up knowingly:
 #   refuse  Fransa'da yasayan bir ciftciyim ve bugday ekiyorum   (clause-final)
 #   refuse  Fransa'da yerlesen bir ciftciyim                     (whitelist)
+#   refuse  Fransa'da yasayan bir ciftlik sahibiyim              (agent noun)
 # The comma form of the first is an accept ("...ciftciyim, bugday mi ekmeliyim"),
 # because `_TR_CLAUSE` ends the clause there; it is `ve` that is not a boundary.
 _TR_RESIDENT_PARTICIPLES = frozenset({"yasayan", "calisan", "oturan"})
@@ -1221,13 +1370,86 @@ _TR_SHAPE_WORDS = 3
 # enumerated first-person subject counts here, and `from` is admitted beside
 # `in`/`at` because after one of these subjects it predicates the speaker
 # ("I am from Kenya") rather than a purchase.
+#
+# `my farm is in` / `my field is in` / `our farm is in` WERE ADDED THIS WAVE and
+# they are the same whitelist logic one step along: the subject is a possessed
+# noun rather than a pronoun, but it is the speaker's own holding, so the place
+# it sits in is the speaker's. The possessive is what does the work -
+# "my supplier is in France" and "my uncle lives in France" are refused, because
+# the thing possessed is a person somewhere else.
+#
+# IT HAD NO REFUSE SET AT ALL BEFORE THIS WAVE, which is why it is the only
+# branch on this path that was never measured in the refusing direction: the
+# Turkish side carried ~50 cases against the same OR and the English side
+# carried two accepts. Fifteen refusals are pinned now
+# (`_ENGLISH_NOT_A_LOCATION` in tests/test_engine.py) in four classes - merely
+# naming, somebody else's place, a finished action and a market - and the branch
+# admits 0 of them. ELEVEN of the fifteen name a country `extract_country`
+# actually resolves, which is the number that belongs beside that zero: the
+# other four are refused by country.py before this pattern is reached, so they
+# test nothing here.
 _SELF_EN = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
-            r"|i\s+farm|we\s+farm)(?:\s+based)?\s+(?:in|at|from)\s+")
+            r"|i\s+farm|we\s+farm|my\s+farm\s+is|our\s+farm\s+is"
+            r"|my\s+field\s+is|my\s+fields\s+are)(?:\s+based)?"
+            r"\s+(?:in|at|from)\s+")
+
+# THE ASSISTANT'S OWN LOCATION QUESTION, recognised in its reply's history.
+#
+# A MESSAGE THAT IS NOTHING BUT THE COUNTRY NAME predicates nobody - it is a
+# noun - and it was admitted unconditionally until this wave on the argument
+# that it is "the natural reply to `hangi ulkedesiniz?`". That argument is right
+# about the reply and wrong about the message: the SAME one-word message is also
+# the natural reply to "hangi urunu dusunuyorsunuz?", and `Mısır` is Egypt and
+# maize at once. Measured at 78b72a2: `_states_location("Mısır", aliases(59))`
+# is True, so a grower answering the crop question with `mısır` was moved to
+# Egypt - and because `_country_lines` asks EVERY user turn, he stayed there for
+# the rest of the conversation and was handed Egypt's wheat figures on the next
+# question. `Çin`, `mısır` and `Mısır.` behave the same way.
+#
+# SO THE BRANCH IS GATED ON THE CONVERSATION rather than on the message, and
+# that is the one place in this guard where context is the evidence: the bare
+# name counts only when the assistant's immediately preceding turn asked the
+# user where they are.
+#
+# WHAT THIS PATTERN LOOKS FOR, and why it is a place-word list and not a
+# question mark. The crop-choice block tells the model "cevabinda hangi ilde
+# oldugunu sor", so the question is generated, not fixed, and it arrives in the
+# history as free Turkish - "Hangi ilde oldugunuzu soyler misiniz?", "Oncelikle
+# hangi ildesiniz?", "Hangi il veya bolgede tarim yapiyorsunuz?", "Nerede
+# yasiyorsunuz?". What every form of it contains is a PLACE interrogative, so
+# that is what is matched, on folded text. A question mark is NOT required: the
+# imperative form ("Lutfen hangi ilde oldugunuzu belirtin.") asks just as
+# plainly, and requiring `?` would have made the gate depend on the model's
+# punctuation.
+#
+# THE SUFFIX ALTERNATION IS CLOSED ON PURPOSE, because `hangi il` is a prefix of
+# `hangi ilac`: "Hangi ilaci kullaniyorsunuz?" is an ordinary question in this
+# assistant and must not open the branch. `il` followed by `a` matches no
+# alternative and fails the trailing `(?!\w)`, so it is refused; `hangi ilde`,
+# `hangi ildesiniz` and `hangi il/bolgede` all match.
+#
+# WHAT IT STILL ADMITS THAT IT SHOULD NOT, named rather than left to be found:
+# a turn that MENTIONS a place word without asking for one, e.g. "Hangi ilcede
+# oldugunuz onemli degil, urun neydi?". The next one-word reply would be read as
+# a location. This is the gate's own near miss, and the crop-collision rule
+# below is what keeps the worst case of it - a crop name - out anyway. The two
+# rules are kept together for that reason: this one fails on an assistant turn
+# that only mentions a place, that one fails on a country that is not a crop.
+_ASKED_WHERE = re.compile(
+    r"(?<!\w)(?:"
+    r"hangi\s+(?:il|ilde|ildesiniz|ilce|ilcede|ilcedesiniz|sehir|sehirde"
+    r"|sehirdesiniz|ulke|ulkede|ulkedesiniz|bolge|bolgede|bolgedesiniz"
+    r"|yer|yerde|koy|koyde)(?!\w)"
+    r"|nerede(?:siniz|sin)?(?!\w)"
+    r"|nereli(?:siniz|sin)?(?!\w)"
+    r"|il(?:iniz|inizi|inizde)(?!\w)"
+    r")"
+)
 
 # Same trim set src/context/country.py uses, for the same one reason: a message
-# that is NOTHING BUT the country name is the natural reply to "hangi
-# ulkedesiniz?", and that reply is a statement of location even though it carries
-# no suffix at all.
+# that is NOTHING BUT the country name is the natural reply to a question about
+# where the user is, and that reply is a statement of location even though it
+# carries no suffix at all. See _ASKED_WHERE for the question it has to follow.
 _SELF_TRIM = " \t\n\r.,!?;:()\"'-…"
 
 
@@ -1249,13 +1471,50 @@ def _code_aliases(code: int) -> tuple[str, ...]:
                  if area == code)
 
 
+def _clause_words(folded: str, pos: int) -> list[str]:
+    """The words of the clause opening at `pos`, trimmed of punctuation.
+
+    One reader of `_TR_CLAUSE` and `_TR_WORD_TRIM` for the three branches that
+    need it, so the clause is cut the same way for all of them - the shape
+    branch and the window branch used to cut it with two copies of this.
+    """
+    clause = _TR_CLAUSE.split(folded[pos:], maxsplit=1)[0]
+    return [word for word in (raw.strip(_TR_WORD_TRIM)
+                              for raw in clause.split()) if word]
+
+
+def _self_predicate(word: str, previous: str) -> bool:
+    """Whether `word` is a first-person predicate that puts the SPEAKER in the
+    place a locative just named.
+
+    TWO ADMISSIONS AND NOTHING ELSE, which is the inversion: a copula on an
+    agent noun (`ciftciyim`), or the present continuous of a residence or
+    cultivation verb (`yasiyorum`, `ekiyorum`, `<activity> yapiyorum`). See
+    _TR_AGENT_PERSON and _TR_SELF_VERBS for what each one refuses and costs.
+
+    `previous` is the word before this one, needed only for `yap-`, which takes
+    its meaning from its object. It is the previous word in the CLAUSE, not the
+    previous word the window counted, so an activity noun skipped for any reason
+    still licences its verb.
+    """
+    if _TR_AGENT_PERSON.search(word):
+        return True
+    verb = _TR_VERBAL_PERSON.match(word)
+    if verb is None:
+        return False
+    stem = verb.group(1)
+    if stem in _TR_SELF_VERBS:
+        return True
+    return stem == "yap" and previous in _TR_SELF_ACTIVITIES
+
+
 def _first_person_follows(folded: str, pos: int) -> bool:
-    """Whether the clause opening at `pos` has a first-person predicate in its
-    first `_TR_CLAUSE_WORDS` words.
+    """Whether the clause opening at `pos` has a first-person SELF predicate in
+    its first `_TR_CLAUSE_WORDS` words.
 
     `pos` is the end of a locative that ended its word, so this answers "is the
     thing in that place the SPEAKER" - see _TR_CLAUSE_WORDS for the measured
-    width and what it costs.
+    width and what it costs, and `_self_predicate` for which predicates count.
 
     EVERY OCCURRENCE IS ASKED by the caller, not just the first: "Fransa'da
     fiyatlar yuksek, Fransa'da yasiyorum" has two locatives and only the second
@@ -1264,71 +1523,151 @@ def _first_person_follows(folded: str, pos: int) -> bool:
     TWO WORDS ARE SKIPPED WITHOUT SPENDING THE WINDOW - the bare subject pronoun
     and the volitional stem. Each has its own comment above; what they share is
     that neither can be the predicate this scan is looking for, so counting them
-    would only push the predicate out of reach. The earlier revision sliced the
+    would only push the predicate out of reach. An earlier revision sliced the
     clause to `_TR_CLAUSE_WORDS` words BEFORE skipping, so a skipped word still
     cost a slot; that is what made "Fransa'da ben bugday ekiyorum" a refusal.
     """
-    clause = _TR_CLAUSE.split(folded[pos:], maxsplit=1)[0]
     taken = 0
-    for word in clause.split():
-        word = word.strip(_TR_WORD_TRIM)
-        if not word or word == _TR_SUBJECT_PRONOUN or _TR_VOLITIONAL.match(word):
+    previous = ""
+    for word in _clause_words(folded, pos):
+        if word == _TR_SUBJECT_PRONOUN or _TR_VOLITIONAL.match(word):
+            previous = word
             continue
         taken += 1
         if taken > _TR_CLAUSE_WORDS:
             return False
-        if _TR_FIRST_PERSON.search(word):
+        if _self_predicate(word, previous):
             return True
+        previous = word
     return False
+
+
+def _owned_land_follows(folded: str, pos: int) -> bool:
+    """Whether the clause opening at `pos` says the speaker HAS worked land
+    there - `<land noun carrying -Im> var`, adjacent.
+
+    The whole clause is read rather than a window, because the amount comes
+    first in Turkish ("Fransa'da 30 donum tarlam var") and no width that reaches
+    `tarlam` there refuses `bir dayim var`. Adjacency to `var` is what carries
+    it instead, and the noun list is what tells land from kinship - see
+    _TR_OWNED_LAND, where both are measured.
+    """
+    words = _clause_words(folded, pos)
+    return any(owned in _TR_OWNED_LAND and following == "var"
+               for owned, following in zip(words, words[1:]))
 
 
 def _relative_clause_self(folded: str, pos: int) -> bool:
     """Whether the clause opening at `pos` is `<residence participle> bir
-    <first-person predicate>` and nothing else - the one participle shape that
-    puts the SPEAKER in the place rather than an object.
+    <agent-noun copula>` and nothing else - the one participle shape that puts
+    the SPEAKER in the place rather than an object.
 
     `pos` is the end of a locative that ended its word, the same input
-    `_first_person_follows` takes, and the caller asks both of every occurrence.
+    `_first_person_follows` takes, and the caller asks all three of every
+    occurrence.
 
-    See _TR_RESIDENT_PARTICIPLES for the measured table, the three classes the
-    regex this replaces admitted, and what the two narrowings here cost.
+    See _TR_RESIDENT_PARTICIPLES for the measured table, the classes the two
+    regexes this replaces admitted, and what the three narrowings here cost.
     """
-    clause = _TR_CLAUSE.split(folded[pos:], maxsplit=1)[0]
-    words = [word for word in (raw.strip(_TR_WORD_TRIM)
-                               for raw in clause.split()) if word]
+    words = _clause_words(folded, pos)
     if len(words) != _TR_SHAPE_WORDS:
         return False
     participle, article, predicate = words
     if participle not in _TR_RESIDENT_PARTICIPLES or article != "bir":
         return False
-    return bool(_TR_FIRST_PERSON.search(predicate))
+    return bool(_TR_AGENT_PERSON.search(predicate))
 
 
-def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
+def _asked_where(text: str) -> bool:
+    """Whether an assistant turn asked the user where they are.
+
+    See _ASKED_WHERE for what it matches, why a question mark is not required,
+    and the near miss it still admits.
+    """
+    return bool(_ASKED_WHERE.search(_normalize_tr(text or "")))
+
+
+def _last_assistant(turns: list[dict]) -> str:
+    """The content of the last assistant turn in `turns`, or "".
+
+    Walked backwards rather than filtered, because only the LAST one is the
+    question a reply answers - an earlier province question in the same
+    conversation was already answered or already abandoned.
+    """
+    for turn in reversed(turns):
+        if turn.get("role") == "assistant":
+            return turn.get("content", "") or ""
+    return ""
+
+
+def _is_a_crop_name(folded: str) -> bool:
+    """Whether this whole folded text is itself the name of a crop family.
+
+    THE OTHER HALF OF THE BARE-NAME GATE, and it is kept beside the
+    conversational one rather than instead of it, because the two fail on
+    disjoint inputs: the assistant's crop question and its province question
+    arrive in the SAME generated turn more often than not - the block asks for
+    the province and then lists six other things to ask about - so a turn that
+    asks where the user is usually also asks what they plan to plant. Measured
+    over the shipped tables: of 187 crop family names and 418 folded country
+    alias keys, exactly ONE name is both - `misir`, maize and Egypt - and all
+    seven one-word spellings of it (`Mısır`, `mısır`, `MISIR`, `Mısır.`,
+    `misir`, `Mısır?`, padded) resolve to it.
+
+    Asked of `_named_crops`, the module's one crop detector, rather than of a
+    second folded family table: two definitions of "is a crop name" is exactly
+    the drift `_code_aliases` exists to avoid on the country side. It is only
+    ever reached on a message that IS one country name, so the detector runs on
+    one word.
+
+    `_named_crops` never raises - a detector failure returns () - so a broken
+    crop table reads as "not a crop name" and the gate falls back to the
+    conversational test alone.
+    """
+    return any(_normalize_tr(re.split(r"\s*[(,]", name)[0].strip()) == folded
+               for name in _named_crops(folded))
+
+
+def _states_location(text: str, aliases: tuple[str, ...],
+                     asked: bool = False) -> bool:
     """Whether `text` says the SPEAKER is in the country `aliases` names.
 
+    A WHITELIST: every branch below is a shape that predicates the speaker, and
+    anything that matches none of them is refused. See _SELF_TR for why the test
+    is inverted and which classes the refuse-list revisions left open.
+
     One text, not a conversation: the caller decides which texts to ask about.
+    `asked` is the one thing this function cannot read off its own text - whether
+    the assistant's immediately preceding turn asked the user where they are -
+    and it is needed by the bare-name branch alone. It defaults False, so a
+    caller that does not track the conversation gets the strict reading.
     """
     folded = _normalize_tr(text or "")
     if not folded:
         return False
     whole = folded.strip(_SELF_TRIM)
     for name in aliases:
-        if whole == name:
+        # THE BARE NAME, gated twice: the assistant must have asked where the
+        # user is, and the name must not also be a crop's. See _ASKED_WHERE and
+        # _is_a_crop_name - neither gate covers for the other.
+        if whole == name and asked and not _is_a_crop_name(whole):
             return True
         key = re.escape(name)
         if re.search(rf"(?<!\w){key}{_SELF_TR}", folded):
             return True
-        # The second and third Turkish branches share this scan, because both
-        # read the clause that OPENS at a locative and both must be asked of
-        # every occurrence: case ending on the name with the person on the verb,
-        # and the one participle shape that places the SPEAKER rather than an
-        # object. The second reads a distance, the third a shape - see
-        # _TR_CLAUSE_WORDS and _TR_RESIDENT_PARTICIPLES.
+        # The three locative branches share this scan, because all three read
+        # the clause that OPENS at a locative and all three must be asked of
+        # every occurrence: the case ending on the name with a self predicate
+        # near it, the one participle shape that places the SPEAKER, and owned
+        # land. The first reads a distance, the second a shape, the third an
+        # adjacency - see _TR_CLAUSE_WORDS, _TR_RESIDENT_PARTICIPLES and
+        # _TR_OWNED_LAND.
         for match in re.finditer(rf"(?<!\w){key}{_TR_LOCATIVE}", folded):
             if _first_person_follows(folded, match.end()):
                 return True
             if _relative_clause_self(folded, match.end()):
+                return True
+            if _owned_land_follows(folded, match.end()):
                 return True
         if re.search(rf"{_SELF_EN}{key}(?!\w)", folded):
             return True
@@ -1398,10 +1737,10 @@ def _shared_item_label(crop_ids: list[str], answering: str) -> str | None:
     leave the third case. 331 is still reproducible by asking this question of
     the old first-match candidate, which is not the one the caller passes.
 
-    `Bakla, Kuru (Yemlik)` was the
-    worst of them, because data/crop_fao_map.json's own note on item 181 says
-    FAOSTAT does not separate food-grade broad beans from feed-grade ones - so
-    the printed name was contradicted by the map that supplied the figure.
+    `Bakla, Kuru (Yemlik)` was the worst of them, because
+    data/crop_fao_map.json's own note on item 181 says FAOSTAT does not separate
+    food-grade broad beans from feed-grade ones - so the printed name was
+    contradicted by the map that supplied the figure.
 
     THE LABEL COMES FROM data/world_norms.json's `items` TABLE, which carries
     FAOSTAT's name for every item it ships figures for - `{"401": {"label":
@@ -1470,6 +1809,21 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
     guard's refuse set against any new branch BEFORE widening it - see
     _TR_RESIDENT_PARTICIPLES, where a 0-of-27 result turned out to mean that 26
     of the 27 could not reach the rule being measured.
+
+    AND IT IS WHY THAT GUARD IS A WHITELIST NOW. Four waves patched it as a
+    refuse-list and each one left a class open; the bare-name class in
+    particular was invisible for exactly the reason above, since `Mısır` as a
+    whole message names no crop this function would have printed before the
+    figure-less line existed. See _SELF_TR for the inversion and the four
+    classes it closed.
+
+    EACH TURN IS ASKED WITH ITS OWN QUESTION CONTEXT, which is the one thing
+    `_states_location` cannot read off its own text. The bare-name branch counts
+    only after the assistant asked where the user is, so the current message is
+    asked against the last assistant turn in the history and a history user turn
+    against the assistant turn in front of IT. One flag for the whole
+    conversation would let a province question asked at the end licence a bare
+    crop name typed at the start.
 
     THE FIGURE-LESS LINE DOES NOT SAY "FAOSTAT" and does not ask the answer to
     carry FAOSTAT's spelling, which the full first line does. The parenthesis
@@ -1577,10 +1931,20 @@ def _country_lines(message: str, history: list[dict] | None) -> list[str]:
         # Assistant turns are skipped for the reason country.extract_country
         # skips them: the assistant names countries while answering, and reading
         # its own words back would place the grower wherever its last example was.
-        said = [message] + [turn.get("content", "")
-                            for turn in reversed(history or [])
-                            if turn.get("role") == "user"]
-        if not any(_states_location(text, aliases) for text in said):
+        # EACH TURN CARRIES ITS OWN QUESTION CONTEXT, because the bare-name
+        # branch is the one shape whose evidence is the turn BEFORE it: the
+        # current message's context is the last assistant turn in the history,
+        # and a history user turn's context is the assistant turn in front of
+        # it. Carrying one flag for the whole conversation would let a province
+        # question asked at the end licence a bare crop name typed at the start.
+        turns = list(history or [])
+        said = [(message, _asked_where(_last_assistant(turns)))]
+        for index in range(len(turns) - 1, -1, -1):
+            if turns[index].get("role") == "user":
+                said.append((turns[index].get("content", ""),
+                             _asked_where(_last_assistant(turns[:index]))))
+        if not any(_states_location(text, aliases, asked)
+                   for text, asked in said):
             return []
 
         # FROM HERE THE LOCATION IS SETTLED, SO THE PROVINCE QUESTION IS WRONG
