@@ -162,9 +162,23 @@ class NormValue:
     recent_max: float | None = None
     # FAOSTAT's provenance letter for THIS cell - "A" a country's own report,
     # "E" FAO's estimate, "X" an outside organization, "B" a series break, "I"
-    # imputed; data/world_norms.json's meta.flags glosses all five. 41,3% of the
-    # shipped yield cells carry "E", so a world figure printed without it would
-    # be attributed to a country that never reported it.
+    # imputed; data/world_norms.json's meta.flags glosses all five.
+    #
+    # 51,3% OF THE YIELD CELLS THAT ARE ACTUALLY PRINTED carry "E", so a world
+    # figure printed without it would be attributed to a country that never
+    # reported it. The population matters and an earlier revision of this
+    # comment measured the wrong one: it said 41,3%, which is 29.842 of the
+    # 72.335 non-null yield cells in the file and exactly right as arithmetic -
+    # but `_pick_world` only ever returns the LATEST non-null cell of a series,
+    # and over those 8.453 cells "E" is 4.333, 51,3%. The claim this number
+    # supports is about printed figures, so the printed set is the one to count.
+    # True as stated and measuring the wrong set is the "almost true" class this
+    # project names as its recurring defect.
+    #
+    # THE PRICE TABLE IS A DIFFERENT STORY and is not covered by either figure:
+    # of its 33.209 non-null cells none is "E" at all (33.163 "A", 43 "B", 3
+    # "I"), and all 4.673 printed cells are "A". So the estimate gloss is a
+    # yield-side concern today.
     #
     # None for every TÜİK figure: that file publishes no per-cell flag. None
     # therefore means "this source carries no flag", NEVER "official" - a

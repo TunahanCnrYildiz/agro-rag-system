@@ -588,7 +588,12 @@ supplies the contract, not the implementation:
 Measured and already settled, so do not spend effort re-deriving: `location.py`'s
 existing `(?<!\w)` plus strict-suffix guards already block `fas` inside
 `burkina fasoda` and `uk` inside `arnavutlukta`. Reuse them; the alias table's
-34 substring pairs are handled by the longest-first ordering you inherit.
+78 substring pairs — 35 of them pointing at two different countries, 43 one
+country's own aliases — are handled by the longest-first ordering you inherit.
+(This plan said 34 until commit `2526ab6` counted them: the code, the `_ORDERED`
+comment, `_matchers`' docstring and
+`test_the_substring_pair_count_the_ordering_is_justified_by` all say 78/35, and
+this line was the last place the retired number survived.)
 
 - [ ] **Step 4: Run the tests**
 
