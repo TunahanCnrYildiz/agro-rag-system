@@ -28,7 +28,7 @@ from functools import lru_cache
 
 from src import norms
 from src.budget import FieldError, format_qty, format_tr
-from src.engine import _TR_SUFFIXES, _normalize_tr
+from src.engine import _TR_SUFFIXES, _family_head, _label_head, _normalize_tr
 
 
 @lru_cache(maxsize=1)
@@ -49,7 +49,7 @@ def _families() -> tuple[tuple[str, str], ...]:
     """
     out: dict[str, str] = {}
     for _crop_id, label in norms.available_crops():
-        family = re.split(r"\s*[(,]", label)[0].strip()
+        family = _label_head(label)
         if family:
             out.setdefault(_normalize_tr(family), family)
     return tuple(sorted(out.items(), key=lambda item: -len(item[0])))
@@ -141,7 +141,7 @@ def _not_this_plant() -> tuple[str, ...]:
     families = dict(_families())
     harvest: dict[str, set[str]] = {}          # name -> its source labels' own
     for _crop_id, label in norms.available_crops():
-        own = _normalize_tr(re.split(r"\s*[(,]", label)[0].strip())
+        own = _family_head(label)
         pieces = [inner for inner in _LABEL_VARIANT.findall(label)
                   if "Hariç" not in inner]    # a clause, read by the next line
         pieces += _LABEL_EXCLUSION.findall(label)

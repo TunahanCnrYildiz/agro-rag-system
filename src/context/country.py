@@ -362,6 +362,23 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # branch got wrong. A person's name never stands after `in`, so the removal is
 # cheap and it should be its own change with its own measurement.
 #
+# RE-MEASURED 2026-10-06, after the guard was cut to two patterns, and the lead
+# is SHARPER now rather than weaker - the decision is still to keep, and this is
+# what it costs and buys at today's tip:
+#   * what it costs: `extract_country("i am in jordan")` and `("i am in chad")`
+#     are None, so a lowercase English self-declaration naming either country
+#     gets no figures at all. Capitalised, both resolve.
+#   * what it buys: NOTHING reachable. "Jordan said the yield in Jordan is low"
+#     resolves 112, and `extract_country` has exactly ONE caller - inside
+#     `_country_lines`, behind `engine._states_location`, which refuses that
+#     sentence because no person suffix sits on the name. So the misreading the
+#     gate exists to prevent cannot reach a user today.
+# It is kept all the same, on the same argument and not a new one: removing it
+# widens recall, and this wave DELETED rules from the guard that reads this
+# module. Widening the resolver in the wave that strips its reader is the exact
+# shape of the mistake three earlier waves made. Pinned as a cost by
+# `test_the_capital_gate_on_chad_and_jordan_costs_their_lowercase_typists`.
+#
 # HAND-KEPT, and it has to be: this is a claim about English vocabulary, and no
 # property of the alias table can derive it. A new alias that is also an English
 # noun stays unguarded until it is added here.

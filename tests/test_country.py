@@ -718,3 +718,31 @@ def test_area_zero_would_be_an_answer_not_a_miss(monkeypatch):
     monkeypatch.setattr(country_ctx, "_find", only_history)
     assert extract_country("buğday mı ekmeliyim",
                            [{"role": "user", "content": "Fransa'dayım"}]) == 0
+
+
+def test_the_capital_gate_on_chad_and_jordan_costs_their_lowercase_typists():
+    """A LEAD PINNED AS A COST, so the next wave to pick it up starts from a
+    measurement rather than from prose. `chad` and `jordan` sit in
+    `_AMBIGUOUS_EN` on a weaker claim than the other eight: they are proper
+    nouns of OTHER referents - a given name, a surname - so a capital letter
+    cannot separate them from the country, and measured, it does not try.
+
+    What the gate costs is here: the lowercase English self-declaration. What it
+    buys is nothing reachable - "Jordan said the yield in Jordan is low"
+    resolves, but `extract_country`'s one caller sits behind
+    `engine._states_location`, which refuses that sentence outright.
+
+    KEPT ANYWAY, and the reason is process rather than measurement: removing
+    these two WIDENS this module's recall, and the wave that wrote this test
+    deleted five rules from the guard that reads it. Three earlier waves on this
+    branch widened and narrowed in the same commit and each one reopened a class
+    it had just closed."""
+    assert extract_country("I am in Jordan") == 112
+    assert extract_country("I am in Chad") == 39
+    assert extract_country("i am in jordan") is None
+    assert extract_country("i am in chad") is None
+    # And the misreading the gate exists for is held by the guard, not here.
+    from src import engine
+    assert extract_country("Jordan said the yield in Jordan is low") == 112
+    assert not engine._states_location("Jordan said the yield in Jordan is low",
+                                       engine._code_aliases(112))

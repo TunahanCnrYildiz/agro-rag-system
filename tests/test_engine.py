@@ -2,6 +2,7 @@
 embedding clients are all monkeypatched)."""
 
 import json
+import re
 from datetime import date
 
 from src import engine
@@ -1515,6 +1516,68 @@ def test_crop_choice_block_asks_for_the_province_when_missing():
     assert "toprak" in out and "ONERME" in out
 
 
+def test_the_location_question_asks_for_the_country_in_a_shape_the_guard_accepts():
+    """THE RECOVERY FOR THE DELETED BARE-NAME BRANCH, and the one thing that
+    makes the 39 surrendered accepts survivable: the question itself steers the
+    reply into the only Turkish shape the guard still reads.
+
+    A grower outside Turkiye cannot answer "which province", and since this wave
+    a bare "Fransa" is not an answer either. So the question asks for the country
+    AND SHOWS THE SPELLING - "Fransa'dayim" is `_SELF_TR`'s own pattern, written
+    out rather than described because a model copies an example and paraphrases
+    an instruction.
+
+    The example is asserted against the guard rather than quoted, so the two can
+    never drift: if the pattern narrows, this fails."""
+    assert "Fransa'dayim" in engine._ASK_LOCATION
+    assert engine._states_location("Fransa'dayim", engine._code_aliases(68))
+    assert "hangi ilde" in engine._ASK_LOCATION
+    assert "ulkesini" in engine._ASK_LOCATION
+
+
+def test_both_routes_ask_the_location_question_in_the_same_words():
+    """ONE STRING, TWO ROUTES. It used to be written out at both call sites, and
+    not identically - the fert_plan copy carried ", tavsiyeni genel tut." and the
+    crop_choice one did not, so the brief that ordered this change described them
+    as the same string when they were not. They are the same string now.
+
+    `_ASK_LOCATION` DOES NOT CONTAIN "Turkiye disinda", deliberately: that is the
+    phrase the block prints when a country IS settled, and four tests assert it
+    is absent from a block that is still asking. One substring with two meanings
+    would make those four pass for the wrong reason."""
+    fert = engine._context_block("fert_plan", "Domatese ne zaman gubre versem?",
+                                 None, date(2026, 8, 10))
+    crop = engine._context_block("crop_choice", "Bu yil ne eksem?", None,
+                                 date(2026, 8, 10))
+    assert engine._ASK_LOCATION in fert
+    assert engine._ASK_LOCATION in crop
+    assert "Turkiye disinda" not in engine._ASK_LOCATION
+
+
+def test_the_label_fold_is_one_function_and_not_six_copies():
+    """`re.split(r"\\s*[(,]", label)[0].strip()` was written out SIX times - three
+    in src/engine.py, two in src/crop_compare.py, and a sixth added one wave ago
+    inside the country guard's crop-collision gate, which this wave deleted.
+
+    They diverge in the dangerous direction. The folded form answers "is this
+    label this family's", so a split set that stops matching reads as "not this
+    crop" - and on the gate that held the sixth copy, "not a crop" meant PLACE
+    THE USER. The module argues against exactly this twenty lines from one of the
+    copies, in `_code_aliases`' docstring.
+
+    Pinned on the three label shapes the shipped table actually holds: a bare
+    family name, an exclusion clause, and a parenthetical variant."""
+    from src import crop_compare
+    assert engine._label_head("Fasulye") == "Fasulye"
+    assert engine._label_head("Buğday, Durum Buğdayı Hariç") == "Buğday"
+    assert engine._label_head("Domates (Salçalık)") == "Domates"
+    assert engine._family_head("Buğday, Durum Buğdayı Hariç") == "bugday"
+    assert engine._family_head("Domates (Salçalık)") == "domates"
+    # And crop_compare reads the same two functions rather than its own copies.
+    assert crop_compare._label_head is engine._label_head
+    assert crop_compare._family_head is engine._family_head
+
+
 def test_crop_choice_block_carries_the_season():
     """The month comes from `today`, not from the clock, so this is stable."""
     out = engine._context_block(
@@ -2061,124 +2124,76 @@ def test_a_stated_foreign_location_still_replaces_the_question():
     assert "France" in block
 
 
-# The accepts the window branch and the suffix branch carry, as a named list.
-_WINDOW_ACCEPTS = [
-    # The copula fused to the name's own suffix.
+# THE WHOLE ACCEPT SET NOW: the person suffix fused to the country's own name,
+# with and without the apostrophe. Everything else the guard used to admit is in
+# `_SURRENDERED_ACCEPTS` below, pinned as a cost.
+_FUSED_SUFFIX_ACCEPTS = [
     "Fransa'dayım, buğday mı ekmeliyim",
     "Fransadayim, bugday mi ekmeliyim",
-    # The dominant Turkish pattern: case ending on the NAME, person on the VERB.
-    # An earlier revision of this guard refused all four of these.
-    "Fransa'da yaşıyorum, buğday mı ekmeliyim",
-    "Fransa'da çiftçilik yapıyorum, buğday mı ekmeliyim",
-    "Fransa'da yaşayan bir çiftçiyim, buğday mı ekmeliyim",
-    "Fransada ciftciyim, bugday mi ekmeliyim",
-    # The stated subject pronoun - see _TR_SUBJECT_PRONOUN. Turkish drops `ben`
-    # by default and states it for emphasis, so this is the third sentence
-    # above with one extra word, and that word used to push the predicate out
-    # of the two-word window.
-    "Fransa'da ben buğday ekiyorum, buğday mı ekmeliyim",
+    # A phone's apostrophe, U+2019. `_normalize_tr` folds it to `'`, and this
+    # assertion is INHERITED from the deleted shape branch, which pinned the
+    # same character on "Fransa’da yaşayan bir çiftçiyim". The character's
+    # behaviour is shared with the surviving branch, so the sentence was
+    # rewritten rather than dropped - the mobile app is the delivery surface and
+    # a reader should not have to assume this branch inherits the fold.
+    "Fransa’dayım, buğday mı ekmeliyim",
 ]
 
 
-@pytest.mark.parametrize("message", _WINDOW_ACCEPTS)
-def test_a_locative_with_a_first_person_predicate_is_a_stated_location(message):
-    """Turkish puts the case ending on the place and the person on the verb far
-    more often than it fuses them into "Fransa'dayım". A guard that demanded the
-    copula on the NAME refused every sentence below - real sentences a grower in
-    France would write, all of which `extract_country` resolves to France."""
+@pytest.mark.parametrize("message", _FUSED_SUFFIX_ACCEPTS)
+def test_the_fused_suffix_is_a_stated_location(message):
+    """The one Turkish shape that survives, end to end. It is the only branch of
+    the five that ever stood here which produced no Critical in four reviews, and
+    the reason is structural: the suffix is on the NAME, so the rule reads no
+    window, no verb, no clause and no conversation. There is nothing between the
+    evidence and the decision for a participle to ride in on."""
     block = engine._crop_choice_block(message, None, date(2026, 9, 25))
     assert "France" in block
     assert "597,35 kg/da" in block
     assert "BILINMIYOR" not in block
 
 
-# One accept per member of _TR_SELF_VERBS and _TR_SELF_ACTIVITIES, because the
-# whitelist is what the window branch now rests on and a member nothing pins is
-# a member nothing measures - the lesson _TR_RESIDENT_PARTICIPLES was rebuilt
-# on. The six stems the refuse set cannot reach (`dik`, `yetistir`, `uret`,
-# `sul`, `bud`, `besl`) are exactly the ones that need this test most: nothing
-# in the 92 refusals contains them, so a "0/92 for adding them" would be the
-# empty measurement this branch has twice mistaken for a guarantee.
-_SELF_VERB_ACCEPTS = [
-    "Fransa'da yaşıyorum",
-    "Fransa'da oturuyorum",
-    "Fransa'da çalışıyorum",
-    "Fransa'da buğday ekiyorum",
-    "Fransa'da fidan dikiyorum",
-    "Fransa'da domates yetiştiriyorum",
-    "Fransa'da buğday üretiyorum",
-    "Fransa'da tarla suluyorum",
-    "Fransa'da bağ buduyorum",
-    "Fransa'da hayvan besliyorum",
-    # `yap-` takes its meaning from its object, so each object is pinned too.
-    "Fransa'da çiftçilik yapıyorum",
-    "Fransa'da tarım yapıyorum",
-    "Fransa'da ekim yapıyorum",
-    "Fransa'da üretim yapıyorum",
-    "Fransa'da bağcılık yapıyorum",
-    "Fransa'da seracılık yapıyorum",
-    "Fransa'da hayvancılık yapıyorum",
-    "Fransa'da hasat yapıyorum",
+# THE SUFFIX'S OWN NEAR MISSES - the other way a one-decision rule can fail.
+# `[dt][ae]` on the name followed by something that is NOT `-yIm`. These are the
+# inputs that break the DECISION ("the person suffix, fused, on the name") as
+# opposed to the inputs that merely reach it, and that distinction is the whole
+# subject of this wave: four reviews found a rule licensed by a zero taken over
+# inputs that could not have broken it.
+_SUFFIX_NEAR_MISSES = [
+    ("Fransa'daydım, şimdi döndüm", 68),      # PAST: `y` then `d`, not a vowel
+    ("Fransa'dayken buğday ektim", 68),       # `while`: `y` then `k`
+    ("Fransa'dalar, ben burada kaldım", 68),  # THIRD person plural: no `y`
+    ("Fransa'daki gibi sera kurayım", 68),    # the relativiser: no `y`
+    ("Fransa'dan fidan getirdim", 68),        # ablative: not a locative
 ]
 
 
-@pytest.mark.parametrize("text", _SELF_VERB_ACCEPTS)
-def test_each_whitelisted_self_verb_is_a_stated_location(text):
-    """The admitting half of the inversion. A residence or cultivation verb in
-    the first person says the speaker is there; the twenty commerce, search and
-    travel verbs in `_ACTION_LOCATIVES` say he is doing business with the place.
-    No width and no tense separates the two - only the verb does."""
-    assert engine._states_location(text, engine._code_aliases(68))
-
-
-# One accept per shape the agent-noun copula and the land branch admit.
-_AGENT_NOUN_ACCEPTS = [
-    "Fransa'da çiftçiyim",
-    "Fransa'da bir çiftçiyim",
-    "Fransa'da üreticiyim",
-    "Fransa'da bağcıyım",
-]
-
-_OWNED_LAND_ACCEPTS = [
-    "Fransa'da tarlam var",
-    "Fransa'da arazim var",
-    "Fransa'da bir çiftliğim var",
-    "Fransa'da bahçem var",
-    "Fransa'da seram var",
-    "Fransa'da bağım var",
-    # The amount comes first in Turkish, which is why this branch reads the
-    # whole clause rather than a window.
-    "Fransa'da 30 dönüm arazim var",
-]
-
-
-@pytest.mark.parametrize("text", _AGENT_NOUN_ACCEPTS)
-def test_an_agent_noun_copula_is_a_stated_location(text):
-    """`c[iu]y[iu][mz]$` is what separates the copula on an agent noun from the
-    bare possessive on a `y`-final stem - `ciftciyim` from `dayim`. These are
-    the accepts it has to keep while refusing the ten in
-    `_SHAPE_NEAR_MISSES_CLOSED`."""
-    assert engine._states_location(text, engine._code_aliases(68))
-
-
-@pytest.mark.parametrize("text", _OWNED_LAND_ACCEPTS)
-def test_owning_worked_land_somewhere_is_a_stated_location(text):
-    """"Fransa'da bir çiftliğim var" was written down by an earlier wave as a
-    cost of the two-word window. It was never a width problem: `ciftligim`
-    carries the bare possessive and `var` is not first person at all, so no
-    window could have reached it. It needed a shape, and the shape is the land
-    noun's own list - see _TR_OWNED_LAND for why the noun cannot be left open."""
-    assert engine._states_location(text, engine._code_aliases(68))
+@pytest.mark.parametrize("text,code", _SUFFIX_NEAR_MISSES)
+def test_the_fused_suffix_is_the_whole_decision(text, code):
+    """Five endings that share the locative's letters and are not a first-person
+    copula on them. The past tense is the one that matters most - "Fransa'daydım"
+    is "I WAS in France", the class four waves of tense rules existed for, and
+    here it is refused by the same four characters that admit "Fransa'dayım"."""
+    assert not engine._states_location(text, engine._code_aliases(code))
 
 
 _POSSESSION_NEAR_MISSES = [
     # `<possessed noun> var` is also how a relative or a contact abroad is
-    # mentioned, which is the class K2 lives in. Seventeen of the 92 refusals
-    # reach the land branch's shape; these seven are the ones whose possessed
-    # noun is a PERSON, and the noun list is the only thing that refuses them.
-    # ("Fransa'da bir dayım var") lives in
-    # _WINDOW_PERSON_NEAR_MISSES instead: it is the one sentence of this shape
-    # that leaked through the WINDOW at 78b72a2, so it is measured there.
+    # mentioned, which is the class K2 lives in. These six are the ones whose
+    # possessed noun is a PERSON; "Fransa'da bir dayım var" lives in
+    # _WINDOW_PERSON_NEAR_MISSES instead, because it is the one sentence of this
+    # shape that leaked through the WINDOW at 78b72a2.
+    #
+    # AND THE REACH COUNT THE DELETED LAND BRANCH QUOTED WAS BOTH WRONG AND
+    # BESIDE THE POINT, which is worth keeping because it is this wave's whole
+    # lesson in one number. The comment said "16 of the 86 refusals reach this
+    # branch's shape". Re-measured: 16 under its own wording (a possessed noun
+    # in `-Im`, then `var`) and 18 under the looser reading its prose also
+    # suggested, since `tarlasi` and `fiyatlari` are possessed too. Neither
+    # number mattered. The branch's real decision was to read the WHOLE CLAUSE
+    # with no adjacency, and ZERO of the 86 put a whitelisted LAND noun behind
+    # an object locative - so the only input that could have failed it was
+    # absent, and twelve such sentences were admitted in production.
     ("Fransa'da bir arkadaşım var", 68),
     ("Fransa'da müşterim var", 68),
     ("Fransa'da bir tanıdığım var", 68),
@@ -2192,10 +2207,15 @@ _POSSESSION_NEAR_MISSES = [
 
 @pytest.mark.parametrize("text,code", _POSSESSION_NEAR_MISSES)
 def test_possessing_something_that_is_not_land_is_not_a_location(text, code):
-    """The land branch's own near misses. Without the noun list this branch
-    admits all seven, and the first of them - "Fransa'da bir dayım var" - is
-    the sentence the window branch admitted at 78b72a2 as well, on `dayim`
-    matching a loose `y[iu][mz]$`."""
+    """`<possessed noun> var` is how a relative or a contact abroad is mentioned,
+    and for three waves this was the shape a rule tried to tell from owned land
+    by whitelisting the NOUN. The land branch is deleted - its own
+    whole-clause read handed back twelve object-locative sentences, licensed by
+    a zero that 0 of the 86 refusals could break - so these six are now refused
+    for the same reason "Fransa'da tarlam var" is: `var` is not a person suffix
+    on the name. Kept, because the class is the dearest one on this path and the
+    next wave to propose a land branch should find its near misses already
+    written down."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
@@ -2204,10 +2224,19 @@ _ENGLISH_ACCEPTS = [
     "I am in France",
     "I farm in France",
     "we are based in France",
-    # Added this wave: the subject is a possessed noun rather than a pronoun,
-    # but it is the speaker's own holding.
+    # The subject is a possessed noun rather than a pronoun, but it is the
+    # speaker's own holding.
     "my farm is in France",
     "my field is in France",
+    # TEMPORARY PRESENCE, and it is pinned as an ACCEPT on purpose rather than
+    # left out as the gap a previous review called it. See _SELF_EN: the Turkish
+    # twin "Fransa'dayım, fuara geldim" is admitted and cannot be refused
+    # without reading the rest of the sentence, which is the inference this wave
+    # deleted - and a grower who IS in France this week is in France.
+    "I am in France for the fair",
+    "I am in France this week",
+    "we are in France visiting a supplier",
+    "I'm in France on holiday",
 ]
 
 
@@ -2220,10 +2249,20 @@ def test_the_english_branch_admits_a_self_declaration(text):
     assert engine._states_location(text, engine._code_aliases(68))
 
 
-# THE ENGLISH BRANCH HAD NO REFUSE SET AT ALL before this wave - two accepts,
-# and the ablation tables exclude it by construction - so nothing measured
-# whether an English sentence that merely NAMES a country keeps the province
-# ask. Four classes, the same four the Turkish side carries.
+# THE ENGLISH BRANCH IS ONE OF TWO SURVIVORS, so its refuse set is measured the
+# way the Turkish side's is - with the number of inputs that could break each
+# DECISION beside the zero, not the number that reach the branch:
+#
+#   refusals                                                          25
+#   admitted                                                           0
+#   naming a country extract_country resolves (the rest test nothing) 21
+#   in this branch's own `<subject> ... in <name>` frame, so able to
+#     break the PERSON decision                                       13
+#   first-person subject beside a preposition, so able to break the
+#     ADJACENCY decision                                               8
+#
+# Class (e) is new this wave and it is the class that makes the 13 possible:
+# before it, three sentences carried the whole person decision.
 _ENGLISH_NOT_A_LOCATION = [
     # (a) merely naming
     ("the yield in France is high", 68),
@@ -2246,16 +2285,60 @@ _ENGLISH_NOT_A_LOCATION = [
     ("I sell wheat in Germany", 79),
     ("I am looking for a buyer in Germany", 79),
     ("we export tomatoes to the Netherlands", 150),
+    # (e) A SUBJECT THAT IS NOT THE SPEAKER, in this branch's own frame. Ten
+    # sentences that differ from "my farm is in France" in the subject alone, so
+    # they are the only inputs that can fail the person decision - the
+    # equivalent of what `_WINDOW_PERSON_NEAR_MISSES` is for the Turkish side.
+    # All ten resolve France, so none of them is refused by country.py first.
+    ("he is in France", 68),
+    ("she lives in France", 68),
+    ("my son is in France", 68),
+    ("our customer is in France", 68),
+    ("my buyer is in France", 68),
+    ("the farm is in France", 68),
+    ("his farm is in France", 68),
+    ("their field is in France", 68),
+    ("my brother farms in France", 68),
+    ("the company is based in France", 68),
 ]
 
 
 @pytest.mark.parametrize("text,code", _ENGLISH_NOT_A_LOCATION)
 def test_the_english_branch_refuses_what_is_not_a_self_declaration(text, code):
-    """The measurement the English branch never had. `_SELF_EN` admits 0 of
-    these fifteen. Class (b) is the one the wave that added `my farm is in`
-    had to get right: the possessive licences the speaker's own holding and
-    nothing else, so a supplier, an uncle and a friend all stay out."""
+    """`_SELF_EN` admits 0 of these twenty-five. Class (b) and class (e) are the
+    person decision: the possessive licences the SPEAKER'S own holding and
+    nothing else, so a supplier, an uncle, a friend, a son, a customer, a buyer,
+    a brother, a company and two third-person pronouns all stay out, and so does
+    "the farm is in France" with no possessive at all.
+
+    Class (e) exists because this branch is now one of two, and three sentences
+    were not a serious refuse set for a rule carrying half the guard."""
     assert not engine._states_location(text, engine._code_aliases(code))
+
+
+def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
+    """THE NUMBERS BESIDE _SELF_EN'S ZERO, pinned so they cannot go stale - this
+    branch has had four stale denominators written above it on this branch alone.
+
+    A reach count is only a guarantee when it counts the inputs that could break
+    THE DECISION UNDER TEST. For this branch there are two decisions - the
+    subject must be first-person, and the preposition must stand between that
+    subject and the name - so there are two counts, and they are taken here
+    rather than asserted in prose."""
+    from src.context import country as country_ctx
+    frame = re.compile(r"(?<!\w)(?:\w+(?:\s+\w+)?)\s+"
+                       r"(?:is|are|am|'m|live|lives|farm|farms)"
+                       r"(?:\s+based)?\s+(?:in|at|from)\s+")
+    first_person = re.compile(r"(?<!\w)(?:i|we)(?:\s|')")
+    texts = [text for text, _code in _ENGLISH_NOT_A_LOCATION]
+    folded = [engine._normalize_tr(text) for text in texts]
+    assert len(texts) == 25
+    assert sum(1 for text in texts
+               if country_ctx.extract_country(text, None) is not None) == 21
+    assert sum(1 for text in folded if frame.search(text)) == 13
+    assert sum(1 for text in folded
+               if first_person.search(text)
+               and re.search(r"\b(?:in|at|from|to)\b", text)) == 8
 
 
 _WIDENED_BRANCH_REFUSALS = [
@@ -2267,7 +2350,8 @@ _WIDENED_BRANCH_REFUSALS = [
     ("Fransa'da ekim zamanı geçti mi", 68),
     ("Amerika'da tohum fiyatları nasıl, ben ne eksem", 231),
     ("Fransa'da durum buğdayı yetişir mi", 68),
-    # A plan rather than a location; see _TR_VOLITIONAL.
+    # A plan rather than a location. The volitional stem `ist-` was skipped
+    # free by the deleted window, which is how `istenen` and `istedigim` got in.
     ("Hollanda'da sera kurmak istiyorum", 150),
     # Hearsay: the locative belongs to the embedded clause. `verim` also ENDS in
     # the aorist's letters, which is why no ending test was ever the right test
@@ -2306,22 +2390,19 @@ _OBJECT_LOCATIVES = [
 
 @pytest.mark.parametrize("text,code", _OBJECT_LOCATIVES)
 def test_a_locative_that_belongs_to_an_object_is_not_a_stated_location(text, code):
-    """THE GUARD READ THE TENSE AND NEVER ASKED WHOSE THE PLACE WAS. A locative
-    followed by a first-person predicate was taken as a statement of location
-    however much stood in between, so an intervening participle phrase rode in
-    free: the SEED is produced in France, not the speaker.
+    """THE CLASS THAT COST THIS GUARD ITS INFERENCE. Every rule that read the
+    words after a locative had to answer "whose is this place", and none of them
+    could: the SEED is produced in France, not the speaker.
 
-    Measured at window 3 on 2526ab6, seven of these eleven were admitted - and
-    `_country_lines` asks every user turn, so one of them in the first turn kept
-    the grower abroad for the rest of the conversation. Three more are admitted
-    at window 4 and one ("Almanya'da çalışan bir arkadaşım var") at no width at
-    all, because `arkadaşım` is not an agent noun in `-cI`.
+    Measured at window 3 on 2526ab6, seven of these eleven were admitted. Three
+    more at window 4. The leading sentence came back a fourth time at c74d9cc,
+    one noun along - "Fransa'da üretilen tohumu ektiğim bir tarlam var" - because
+    the land branch read the whole clause and never asked what the locative
+    attached to, 12 of 12.
 
-    These eleven are why `_TR_CLAUSE_WORDS` is 2 and not 3. They are held twice
-    over now - by the width AND by the verb whitelist, since `kullanıyorum`,
-    `alıyorum` and `deniyorum` are none of them residence or cultivation verbs -
-    and that redundancy is deliberate: the width cannot tell a speaker from a
-    seed, and the whitelist cannot tell which clause a verb belongs to."""
+    They are refused by construction now: the surviving Turkish pattern never
+    looks past the name, so there is no span for a participle phrase to stand
+    in."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
@@ -2339,45 +2420,17 @@ def test_an_object_locative_does_not_open_the_country_block(message, code):
     assert "FAOSTAT" not in block
 
 
-_SHAPE_ACCEPTS = [
-    "Fransa'da yaşayan bir çiftçiyim",
-    "Fransa'da çalışan bir işçiyim",
-    "Fransa'da yaşayan bir çiftçiyiz",
-    # The third member of _TR_RESIDENT_PARTICIPLES. Pinned so the whitelist has
-    # no member nothing measures - that was how the branch this replaces came to
-    # carry a claim its own corpus could not test.
-    "Fransa'da oturan bir çiftçiyim",
-    # A phone's apostrophe, U+2019. `_normalize_tr` folds it to `'`, so this
-    # branch gets it for free - pinned because the other guards on this path
-    # have their own test for the same character and a reader should not have to
-    # assume a third one inherits it.
-    "Fransa’da yaşayan bir çiftçiyim",
-]
-
-
-@pytest.mark.parametrize("text", _SHAPE_ACCEPTS)
-def test_a_relative_clause_predicating_the_speaker_is_a_stated_location(text):
-    """The one participle shape that attaches the place to the SUBJECT: the
-    relative clause modifies the noun the first person is predicated of, so the
-    farmer living in France IS the speaker.
-
-    It used to be reached by _TR_CLAUSE_WORDS = 3 and nothing else, which is the
-    width that also admitted the eleven above. It is read by SHAPE now, so the
-    accept survives a window that refuses them - the two rules are disjoint and
-    both are kept."""
-    assert engine._states_location(text, engine._code_aliases(68))
-
-
 # THE SHAPE BRANCH'S OWN NEAR MISSES, and the reason this list exists at all:
 # the wave that introduced that branch measured it against a refuse set in which
 # ONE sentence out of 27 could reach its pattern, so its "0/27 refusals" was an
 # empty measurement rather than a guarantee. Every sentence here reaches the
 # branch's prefix - locative, a word ending in `-an/-en`, `bir` - so the tables
-# in src/engine.py can fail. 28 of the 92 refusals the suite now carries do.
+# in src/engine.py can fail. 26 of the 91 refusals the suite carries reach the
+# deleted branch's loose prefix and 10 its shipped gate.
 #
 # Measured 2026-10-03 against the branch as it shipped at 12aba9e: TWELVE of
 # these fifteen were admitted, and the first seven are the class
-# `_TR_CLAUSE_WORDS = 2` had just been narrowed to close - the locative belongs
+# the two-word window had just been narrowed to close - the locative belongs
 # to the uncle, not to the speaker, and the user was placed abroad for the whole
 # conversation.
 _SHAPE_NEAR_MISSES = [
@@ -2417,13 +2470,12 @@ def test_the_shape_branch_refuses_what_only_looks_like_its_shape(text, code):
     çalışan bir dayım var" has no first-person predicate at all and was read as a
     statement of location.
 
-    Three narrowings hold these out and they fail on DISJOINT inputs, so all
-    three are kept: the clause after the locative must be exactly
-    `<participle> bir <predicate>` (a Turkish copular predicate ends its clause,
-    a possessed noun does not), the participle must be one of
-    _TR_RESIDENT_PARTICIPLES, and the predicate must be an agent noun in `-cI`.
-    The first holds group (a), the second groups (b) and (c), and the third
-    holds `_SHAPE_NEAR_MISSES_CLOSED` below, which satisfies both the others."""
+    Three narrowings were added to hold these out and the branch is now deleted
+    with them. Fifteen sentences are kept all the same, because the fifteen are
+    the measurement the branch never had: the version before them scored "0 of
+    27" on a refuse set in which ONE sentence could reach the pattern. A list
+    built to reach a deleted rule is what the next proposal for one has to clear
+    before it gets written."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
@@ -2433,7 +2485,8 @@ def test_the_shape_branch_refuses_what_only_looks_like_its_shape(text, code):
 # gate it scored. All ten of these do.
 #
 # The clause after the locative is exactly three words, the participle is in
-# _TR_RESIDENT_PARTICIPLES, and the third word carries `-yIm` - but on a
+# the deleted residence-participle whitelist, and the third word carries
+# `-yIm` - but on a
 # possessed noun, not on a copula. Measured at 78b72a2: all ten True.
 _SHAPE_NEAR_MISSES_CLOSED = [
     ("Fransa'da çalışan bir dayım, ona soruyorum", 68),
@@ -2458,15 +2511,11 @@ def test_a_possessed_noun_is_not_a_copular_predicate(text, code):
     lost the province ask and was handed France's figures for the rest of the
     conversation.
 
-    What separates them is derivational, not positional: Turkish agent nouns end
-    in `-cI`, so `çiftçiyim` and `işçiyim` are admitted and `dayım`, `tayım`,
-    `köyüm`, `yayım`, `sayım` are not. No lexicon-free test does better - both
-    readings are a vowel-final stem plus five letters - and what that costs is
-    pinned in `test_the_measured_cost_of_the_inversion`.
-
-    It is worth 10 of the 86 refusals on its own, which is the highest of the
-    shape branch's three narrowings; clause-final, which the wave before this one
-    credited with this class, is worth 0."""
+    The derivational test that separated them - Turkish agent nouns end in
+    `-cI`, so `çiftçiyim` passed and `dayım` did not - is deleted with the branch
+    it gated, and it took "Fransa'da çiftçiyim" with it. The ten stay pinned
+    because they are the only ten that ever reached the gate they were built for:
+    the wave before measured "0 of 42" on a set where NONE of the 42 could."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
@@ -2491,10 +2540,13 @@ def test_a_shape_near_miss_does_not_open_the_country_block(text, code):
 
 
 # THE PRESENT CONTINUOUS OF A COMMERCE, SEARCH OR TRAVEL VERB - the class no
-# tense and no width can see, and the one the inversion exists for. Every
+# tense and no width can see, and the one the whitelist was built for. Every
 # sentence here puts a first-person present-continuous verb within two words of
-# a locative, so every one reaches the window branch's pattern; 20 of the 92
-# refusals do. Measured at 78b72a2: all twenty True.
+# a locative, so every one reached the deleted window branch's pattern - 20 of
+# the 86 refusals did. Measured at 78b72a2: all twenty True. And the verb
+# whitelist's "20 of 86" is the zero this wave deleted a rule over: twenty
+# SIMPLE verbs, not one light-verb construction, so `-mAyA çalış-` was never
+# tested and "Almanya'da satmaya çalışıyorum" walked through.
 #
 # The first four are the present-tense twins of the five pinned past-tense
 # refusals below - the example was closed, the class was not. The rest is the
@@ -2529,8 +2581,8 @@ def test_doing_business_in_a_place_is_not_being_in_it(text, code):
     """The tense rule closed "Amerika'da buğday aldım" and left "Amerika'da
     buğday alıyorum" wide open, because the present continuous is as much the
     tense of "what I am buying there" as of "where I am". The ending test of the
-    day - `_TR_FIRST_PERSON`, since split into `_TR_AGENT_PERSON` and
-    `_TR_VERBAL_PERSON` - justified the present continuous in its own comment as
+    day - `_TR_FIRST_PERSON`, since split in two and then deleted outright -
+    justified the present continuous in its own comment as
     "the tenses 'where I am' is said in"; it is equally the tense a market, a
     supplier and a trip are described in, and then the locative attaches to them.
 
@@ -2555,12 +2607,12 @@ def test_a_market_abroad_does_not_open_the_country_block(message, code):
     assert "FAOSTAT" not in block
 
 
-# The window branch's own person gate: a `-yIm`-shaped word that is a possessed
-# noun standing INSIDE the two-word window. These are the only inputs that can
-# tell `c[iu]y[iu][mz]$` from a loose `y[iu][mz]$` on THIS branch - the ten in
-# `_SHAPE_NEAR_MISSES_CLOSED` sit three words out and test the shape branch
-# instead. Nine of the 92 refusals reach it; with the loose test the branch
-# admits all nine.
+# A `-yIm`-shaped word that is a POSSESSED NOUN, standing next to the locative.
+# These are the sentences the surviving Turkish pattern has to keep refusing
+# while admitting "Fransa'dayım", and the distinction it draws is the one that
+# matters: the suffix is on `dayım` and `tayım`, not on `Fransa`. 38 of the 86
+# refusals carry such a word somewhere - see _SELF_TR for the count and why it
+# is the right one to write beside that branch's zero.
 _WINDOW_PERSON_NEAR_MISSES = [
     ("Fransa'da bir dayım var", 68),
     ("Fransa'da dayım oturuyor", 68),
@@ -2575,20 +2627,48 @@ _WINDOW_PERSON_NEAR_MISSES = [
 
 @pytest.mark.parametrize("text,code", _WINDOW_PERSON_NEAR_MISSES)
 def test_a_possessed_noun_in_the_window_is_not_a_predicate(text, code):
-    """The same defect as `_SHAPE_NEAR_MISSES_CLOSED` one phrase nearer, and the
-    one sentence of this class that leaked through the WINDOW rather than the
-    shape branch at 78b72a2: "Fransa'da bir dayım var" has `dayım` as the second
-    word, so the loose person test found it inside the window with no participle
-    anywhere in the sentence.
+    """"Fransa'da bir dayım var" is the sentence that leaked at 78b72a2 on a
+    loose `y[iu][mz]$`, and it is the clearest statement of why the suffix has
+    to be fused to the NAME: `dayım` is five letters from `Fransa` and it is my
+    uncle, not me.
 
-    "Fransa'da dayım oturuyor" is here for the mirror case: `oturuyor` is a
+    "Fransa'da dayım oturuyor" is here for the mirror case: `oturuyor` was a
     whitelisted stem but THIRD person, so the uncle lives there and the speaker
     does not."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
+def test_the_reach_count_beside_the_surviving_branchs_zero():
+    """THE ONE NUMBER THIS WAVE EXISTS TO GET RIGHT. Four reviews in a row found
+    a rule licensed by a zero that none of the refusals could have broken,
+    because the count written beside it was the number of inputs that ENTER the
+    branch rather than the number that could BREAK the decision under test.
+
+    `_SELF_TR`'s decision is "the person suffix sits on the country's own name,
+    with nothing in between". An input can break that decision only by carrying a
+    `-yIm`-shaped word somewhere ELSE - a looser reading would admit exactly
+    those. 39 of the 91 refusals do, and the words are `dayim`, `tayim`,
+    `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ciftciyim`,
+    `ureticiyim`, `sucluyum` and `tohumcuyum` - possessed nouns, optatives and
+    other people's agent nouns. Measured here rather than asserted in a comment,
+    because the comment above `_SELF_TR` quotes this number."""
+    person = re.compile(r"y[iu][mz]$")
+    reach = []
+    for text, code in _TURKISH_REFUSALS:
+        names = engine._code_aliases(code)
+        words = [raw.strip(" '\"()-,;:.!?…")
+                 for raw in engine._normalize_tr(text).split()]
+        if any(person.search(word) and not any(word.startswith(name)
+                                               for name in names)
+               for word in words):
+            reach.append(text)
+    assert len(reach) == 39, reach
+    assert [text for text, code in _TURKISH_REFUSALS
+            if engine._states_location(text, engine._code_aliases(code))] == []
+
+
 # --------------------------------------------------------------------------- #
-# A bare country name needs the question it answers
+# A bare country name is a noun, and no conversation makes it a location
 # --------------------------------------------------------------------------- #
 _BARE_NAMES = [
     # The one crop/country collision the shipped tables hold, in every spelling
@@ -2604,7 +2684,33 @@ _BARE_NAMES = [
     ("Hollanda", 150),
 ]
 
-_ASKED_WHERE_TURNS = [
+# THE ASSISTANT TURNS THE DELETED GATE READ WRONGLY. Ten realistic turns for
+# THIS product, none of which asks where the user is, and the gate opened on
+# 10 of 10 - it was a place-word MENTION detector, not a question detector.
+#
+# The seventh is `crop_compare.ASK_FOR_CROPS`, A SHIPPED LITERAL of our own,
+# returned verbatim as `ChatResult(answer=crop_compare.ASK_FOR_CROPS)`, so it
+# lands in the history as an assistant turn. It asks which two CROPS and it
+# opened the location gate, through "ilinizde". That is why the gate is gone
+# rather than narrowed: the evidence it needed is the model's own wording, which
+# this repo does not own, and the one wording it DOES own defeated it.
+_NON_ASKING_TURNS = [
+    "Toprak analizini nerede yaptırabileceğinizi il tarım müdürlüğünden sorun.",
+    "Sertifikalı fidanı nerede bulabileceğinizi anlatayım.",
+    "Zirai ilaç bayisinin nerede olduğunu öğrenmeniz yeterli.",
+    "Buğday verimi hangi bölgede olduğunuza göre değişir, genel olarak şöyle.",
+    "Hangi ilçede olduğunuz önemli değil, ürün neydi?",
+    "Sulama suyunun nerede biriktiğine bakın.",
+    None,                                      # crop_compare.ASK_FOR_CROPS
+    "Gübreyi hangi yerde depoladığınız önemli.",
+    "Deneme parselini hangi köyde kurduğunuz fark etmez.",
+    "Fidanı nerede saklıyorsunuz?",
+]
+
+# And the turns that DO ask. They were the gate's accepts; they are kept so the
+# test below can say that a bare name is refused after these too - which is the
+# behaviour change, and the cost.
+_ASKING_TURNS = [
     "Hangi ilde olduğunuzu söyler misiniz?",
     "Öncelikle hangi ildesiniz?",
     "Hangi il veya bölgede tarım yapıyorsunuz?",
@@ -2612,49 +2718,32 @@ _ASKED_WHERE_TURNS = [
     "Hangi şehirdesiniz?",
     "Lütfen hangi ilde olduğunuzu belirtin.",
     "Hangi ülkedesiniz?",
-]
-
-_OTHER_QUESTION_TURNS = [
-    "Hangi ürünü düşünüyorsunuz?",
-    "Toprak analizi yaptırdınız mı?",
-    "Hangi ilacı kullanıyorsunuz?",
-    "Sulama imkanınız var mı?",
-    "Buğday mı mısır mı düşünüyorsunuz?",
-    "Arazi büyüklüğünüz nedir?",
+    "Hangi ildesiniz ve hangi ürünü düşünüyorsunuz?",
 ]
 
 
 @pytest.mark.parametrize("text,code", _BARE_NAMES)
 def test_a_bare_country_name_alone_is_not_a_stated_location(text, code):
-    """A one-word message predicates nobody - it is a noun. The branch that
-    admitted it was justified as reading "the natural reply to `hangi
-    ülkedesiniz?`", and that is right about the reply and wrong about the
-    message: the same one-word message is the natural reply to "hangi ürünü
-    düşünüyorsunuz?" too.
-
-    Measured at 78b72a2, all eight of these were True."""
+    """A one-word message predicates nobody - it is a noun. Measured at 78b72a2,
+    all eight were True unconditionally; the wave after that gated them on the
+    assistant's own question, and this wave deletes the gate. EIGHT, not ten -
+    the wave-3 report quoted a denominator of 10 for this list and the list
+    carries 8, which is why its length is pinned below."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
-@pytest.mark.parametrize("asked", _ASKED_WHERE_TURNS)
-def test_the_assistant_asking_where_opens_the_bare_name_branch(asked):
-    """The reply the branch exists for, and it is recovered rather than lost: a
-    grower answering "hangi ildesiniz?" with "Fransa" is placed in France, which
-    is the turn an earlier wave called the worst in the route."""
-    assert engine._asked_where(asked)
-    history = [{"role": "user", "content": "bu yıl ne eksem"},
-               {"role": "assistant", "content": asked}]
-    block = engine._crop_choice_block("Fransa", history, date(2026, 9, 25))
-    assert "France" in block
-    assert "BILINMIYOR" not in block
+@pytest.mark.parametrize("asked", _ASKING_TURNS)
+def test_a_bare_name_is_refused_even_after_the_question_it_answers(asked):
+    """THE COST OF DELETING THE BARE-NAME BRANCH, pinned as a cost and not as a
+    correct answer. A grower answering "hangi ildesiniz?" with "Fransa" used to
+    be placed in France; he now gets the question again, and `_ASK_LOCATION`
+    asks him for "Fransa'dayım" this time. That is ONE EXTRA TURN for every
+    foreign grower who answers with a bare country name - eight shapes of the
+    question, here, and the cost is the same after all eight.
 
-
-@pytest.mark.parametrize("asked", _OTHER_QUESTION_TURNS)
-def test_another_question_does_not_open_the_bare_name_branch(asked):
-    """The gate's refusing half. The block asks for the province AND lists six
-    other things to ask about, so the assistant's turn is usually a bundle - and
-    a bundle that does not ask where the user is must not license a bare name."""
-    assert not engine._asked_where(asked)
+    What it buys is in `test_the_deleted_gate_fired_on_turns_that_asked_nothing`
+    below: the same gate read a bare name after a CROP question, and one of the
+    turns it read that way is a string this repo ships."""
     history = [{"role": "user", "content": "bu yıl ne eksem"},
                {"role": "assistant", "content": asked}]
     block = engine._crop_choice_block("Fransa", history, date(2026, 9, 25))
@@ -2662,18 +2751,47 @@ def test_another_question_does_not_open_the_bare_name_branch(asked):
     assert "France" not in block
 
 
+def test_the_deleted_gate_fired_on_turns_that_asked_nothing():
+    """WHY THE GATE COULD NOT BE NARROWED INSTEAD. Its evidence was the
+    assistant's own question, which this repo does not write - the crop-choice
+    block says "cevabinda hangi ilde oldugunu sor" and the model phrases it - so
+    the gate had to match place WORDS, and then every turn that MENTIONS a place
+    opened it. Ten realistic non-asking turns, 10 of 10 wrongly open at c74d9cc.
+
+    One of the ten is `crop_compare.ASK_FOR_CROPS`, which this repo DOES own: it
+    asks which two crops, it contains "ilinizde", and it is returned verbatim as
+    an assistant turn. So the branch's declared defence - "the assistant's real
+    wording is not in the repo, so no test could catch this" - was refuted by a
+    string in the repo.
+
+    Asserted as the behaviour that matters rather than on the deleted predicate:
+    after any of these turns, a bare country name does not place the user."""
+    from src import crop_compare
+    turns = [turn if turn is not None else crop_compare.ASK_FOR_CROPS
+             for turn in _NON_ASKING_TURNS]
+    assert len(turns) == 10
+    assert "ilinizde" in engine._normalize_tr(crop_compare.ASK_FOR_CROPS)
+    for asked in turns:
+        history = [{"role": "user", "content": "bu yıl ne eksem"},
+                   {"role": "assistant", "content": asked}]
+        block = engine._crop_choice_block("Fransa", history, date(2026, 9, 25))
+        assert "BILINMIYOR" in block, asked
+        assert "France" not in block, asked
+
+
 @pytest.mark.parametrize("reply", ["Mısır", "mısır", "Mısır."])
 def test_a_crop_name_is_not_a_location_even_after_a_location_question(reply):
-    """THE SECOND GATE, and it is not redundant with the first: the province
-    question and the crop question arrive in the SAME generated turn more often
-    than not, so a turn that asks where the user is usually also asks what he
-    plans to plant. `Mısır` is Egypt and maize at once, and it is the ONLY such
-    collision in the shipped tables - 187 crop families against 418 folded
-    country alias keys."""
+    """`Mısır` is Egypt and maize at once - the ONLY such collision in the
+    shipped tables, 187 crop families against 418 folded country alias keys -
+    and it was the sentence that proved the bare name needed a gate at all.
+
+    It needed TWO gates while the branch existed, because the province question
+    and the crop question arrive in the same generated turn. With the branch
+    gone it needs none, and the crop-name half of the guard (`_is_a_crop_name`,
+    which held the fourth copy of the label fold) went with it."""
     history = [{"role": "user", "content": "bu yıl ne eksem"},
                {"role": "assistant",
                 "content": "Hangi ildesiniz ve hangi ürünü düşünüyorsunuz?"}]
-    assert engine._asked_where(history[-1]["content"])
     block = engine._crop_choice_block(reply, history, date(2026, 9, 25))
     assert "BILINMIYOR" in block
     assert "Egypt" not in block
@@ -2694,124 +2812,142 @@ def test_a_crop_name_in_history_does_not_move_the_grower_abroad():
     assert "677,77" not in block
 
 
-def test_a_bare_name_reads_its_own_turns_question_not_the_last_one():
-    """Each turn carries its own question context. A province question asked at
-    the END of a conversation must not license a bare crop name typed at the
-    start - which one flag for the whole history would have done."""
-    history = [{"role": "assistant", "content": "Hangi ürünü düşünüyorsunuz?"},
-               {"role": "user", "content": "mısır"},
-               {"role": "assistant", "content": "Hangi ildesiniz?"}]
-    block = engine._crop_choice_block("Konya değil, yurt dışındayım", history,
-                                      date(2026, 9, 25))
-    assert "Egypt" not in block
-
-
-def test_the_province_question_prefix_is_not_a_drug_question():
-    """`hangi il` is a prefix of `hangi ilaç`, and "Hangi ilacı
-    kullanıyorsunuz?" is an ordinary question in this assistant. The suffix
-    alternation in _ASKED_WHERE is closed for exactly this reason."""
-    assert not engine._asked_where("Hangi ilacı kullanıyorsunuz?")
-    assert not engine._asked_where("Hangi ilaçları denediniz?")
-    assert engine._asked_where("Hangi ilde olduğunuzu söyler misiniz?")
-    assert engine._asked_where("Hangi il/bölgede tarım yapıyorsunuz?")
-
-
 # --------------------------------------------------------------------------- #
-# What the inversion costs
+# What dropping the inference costs
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("text", [
-    # What window 2 costs that window 3 did not. One sentence, not two: the
-    # other, "Fransa'da ben buğday ekiyorum", is an ACCEPT now - see
-    # _TR_SUBJECT_PRONOUN. This one is given up knowingly, because it stands at
-    # exactly the distance "Fransa'da üretilen tohum kullanıyorum" stands at and
-    # has no pronoun to skip, so no width can admit it and refuse that.
-    "Fransa'da iki yıldır çiftçiyim",
-])
-def test_the_measured_cost_of_the_narrowed_window(text):
-    """Pinned as a COST, not as a correct answer, and narrowed this wave to the
-    one sentence the narrowing actually cost. The docstring it replaces called
-    four sentences the price of window 2; two of them were refused at window 3
-    as well (they are below) and one has since been bought back."""
+# THE 39 ACCEPTS THIS WAVE GIVES UP, listed rather than described, because this
+# is a SCOPE REDUCTION and the brief that ordered it said the price would be
+# counted and nailed down. Every sentence here was an accept at c74d9cc, every
+# one of them really does say where the speaker is, and every one of them now
+# gets `_ASK_LOCATION` back instead of figures. 39 of the 41 Turkish accepts;
+# the two survivors are in `_FUSED_SUFFIX_ACCEPTS`.
+#
+# They are grouped by the rule that used to admit them, so the price is
+# attributable: if a later wave proposes any of these rules again, the group
+# below is what it is buying.
+_SURRENDERED_ACCEPTS = [
+    # (1) THE WINDOW - a locative plus a first-person predicate within two
+    # words. Deleted because it never asked WHOSE the place was: the same two
+    # words hold "Fransa'da buğday ekiyorum" and "Fransa'da üretilen tohum
+    # kullanıyorum", and no width tells a speaker from a seed.
+    "Fransa'da yaşıyorum, buğday mı ekmeliyim",
+    "Fransa'da çiftçilik yapıyorum, buğday mı ekmeliyim",
+    "Fransa'da ben buğday ekiyorum, buğday mı ekmeliyim",
+    # (2) THE RESIDENCE/CULTIVATION VERB WHITELIST, one per member. Deleted
+    # because `-mAyA çalış-` makes `çalış-` a light verb, so "Almanya'da satmaya
+    # çalışıyorum" - the canonical Turkish exporter - was placed in Germany, and
+    # the "20 of 86" that licensed the list held no light-verb construction at
+    # all.
+    "Fransa'da yaşıyorum",
+    "Fransa'da oturuyorum",
+    "Fransa'da çalışıyorum",
+    "Fransa'da buğday ekiyorum",
+    "Fransa'da fidan dikiyorum",
+    "Fransa'da domates yetiştiriyorum",
+    "Fransa'da buğday üretiyorum",
+    "Fransa'da tarla suluyorum",
+    "Fransa'da bağ buduyorum",
+    "Fransa'da hayvan besliyorum",
+    "Fransa'da çiftçilik yapıyorum",
+    "Fransa'da tarım yapıyorum",
+    "Fransa'da ekim yapıyorum",
+    "Fransa'da üretim yapıyorum",
+    "Fransa'da bağcılık yapıyorum",
+    "Fransa'da seracılık yapıyorum",
+    "Fransa'da hayvancılık yapıyorum",
+    "Fransa'da hasat yapıyorum",
+    # (3) THE AGENT-NOUN COPULA, `c[iu]y[iu][mz]$`. Deleted with the window it
+    # rode on: the copula is on the NOUN, so admitting it means reading words
+    # after the name, which is the decision nothing could measure.
+    "Fransa'da çiftçiyim",
+    "Fransa'da bir çiftçiyim",
+    "Fransa'da üreticiyim",
+    "Fransa'da bağcıyım",
+    "Fransada ciftciyim, bugday mi ekmeliyim",
+    # (4) OWNED LAND, `<land noun carrying -Im> var`. Deleted because it read
+    # the WHOLE CLAUSE with no adjacency and handed back 12 of 12 object-
+    # locative sentences, on a "0 of 86" that 0 of the 86 could break.
+    "Fransa'da tarlam var",
+    "Fransa'da arazim var",
+    "Fransa'da bir çiftliğim var",
+    "Fransa'da bahçem var",
+    "Fransa'da seram var",
+    "Fransa'da bağım var",
+    "Fransa'da 30 dönüm arazim var",
+    # (5) THE RESIDENCE PARTICIPLE SHAPE. Deleted because its person test was a
+    # morphological claim ("agent nouns end in -cI") standing in for a meaning,
+    # and because a comma closing the clause walked `bir dayım` straight back
+    # through it.
+    "Fransa'da yaşayan bir çiftçiyim",
+    "Fransa'da çalışan bir işçiyim",
+    "Fransa'da yaşayan bir çiftçiyiz",
+    "Fransa'da oturan bir çiftçiyim",
+    "Fransa'da yaşayan bir çiftçiyim, buğday mı ekmeliyim",
+    # The curly apostrophe, U+2019, on the shape branch. The character still
+    # works - see `_FUSED_SUFFIX_ACCEPTS`, which inherited that assertion - so
+    # this is lost to the branch and not to the fold.
+    "Fransa’da yaşayan bir çiftçiyim",
+]
+
+
+@pytest.mark.parametrize("text", _SURRENDERED_ACCEPTS)
+def test_the_price_of_dropping_the_inference(text):
+    """PINNED AS A COST, NOT AS A CORRECT ANSWER - 39 sentences that say where
+    the speaker is and are refused now.
+
+    WHY THE DIRECTION IS STILL RIGHT, and it is the one sentence this test
+    exists to carry: a refusal costs ONE QUESTION and the user gets the answer
+    back by writing "Fransa'dayım", which `_ASK_LOCATION` now asks him for in
+    exactly that spelling. A wrong admission is silent, wrong, and - because
+    `_country_lines` asks every user turn - sticky for the whole conversation,
+    with nothing in the product that retracts it. Four reviews found four
+    Criticals of that second kind in five waves of rules built to recover these
+    39, and every one of those rules was licensed by a measurement that could
+    not fail.
+
+    What would change this trade is a measurement, not an argument: a rule here
+    earns its place when its refuse set contains the inputs that could break the
+    DECISION it makes, not the inputs that merely reach it."""
     assert not engine._states_location(text, engine._code_aliases(68))
 
 
-@pytest.mark.parametrize("text", [
-    # Predicate at word 4 and at word 5. Refused at window 3 as well, so these
-    # are NOT what the narrowing to 2 cost - they were in the same test as the
-    # sentence above and the docstring did not separate them.
+# COSTS THAT ARE OLDER THAN THIS WAVE and are unchanged by it: eleven sentences
+# the inverted whitelist already refused. They are kept because they are still
+# refused and still regrettable, and because the reason each one was refused has
+# changed - every one of them is now refused for the same single reason, that
+# the person suffix is not on the name.
+_STANDING_COSTS = [
+    # Were the price of the two-word window, and of the widths beyond it.
+    "Fransa'da iki yıldır çiftçiyim",
     "Fransa'da uzun süredir çiftçilik yapıyorum",
     "Fransa'da küçük bir arazide çiftçilik yapıyorum",
-])
-def test_a_predicate_beyond_any_measured_window_is_a_standing_cost(text):
-    """Pinned as a cost that no width on this guard's own table ever paid for.
-    Admitting these needs window 4, and window 4 admits 4 of the 86 refusals."""
-    assert not engine._states_location(text, engine._code_aliases(68))
-
-
-@pytest.mark.parametrize("text", [
-    # The clause-final rule: `ve` is not a clause boundary, so this clause is
-    # five words and the shape does not match. The comma form of the same
-    # sentence IS an accept, because `_TR_CLAUSE` ends the clause there.
+    # Were the price of the shape branch's two narrowings.
     "Fransa'da yaşayan bir çiftçiyim ve buğday ekiyorum",
-    # The whitelist: a residence participle nobody measured is a refusal.
     "Fransa'da yerleşen bir çiftçiyim",
-])
-def test_the_measured_cost_of_the_shape_branchs_two_narrowings(text):
-    """The price of closing the twelve above, written down rather than left for
-    the next pass to find. Both are real statements of location.
-
-    `yerleşen` is the honest shape of the whitelist's cost: the list has three
-    members because three are measured, and a fourth that no accept needed would
-    be a member on suspicion. The morphological rule that would replace the list
-    - refuse the PASSIVE participle - does not work, because `bulunan` is passive
-    and does place its subject."""
-    assert not engine._states_location(text, engine._code_aliases(68))
-
-
-_INVERSION_COSTS = [
-    # The verb whitelist. All four are first-person present-continuous verbs of
-    # real work in a real place, and all four were accepts at 78b72a2.
+    # Were the price of the verb whitelist: `topl-` also heads "bilgi
+    # topluyorum", `işlet-` a business run from anywhere, `kullan-` is
+    # `_OBJECT_LOCATIVES`' own verb, and `oku-` is the present twin of the
+    # pinned past-tense refusal "Fransa'da okudum".
     "Fransa'da zeytin topluyorum",
     "Fransa'da sera işletiyorum",
     "Fransa'da traktör kullanıyorum",
     "Fransa'da okuyorum",
-    # The agent-noun copula: a first-person nominal predicate that is not an
-    # agent noun in `-cI`.
+    # Were the price of the agent-noun copula: a first-person nominal predicate
+    # that is not an agent noun in `-cI`.
     "Fransa'da emekliyim",
     "Fransa'da yeniyim",
 ]
 
 
-@pytest.mark.parametrize("text", _INVERSION_COSTS)
-def test_the_measured_cost_of_the_inversion(text):
-    """WHAT THE INVERSION COSTS, counted rather than described. Six sentences
-    that DO say where the speaker is and are refused now; every one is an accept
-    at 78b72a2, and a seventh - a bare country name with no question behind it -
-    is pinned in `test_a_bare_country_name_alone_is_not_a_stated_location`.
+@pytest.mark.parametrize("text", _STANDING_COSTS)
+def test_the_costs_the_inversion_already_paid_are_still_paid(text):
+    """The eleven costs the previous wave counted, re-pinned in one place
+    because the four tests that held them named four rules that no longer exist.
+    No sentence was dropped in the merge; their reasons were.
 
-    ELEVEN COSTS IN ALL on this path, counted here so the report does not have
-    to: these six, the bare name, and the four already pinned in the three tests
-    above (the narrowed window, the two predicates beyond any width, and the
-    shape branch's two narrowings). Against them the inversion closes 41
-    measured leaks - 8 bare names, 10 comma-closed `bir dayim` sentences, 20
-    commerce verbs, and the three `_SHAPE_NEAR_MISSES` the window alone held.
-
-    `topl-` also heads "bilgi topluyorum" and `işlet-` a business run from
-    anywhere, so neither is a residence verb. `kullan-` is the one that cannot
-    be bought back at any price: "Fransa'da üretilen tohum kullanıyorum" is the
-    leading object-locative sentence, so admitting the stem reopens the class
-    the window was narrowed for. `oku-` is the present twin of a pinned
-    past-tense refusal, "Fransa'da okudum".
-
-    `emekliyim` and `yeniyim` are the agent-noun test's own price: no
-    lexicon-free rule separates the copula on a vowel-final stem from the bare
-    possessive on a `y`-final one, and the derivational suffix that does
-    separate the words that matter only covers agent nouns.
-
-    The direction is the deliberate one. A refusal costs a question, and the
-    user gets it back by writing "Fransa'dayım" - which the figure-less country
-    line made worth answering. A wrong admission is silent, wrong and sticky for
-    the whole conversation."""
+    50 COSTS IN ALL on this path now: these eleven, the 39 in
+    `_SURRENDERED_ACCEPTS`, and the bare name, which is pinned in its own two
+    tests above because its cost is a TURN rather than an answer."""
     assert not engine._states_location(text, engine._code_aliases(68))
 
 
@@ -2883,47 +3019,52 @@ def test_the_assistant_naming_a_country_is_not_a_location():
 
 
 # --------------------------------------------------------------------------- #
-# The corpus the ablation tables are quoted over
+# The corpus the guard's numbers are quoted over
 # --------------------------------------------------------------------------- #
-_TURKISH_ACCEPTS = (_WINDOW_ACCEPTS + _SELF_VERB_ACCEPTS + _AGENT_NOUN_ACCEPTS
-                    + _OWNED_LAND_ACCEPTS + _SHAPE_ACCEPTS)
+_TURKISH_ACCEPTS = list(_FUSED_SUFFIX_ACCEPTS)
 
 _TURKISH_REFUSALS = (_MERELY_NAMING + _WIDENED_BRANCH_REFUSALS
                      + _OBJECT_LOCATIVES + _SHAPE_NEAR_MISSES
                      + _SHAPE_NEAR_MISSES_CLOSED + _ACTION_LOCATIVES
                      + _WINDOW_PERSON_NEAR_MISSES + _POSSESSION_NEAR_MISSES
-                     + _PAST_TENSE_REFUSALS)
+                     + _PAST_TENSE_REFUSALS + _SUFFIX_NEAR_MISSES)
 
 
-def test_the_corpus_the_guards_ablation_tables_are_taken_over():
-    """41 ACCEPTS AND 86 REFUSALS, pinned the way
+def test_the_corpus_the_guards_numbers_are_quoted_over():
+    """3 ACCEPTS AND 91 REFUSALS, pinned the way
     `test_the_world_layer_row_counts_the_two_comments_rest_on` pins 8425/321/33.
 
-    Six ablation tables in src/engine.py quote an accept denominator and a
-    refusal denominator, and the accept one has been wrong once already: six
-    tables said "8 Turkish accepts" against a suite that carried 9 at 951215a,
-    10 at 12aba9e and 12 at 78b72a2, and nothing pinned it, so it went stale at
-    every commit that added an accept. The refusal column was right every time
-    because the 42 WAS counted from the suite.
+    EVERY DENOMINATOR src/engine.py's guard comment quotes IS HERE, because five
+    stale numbers were found above this guard on this branch - "37 accepts" and
+    "37 accepts / 92 refusals" against a real 41/86, "16 reach" against a real
+    18, and a bare-name table quoted over 10 for a list of 8. A number a test
+    does not derive from the suite goes stale at the next commit that touches
+    what it counted.
 
-    The counts are derived from the lists the tables are taken over, so adding a
-    case to any of them fails here and the tables get re-taken instead of
-    drifting. The eleven pinned COSTS are deliberately outside both numbers: a
-    cost is a sentence the guard refuses and we wish it did not, so a looser rule
-    that admits one is not "wrongly" admitting it - counting costs in the refusal
-    denominator inflates every ablation column with sentences the table is not
-    about. Measured: including them turned `clause-final off` from 0 into 1 and
-    `person test loose` from 8 into 9 on the window branch."""
-    assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 41
-    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 86
-    assert len(_ENGLISH_NOT_A_LOCATION) == 15
-    assert len(_ENGLISH_ACCEPTS) == 6
+    THE ACCEPT COLUMN FELL FROM 41 TO 3 and that is the wave's whole subject:
+    the 39 sentences it lost are listed in `_SURRENDERED_ACCEPTS` and pinned as
+    costs there, not deleted. The refusal column ROSE from 86 to 91 - deleting
+    rules cannot admit anything, so all 86 still refuse, and the five new ones
+    are `_SUFFIX_NEAR_MISSES`, built to break the one decision the surviving
+    Turkish pattern makes.
+
+    THE 50 PINNED COSTS ARE DELIBERATELY OUTSIDE BOTH NUMBERS: a cost is a
+    sentence the guard refuses and we wish it did not, so a looser rule that
+    admits one is not "wrongly" admitting it. Counting them in the refusal
+    denominator would inflate every column with sentences the number is not
+    about."""
+    assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 3
+    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 91
+    assert len(_ENGLISH_ACCEPTS) == 10
+    assert len(_ENGLISH_NOT_A_LOCATION) == 25
+    assert len(_BARE_NAMES) == 8
+    assert len(_SURRENDERED_ACCEPTS) == 39
+    assert len(_STANDING_COSTS) == 11
 
 
 def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
-    """The two columns of every table, taken in one place, so a reader can see
-    the 41/41 and 0/86 the comments quote without re-deriving them from fifteen
-    parametrizations.
+    """The two columns in one place, so a reader sees the 3/3 and 0/91 the
+    guard's comment quotes without re-deriving them from the parametrizations.
 
     Asserted as COUNTS with the offenders named, because a parametrized failure
     reports one case and this reports the shape of a regression."""
@@ -2933,6 +3074,36 @@ def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
     leaked = [text for text, code in _TURKISH_REFUSALS
               if engine._states_location(text, engine._code_aliases(code))]
     assert leaked == []
+    english_out = [text for text in _ENGLISH_ACCEPTS
+                   if not engine._states_location(text,
+                                                  engine._code_aliases(68))]
+    assert english_out == []
+    english_in = [text for text, code in _ENGLISH_NOT_A_LOCATION
+                  if engine._states_location(text, engine._code_aliases(code))]
+    assert english_in == []
+
+
+def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
+    """THE RE-MEASUREMENT THE BRIEF ASKED FOR, and it is not the same assertion
+    as the one above. Deleting a rule cannot admit anything, but it CAN move
+    which rule refuses a sentence - a refusal the verb whitelist used to hold
+    now falls to whatever is left. So each surviving pattern is scored on its
+    own against the whole refuse set, rather than the pair being scored as a
+    unit: if either one were carrying a class only the other refused, a later
+    change to that one would open it silently.
+
+    Measured: each pattern admits 0 of the 91 by itself."""
+    for name, pattern in (("_SELF_TR", engine._SELF_TR),
+                          ("_SELF_EN", engine._SELF_EN)):
+        for text, code in _TURKISH_REFUSALS + _ENGLISH_NOT_A_LOCATION:
+            folded = engine._normalize_tr(text)
+            for alias in engine._code_aliases(code):
+                key = re.escape(alias)
+                if name == "_SELF_TR":
+                    hit = re.search(rf"(?<!\w){key}{pattern}", folded)
+                else:
+                    hit = re.search(rf"{pattern}{key}(?!\w)", folded)
+                assert not hit, (name, text)
 
 
 # --------------------------------------------------------------------------- #
