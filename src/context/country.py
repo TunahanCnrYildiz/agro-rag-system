@@ -261,7 +261,7 @@ _EN_IN = r"(?:in|at)\s+"
 # accepting a supplier places the grower in the wrong country in silence.
 _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 
-# HAZARD: a bare preposition is NOT evidence either, because eleven English
+# HAZARD: a bare preposition is NOT evidence either, because ten English
 # country names are also ordinary English nouns - and in an agriculture
 # assistant they are ordinary WORKING nouns. `from turkey farms` satisfied
 # `(?:in|from|at)\s+turkey(?!\w)` because a space is not a word character, and
@@ -294,7 +294,7 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # ONE RULE THAT SEPARATES THEM is the one English itself uses: proper nouns are
 # CAPITALISED. `Turkey` is the country and `turkey` is the bird, and the same
 # line divides `Chile`/`chile`, `China`/`china`, `Brazil`/`brazil`,
-# `Niger`/`niger`. So for these eleven names ONLY, the name must also appear
+# `Niger`/`niger`. So for these ten names ONLY, the name must also appear
 # Capitalised in the ORIGINAL text; the other 188 keep their old behaviour
 # unchanged, because `Egypt`, `France` and `Kenya` are not words.
 #
@@ -316,7 +316,7 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # WHAT THE CAPITAL LETTER COSTS, measured:
 #  * A user who types all-lowercase gets a refusal where they used to get a
 #    placement: "i am in turkey" resolves to nothing. That is the safe direction
-#    - the assistant asks - and it falls on eleven names out of 199, not on the
+#    - the assistant asks - and it falls on ten names out of 199, not on the
 #    table. It is the price this rule was chosen knowing about.
 #  * It buys NOTHING against the capitalised compound noun, per the ten measured
 #    figures above. Everything refused there is refused by _EN_HEAD, and if
@@ -345,6 +345,23 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # the charge had reached the Turkish branches as well. The compound nouns they do
 # appear in - `Peru balsam` - are _EN_HEAD's business, not this gate's.
 #
+# `georgia` WAS REMOVED THIS WAVE, for the opposite reason: not too little
+# ambiguity but too much for a capital letter to settle. See _NOT_THIS_PLACE,
+# which refuses the English spelling outright.
+#
+# `chad` AND `jordan` ARE KEPT ON A WEAKER CLAIM THAN THE OTHER EIGHT, and that
+# is said here rather than left implied. They are not ordinary English nouns -
+# they are proper nouns of OTHER referents, a given name and a surname - so the
+# capital cannot separate them from the country, and measured, it does not try:
+# "Jordan said the yield in Jordan is low" -> 112 and "we counted the hanging
+# chad in Chad" -> 39 with the gate in place. What the gate does for these two
+# is refuse "i am in jordan" and "i am in chad", which is pure cost by the
+# `peru`/`cuba` argument. They are kept anyway, for one reason: removing them
+# WIDENS this module's recall, and widening a resolver in the same wave that
+# narrows the guard reading it is exactly what three earlier waves on this
+# branch got wrong. A person's name never stands after `in`, so the removal is
+# cheap and it should be its own change with its own measurement.
+#
 # HAND-KEPT, and it has to be: this is a claim about English vocabulary, and no
 # property of the alias table can derive it. A new alias that is also an English
 # noun stays unguarded until it is added here.
@@ -352,7 +369,7 @@ _NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
 # TESTED ON THE ORIGINAL TEXT, not the folded text: _normalize_tr lowercases, so
 # the signal is gone by the time the branches run. _find therefore takes both.
 _AMBIGUOUS_EN = frozenset({
-    "brazil", "chad", "chile", "china", "georgia",
+    "brazil", "chad", "chile", "china",
     "guinea", "jordan", "mali", "niger", "sudan", "turkey",
 })
 
@@ -389,7 +406,7 @@ _AMBIGUOUS_EN = frozenset({
 # Brazil growing soy" (21, measured), which is the class the tail whitelist was
 # already charged with killing. The head-noun list stays nominal.
 #
-# APPLIED TO EVERY KEY, not just the eleven above. `India`, `Panama`, `Morocco`
+# APPLIED TO EVERY KEY, not just the ten above. `India`, `Panama`, `Morocco`
 # and `Japan` are not ordinary English nouns and are NOT gated on a capital, but
 # `India ink`, `Panama hats`, `Morocco leather` and `Japan wax` are all compound
 # nouns of exactly this shape - measured, "in India ink" -> 100 and "in Panama
@@ -440,6 +457,40 @@ _EN_HEAD = (r"(?:grass(?:es)?|seeds?|nuts?|clay|peppers?|manure|litter|farms?"
 _NO_AREA = re.compile(
     r"(?<!\w)(?:kuzey\s+kibris|k\.?k\.?t\.?c\.?|trnc|northern\s+cyprus)(?!\w)"
 )
+
+# HAZARD, THE SAME SHAPE ONE STEP ALONG: a country name whose dominant reading
+# in THIS assistant is a different place, and one FAOSTAT holds no figures for.
+# `Georgia` is a top-ten US agricultural state - peanuts, pecans, peaches,
+# poultry - and "my farm is in Georgia" from an English-speaking grower is far
+# likelier to be the state than the Republic. FAOSTAT has no US-state area, so
+# the state cannot be answered; area 73 can, and answering it hands a Georgia
+# grower Caucasian yields with nothing said. That is the TRNC harm exactly, and
+# it is treated the same way: refuse, and let the assistant ask.
+#
+# IT WAS THE OTHER WAY ROUND UNTIL THIS WAVE, and pinned: tests/test_country.py
+# asserted `("my farm is in Georgia", 73)` as the correct answer. The guard in
+# src/engine.py did not read `my farm is in` at all, so the wrong answer stayed
+# behind a branch that never fired; the same wave that admitted that shape as a
+# self-declaration had to decide this, and decided against the country.
+#
+# THE ENGLISH SPELLING ONLY, which is what makes the trade cheap. `Gürcistan`
+# and `gurcistan` are untouched and still resolve to 73, so this product's
+# primary user - a Turkish speaker - loses nothing whatever. What is given up is
+# an English-speaking grower in the Republic of Georgia, who is asked instead of
+# placed. Measured: "Gürcistan'dayım" -> 73, "Gürcistan'da yaşıyorum" -> 73,
+# "my farm is in Georgia" -> None, "I farm in Georgia" -> None, "the yield in
+# Georgia peaches is high" -> None (73 before, and the capital gate bought
+# nothing against it).
+#
+# MESSAGE-WIDE, for the reason _NO_AREA is: the user HAS said where they are,
+# and falling through to another country in the same sentence or to an older
+# turn is the same silent misplacement in a different costume.
+#
+# NOT A CAPITALISATION MATTER. `georgia` was in _AMBIGUOUS_EN and the gate could
+# never have helped: both readings are proper nouns and both are capitalised.
+# That is the module's own argument for why the capital "buys NOTHING against
+# the capitalised compound noun", applied to a capitalised PLACE noun.
+_NOT_THIS_PLACE = re.compile(r"(?<!\w)georgia(?!\w)")
 
 
 @lru_cache(maxsize=1)
@@ -529,8 +580,8 @@ def _matchers() -> tuple[
         # this way keeps the tuple one shape and _find free of language tests.
         # It still carries the `name` group every branch is read through.
         never = r"(?P<name>(?!))"
-        # Only the eleven ambiguous names carry the test; the rest get None and
-        # are never asked. `key` is ASCII for all eleven, so the capital can be
+        # Only the ten ambiguous names carry the test; the rest get None and
+        # are never asked. `key` is ASCII for all ten, so the capital can be
         # taken straight off it - no Turkish letter needs unfolding.
         #
         # The lookbehind is kept although _find only ever anchors this pattern at
@@ -572,7 +623,9 @@ def _matchers() -> tuple[
 
 
 def _refuses(folded: str) -> bool:
-    """True when the ALREADY-FOLDED text names a place FAOSTAT has no area for.
+    """True when the ALREADY-FOLDED text names a place this table cannot answer
+    for - either one FAOSTAT has no area for at all (_NO_AREA) or one whose
+    dominant reading here is a place it has no area for (_NOT_THIS_PLACE).
 
     Separate from _find because it is not a failure to match - it is a decision
     not to answer, and the caller must stop rather than look elsewhere.
@@ -580,7 +633,7 @@ def _refuses(folded: str) -> bool:
     Takes folded text, not raw: every caller needs the fold anyway and doing it
     here as well folded each message twice on a path that runs on every answer.
     """
-    return bool(_NO_AREA.search(folded))
+    return bool(_NO_AREA.search(folded) or _NOT_THIS_PLACE.search(folded))
 
 
 def _admits(cap: re.Pattern[str] | None, head: re.Pattern[str],
@@ -628,7 +681,7 @@ def _find(folded: str, original: str) -> int | None:
     firing on a crop name.
 
     TAKES THE TEXT TWICE, folded and as the user wrote it. The branches need the
-    fold; the eleven names that are also ordinary English nouns need the capital
+    fold; the ten names that are also ordinary English nouns need the capital
     letter, which the fold destroys. Folding stayed where it is - in
     extract_country, done once per text - and the original is passed alongside it
     rather than re-derived, because these two strings must describe the same text
@@ -636,7 +689,7 @@ def _find(folded: str, original: str) -> int | None:
     _AMBIGUOUS_EN.
 
     TWO PRECONDITIONS SIT ON EVERY MATCH, not on every key: the capital letter
-    for those eleven names, and the head-noun refusal for all 199. Both are
+    for those ten names, and the head-noun refusal for all 199. Both are
     asked of the OCCURRENCE a branch found, so a later mention cannot licence an
     earlier one and an earlier one cannot condemn a later one. See _admits, which
     names what whole-text testing was measured to cost in each direction.

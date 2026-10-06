@@ -158,15 +158,19 @@ def test_the_head_noun_must_sit_immediately_after_the_name(message, code):
 @pytest.mark.parametrize("message", [
     "i am in turkey",
     "i live in brazil",
-    "my farm is in georgia",
+    "my farm is in chile",
     "malide yasiyorum",
     "sudanda yasiyorum",
 ])
 def test_the_capitalisation_rule_costs_the_lowercase_typist(message):
     """What the rule charges, pinned so it is visible rather than discovered. A
     user who types all-lowercase is refused where they used to be placed. It
-    falls on eleven names out of 199 - the ones that are also ordinary nouns -
+    falls on ten names out of 199 - the ones that are also ordinary nouns -
     and the failure is in the safe direction: the assistant asks.
+
+    The third sentence used to name `georgia` and would now pass for the WRONG
+    REASON - `Georgia` is refused in both cases by _NOT_THIS_PLACE, whatever
+    this gate does - so it names `chile` instead, which this gate alone holds.
 
     "malide yasiyorum" is there because `Mali` is spelled the same in both
     lists, so the requirement reaches its Turkish branches too. `mali` is also
@@ -249,16 +253,57 @@ def test_sudan_still_resolves_when_it_is_the_country(message, code):
 @pytest.mark.parametrize("message, code", [
     ("I am in Turkey", TURKIYE),
     ("I live in Brazil", BRAZIL),
-    ("my farm is in Georgia", 73),
+    ("my farm is in Guinea", 90),
     ("I am in Chile", 40),
     ("Mali'deyim", 133),
     ("Sudan'dayım", 276),
     ("TURKEY", TURKIYE),
 ])
 def test_the_same_ambiguous_names_resolve_when_capitalised(message, code):
-    """The other half, as always. All eleven stay reachable - the rule asks for a
+    """The other half, as always. All ten stay reachable - the rule asks for a
     capital letter, not for a different word. "TURKEY" counts: all-caps is a
-    shout, not a common noun."""
+    shout, not a common noun.
+
+    `my farm is in Georgia` STOOD IN THIS LIST AND ASSERTED 73, and it is
+    `Guinea` here now. The sentence shape is kept because it is the one this
+    wave added to src/engine.py's `_SELF_EN`; the country is changed because
+    `Georgia` is refused outright - see the test below."""
+    assert extract_country(message) == code
+
+
+@pytest.mark.parametrize("message", [
+    "my farm is in Georgia",
+    "I farm in Georgia",
+    "I am in Georgia",
+    "we grow peanuts in Georgia",
+    "the yield in Georgia peaches is high",
+])
+def test_the_english_georgia_is_refused_rather_than_placed(message):
+    """`Georgia` is a top-ten US agricultural state and FAOSTAT has no US-state
+    area, so an English-speaking grower who says his farm is in Georgia cannot
+    be answered - and area 73 CAN be, which is the harm: he was handed Caucasian
+    yields with nothing said. Same shape as the TRNC, same answer.
+
+    The first of these was pinned the other way, as `("my farm is in Georgia",
+    73)`, and it passed because src/engine.py's guard did not read `my farm is
+    in` at all - so the wrong answer sat behind a branch that never fired. The
+    wave that admitted that shape as a self-declaration had to decide this.
+
+    The capital gate could never have helped: both readings are proper nouns and
+    both are capitalised. The last sentence here resolved to 73 with the gate in
+    place."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Gürcistan'dayım", 73),
+    ("Gürcistan'da yaşıyorum", 73),
+    ("Gürcistan'da çiftçiyim", 73),
+])
+def test_the_turkish_georgia_still_resolves(message, code):
+    """What makes the refusal above cheap: it is scoped to the ENGLISH spelling,
+    so this product's primary user loses nothing. A Turkish speaker writes
+    `Gürcistan`, and the US state has no Turkish name that collides with it."""
     assert extract_country(message) == code
 
 
