@@ -762,7 +762,19 @@ def _context_block(route: str, message: str, history: list[dict] | None,
         if fc:
             lines.append(f"Hava durumu: {fc}.")
     else:
-        lines.append(_ASK_LOCATION)
+        # THIS ROUTE ASKS FOR THE PROVINCE ONLY, and `_ASK_LOCATION`'s invitation
+        # to name a country deliberately does NOT reach it. `_country_lines` has
+        # exactly one caller - `_crop_choice_block` - so a `fert_plan` user who
+        # answered "Fransa'dayim" would be asked again on the next turn, having
+        # been told to say the thing this route cannot read. A question whose
+        # answer is discarded is worse than a narrower question.
+        #
+        # The world layer reaching `fert_plan` is a separate round: that route
+        # serves a fertilization and irrigation plan, and FAOSTAT publishes
+        # neither - it publishes yield and price, which is what `crop_choice`
+        # needs. See docs/client-requirements.md §8 on the season programme.
+        lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
+                     "oldugunu sor, tavsiyeni genel tut.")
     lines.append("Bitkinin fenolojik donemi bilinmiyorsa cevabinda sor "
                  "(fide, cicek, meyve tutumu gibi).")
     return "\n".join(lines)
@@ -1051,6 +1063,10 @@ _SELF_EN = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
 # "Turkiye disinda" is what the answer block prints when a country IS settled,
 # and four tests assert it is absent from a block that asks this question. Two
 # meanings for one substring would make those tests pass for the wrong reason.
+#
+# USED BY `crop_choice` ONLY. `fert_plan` asks for the province in its own words
+# and does not invite a country, because `_country_lines` has one caller and it
+# is not that route - see the comment at that call site.
 _ASK_LOCATION = ("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu "
                  "sor; yurt disindaysa ulkesini Fransa'dayim gibi yazmasini "
                  "iste, tavsiyeni genel tut.")

@@ -1535,11 +1535,18 @@ def test_the_location_question_asks_for_the_country_in_a_shape_the_guard_accepts
     assert "ulkesini" in engine._ASK_LOCATION
 
 
-def test_both_routes_ask_the_location_question_in_the_same_words():
-    """ONE STRING, TWO ROUTES. It used to be written out at both call sites, and
-    not identically - the fert_plan copy carried ", tavsiyeni genel tut." and the
-    crop_choice one did not, so the brief that ordered this change described them
-    as the same string when they were not. They are the same string now.
+def test_only_the_route_that_can_read_a_country_asks_for_one():
+    """TWO ROUTES, TWO QUESTIONS, and the difference is the point.
+
+    `_country_lines` has exactly ONE caller, `_crop_choice_block`. An earlier
+    revision of this test pinned both routes to the same string, because the
+    brief that ordered the change asked for that - and the result was a
+    `fert_plan` user being told to write "Fransa'dayim" and then asked again on
+    the next turn, since nothing on that route reads the answer. A question whose
+    answer is discarded is worse than a narrower question.
+
+    The world layer reaching `fert_plan` is a separate round: that route serves a
+    fertilization and irrigation plan and FAOSTAT publishes neither.
 
     `_ASK_LOCATION` DOES NOT CONTAIN "Turkiye disinda", deliberately: that is the
     phrase the block prints when a country IS settled, and four tests assert it
@@ -1549,8 +1556,11 @@ def test_both_routes_ask_the_location_question_in_the_same_words():
                                  None, date(2026, 8, 10))
     crop = engine._context_block("crop_choice", "Bu yil ne eksem?", None,
                                  date(2026, 8, 10))
-    assert engine._ASK_LOCATION in fert
     assert engine._ASK_LOCATION in crop
+    assert engine._ASK_LOCATION not in fert
+    # Both still ask for the province; only one invites a country.
+    assert "hangi ilde oldugunu sor" in fert
+    assert "ulkesini" not in fert
     assert "Turkiye disinda" not in engine._ASK_LOCATION
 
 
