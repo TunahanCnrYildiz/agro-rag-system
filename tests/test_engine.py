@@ -2178,6 +2178,37 @@ _SUFFIX_NEAR_MISSES = [
 ]
 
 
+_NATIONALITY_REFUSALS = [
+    ("Hollandalıyım, buğday mı ekmeliyim", 150),
+    ("Fransalıyım", 68),
+    ("Fransalıyım, buğday mı ekmeliyim", 68),
+    ("hollandaliyim, bugday mi ekmeliyim", 150),
+]
+
+
+@pytest.mark.parametrize("text,code", _NATIONALITY_REFUSALS)
+def test_a_nationality_is_not_a_location(text, code):
+    """`-lI` ON THE NAME SAYS WHERE THE SPEAKER IS FROM, NOT WHERE HE IS.
+    "Hollandalıyım" is "I am Dutch", and a Dutch grower farming in Antalya says
+    it truthfully while standing in Türkiye - so admitting it printed the
+    Netherlands' average yield beside "hangi ilde oldugunu SORMA" for a grower
+    whose province we should have asked for.
+
+    IT WAS ADMITTED FOR FOUR WAVES AND DECLARED, NEVER DECIDED: the comment
+    above `_SELF_TR` called it "weaker evidence of presence" in every revision.
+    A nationality is an inference about location, and this branch's last wave
+    took the inference out; this is the same decision applied to the arm that
+    survived it by being described rather than measured.
+
+    THE COST IS ONE TURN, the same trade as the deleted bare-name branch:
+    "Fransalıyım" gets `_ASK_LOCATION` back, which asks for "Fransa'dayım" in
+    exactly that spelling, and the next turn is placed. `extract_country` still
+    RESOLVES these sentences - see tests/test_country.py - because resolving a
+    name and placing a speaker are different questions, and only the second one
+    is this guard's."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
 @pytest.mark.parametrize("text,code", _SUFFIX_NEAR_MISSES)
 def test_the_fused_suffix_is_the_whole_decision(text, code):
     """Five endings that share the locative's letters and are not a first-person
@@ -2435,7 +2466,7 @@ def test_an_object_locative_does_not_open_the_country_block(message, code):
 # ONE sentence out of 27 could reach its pattern, so its "0/27 refusals" was an
 # empty measurement rather than a guarantee. Every sentence here reaches the
 # branch's prefix - locative, a word ending in `-an/-en`, `bir` - so the tables
-# in src/engine.py can fail. 26 of the 91 refusals the suite carries reach the
+# in src/engine.py can fail. 26 of the 95 refusals the suite carries reach the
 # deleted branch's loose prefix and 10 its shipped gate.
 #
 # Measured 2026-10-03 against the branch as it shipped at 12aba9e: TWELVE of
@@ -2657,10 +2688,12 @@ def test_the_reach_count_beside_the_surviving_branchs_zero():
     `_SELF_TR`'s decision is "the person suffix sits on the country's own name,
     with nothing in between". An input can break that decision only by carrying a
     `-yIm`-shaped word somewhere ELSE - a looser reading would admit exactly
-    those. 39 of the 91 refusals do, and the words are `dayim`, `tayim`,
+    those. 42 of the 95 refusals do, and the words are `dayim`, `tayim`,
     `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ciftciyim`,
-    `ureticiyim`, `sucluyum` and `tohumcuyum` - possessed nouns, optatives and
-    other people's agent nouns. Measured here rather than asserted in a comment,
+    `ureticiyim`, `sucluyum`, `tohumcuyum` and `ekmeliyim` - possessed nouns,
+    optatives and
+    other people's agent nouns, plus the optative `ekmeliyim` that three of the
+    nationality refusals carry. Measured here rather than asserted in a comment,
     because the comment above `_SELF_TR` quotes this number."""
     person = re.compile(r"y[iu][mz]$")
     reach = []
@@ -2672,7 +2705,7 @@ def test_the_reach_count_beside_the_surviving_branchs_zero():
                                                for name in names)
                for word in words):
             reach.append(text)
-    assert len(reach) == 39, reach
+    assert len(reach) == 42, reach
     assert [text for text, code in _TURKISH_REFUSALS
             if engine._states_location(text, engine._code_aliases(code))] == []
 
@@ -3037,7 +3070,8 @@ _TURKISH_REFUSALS = (_MERELY_NAMING + _WIDENED_BRANCH_REFUSALS
                      + _OBJECT_LOCATIVES + _SHAPE_NEAR_MISSES
                      + _SHAPE_NEAR_MISSES_CLOSED + _ACTION_LOCATIVES
                      + _WINDOW_PERSON_NEAR_MISSES + _POSSESSION_NEAR_MISSES
-                     + _PAST_TENSE_REFUSALS + _SUFFIX_NEAR_MISSES)
+                     + _PAST_TENSE_REFUSALS + _SUFFIX_NEAR_MISSES
+                     + _NATIONALITY_REFUSALS)
 
 
 def test_the_corpus_the_guards_numbers_are_quoted_over():
@@ -3053,10 +3087,11 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
 
     THE ACCEPT COLUMN FELL FROM 41 TO 3 and that is the wave's whole subject:
     the 39 sentences it lost are listed in `_SURRENDERED_ACCEPTS` and pinned as
-    costs there, not deleted. The refusal column ROSE from 86 to 91 - deleting
-    rules cannot admit anything, so all 86 still refuse, and the five new ones
-    are `_SUFFIX_NEAR_MISSES`, built to break the one decision the surviving
-    Turkish pattern makes.
+    costs there, not deleted. The refusal column ROSE from 86 to 95 - deleting
+    rules cannot admit anything, so all 86 still refuse; five of the nine new
+    ones are `_SUFFIX_NEAR_MISSES`, built to break the one decision the
+    surviving Turkish pattern makes, and four are `_NATIONALITY_REFUSALS`, the
+    `-lI` arm that was dropped after this wave.
 
     THE 50 PINNED COSTS ARE DELIBERATELY OUTSIDE BOTH NUMBERS: a cost is a
     sentence the guard refuses and we wish it did not, so a looser rule that
@@ -3064,7 +3099,7 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     denominator would inflate every column with sentences the number is not
     about."""
     assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 3
-    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 91
+    assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 95
     assert len(_ENGLISH_ACCEPTS) == 10
     assert len(_ENGLISH_NOT_A_LOCATION) == 25
     assert len(_BARE_NAMES) == 8
@@ -3102,7 +3137,7 @@ def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
     unit: if either one were carrying a class only the other refused, a later
     change to that one would open it silently.
 
-    Measured: each pattern admits 0 of the 91 by itself."""
+    Measured: each pattern admits 0 of the 95 by itself."""
     for name, pattern in (("_SELF_TR", engine._SELF_TR),
                           ("_SELF_EN", engine._SELF_EN)):
         for text, code in _TURKISH_REFUSALS + _ENGLISH_NOT_A_LOCATION:

@@ -902,10 +902,11 @@ def _world_amount(amount: float) -> str:
 # not visible. So the inference is gone, and what remains are the two patterns
 # whose decision is small enough for a refuse set to test:
 #
-#  * _SELF_TR - the person suffix FUSED TO THE NAME, nothing in between:
-#    "Fransa'dayim", "Ganadayim", "Fransaliyim". It reads no window, no verb, no
+#  * _SELF_TR - the LOCATIVE person suffix FUSED TO THE NAME, nothing in
+#    between: "Fransa'dayim", "Ganadayim". It reads no window, no verb, no
 #    clause, no conversation. Across five waves it produced ZERO Criticals, and
-#    it is the only branch here that produced none.
+#    it is the only branch here that produced none. Its `-lI` arm - the
+#    nationality - was dropped afterwards; see the comment on the pattern.
 #  * _SELF_EN - its English twin: an enumerated first-person subject, then
 #    `in`/`at`/`from`, then the name, adjacent.
 #
@@ -924,12 +925,13 @@ def _world_amount(amount: float) -> str:
 #   "Fransa'dayim" - and `_ASK_LOCATION` now asks for exactly that spelling,
 #   which is why the question text changed in the same commit as the deletion.
 #
-# THE REFUSE SET IS 91 AND 0 OF IT IS ADMITTED. Deleting rules cannot admit
+# THE REFUSE SET IS 95 AND 0 OF IT IS ADMITTED. Deleting rules cannot admit
 # anything, so every one of the 86 refusals the five waves earned still refuses;
-# the five new ones are the suffix's own near misses, listed below. Re-measured
+# five of the nine new ones are the suffix's own near misses, listed below, and
+# four are the `-lI` nationality dropped after this wave. Re-measured
 # PER BRANCH rather than as a pair, because deleting a rule moves which rule
 # refuses a sentence even when it admits nothing: each surviving pattern admits
-# 0 of the 91 on its own, so neither is carrying a class only the other held.
+# 0 of the 95 on its own, so neither is carrying a class only the other held.
 #
 # REJECTED: keeping the bare-name branch - "Fransa" alone, counted as a location
 # because the assistant had just asked where the user is. The idea is right and
@@ -964,11 +966,11 @@ def _world_amount(amount: float) -> str:
 # branch. The decision is "the person suffix sits on the NAME, with nothing in
 # between". What could break it is a `-yIm`-shaped word somewhere ELSE in the
 # sentence, because a rule that read the clause instead of the name would admit
-# those. Measured over the 91 refusals: 39 carry one - `dayim`, `tayim`,
-# `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ciftciyim`,
-# `ureticiyim`, `sucluyum`, `tohumcuyum` - and _SELF_TR admits 0 of the 91. That
-# is the measurement the five deleted rules never had: the 39 are exactly the
-# inputs a looser reading of this one decision would get wrong.
+# those. Measured over the 95 refusals: 42 carry one - `dayim`, `tayim`,
+# `koyum`, `sayim`, `payim`, `soyum`, `ekeyim`, `kurayim`, `ekmeliyim`,
+# `ciftciyim`, `ureticiyim`, `sucluyum`, `tohumcuyum` - and _SELF_TR admits 0 of
+# the 95. That is the measurement the five deleted rules never had: the 42 are
+# exactly the inputs a looser reading of this one decision would get wrong.
 #
 # AND THE SUFFIX'S OWN NEAR MISSES, the other way one decision can fail - the
 # letters `[dt][ae]` followed by something that is not `-yIm`. All five refused,
@@ -979,12 +981,23 @@ def _world_amount(amount: float) -> str:
 #   Fransa'daki     the relativiser             no `y` at all
 #   Fransa'dan      ablative                    not a locative
 #
-# `-lI` IS A NATIONALITY AND IS ADMITTED, declared rather than measured:
-# "Hollandaliyim" is "I am Dutch", which is weaker evidence of presence than
-# "Hollanda'dayim". It is pre-existing, it is named in this comment's every
-# revision, and it is left alone because narrowing it is a separate decision from
-# this wave's - and because a resolved province beats this function anyway.
-_SELF_TR = r"'?(?:[dt][ae]|l[iu])y[iu][mz](?!\w)"
+# `-lI` IS A NATIONALITY AND IS NOW REFUSED. "Hollandaliyim" is "I am Dutch",
+# not "I am in the Netherlands" - it states where the speaker is FROM, and a
+# Dutch grower farming in Antalya says it truthfully while standing in Turkiye.
+# It was admitted for four waves and declared in every revision of this comment
+# as "weaker evidence of presence", which is the shape of a thing nobody had
+# decided. It is decided now, on this wave's own rule: a nationality is an
+# INFERENCE about location, and inference is what came out.
+#
+# IT IS THE SAME TRADE AS THE BARE NAME, and taken for the same reason: the
+# speaker writes "Fransaliyim", gets `_ASK_LOCATION` back, writes "Fransa'dayim"
+# and is placed. One turn, against a class of silent wrong placements for every
+# foreign national living in Turkiye who has not named a province.
+#
+# WHAT STAYS IS THE LOCATIVE ALONE - `-da/-de/-ta/-te` fused to the name and
+# carrying the person. One decision, one shape, and the reach count above is
+# measured against it.
+_SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 
 # The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
 # preposition says where something is, not where the USER is. "I buy seed from

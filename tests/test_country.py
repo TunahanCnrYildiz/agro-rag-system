@@ -448,8 +448,13 @@ def test_english_from_is_a_supplier_not_a_location(message):
 def test_from_still_places_the_user_when_it_predicates_the_user(message, code):
     """The boundary drawn around `from`: it is evidence only where it describes
     the USER rather than a purchase. An enumerated copula cannot be reached by
-    any sentence about buying. This is the English twin of `-lı` in the Turkish
-    suffix, which already accepts "Hollandalıyım" as a statement of location."""
+    any sentence about buying.
+
+    `from` AND `-lı` HAVE SINCE PARTED COMPANY, and this docstring used to point
+    at `-lı` as its twin. This function still RESOLVES "Hollandalıyım" - naming a
+    country is what it is for - but engine's guard no longer places a speaker on
+    it, because a nationality says where he is from. Whether `from` should follow
+    it is open and recorded; see `_NATIONALITY_REFUSALS` in tests/test_engine.py."""
     assert extract_country(message) == code
 
 
