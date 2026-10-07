@@ -2342,17 +2342,93 @@ def test_possessing_something_that_is_not_land_is_not_a_location(text, code):
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
-_DECLARED_ENGLISH_ACCEPTS = [
-    # THE CONDITIONAL AND THE FUTURE. Both have refused Turkish twins and the
-    # asymmetry is not repaired.
+_CONDITIONAL_REFUSALS = [
     ("If I am in France next year, should I plant wheat", 68),
+    ("if i'm in France the prices are different", 68),
+]
+
+
+@pytest.mark.parametrize("text,code", _CONDITIONAL_REFUSALS)
+def test_a_supposed_location_is_not_a_location(text, code):
+    """A COMMENT'S CLAIM MEASURED AND FOUND FALSE. The wave that declared this
+    sentence an accept wrote that refusing it "means reading the tail", which is
+    the inference the guard had just had removed - so it was pinned as a decision
+    rather than fixed. It is not true: `if` stands immediately LEFT of the
+    subject, and a fixed-width negative lookbehind reads it without touching the
+    rest of the sentence. The sixth review measured it at 0 accepts lost and 0
+    refusals missed.
+
+    `when I am in France I plant wheat` is still admitted, in
+    `_DECLARED_ENGLISH_ACCEPTS`, and the line between them is the mood: `if`
+    supposes a France the speaker is not in, `when` says he goes there."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+_POSSESSED_SUBJECT_COSTS = [
+    ("my farm is in France", 68),
+    ("my field is in France", 68),
+]
+
+
+@pytest.mark.parametrize("text,code", _POSSESSED_SUBJECT_COSTS)
+def test_the_price_of_requiring_a_pronoun_subject(text, code):
+    """PINNED AS A COST. Both say where the speaker's own land is, which is
+    exactly what this guard wants to know, and both are refused now.
+
+    They are given up as a CLASS and not patched, because nothing tells them
+    apart from `_POSSESSED_SUBJECT_LEAKS` below without parsing the clause:
+    A word boundary is not a clause boundary, so a possessed-noun subject can
+    sit at the
+    tail of a larger phrase whose real subject is somebody else. A pronoun
+    cannot - `my farm` can be possessed, `i` cannot. The speaker writes
+    "I am in France" and is placed."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+_POSSESSED_SUBJECT_LEAKS = [
+    # Each one is a pinned refusal of this suite's with one genitive added, and
+    # each was ADMITTED until the subject rule required a pronoun. Measured at
+    # the sixth review.
+    ("the supplier of my farm is in France", 68),      # cf. "my supplier is in France"
+    ("the buyer of my field is in France", 68),        # cf. "my buyer is in France"
+    ("the owner of my farm is in France", 68),         # cf. "the farm is in France"
+    ("the man who rents my farm is in France", 68),
+    ("the company that owns my farm is in the Netherlands, my field is in Antalya", 150),
+]
+
+
+@pytest.mark.parametrize("text,code", _POSSESSED_SUBJECT_LEAKS)
+def test_a_possessed_subject_inside_a_larger_phrase_is_not_the_speaker(text, code):
+    """THE SIXTH REVIEW'S CRITICAL, and the reason the subject list is pronouns.
+
+    The last sentence is the one that decided it: the speaker says his field is
+    in Antalya in the same breath, and the guard placed him in the Netherlands
+    and printed "hangi ilde oldugunu SORMA" - the same harm the previous commit
+    deleted `from` to stop, through a different door, and sticky for the whole
+    conversation because `_country_lines` asks every user turn.
+
+    Six waves closed the sentences they had thought of. This one closes the part
+    of speech."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+_DECLARED_ENGLISH_ACCEPTS = [
+    # THE FUTURE, and the temporal `when`. Both have refused Turkish twins and
+    # the asymmetry is not repaired: refusing them means reading the tail, which
+    # is the inference this branch deleted. `when` is also a decision and not a
+    # miss - it says the speaker does go to France, where `if` supposes a France
+    # he is not in, and `if` is refused; see `_CONDITIONAL_REFUSALS`.
     ("I am in India tomorrow", 100),
+    ("When I am in France I plant wheat", 68),
     # A COUNTRY'S NAME AS THE FIRST WORD OF A LONGER FOREIGN PLACE NAME, two US
     # towns named after countries. The level below the `Georgia` decision in
     # `country._NOT_THIS_PLACE`, and admitted for the same reason as the two
     # above: refusing them means reading the tail.
-    ("my farm is in Lebanon, Ohio", 121),
-    ("my farm is in Peru, Indiana", 170),
+    # REWRITTEN WITH A PRONOUN SUBJECT after the possessed-noun subjects were
+    # dropped: with "my farm is" these two were refused by the subject rule and
+    # stopped measuring the tail decision they are here for.
+    ("I am in Lebanon, Ohio", 121),
+    ("we are in Peru, Indiana", 170),
 ]
 
 _ENGLISH_ACCEPTS = [
@@ -2360,10 +2436,6 @@ _ENGLISH_ACCEPTS = [
     ("I am in France", 68),
     ("I farm in France", 68),
     ("we are based in France", 68),
-    # The subject is a possessed noun rather than a pronoun, but it is the
-    # speaker's own holding.
-    ("my farm is in France", 68),
-    ("my field is in France", 68),
     # TEMPORARY PRESENCE, and it is pinned as an ACCEPT on purpose rather than
     # left out as the gap a previous review called it. See _SELF_EN: the Turkish
     # twin "Fransa'dayım, fuara geldim" is admitted and cannot be refused
@@ -2496,7 +2568,7 @@ _ENGLISH_NOT_A_LOCATION = [
     ("their field is in France", 68),
     ("my brother farms in France", 68),
     ("the company is based in France", 68),
-] + _ENGLISH_ORIGIN_REFUSALS
+] + _ENGLISH_ORIGIN_REFUSALS + _POSSESSED_SUBJECT_LEAKS + _CONDITIONAL_REFUSALS
 
 
 @pytest.mark.parametrize("text,code", _ENGLISH_ORIGIN_REFUSALS)
@@ -2552,7 +2624,7 @@ def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
     EACH COUNT IS ANCHORED ON THE NAME, and that is a correction rather than a
     restatement. The old person count matched `<subject> ... in <anything>` and
     the old adjacency count was "a first-person word somewhere AND a preposition
-    somewhere": over this set the first returns 17 and the second 18, because
+    somewhere": over this set the first returns 23 and the second 11, because
     nine of the ten origin refusals carry a second clause with a Turkish PROVINCE
     in it - "my farm is in Antalya" satisfies both and tests neither. A count
     that cannot fail is the defect this guard has been reviewed for five times,
@@ -2567,10 +2639,18 @@ def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
                     the subject list cannot leave this count measuring the old
                     one.
 
-    The person and adjacency counts are UNCHANGED by the ten sentences class (f)
-    added, and that is itself the finding: every origin refusal has a
-    first-person subject in the branch's own frame, so the preposition is the
-    only decision they can break."""
+    The person and adjacency counts were UNCHANGED by the ten sentences class (f)
+    added, and that was itself a finding: every origin refusal has a first-person
+    subject in the branch's own frame, so the preposition is the only decision
+    they can break.
+
+    THE PERSON COUNT THEN MOVED 13 -> 19, and that is the sixth review's
+    Critical written as a number. All five of `_POSSESSED_SUBJECT_LEAKS` reach
+    the person decision, where the 35 before them produced 13 - and every one of
+    those 13 broke it by putting a THIRD PARTY in the subject slot. None put a
+    larger phrase around a first-person one, which is the sub-decision the
+    possessed-noun subjects actually made, so the 13 was not stale and not
+    vacuous: it was partitioned wrongly, which is just as invisible."""
     from src.context import country as country_ctx
     any_subject = (r"(?<!\w)\w+(?:\s+\w+)?\s+"
                    r"(?:is|are|am|'m|live|lives|farm|farms)"
@@ -2584,21 +2664,23 @@ def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
         return any(re.search(rf"{prefix}{re.escape(name)}(?!\w)", folded)
                    for name in engine._code_aliases(code))
 
-    assert len(_ENGLISH_NOT_A_LOCATION) == 35
+    assert len(_ENGLISH_NOT_A_LOCATION) == 42
     assert sum(1 for text, _code in _ENGLISH_NOT_A_LOCATION
-               if country_ctx.extract_country(text, None) is not None) == 31
+               if country_ctx.extract_country(text, None) is not None) == 38
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
-               if before_the_name(any_subject, text, code)) == 13
+               if before_the_name(any_subject, text, code)) == 19
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
                if first_person.search(engine._normalize_tr(text))
-               and before_the_name(bare_prep, text, code)) == 5
+               and before_the_name(bare_prep, text, code)) == 7
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
                if before_the_name(origin, text, code)) == 10
     # And the count the origin class exists for was ZERO on the set that shipped
     # the Critical: nothing in the old twenty-five could break the preposition
     # decision.
     old = [pair for pair in _ENGLISH_NOT_A_LOCATION
-           if pair not in _ENGLISH_ORIGIN_REFUSALS]
+           if pair not in _ENGLISH_ORIGIN_REFUSALS
+           and pair not in _POSSESSED_SUBJECT_LEAKS
+           and pair not in _CONDITIONAL_REFUSALS]
     assert len(old) == 25
     assert sum(1 for text, code in old
                if before_the_name(origin, text, code)) == 0
@@ -2688,7 +2770,7 @@ def test_an_object_locative_does_not_open_the_country_block(message, code):
 # ONE sentence out of 27 could reach its pattern, so its "0/27 refusals" was an
 # empty measurement rather than a guarantee. Every sentence here reaches the
 # branch's prefix - locative, a word ending in `-an/-en`, `bir` - so the tables
-# in src/engine.py can fail. 26 of the 95 refusals the suite carries reach the
+# in src/engine.py can fail. 26 of the 99 refusals the suite carries reach the
 # deleted branch's loose prefix and 10 its shipped gate.
 #
 # Measured 2026-10-03 against the branch as it shipped at 12aba9e: TWELVE of
@@ -3364,11 +3446,14 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     about."""
     assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 3
     assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 99
-    assert len(set(_ENGLISH_ACCEPTS)) == len(_ENGLISH_ACCEPTS) == 14
-    assert len(set(_ENGLISH_NOT_A_LOCATION)) == len(_ENGLISH_NOT_A_LOCATION) == 35
+    assert len(set(_ENGLISH_ACCEPTS)) == len(_ENGLISH_ACCEPTS) == 12
+    assert len(set(_ENGLISH_NOT_A_LOCATION)) == len(_ENGLISH_NOT_A_LOCATION) == 42
     assert len(_ENGLISH_ORIGIN_REFUSALS) == 10
     assert len(_DECLARED_ENGLISH_ACCEPTS) == 4
     assert len(_NAME_BOUNDARY_REFUSALS) == 4
+    assert len(_POSSESSED_SUBJECT_COSTS) == 2
+    assert len(_POSSESSED_SUBJECT_LEAKS) == 5
+    assert len(_CONDITIONAL_REFUSALS) == 2
     assert len(_BARE_NAMES) == 8
     assert len(_SURRENDERED_ACCEPTS) == 39
     assert len(_STANDING_COSTS) == 11

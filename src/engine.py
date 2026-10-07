@@ -1164,9 +1164,51 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 # `my farm is in Lebanon, Ohio` is the one level down from the `Georgia` decision
 # in `country._NOT_THIS_PLACE`: FAOSTAT has no US-state area, and US towns named
 # after countries are the same hazard with a comma instead of a word boundary.
-_EN_SUBJECT = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live|we\s+live"
-               r"|i\s+farm|we\s+farm|my\s+farm\s+is|our\s+farm\s+is"
-               r"|my\s+field\s+is|my\s+fields\s+are)(?:\s+based)?\s+")
+# THE SUBJECT MUST BE A FIRST-PERSON PRONOUN. The possessed-noun subjects -
+# `my farm is`, `our farm is`, `my field is`, `my fields are` - were dropped
+# after the sixth review, and they were dropped as a CLASS rather than patched:
+#
+#   `(?<!\w)` IS A WORD BOUNDARY, NOT A CLAUSE BOUNDARY, so a possessed-noun
+#   subject can sit at the tail of a larger phrase whose real subject is
+#   somebody else. Measured at the sixth review:
+#
+#     refuse  my supplier is in France              <- pinned refusal
+#     ADMIT   the supplier of my farm is in France  <- same meaning, one genitive away
+#     refuse  the farm is in France                 <- pinned refusal
+#     ADMIT   the owner of my farm is in France
+#     ADMIT   the man who rents my farm is in France
+#
+#   "The company that owns my farm is in the Netherlands, my field is in
+#   Antalya" placed the user in the Netherlands and printed "hangi ilde
+#   oldugunu SORMA" - the exact harm the previous commit deleted `from` to
+#   stop, reached through a different door, and sticky for the conversation
+#   because `_country_lines` asks every user turn.
+#
+# A PRONOUN SUBJECT CANNOT BE THE TAIL OF ANOTHER SUBJECT. `my farm` can be
+# possessed by a larger phrase; `i` cannot be possessed by anything. That is why
+# the cut is drawn at the part of speech and not at a list of leaky phrases: the
+# six waves before it each closed the sentences they had thought of.
+#
+# WHAT IT COSTS, counted: 2 of the 12 English accepts - "my farm is in France"
+# and "my field is in France" - both pinned as costs. They say where the
+# speaker's land is, which is what this guard wants to know, and they are given
+# up because nothing distinguishes them from the five admissions above without
+# parsing the clause. The speaker writes "I am in France" and is placed.
+#
+# `if` IS REFUSED AND `when` IS NOT, and the difference is the mood rather than
+# the length of the word. An earlier revision of this comment declared the
+# conditional admitted "because refusing it means reading the tail", and that
+# was simply wrong: `if` sits immediately to the LEFT of the subject, and a
+# fixed-width negative lookbehind reads it without touching the rest of the
+# sentence. The sixth review measured the claim and found it false; it costs 0
+# of the other accepts and misses 0 of the refusals.
+#
+# `when I am in France I plant wheat` STAYS ADMITTED, and that is a decision:
+# `if` is counterfactual - the speaker is supposing a France he is not in - while
+# `when` is temporal and says he does go there. `unless` would fit the same
+# lookbehind and is left out for want of a sentence anyone would write.
+_EN_SUBJECT = (r"(?<!\w)(?<!if\s)(?:i\s+am|i'm|we\s+are|we're|i\s+live"
+               r"|we\s+live|i\s+farm|we\s+farm)(?:\s+based)?\s+")
 
 # Split from the preposition so the reach counts above can be taken against the
 # REAL subject list rather than a copy of it: the preposition decision's count is
