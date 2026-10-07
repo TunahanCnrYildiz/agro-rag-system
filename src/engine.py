@@ -973,7 +973,7 @@ def _world_amount(amount: float) -> str:
 # the 99. That is the measurement the five deleted rules never had: the 44 are
 # exactly the inputs a looser reading of this one decision would get wrong.
 # FOURTEEN FORMS, AND THE LIST USED TO NAME THIRTEEN: restricted to the thirteen
-# it printed the count is 39, not 42, and the form it left out is `yayim`
+# it printed the count is 41, not 44, and the form it left out is `yayim`
 # ("Hollanda'da cikan bir yayim var"). The number was derived by a test and the
 # enumeration was prose, so only the prose went stale - and the enumeration is
 # the half a reader uses.
@@ -1063,107 +1063,141 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 # refused by the SUBJECT decision instead. That is the fifth instance of the
 # family named above _SELF_TR, and the refuse set now has a class for it.
 #
-# Dropping it cost nothing measurable: 0 of the 14 pinned accepts use `from`,
+# Dropping it cost nothing measurable: 0 of the 14 accepts pinned AT THE TIME
+# used `from` (the set is 16 now and still 0, re-measured this wave),
 # and 0 of the 25 refusals were being held by it. `extract_country` still
 # RESOLVES "I am from Kenya" - resolving a name and placing a speaker are
 # different questions and only the second one is this guard's, which is the same
 # split the `-lI` decision drew.
 #
-# `my farm is in` / `my field is in` / `our farm is in` are the same whitelist
-# logic one step along: the subject is a possessed noun rather than a pronoun,
-# but it is the speaker's own holding, so the place it sits in is the speaker's.
-# The possessive is what does the work - "my supplier is in France" and "my
-# uncle lives in France" are refused, because the thing possessed is somebody
-# else.
+# THE POSSESSED-NOUN SUBJECTS ARE GONE, and this is where the paragraph
+# recommending them used to stand. It said `my farm is in` / `my field is in` /
+# `our farm is in` "are the same whitelist logic one step along ... the
+# possessive is what does the work", in the present tense and affirmatively,
+# a hundred lines above its own refutation - for one commit, because the commit
+# that deleted them was a single hunk at the bottom of this comment. What
+# replaced them, why, and what it cost are below.
 #
-# ITS REFUSE SET IS 35 NOW, AND IT HAD NONE AT ALL TWO WAVES AGO. It is one of
+# ITS REFUSE SET IS 58 NOW, AND IT HAD NONE AT ALL FIVE WAVES AGO. It is one of
 # the two surviving branches, so it is measured the way the Turkish side is,
 # with the reach counts beside the zero rather than the entry counts. THERE ARE
-# THREE DECISIONS HERE AND NOT TWO - the subject, the adjacency, and WHICH
-# PREPOSITION COUNTS AS PRESENCE - and the third one had no count beside it at
-# all while `from` was admitted. Each is counted against the NAME, because a
-# count taken over the sentence instead inflates on a second clause that says
-# nothing about the decision:
+# FOUR DECISIONS HERE AND NOT THREE - the subject, the adjacency, WHICH
+# PREPOSITION COUNTS AS PRESENCE, and WHOSE `i` IT IS - and the fourth had no
+# count beside it at all until the seventh review. Each is counted against the
+# NAME, because a count taken over the sentence instead inflates on a second
+# clause that says nothing about the decision:
 #
-#   refusals                                                         35
+#   refusals                                                         58
 #   admitted by the branch                                            0
-#   naming a country extract_country resolves (the rest test nothing) 31
-#   ANY SUBJECT, THEN `in`/`at`, THEN THE NAME -                      13
-#     the only inputs that can break the PERSON decision: "he is in
-#     France", "my son is in France", "our customer is in France", "the
-#     farm is in France", "his farm is in France", "their field is in
-#     France", "the company is based in France" and six more.
+#   naming a country extract_country resolves (the rest test nothing) 54
+#   ANY SUBJECT, THEN `in`/`at`, THEN THE NAME -                      35
+#     the only inputs that can break the PERSON decision. Partitioned
+#     below, because a total can be right while its cells lie.
 #   A FIRST-PERSON SUBJECT IN THE SENTENCE AND A BARE `in`/`at` IN
-#   FRONT OF THE NAME -                                                5
-#     the only inputs that can break the ADJACENCY decision: "I sell
-#     wheat in Germany", "I studied in France", "I went to a fair in
-#     the Netherlands", "I saw a greenhouse in the Netherlands", "I am
-#     looking for a buyer in Germany". The branch refuses them because
-#     the subject is not followed by the preposition - a verb and an
-#     object stand in between.
+#   FRONT OF THE NAME -                                               23
+#     the only inputs that can break the ADJACENCY decision: a verb and
+#     an object stand between the subject and the preposition, as in "I
+#     sell wheat in Germany" or "I studied in France". 5 of the 23 are
+#     that shape; the other 18 are the two classes below, which this
+#     wording also reaches and says nothing about.
 #   A WHITELISTED SUBJECT, THEN `from`, THEN THE NAME -               10
 #     the only inputs that can break the PREPOSITION decision, and this
 #     count was 0 until `from` was dropped: "I am from Kenya", "we are
-#     from France", "I am from the Netherlands, my farm is in Antalya",
-#     "We are from India but we farm in Konya" and six more.
+#     from France", "I am from the Netherlands, my farm is in Antalya"
+#     and seven more.
+#   THE PATTERN MATCHES AND A MOOD WORD OR AN ATTRIBUTING VERB TOUCHES
+#   THE SUBJECT -                                                     18
+#     the only inputs that can break the MOOD and ATTRIBUTION
+#     decisions, i.e. what a rule without `_EN_NOT_THE_SPEAKER` would
+#     admit. Over the 42 that shipped `(?<!if\s)` this count was 2, and
+#     both carried the literal `if` the code happened to read - which is
+#     how four other spellings of the mood and a whole attribution class
+#     were admitted under a comment claiming the line was the mood.
 #
-# THE ADJACENCY COUNT READ 8 BEFORE AND READS 5 NOW, and nothing leaked: the
-# old count was "a first-person word anywhere in the sentence AND a preposition
-# anywhere in the sentence", which "I buy seed from France" satisfies while being
-# refused by the SUBJECT decision. Over the 35 that wording returns 18, because
-# every origin refusal carries both halves - a number that cannot fail and
-# therefore says nothing. The count above asks instead what a rule WITHOUT the
-# adjacency requirement would admit: a bare `in`/`at` in front of the name, which
-# is exactly country.py's own looser rule. Same for the person count, which is
-# what a rule with a WIDER subject list would admit; it reads 13 on both sets,
-# and that is the finding - the origin class all has first-person subjects, so it
-# breaks the preposition decision and nothing else.
+# THE PERSON COUNT WENT 13 -> 19 -> 35 AND THE PARTITION IS THE MEASUREMENT.
+# A reach count can be neither stale nor vacuous and still lie by being
+# partitioned wrongly, which the sixth review found and the seventh found again
+# one level down. The 35 splits by the sub-decision each refusal can break, and
+# it splits exactly:
+#
+#   13  (a) a THIRD PARTY in the subject slot - "he is in France", "the
+#           farm is in France", "the company is based in France"
+#    5  (b) a first-person possessive inside a LARGER subject - "the
+#           supplier of my farm is in France"; the sixth review's Critical
+#    8  (c) an ATTRIBUTED `i`, which is somebody ELSE's - "he said 'i am
+#           in France'"; the seventh review's Important 1
+#    9  (d) a SUPPOSED mood - "assuming i am in France"; the seventh
+#           review's Critical. 9 and not 10 because "if i'm in France the
+#           prices are different" has no space before the `'m`, so the
+#           loose person frame does not model it.
+#
+# Cells (c) and (d) were the EMPTY ones at `4a1af74`: (c) held nothing at all
+# and (d) held the single `if` sentence the code read, and both had measured
+# live admissions placing a grower abroad and suppressing the province question
+# for the rest of the conversation. An empty cell under a correct total is the
+# shape this guard has now been reviewed for seven times.
+#
+# THE ADJACENCY COUNT READ 8, THEN 5, AND READS 23 NOW, and the reader is owed
+# the partition rather than the total: 5 (a) + 0 (b) + 8 (c) + 10 (d). The 5
+# measure adjacency; the 18 would be admitted by a rule that relaxed adjacency
+# alone, so they belong in the count by its own definition while testing
+# nothing about adjacency. That overlap is the argument FOR the fourth count,
+# not against the third. The old wording - "a first-person word anywhere in the
+# sentence AND a preposition anywhere in the sentence" - returns 27 over the 58
+# and 5 over the old 25, and "I buy seed from France" satisfies it while being
+# refused by the SUBJECT decision; the same for the person count, whose loose
+# wording returns 39 over the 58 against 13 over the old 25. (43, not 39, if the
+# loose wording is taken with the preposition set the old rule actually had:
+# before `c218ae0` this branch admitted `from`. Two reviews printed that number
+# measured with the NEW set, which is neither the old rule nor anything shipped.
+# The point it serves is stronger at 43.)
 #
 # TEMPORARY PRESENCE IS ADMITTED, AND THAT IS A DECISION, not a gap. "I am in
 # France for the fair", "I am in France this week", "we are in France visiting a
-# supplier" all resolve France, and the fifth class the previous review found
-# missing from this set is missing because it belongs on the OTHER side. Two
-# reasons, and the first is the stronger: the Turkish twin "Fransa'dayim, fuara
-# geldim" is admitted by _SELF_TR and cannot be refused without reading the rest
-# of the sentence, which is the inference this wave deleted - so refusing the
-# English one would make the two surviving branches disagree about the same
-# speaker. And a grower who IS in France this week is in France: FAOSTAT's French
-# figures are the right context for the question he is asking from there. What is
-# wrong about it is only that `_country_lines` makes it stick for the whole
+# supplier" all resolve France, and the fifth class a review found missing from
+# this set is missing because it belongs on the OTHER side. Two reasons, and the
+# first is the stronger: the Turkish twin "Fransa'dayim, fuara geldim" is
+# admitted by _SELF_TR and cannot be refused without reading the rest of the
+# sentence, which is the inference this wave deleted - so refusing the English
+# one would make the two surviving branches disagree about the same speaker. And
+# a grower who IS in France this week is in France: FAOSTAT's French figures are
+# the right context for the question he is asking from there. What is wrong
+# about it is only that `_country_lines` makes it stick for the whole
 # conversation, which is that function's own recorded open item and not this
 # pattern's to fix. Pinned as accepts in `_ENGLISH_ACCEPTS`, not as a gap.
 #
-# AND SO ARE THE CONDITIONAL, THE FUTURE AND THE FIRST WORD OF A LONGER FOREIGN
-# PLACE NAME. Four more accepts, declared on the same rule as temporary presence
-# and for one measured reason: REFUSING THEM NEEDS THE TAIL OF THE SENTENCE, and
-# reading the tail is what this branch's history rejected with a table. The four:
+# AND SO ARE THE FUTURE AND THE FIRST WORD OF A LONGER FOREIGN PLACE NAME -
+# THREE DECLARED ACCEPTS, DOWN FROM FOUR. They are declared on the same rule as
+# temporary presence and for one measured reason: REFUSING THEM NEEDS THE TAIL
+# OF THE SENTENCE, and reading the tail is what this branch's history rejected
+# with a table.
 #
-#   If I am in France next year, should I plant wheat      68
 #   I am in India tomorrow                                100
-#   my farm is in Lebanon, Ohio                           121
-#   my farm is in Peru, Indiana                           170
+#   I am in Lebanon, Ohio                                 121
+#   we are in Peru, Indiana                               170
 #
-# `if`/`when`/`unless` do not fit in a fixed-width lookbehind, and `tomorrow` or
-# `, Ohio` is the tail - and EVERY candidate tail word was measured damaging,
-# `and`, the comma and the full stop included, because "my field is in Egypt
-# for..." and "the protein in turkey for..." have the same tail. Bringing the
-# tail back brings back the inference the wave before this one deleted.
+# `tomorrow` and `, Ohio` ARE the tail, and every candidate tail word was
+# measured damaging - `and`, the comma and the full stop included - because "my
+# field is in Egypt for..." and "the protein in turkey for..." have the same
+# tail. Bringing the tail back brings back the inference the wave before this
+# one deleted. `I am in Lebanon, Ohio` is one level down from the `Georgia`
+# decision in `country._NOT_THIS_PLACE`: FAOSTAT has no US-state area, and US
+# towns named after countries are the same hazard with a comma instead of a word
+# boundary. These two were written with `my farm is` until the sixth review,
+# which made them refusals of the SUBJECT rule and stopped them measuring the
+# tail decision they exist for.
 #
-# The damage is also small, and this is where they differ from the `from` arm
-# above: a grower asking "If I am in France next year, should I plant wheat" IS
-# THINKING ABOUT FRANCE, and FAOSTAT's French figures are the right context for
-# that question. The `from` sentence is the opposite - there the user said his
-# field is in Antalya and was told not to ask which province.
+# THE CONDITIONAL USED TO BE THE FOURTH AND IS A REFUSAL NOW, and the argument
+# that kept it was written here: "the damage is also small ... a grower asking
+# 'If I am in France next year, should I plant wheat' IS THINKING ABOUT FRANCE,
+# and FAOSTAT's French figures are the right context". It lost on the second
+# half. He is thinking about France and he is not IN it, so the block prints
+# "Kullanici Turkiye disinda: France ... hangi ilde oldugunu SORMA" - it tells a
+# grower in Turkiye not to say which province he is in - and `_country_lines`
+# asks every user turn, so it sticks for the conversation. That is the same harm
+# the `from` arm was deleted for, and it was sitting under a paragraph calling
+# it small.
 #
-# THE TURKISH SIDE IS ASYMMETRIC HERE AND THAT IS NOT REPAIRED: "Fransa'daysam
-# ne ekerim" and "Fransa'da olsaydim bugday ekerdim" are refused for free,
-# because `'daysam` and `'da` do not fill `[dt][ae]y[iu][mz]` - Turkish puts the
-# conditional in the morphology and English has no equivalent to read. The two
-# branches agree about a speaker who states where he is; they disagree about one
-# who supposes it, and only the Turkish one gets that for nothing.
-# `my farm is in Lebanon, Ohio` is the one level down from the `Georgia` decision
-# in `country._NOT_THIS_PLACE`: FAOSTAT has no US-state area, and US towns named
-# after countries are the same hazard with a comma instead of a word boundary.
 # THE SUBJECT MUST BE A FIRST-PERSON PRONOUN. The possessed-noun subjects -
 # `my farm is`, `our farm is`, `my field is`, `my fields are` - were dropped
 # after the sixth review, and they were dropped as a CLASS rather than patched:
@@ -1184,37 +1218,131 @@ _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 #   stop, reached through a different door, and sticky for the conversation
 #   because `_country_lines` asks every user turn.
 #
-# A PRONOUN SUBJECT CANNOT BE THE TAIL OF ANOTHER SUBJECT. `my farm` can be
-# possessed by a larger phrase; `i` cannot be possessed by anything. That is why
-# the cut is drawn at the part of speech and not at a list of leaky phrases: the
-# six waves before it each closed the sentences they had thought of.
+# A PRONOUN SUBJECT CANNOT BE THE TAIL OF ANOTHER SUBJECT: `my farm` can be
+# possessed by a larger phrase, `i` cannot be possessed by anything. THAT CLAIM
+# IS ABOUT POSSESSION AND IT IS TRUE; THE CONCLUSION DRAWN FROM IT - "so the
+# whitelisted subject is the writer" - IS FALSE, and the seventh review measured
+# it. A pronoun cannot be possessed but it can be ATTRIBUTED, and attribution
+# puts somebody else's `i` in the subject slot without possessing anything:
 #
-# WHAT IT COSTS, counted: 2 of the 12 English accepts - "my farm is in France"
-# and "my field is in France" - both pinned as costs. They say where the
-# speaker's land is, which is what this guard wants to know, and they are given
-# up because nothing distinguishes them from the five admissions above without
-# parsing the clause. The speaker writes "I am in France" and is placed.
+#     ADMIT   he says i am in France
+#     ADMIT   he said "i am in France" in his email
+#     ADMIT   my supplier wrote: i am in France, send the order
+#     ADMIT   the form says i live in France
+#     ADMIT   translate "i am in France" into Turkish
+#     ADMIT   he said "i am in the Netherlands", my field is in Antalya
 #
-# `if` IS REFUSED AND `when` IS NOT, and the difference is the mood rather than
-# the length of the word. An earlier revision of this comment declared the
-# conditional admitted "because refusing it means reading the tail", and that
-# was simply wrong: `if` sits immediately to the LEFT of the subject, and a
-# fixed-width negative lookbehind reads it without touching the rest of the
-# sentence. The sixth review measured the claim and found it false; it costs 0
-# of the other accepts and misses 0 of the refusals.
+# The last is the sixth review's own Critical sentence with an attribution in
+# place of the genitive, and it reached the prompt end to end. 0 of the 42
+# refusals carried an attributing verb at all, so nothing in the suite could
+# break this sub-decision - which is why the claim could carry the whole class
+# cut for a commit. `_ATTRIBUTED_SUBJECT_REFUSALS` is that cell now, and the
+# comment says which half of the claim was measured: possession was, speakerhood
+# was argued.
 #
-# `when I am in France I plant wheat` STAYS ADMITTED, and that is a decision:
-# `if` is counterfactual - the speaker is supposing a France he is not in - while
-# `when` is temporal and says he does go there. `unless` would fit the same
-# lookbehind and is left out for want of a sentence anyone would write.
-_EN_SUBJECT = (r"(?<!\w)(?<!if\s)(?:i\s+am|i'm|we\s+are|we're|i\s+live"
+# WHAT THE PRONOUN RULE COSTS, counted: 2 of the English accepts - "my farm is
+# in France" and "my field is in France" - both pinned as costs. They say where
+# the speaker's land is, which is exactly what this guard wants to know. The
+# reason written here used to be that "nothing distinguishes them from the five
+# admissions above without parsing the clause", AND THAT IS MEASURABLY FALSE by
+# the same argument that overturned the `if` claim one paragraph down. A
+# CONSUMED clause-start alternative is not a lookbehind, so its width is free:
+#
+#   (?:^|(?<=[.,;!?]\s))(?:my\s+farm\s+is|our\s+farm\s+is
+#                         |my\s+field\s+is|my\s+fields\s+are)\s+(?:in|at)\s+
+#
+# Measured beside the left veto: both costs recovered, 0 of the 58 refusals
+# leaked, 0 of the 5 `_POSSESSED_SUBJECT_LEAKS` admitted, and the fresh
+# attribution leak the seventh review warned this anchor would open - "Ahmet
+# said, my farm is in France", "he wrote: my farm is in France" - is refused,
+# because `_EN_NOT_THE_SPEAKER` reads that token too. SO THE REASON THEY ARE
+# STILL REFUSED IS THE ORDER OF THE WAVES AND NOT THE PARSE: this wave narrowed
+# the English arm twice, and narrowing and widening in the same wave is the
+# mistake this branch made three times. Measured, written down, next round. In
+# the meantime the speaker writes "I am in France" and is placed.
+#
+# `if` WAS REFUSED BY THE WORD AND IS REFUSED BY THE MOOD NOW. The sixth review
+# overturned the claim that refusing the conditional "means reading the tail" -
+# correctly, `if` stands immediately to the LEFT of the subject - and shipped
+# `(?<!if\s)`, under a comment saying the line was "the mood rather than the
+# length of the word". IT WAS THE WORD, and the seventh review measured the
+# difference: `suppose`, `supposing`, `assuming`, `in case`, `unless` and
+# `whether` were all admitted, placed the speaker abroad, suppressed the
+# province question and stuck for the conversation; and `if  i am in France`
+# with two spaces was admitted too, because a lookbehind in `re` must be
+# FIXED-WIDTH and `_normalize_tr` does not collapse runs of space. One spelling
+# at one width is what a lookbehind can say.
+#
+# SO THE DECISION MOVED OUT OF THE PATTERN AND INTO ONE TOKEN. `_GUARDS` carries
+# a left veto per guard and `_guard_hits` applies it to the text to the LEFT of
+# the match, anchored with `$`: a mood word or an attributing verb TOUCHING the
+# subject, through any run of space and through the comma, colon or quote a
+# writer puts between. That is not reading the sentence - it is the same fixed
+# window the lookbehind read, with the width free, which is the half a
+# lookbehind could not express. Measured: 0 of the 16 accepts lost, 0 of the 58
+# refusals leaked, and `(?<!if\s)`'s own two false blocks - "the tarif i am in
+# France", "a motif i am in France", the only shapes that could collide - are
+# admitted again, which is a side effect and not the reason.
+#
+# AND THE COST SIDE OF THAT VETO HAD ONE INPUT BEFORE THIS WAVE. Every one of
+# the twelve accepts began at the start of the message, so there was nothing to
+# the left of the subject to veto and any left rule at all would have measured
+# free - except `When I am in France I plant wheat`, which is 1 of 12.
+# `_LEFT_CONTEXT_ACCEPTS` puts a token there on purpose, so the count is 5 of 16
+# now: `actually i am in France`, `the buyer said nothing, i am in France` (an
+# attributing verb in the sentence but not touching the subject) and `when the
+# fair opens, i am in France` (a whole clause between the mood slot and the
+# subject), beside `when` and `whenever`.
+#
+# `when I am in France` AND `whenever I am in France` STAY ADMITTED, and that is
+# a decision: the mood words suppose a country the speaker is not in, while the
+# temporals say he does go there. Both are pinned as declared accepts, because
+# they are the only two inputs that can break the mood decision in the admitting
+# direction.
+#
+# WHAT THE VETO DOES NOT CLOSE, written down rather than implied. The token must
+# TOUCH the subject, so an attribution at a distance - "he told me that, in his
+# email, i am in France" - is not read; reading further is reading the clause.
+# And THE TURKISH ARM HAS NO LEFT VETO AT ALL, which is not an omission: Turkish
+# is verb-final, so "Fransa'dayim dedi" puts the attributing verb to the RIGHT
+# of the match where a left veto cannot see it. The mood asymmetry is the other
+# way round and is now CLOSED rather than declared - "Fransa'daysam ne ekerim"
+# and "Fransa'da olsaydim bugday ekerdim" are refused for free by morphology,
+# and English refuses its twins now, so the two branches agree about a speaker
+# who supposes a country. They differ about one who is QUOTED, and only the
+# English one gets that.
+_EN_SUBJECT = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live"
                r"|we\s+live|i\s+farm|we\s+farm)(?:\s+based)?\s+")
+
+# WHICH PREPOSITIONS MEAN PRESENCE, in one place because three reach counts and
+# `_SELF_EN` all have to mean the same thing by it. Two of those counts used to
+# spell `(?:in|at)` inline in the test, so widening this would have left them
+# measuring the old rule, green - the sixth review's finding, and the one-line
+# fix it asked for. `from` is deliberately absent; see above.
+_EN_PREP = r"(?:in|at)"
 
 # Split from the preposition so the reach counts above can be taken against the
 # REAL subject list rather than a copy of it: the preposition decision's count is
 # measured by composing this with `from`, and a second copy of the subject list
 # in the test would drift from this one silently.
-_SELF_EN = _EN_SUBJECT + r"(?:in|at)\s+"
+_SELF_EN = _EN_SUBJECT + _EN_PREP + r"\s+"
+
+# THE TOKEN IMMEDIATELY LEFT OF THE SUBJECT, and what it can take back. This is
+# not a reading of the sentence: it is the one token touching the match, read
+# with the width free, which is the only thing a fixed-width lookbehind could
+# not do. See the two paragraphs above `_EN_SUBJECT` for the two decisions it
+# makes and what each one measured.
+_SUPPOSED_MOOD = r"if|unless|suppose|supposing|assuming|whether|in\s+case"
+_ATTRIBUTING_VERB = (r"say|says|said|saying|write|writes|wrote|written"
+                     r"|tell|tells|told|claim|claims|claimed"
+                     r"|reply|replies|replied|state|states|stated"
+                     r"|add|adds|added|mention|mentions|mentioned|translate")
+# The separator is everything that can stand between that token and the subject:
+# any run of space, the comma a writer puts after `if`, the colon before a quoted
+# line, and both the ASCII and the phone's curly quotes. It is a RUN and not one
+# character, which is the half of this that a lookbehind cannot express at all.
+_EN_NOT_THE_SPEAKER = (rf"(?<!\w)(?:{_SUPPOSED_MOOD}|{_ATTRIBUTING_VERB})"
+                       r"[\s,:;\"'‘’“”(]*$")
 
 # THE LOCATION QUESTION, in one place because it is asked from two routes and
 # must read the same in both. It used to be written out twice, as
@@ -1283,9 +1411,21 @@ _ASK_LOCATION = ("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu "
 # re-compose both itself: a change to the COMPOSITION - adding a boundary on the
 # English side, say - would have left that test green while it measured a regex
 # nobody ships, which is this guard's own standing defect in miniature.
-_GUARDS: tuple[tuple[str, str, str], ...] = (
-    ("_SELF_TR", "suffix", _SELF_TR),
-    ("_SELF_EN", "prefix", _SELF_EN),
+#
+# AND EACH ONE CARRIES ITS OWN LEFT VETO, which is where the mood and the
+# attribution decisions live. They cannot live in the pattern: Python's `re`
+# wants a FIXED width behind a lookbehind, and the two things that have to be
+# read - a mood word of two to nine letters, and a run of whitespace or
+# punctuation after it - are both variable. So the fourth field is a regex
+# matched against the text to the LEFT of the match, anchored with `$` so it
+# reads only what touches the match. `None` for the Turkish side, and that is a
+# decision rather than an omission: the Turkish arm is a SUFFIX, so the token
+# that would carry attribution ("Fransa'dayim dedi") stands to the RIGHT of the
+# match and this field cannot see it. Written down in `_SELF_TR`'s own terms,
+# and not repaired here - see the asymmetry paragraph above `_EN_SUBJECT`.
+_GUARDS: tuple[tuple[str, str, str, str | None], ...] = (
+    ("_SELF_TR", "suffix", _SELF_TR, None),
+    ("_SELF_EN", "prefix", _SELF_EN, _EN_NOT_THE_SPEAKER),
 )
 
 
@@ -1301,6 +1441,31 @@ def _guard_regex(side: str, pattern: str, key: str) -> str:
     if side == "suffix":
         return rf"(?<!\w){key}{pattern}"
     return rf"{pattern}{key}(?!\w)"
+
+
+def _guard_hits(guard: tuple[str, str, str, str | None], key: str,
+                folded: str) -> bool:
+    """Whether one `_GUARDS` entry fires on `folded` around the escaped `key`.
+
+    THE WHOLE DECISION ONE GUARD MAKES, in one reader, because it is no longer
+    just a regex: the pattern says what shape places a speaker, and the entry's
+    fourth field says what token standing immediately to the LEFT of that shape
+    takes it back. `_states_location` and the per-pattern test both call this,
+    so neither can be green over a rule nobody ships - which is the standing
+    defect this guard has been reviewed for seven times, and it has already been
+    this test's own defect once.
+
+    EVERY MATCH IS TRIED, not the first: a vetoed match refuses that match and
+    not the sentence. "he said i am in Germany, but i am in France" is placed in
+    France and not in Germany, because the veto reads the left of the match it
+    is deciding rather than the left of the sentence.
+    """
+    _label, side, pattern, veto = guard
+    for match in re.finditer(_guard_regex(side, pattern, key), folded):
+        if veto is not None and re.search(veto, folded[:match.start()]):
+            continue
+        return True
+    return False
 
 
 def _code_aliases(code: int) -> tuple[str, ...]:
@@ -1330,6 +1495,12 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
     that tried to work this out from the rest of the sentence, the four
     Criticals they produced, and what deleting them cost.
 
+    PLUS ONE TOKEN TO THE LEFT, and that is not a reading of the sentence: a
+    mood word or an attributing verb TOUCHING the match says the `i` is supposed
+    or is somebody else's, and `_guard_hits` takes the match back. One token,
+    with its width free, which is the whole difference from the fixed-width
+    lookbehind this replaced. See the two paragraphs above `_EN_SUBJECT`.
+
     One text, not a conversation. The `asked` parameter this used to take - and
     with it the bare-name branch it served - is gone: there was no evidence for
     it that could exist, because the question it depended on is written by the
@@ -1340,8 +1511,8 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
         return False
     for name in aliases:
         key = re.escape(name)
-        for _label, side, pattern in _GUARDS:
-            if re.search(_guard_regex(side, pattern, key), folded):
+        for guard in _GUARDS:
+            if _guard_hits(guard, key, folded):
                 return True
     return False
 

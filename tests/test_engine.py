@@ -2342,26 +2342,110 @@ def test_possessing_something_that_is_not_land_is_not_a_location(text, code):
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
-_CONDITIONAL_REFUSALS = [
+_SUPPOSED_MOOD_REFUSALS = [
+    # The two the sixth review pinned, and the only two the word `if` could see.
     ("If I am in France next year, should I plant wheat", 68),
     ("if i'm in France the prices are different", 68),
+    # FOUR MORE SPELLINGS OF THE SAME MOOD, every one of them admitted while the
+    # decision was keyed on the literal `if\s`. The seventh review measured all
+    # four placing the speaker abroad, suppressing the province question and
+    # sticking for the conversation.
+    ("suppose I am in France - what do I plant", 68),
+    ("supposing I am in France", 68),
+    ("assuming I am in France next year, what should I plant", 68),
+    ("in case I am in France next spring, which wheat", 68),
+    # `unless` was named in the comment and "left out for want of a sentence
+    # anyone would write"; `whether` is the indirect question and was not named
+    # at all. Both are the same mood and both cost nothing.
+    ("unless I am in France I plant wheat", 68),
+    ("nobody knows whether I am in France", 68),
+    # AND THE TWO THE WIDTH OF THE OLD LOOKBEHIND LET THROUGH. `(?<!if\s)` is
+    # exactly one whitespace wide and `_normalize_tr` does not collapse runs, so
+    # the mood survived a second space or a comma. No width is fixed now.
+    ("if  I am in France next year", 68),
+    ("if, I am in France", 68),
 ]
 
 
-@pytest.mark.parametrize("text,code", _CONDITIONAL_REFUSALS)
+@pytest.mark.parametrize("text,code", _SUPPOSED_MOOD_REFUSALS)
 def test_a_supposed_location_is_not_a_location(text, code):
-    """A COMMENT'S CLAIM MEASURED AND FOUND FALSE. The wave that declared this
-    sentence an accept wrote that refusing it "means reading the tail", which is
-    the inference the guard had just had removed - so it was pinned as a decision
-    rather than fixed. It is not true: `if` stands immediately LEFT of the
-    subject, and a fixed-width negative lookbehind reads it without touching the
-    rest of the sentence. The sixth review measured it at 0 accepts lost and 0
-    refusals missed.
+    """A COMMENT'S CLAIM MEASURED AND FOUND FALSE TWICE, in opposite directions.
 
-    `when I am in France I plant wheat` is still admitted, in
-    `_DECLARED_ENGLISH_ACCEPTS`, and the line between them is the mood: `if`
-    supposes a France the speaker is not in, `when` says he goes there."""
+    The fifth wave declared "If I am in France next year" an accept because
+    refusing it "means reading the tail" - untrue, `if` stands immediately LEFT
+    of the subject. The sixth wave refused it with `(?<!if\\s)` and wrote that
+    the line was "the mood rather than the length of the word" - also untrue,
+    because a fixed-width lookbehind can only read ONE spelling at ONE width.
+    `suppose`, `supposing`, `assuming`, `in case`, `unless`, `whether` and `if`
+    with two spaces after it were all admitted, placed abroad and told not to
+    ask the province.
+
+    IT IS THE MOOD NOW, read as a TOKEN. `_EN_NOT_THE_SPEAKER` matches the one
+    token touching the subject with its width free, so the spelling and the
+    spacing are both out of the decision. 0 accepts lost, 0 refusals leaked.
+
+    `when` AND `whenever` STAY ADMITTED, in `_DECLARED_ENGLISH_ACCEPTS`: they are
+    temporal and say the speaker does go there, where the eight above suppose a
+    country he is not in."""
     assert not engine._states_location(text, engine._code_aliases(code))
+
+
+_ATTRIBUTED_SUBJECT_REFUSALS = [
+    # A PRONOUN CANNOT BE POSSESSED, BUT IT CAN BE ATTRIBUTED, and that is the
+    # other half of the class the pronoun rule was justified by. The `i` in each
+    # of these is somebody else's, so the whitelisted subject is not the writer.
+    ("he says I am in France", 68),
+    ('he said "I am in France" in his email', 68),
+    ("my supplier wrote: I am in France, send the order", 68),
+    ("the buyer replied I am in France this week", 68),
+    ("the seller claims we are in France", 68),
+    ("the form says I live in France", 68),
+    # Not reported speech at all, and the same shape: the quoted string is the
+    # object of a request, not a statement about the writer.
+    ('translate "I am in France" into Turkish', 68),
+    # The sixth review's own Critical sentence with an attribution instead of a
+    # genitive: the writer says where his field is IN THE SAME SENTENCE and was
+    # placed in the Netherlands with "hangi ilde oldugunu SORMA" beside it.
+    ('he said "I am in the Netherlands", my field is in Antalya', 150),
+]
+
+
+@pytest.mark.parametrize("text,code", _ATTRIBUTED_SUBJECT_REFUSALS)
+def test_an_attributed_first_person_is_not_the_writer(text, code):
+    """THE SEVENTH REVIEW'S IMPORTANT 1, and it is about a sentence in a comment
+    as much as about these eight.
+
+    The pronoun rule was carried by "A PRONOUN SUBJECT CANNOT BE THE TAIL OF
+    ANOTHER SUBJECT - `my farm` can be possessed by a larger phrase; `i` cannot
+    be possessed by anything". That is true about POSSESSION and the conclusion
+    drawn from it - "so a whitelisted subject is always the writer" - is false:
+    reported speech puts somebody else's `i` in the subject slot without
+    possessing anything. All eight were admitted, and 0 of the refuse set
+    carried an attributing verb at all, so nothing in the suite could see it.
+
+    THE DECISION IS THE SAME ONE TOKEN as the mood: an attributing verb touching
+    the subject, through any run of space, a colon or a quote. Measured at 0
+    accepts lost and 0 refusals leaked.
+
+    WHAT IT DOES NOT CLOSE, written down rather than implied: the verb must
+    TOUCH the subject. "the buyer said nothing, I am in France" is admitted and
+    pinned in `_LEFT_CONTEXT_ACCEPTS`, and an attribution further off - "he told
+    me that, in his email, I am in France" - is not read. Reading further is
+    reading the clause, which is the inference six waves deleted."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+def test_the_veto_reads_the_left_of_the_match_and_not_of_the_sentence():
+    """ONE SENTENCE, TWO COUNTRIES, TWO ANSWERS - which is the whole reason
+    `_guard_hits` walks every match instead of asking `re.search` once.
+
+    "he said i am in Germany, but i am in France" attributes the German clause
+    and states the French one. A veto applied to the sentence would refuse both
+    and lose a real self-declaration; a veto applied to the FIRST match only
+    would refuse Germany and never look again."""
+    text = "he said I am in Germany, but I am in France"
+    assert not engine._states_location(text, engine._code_aliases(79))
+    assert engine._states_location(text, engine._code_aliases(68))
 
 
 _POSSESSED_SUBJECT_COSTS = [
@@ -2375,13 +2459,27 @@ def test_the_price_of_requiring_a_pronoun_subject(text, code):
     """PINNED AS A COST. Both say where the speaker's own land is, which is
     exactly what this guard wants to know, and both are refused now.
 
-    They are given up as a CLASS and not patched, because nothing tells them
-    apart from `_POSSESSED_SUBJECT_LEAKS` below without parsing the clause:
-    A word boundary is not a clause boundary, so a possessed-noun subject can
-    sit at the
-    tail of a larger phrase whose real subject is somebody else. A pronoun
-    cannot - `my farm` can be possessed, `i` cannot. The speaker writes
-    "I am in France" and is placed."""
+    THE REASON WRITTEN HERE USED TO BE "nothing tells them apart from
+    `_POSSESSED_SUBJECT_LEAKS` below without parsing the clause", AND THAT IS
+    MEASURABLY FALSE - by the same argument that overturned the `if` claim one
+    paragraph later. A CONSUMED clause-start alternative is not a lookbehind, so
+    its width is free:
+
+      (?:^|(?<=[.,;!?]\\s))(?:my\\s+farm\\s+is|our\\s+farm\\s+is
+                            |my\\s+field\\s+is|my\\s+fields\\s+are)\\s+(?:in|at)\\s+
+
+    Measured at the seventh review and re-measured here beside the left veto:
+    both of these recovered, 0 of the 58 refusals leaked, 0 of the 5
+    `_POSSESSED_SUBJECT_LEAKS` admitted, and the fresh attribution leak the
+    seventh review warned the anchor would open - "Ahmet said, my farm is in
+    France", "he wrote: my farm is in France" - is refused, because
+    `_EN_NOT_THE_SPEAKER` reads that token too.
+
+    SO THE REAL REASON THEY ARE STILL REFUSED IS THE ORDER OF THE WAVES, not the
+    parse: this wave NARROWED the English arm twice, and widening it in the same
+    wave is the mistake this branch made three times. The anchor is measured,
+    written down, and left for the next round. What the cost is in the meantime:
+    the speaker writes "I am in France" and is placed."""
     assert not engine._states_location(text, engine._code_aliases(code))
 
 
@@ -2413,13 +2511,16 @@ def test_a_possessed_subject_inside_a_larger_phrase_is_not_the_speaker(text, cod
 
 
 _DECLARED_ENGLISH_ACCEPTS = [
-    # THE FUTURE, and the temporal `when`. Both have refused Turkish twins and
-    # the asymmetry is not repaired: refusing them means reading the tail, which
-    # is the inference this branch deleted. `when` is also a decision and not a
-    # miss - it says the speaker does go to France, where `if` supposes a France
-    # he is not in, and `if` is refused; see `_CONDITIONAL_REFUSALS`.
+    # THE FUTURE, and the temporal `when`/`whenever`. The future has a refused
+    # Turkish twin and that asymmetry is not repaired: refusing `tomorrow` means
+    # reading the tail, which is the inference this branch deleted. The two
+    # temporals are a decision and not a miss - they say the speaker does go to
+    # France, where the eight in `_SUPPOSED_MOOD_REFUSALS` suppose a France he is
+    # not in. They are the only inputs that can break the MOOD decision in the
+    # admitting direction, which is why `whenever` is here rather than assumed.
     ("I am in India tomorrow", 100),
     ("When I am in France I plant wheat", 68),
+    ("whenever I am in France I plant wheat", 68),
     # A COUNTRY'S NAME AS THE FIRST WORD OF A LONGER FOREIGN PLACE NAME, two US
     # towns named after countries. The level below the `Georgia` decision in
     # `country._NOT_THIS_PLACE`, and admitted for the same reason as the two
@@ -2429,6 +2530,25 @@ _DECLARED_ENGLISH_ACCEPTS = [
     # stopped measuring the tail decision they are here for.
     ("I am in Lebanon, Ohio", 121),
     ("we are in Peru, Indiana", 170),
+]
+
+# THE INPUTS THAT CAN BREAK THE LEFT-VETO DECISION IN THE ADMITTING DIRECTION,
+# and the set had NONE until this wave: every one of the twelve accepts began at
+# the start of the message, so there was nothing to the left of the subject at
+# all and a veto that refused on ANY left context would have measured 0 cost.
+# That is the vacuous zero this branch has shipped five Criticals on, so the
+# three below put a token there on purpose.
+_LEFT_CONTEXT_ACCEPTS = [
+    # A word touching the subject that is neither a mood nor an attribution.
+    ("actually I am in France", 68),
+    # AN ATTRIBUTING VERB IN THE SENTENCE BUT NOT TOUCHING THE SUBJECT, which is
+    # the minimal pair for "the buyer said I am in France" in
+    # `_ATTRIBUTED_SUBJECT_REFUSALS`: the two differ in the one token the
+    # decision reads and in nothing else.
+    ("the buyer said nothing, I am in France", 68),
+    # The same pair for the mood: `when` is temporal and a whole clause stands
+    # between it and the subject, so neither half of the veto can reach.
+    ("when the fair opens, I am in France", 68),
 ]
 
 _ENGLISH_ACCEPTS = [
@@ -2445,7 +2565,7 @@ _ENGLISH_ACCEPTS = [
     ("I am in France this week", 68),
     ("we are in France visiting a supplier", 68),
     ("I'm in France on holiday", 68),
-] + _DECLARED_ENGLISH_ACCEPTS
+] + _DECLARED_ENGLISH_ACCEPTS + _LEFT_CONTEXT_ACCEPTS
 
 
 @pytest.mark.parametrize("text,code", _ENGLISH_ACCEPTS)
@@ -2457,34 +2577,63 @@ def test_the_english_branch_admits_a_self_declaration(text, code):
     assert engine._states_location(text, engine._code_aliases(code))
 
 
+@pytest.mark.parametrize("text,code", _LEFT_CONTEXT_ACCEPTS)
+def test_the_left_veto_reads_one_token_and_not_the_clause(text, code):
+    """THE COST SIDE OF THE MOOD AND ATTRIBUTION DECISIONS, and it had no inputs
+    before this wave: all twelve accepts started at character 0, so there was
+    nothing to the left of the subject and any veto at all measured free.
+
+    Each of these is the minimal pair of a refusal: "the buyer said nothing, I am
+    in France" against "the buyer said I am in France", "when the fair opens, I
+    am in France" against "if I am in France". The decision reads the ONE token
+    touching the subject - a mood word or an attributing verb, through a run of
+    space, a comma, a colon or a quote - and nothing further.
+
+    Reading further would be reading the clause, which is the inference that
+    produced four Criticals on this branch. So the admitted half is a declared
+    limit: an attribution separated from the subject by a clause is not seen."""
+    assert engine._states_location(text, engine._code_aliases(code))
+
+
 @pytest.mark.parametrize("text,code", _DECLARED_ENGLISH_ACCEPTS)
 def test_the_conditional_the_future_and_a_longer_place_name_are_declared_accepts(
         text, code):
-    """FOUR ADMISSIONS THAT ARE A DECISION, NOT AN OVERSIGHT, and the reason is
-    one measurement: refusing any of them requires reading the TAIL of the
-    sentence, and the tail was measured and rejected on this branch.
+    """FIVE ADMISSIONS THAT ARE A DECISION, NOT AN OVERSIGHT, and they are
+    admitted for two different reasons that an earlier revision of this docstring
+    ran together.
 
-    `if`/`when`/`unless` do not fit in a fixed-width lookbehind, so the
-    conditional has to be found by scanning left; `tomorrow` and `, Ohio` are the
-    tail outright. The wave before this one measured every candidate tail word as
+    THE FUTURE AND THE LONGER PLACE NAME need the TAIL of the sentence, and the
+    tail was measured and rejected on this branch: `tomorrow` and `, Ohio` are
+    the tail outright. The wave before last measured every candidate tail word as
     damaging - `and`, the comma and the full stop included - because "my field is
     in Egypt for..." and "the protein in turkey for..." have the same tail. A
     tail rule here is the inference that produced four Criticals, re-entering by
     a side door.
 
-    AND THE DAMAGE IS SMALL, which is what separates these from the `from` arm
-    dropped in the same wave. A grower asking "If I am in France next year,
-    should I plant wheat" IS THINKING ABOUT FRANCE, and FAOSTAT's French figures
-    are the right context for that question; "I am from the Netherlands, my farm
-    is in Antalya" said the opposite - the field is in Antalya - and was told not
-    to ask which province.
+    `when` AND `whenever` NEED NOTHING, and that is the correction. The earlier
+    claim that "`if`/`when`/`unless` do not fit in a fixed-width lookbehind" was
+    false twice over: the first wave to test it refused `if` with a lookbehind,
+    and the seventh replaced the lookbehind with a token read, so every spelling
+    of the mood now fits. These two are admitted because they MEAN something
+    else - temporal, the speaker does go there - not because they cannot be
+    reached. They are the only two accepts that can break the mood decision in
+    the admitting direction, which is why `whenever` is pinned beside `when`.
 
-    THE TURKISH TWINS ARE REFUSED AND THAT ASYMMETRY STANDS. "Fransa'daysam ne
-    ekerim" and "Fransa'da olsaydım buğday ekerdim" cost nothing to refuse
-    because `'daysam` does not fill `[dt][ae]y[iu][mz]` - Turkish carries the
-    conditional in the morphology, and English has no equivalent to read without
-    the tail. The two branches agree about a speaker who STATES where he is; they
-    differ about one who supposes it, and only Turkish gets that for free."""
+    THE CONDITIONAL IS NO LONGER HERE. It was in this list for one wave, on the
+    argument that "a grower asking 'If I am in France next year' IS THINKING
+    ABOUT FRANCE and FAOSTAT's French figures are the right context". That
+    argument lost: he is thinking about France and he is NOT IN IT, so the block
+    tells him not to say which province he is in, and `_country_lines` asks every
+    user turn, so it sticks. See `_SUPPOSED_MOOD_REFUSALS`.
+
+    THE TURKISH TWINS OF THE MOOD ARE REFUSED AND THAT ASYMMETRY IS NOW THE OTHER
+    WAY ROUND. "Fransa'daysam ne ekerim" and "Fransa'da olsaydım buğday ekerdim"
+    cost nothing to refuse because `'daysam` does not fill `[dt][ae]y[iu][mz]`,
+    and English now refuses its twins too, so the two branches AGREE about a
+    speaker who supposes a country. Where they still differ is attribution:
+    Turkish is verb-final, so "Fransa'dayım dedi" puts the attributing verb to
+    the RIGHT of the match where a left veto cannot see it. Recorded, not
+    repaired - repairing it means reading the Turkish clause."""
     assert engine._states_location(text, engine._code_aliases(code))
     assert not engine._states_location("Fransa'daysam ne ekerim",
                                        engine._code_aliases(68))
@@ -2568,7 +2717,8 @@ _ENGLISH_NOT_A_LOCATION = [
     ("their field is in France", 68),
     ("my brother farms in France", 68),
     ("the company is based in France", 68),
-] + _ENGLISH_ORIGIN_REFUSALS + _POSSESSED_SUBJECT_LEAKS + _CONDITIONAL_REFUSALS
+] + (_ENGLISH_ORIGIN_REFUSALS + _POSSESSED_SUBJECT_LEAKS
+     + _SUPPOSED_MOOD_REFUSALS + _ATTRIBUTED_SUBJECT_REFUSALS)
 
 
 @pytest.mark.parametrize("text,code", _ENGLISH_ORIGIN_REFUSALS)
@@ -2624,66 +2774,177 @@ def test_the_english_refuse_sets_reach_counts_are_what_they_claim():
     EACH COUNT IS ANCHORED ON THE NAME, and that is a correction rather than a
     restatement. The old person count matched `<subject> ... in <anything>` and
     the old adjacency count was "a first-person word somewhere AND a preposition
-    somewhere": over this set the first returns 23 and the second 11, because
+    somewhere": over this set the first returns 39 and the second 27, because
     nine of the ten origin refusals carry a second clause with a Turkish PROVINCE
-    in it - "my farm is in Antalya" satisfies both and tests neither. A count
-    that cannot fail is the defect this guard has been reviewed for five times,
-    so each count here asks what a rule with ONE decision relaxed would admit:
+    in it - "my farm is in Antalya" satisfies both and tests neither. (And the
+    genuinely old person count is 43, not 39: before `c218ae0` the branch
+    admitted `from`, so the loose wording reached over `(in|at|from)`. Two
+    reviews printed that number measured with the NEW preposition set, which is
+    neither the old rule nor anything shipped; the argument it serves - that the
+    loose wordings inflate and test nothing - is stronger at 43.) A count that
+    cannot fail is the defect this guard has been reviewed for six times, so each
+    count here asks what a rule with ONE decision relaxed would admit:
 
       PERSON      - any subject in the frame, then `in`/`at`, then the name.
       ADJACENCY   - a first-person subject anywhere, and a BARE `in`/`at`
                     immediately before the name. That is country.py's own looser
                     rule, which is what this branch is narrower than.
-      PREPOSITION - the REAL subject whitelist, then `from`, then the name. Read
-                    out of `engine._EN_SUBJECT` rather than copied, so widening
-                    the subject list cannot leave this count measuring the old
-                    one.
+      PREPOSITION - the REAL subject whitelist, then `from`, then the name.
+      MOOD AND ATTRIBUTION - the shipped pattern matches and a vetoing token
+                    TOUCHES it, which is what a rule without
+                    `_EN_NOT_THE_SPEAKER` would admit. This is the fourth
+                    decision and it had no count at all until the seventh review.
 
-    The person and adjacency counts were UNCHANGED by the ten sentences class (f)
-    added, and that was itself a finding: every origin refusal has a first-person
-    subject in the branch's own frame, so the preposition is the only decision
-    they can break.
+    THE SUBJECT LIST AND THE PREPOSITION SET ARE BOTH READ OUT OF `engine`, not
+    copied: `engine._EN_SUBJECT` for the subject and `engine._EN_PREP` for the
+    preposition. Two of these counts used to spell `(?:in|at)` inline, so
+    widening the shipped set would have left them measuring the old rule while
+    staying green - the sixth review's Important, taken here.
 
-    THE PERSON COUNT THEN MOVED 13 -> 19, and that is the sixth review's
-    Critical written as a number. All five of `_POSSESSED_SUBJECT_LEAKS` reach
-    the person decision, where the 35 before them produced 13 - and every one of
-    those 13 broke it by putting a THIRD PARTY in the subject slot. None put a
-    larger phrase around a first-person one, which is the sub-decision the
-    possessed-noun subjects actually made, so the 13 was not stale and not
-    vacuous: it was partitioned wrongly, which is just as invisible."""
+    THE PERSON COUNT MOVED 13 -> 19 -> 35, AND THE PARTITION IS THE POINT. A
+    count can be neither stale nor vacuous and still lie by being partitioned
+    wrongly, which is the sixth review's Critical written as a number and the
+    third way a reach count fails. The 35 splits by the sub-decision each
+    refusal can break:
+
+      13  (a) a THIRD PARTY in the subject slot          - the original 13
+       5  (b) a first-person possessive inside a LARGER subject  - review 6
+       8  (c) an ATTRIBUTED `i`, somebody else's         - review 7
+       9  (d) a SUPPOSED mood                            - review 7
+
+    13 + 5 + 8 + 9 = 35, exactly. Cells (c) and (d) were EMPTY at `4a1af74` -
+    (c) entirely, and (d) held the single `if` sentence the code happened to
+    read - and both had measured live admissions, which is what made the seventh
+    review's Critical the seventh instance of one family.
+
+    THE ADJACENCY COUNT PARTITIONS THE SAME WAY and the reader should know it is
+    inflated by the new classes: 23 = 5 (a) + 0 (b) + 8 (c) + 10 (d). The 5 is
+    the number that measures the adjacency decision on its own; the 18 are
+    refused by the veto and would be admitted by a rule that relaxed adjacency
+    alone, so they belong in the count by its own definition while saying
+    nothing about adjacency. That overlap is why the fourth count exists."""
     from src.context import country as country_ctx
     any_subject = (r"(?<!\w)\w+(?:\s+\w+)?\s+"
                    r"(?:is|are|am|'m|live|lives|farm|farms)"
-                   r"(?:\s+based)?\s+(?:in|at)\s+")
-    bare_prep = r"(?<!\w)(?:in|at)\s+"
+                   r"(?:\s+based)?\s+" + engine._EN_PREP + r"\s+")
+    bare_prep = r"(?<!\w)" + engine._EN_PREP + r"\s+"
     origin = engine._EN_SUBJECT + r"from\s+"
     first_person = re.compile(r"(?<!\w)(?:i|we)(?:\s|')")
+    veto = re.compile(engine._EN_NOT_THE_SPEAKER)
 
     def before_the_name(prefix, text, code):
         folded = engine._normalize_tr(text)
         return any(re.search(rf"{prefix}{re.escape(name)}(?!\w)", folded)
                    for name in engine._code_aliases(code))
 
-    assert len(_ENGLISH_NOT_A_LOCATION) == 42
+    def vetoed(text, code):
+        """Whether the shipped pattern matches and the veto is what refuses it."""
+        folded = engine._normalize_tr(text)
+        return any(
+            veto.search(folded[:match.start()])
+            for name in engine._code_aliases(code)
+            for match in re.finditer(
+                engine._guard_regex("prefix", engine._SELF_EN,
+                                    re.escape(name)), folded))
+
+    assert len(_ENGLISH_NOT_A_LOCATION) == 58
     assert sum(1 for text, _code in _ENGLISH_NOT_A_LOCATION
-               if country_ctx.extract_country(text, None) is not None) == 38
+               if country_ctx.extract_country(text, None) is not None) == 54
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
-               if before_the_name(any_subject, text, code)) == 19
+               if before_the_name(any_subject, text, code)) == 35
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
                if first_person.search(engine._normalize_tr(text))
-               and before_the_name(bare_prep, text, code)) == 7
+               and before_the_name(bare_prep, text, code)) == 23
     assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
                if before_the_name(origin, text, code)) == 10
-    # And the count the origin class exists for was ZERO on the set that shipped
-    # the Critical: nothing in the old twenty-five could break the preposition
-    # decision.
+    assert sum(1 for text, code in _ENGLISH_NOT_A_LOCATION
+               if vetoed(text, code)) == 18
+    # The partition of the person count, asserted rather than described: a count
+    # that is right in total and wrong in its cells is invisible otherwise.
+    third_party = [pair for pair in _ENGLISH_NOT_A_LOCATION
+                   if pair not in _POSSESSED_SUBJECT_LEAKS
+                   and pair not in _SUPPOSED_MOOD_REFUSALS
+                   and pair not in _ATTRIBUTED_SUBJECT_REFUSALS]
+    cells = [sum(1 for text, code in cell
+                 if before_the_name(any_subject, text, code))
+             for cell in (third_party, _POSSESSED_SUBJECT_LEAKS,
+                          _ATTRIBUTED_SUBJECT_REFUSALS,
+                          _SUPPOSED_MOOD_REFUSALS)]
+    assert cells == [13, 5, 8, 9]
+    assert sum(cells) == 35
+    # The adjacency count's partition, for the same reason: 5 of the 23 measure
+    # adjacency and the other 18 are the two new classes.
+    adjacent = [sum(1 for text, code in cell
+                    if first_person.search(engine._normalize_tr(text))
+                    and before_the_name(bare_prep, text, code))
+                for cell in (third_party, _POSSESSED_SUBJECT_LEAKS,
+                             _ATTRIBUTED_SUBJECT_REFUSALS,
+                             _SUPPOSED_MOOD_REFUSALS)]
+    assert adjacent == [5, 0, 8, 10]
+    # And each new class's count was ZERO on the set that shipped the finding it
+    # closes. The old twenty-five could not break the preposition decision; the
+    # forty-two could not break the mood decision except through the one
+    # spelling the code read, and could not break the attribution one at all.
     old = [pair for pair in _ENGLISH_NOT_A_LOCATION
            if pair not in _ENGLISH_ORIGIN_REFUSALS
            and pair not in _POSSESSED_SUBJECT_LEAKS
-           and pair not in _CONDITIONAL_REFUSALS]
+           and pair not in _SUPPOSED_MOOD_REFUSALS
+           and pair not in _ATTRIBUTED_SUBJECT_REFUSALS]
     assert len(old) == 25
     assert sum(1 for text, code in old
                if before_the_name(origin, text, code)) == 0
+    forty_two = (old + _ENGLISH_ORIGIN_REFUSALS + _POSSESSED_SUBJECT_LEAKS
+                 + _SUPPOSED_MOOD_REFUSALS[:2])
+    assert len(forty_two) == 42
+    assert sum(1 for text, code in forty_two if vetoed(text, code)) == 2
+    # And 0 of those 42 carried an attributing verb ANYWHERE in the sentence,
+    # not merely 0 in the subject slot - so no reading of them, strict or loose,
+    # could have broken the attribution decision.
+    attributing = re.compile(r"(?<!\w)(?:" + engine._ATTRIBUTING_VERB
+                             + r")(?!\w)")
+    assert sum(1 for text, _code in forty_two
+               if attributing.search(engine._normalize_tr(text))) == 0
+    assert sum(1 for text, _code in _ENGLISH_NOT_A_LOCATION
+               if attributing.search(engine._normalize_tr(text))) == 8
+    # THE LOOSE WORDINGS, derived here rather than quoted: two reviews in a row
+    # found this number stale, and the second time it had been "fixed" by
+    # re-measuring the OLD frame with the NEW preposition set, which is neither
+    # rule. All three are asserted over both sets.
+    loose_person = (r"(?<!\w)\w+(?:\s+\w+)?\s+"
+                    r"(?:is|are|am|'m|live|lives|farm|farms)"
+                    r"(?:\s+based)?\s+")
+    loose_in_at = re.compile(loose_person + r"(?:in|at)\s+")
+    loose_with_from = re.compile(loose_person + r"(?:in|at|from)\s+")
+    loose_adjacency = re.compile(r"(?<!\w)(?:in|at)\s+")
+
+    def loose(pattern, pairs):
+        return sum(1 for text, _code in pairs
+                   if pattern.search(engine._normalize_tr(text)))
+
+    assert loose(loose_in_at, _ENGLISH_NOT_A_LOCATION) == 39
+    assert loose(loose_with_from, _ENGLISH_NOT_A_LOCATION) == 43
+    assert loose(loose_in_at, old) == 13
+    assert loose(loose_with_from, old) == 13
+    assert sum(1 for text, _code in _ENGLISH_NOT_A_LOCATION
+               if first_person.search(engine._normalize_tr(text))
+               and loose_adjacency.search(engine._normalize_tr(text))) == 27
+    assert sum(1 for text, _code in old
+               if first_person.search(engine._normalize_tr(text))
+               and loose_adjacency.search(engine._normalize_tr(text))) == 5
+    # The cost side of the veto had ONE input that could break it, and the one it
+    # had is the `when` sentence. Now it has five: an accept can only break this
+    # decision by having something to the LEFT of the subject at all.
+    def has_left_context(text, code):
+        folded = engine._normalize_tr(text)
+        return any(
+            folded[:match.start()].strip()
+            for name in engine._code_aliases(code)
+            for match in re.finditer(
+                engine._guard_regex("prefix", engine._SELF_EN,
+                                    re.escape(name)), folded))
+
+    assert sum(1 for text, code in _ENGLISH_ACCEPTS
+               if has_left_context(text, code)) == 5
 
 
 _WIDENED_BRANCH_REFUSALS = [
@@ -3001,7 +3262,7 @@ def test_the_reach_count_beside_the_surviving_branchs_zero():
     `tohumcuyum` and `ekmeliyim` - possessed nouns, optatives and other people's
     agent nouns. FOURTEEN FORMS: the comment above `_SELF_TR` used to list
     thirteen of them and the missing one is `yayim`, which is why the restricted
-    count is asserted here too - over the thirteen it returns 39, not 42, so the
+    count is asserted here too - over the thirteen it returns 41, not 44, so the
     number was right and the enumeration was short.
 
     RIGHT OF THE NAME: a token that merely STARTS with an alias and runs on into
@@ -3415,7 +3676,7 @@ _TURKISH_REFUSALS = (_MERELY_NAMING + _WIDENED_BRANCH_REFUSALS
 
 
 def test_the_corpus_the_guards_numbers_are_quoted_over():
-    """3 ACCEPTS AND 91 REFUSALS, pinned the way
+    """3 ACCEPTS AND 99 REFUSALS, pinned the way
     `test_the_world_layer_row_counts_the_two_comments_rest_on` pins 8425/321/33.
 
     EVERY DENOMINATOR src/engine.py's guard comment quotes IS HERE, because five
@@ -3439,6 +3700,14 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     admit; and 10 accepts to 14, because the conditional, the future and the two
     US towns are now DECLARED accepts rather than unwritten ones.
 
+    AND THEY MOVED TWICE MORE SINCE: 35 to 42 when the possessed-noun subjects
+    were dropped (`_POSSESSED_SUBJECT_LEAKS` plus the two conditionals), and 42
+    to 58 when the left veto landed - `_SUPPOSED_MOOD_REFUSALS` grew from 2 to
+    10 because the mood had seven other spellings and two other spacings, and
+    `_ATTRIBUTED_SUBJECT_REFUSALS` is 8 sentences that put somebody ELSE's `i` in
+    the subject slot. The accept column is 16: 14 less the two possessed-noun
+    costs, plus `whenever` and the three `_LEFT_CONTEXT_ACCEPTS`.
+
     THE 50 PINNED COSTS ARE DELIBERATELY OUTSIDE BOTH NUMBERS: a cost is a
     sentence the guard refuses and we wish it did not, so a looser rule that
     admits one is not "wrongly" admitting it. Counting them in the refusal
@@ -3446,21 +3715,23 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     about."""
     assert len(set(_TURKISH_ACCEPTS)) == len(_TURKISH_ACCEPTS) == 3
     assert len(set(_TURKISH_REFUSALS)) == len(_TURKISH_REFUSALS) == 99
-    assert len(set(_ENGLISH_ACCEPTS)) == len(_ENGLISH_ACCEPTS) == 12
-    assert len(set(_ENGLISH_NOT_A_LOCATION)) == len(_ENGLISH_NOT_A_LOCATION) == 42
+    assert len(set(_ENGLISH_ACCEPTS)) == len(_ENGLISH_ACCEPTS) == 16
+    assert len(set(_ENGLISH_NOT_A_LOCATION)) == len(_ENGLISH_NOT_A_LOCATION) == 58
     assert len(_ENGLISH_ORIGIN_REFUSALS) == 10
-    assert len(_DECLARED_ENGLISH_ACCEPTS) == 4
+    assert len(_DECLARED_ENGLISH_ACCEPTS) == 5
+    assert len(_LEFT_CONTEXT_ACCEPTS) == 3
     assert len(_NAME_BOUNDARY_REFUSALS) == 4
     assert len(_POSSESSED_SUBJECT_COSTS) == 2
     assert len(_POSSESSED_SUBJECT_LEAKS) == 5
-    assert len(_CONDITIONAL_REFUSALS) == 2
+    assert len(_SUPPOSED_MOOD_REFUSALS) == 10
+    assert len(_ATTRIBUTED_SUBJECT_REFUSALS) == 8
     assert len(_BARE_NAMES) == 8
     assert len(_SURRENDERED_ACCEPTS) == 39
     assert len(_STANDING_COSTS) == 11
 
 
 def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
-    """The two columns in one place, so a reader sees the 3/3 and 0/91 the
+    """The two columns in one place, so a reader sees the 3/3 and 0/99 the
     guard's comment quotes without re-deriving them from the parametrizations.
 
     Asserted as COUNTS with the offenders named, because a parametrized failure
@@ -3489,24 +3760,33 @@ def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
     unit: if either one were carrying a class only the other refused, a later
     change to that one would open it silently.
 
-    Measured: each pattern admits 0 of the 99 Turkish and 0 of the 35 English by
+    Measured: each pattern admits 0 of the 99 Turkish and 0 of the 58 English by
     itself.
 
-    THE COMPOSITION IS READ OUT OF `engine._GUARDS` AND BUILT BY
-    `engine._guard_regex`, NOT REBUILT HERE. This test used to spell out
+    THE WHOLE DECISION IS READ OUT OF `engine._GUARDS` AND APPLIED BY
+    `engine._guard_hits`, NOT REBUILT HERE. This test used to spell out
     `rf"(?<!\w){key}{pattern}"` and `rf"{pattern}{key}(?!\w)"` itself, which made
     it a copy of the block under test: a change to the composition - a boundary
     added on the English side, say - would have left it green while it measured a
     regex nobody ships. That is this guard's standing defect applied to its own
-    test, and the guard has been reviewed five times for exactly that shape."""
+    test, and the guard has been reviewed six times for exactly that shape.
+
+    AND IT CALLS `_guard_hits` RATHER THAN `re.search`, WHICH IS THE SAME FIX ONE
+    LEVEL ON. Half of what one guard decides is no longer inside its regex: the
+    mood and the attribution are a veto on the text to the LEFT of the match,
+    because a lookbehind in `re` must be fixed-width and neither a mood word nor
+    the run of space after it is. A test that searched the pattern alone would
+    call all 18 of those refusals admitted - it would be red for the right
+    reason today, and green over half a rule the day someone moved the veto into
+    the pattern."""
     assert len(engine._GUARDS) == 2
-    for name, side, pattern in engine._GUARDS:
+    for guard in engine._GUARDS:
+        name = guard[0]
         for text, code in _TURKISH_REFUSALS + _ENGLISH_NOT_A_LOCATION:
             folded = engine._normalize_tr(text)
             for alias in engine._code_aliases(code):
                 key = re.escape(alias)
-                hit = re.search(engine._guard_regex(side, pattern, key), folded)
-                assert not hit, (name, text)
+                assert not engine._guard_hits(guard, key, folded), (name, text)
 
 
 # --------------------------------------------------------------------------- #
