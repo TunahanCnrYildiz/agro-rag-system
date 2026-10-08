@@ -1036,29 +1036,49 @@ def _world_amount(amount: float) -> str:
 #    `_alias_key`'s gated buffer. See that function; the leak was reachable.
 #  * PARITY WITH THE NON-BUFFER TWIN on every shape the shipped corpus holds:
 #    whatever this guard does to "Fransa'daydim" it must do to "Rusya
-#    Federasyonu'ndaydim". 1.760 twinned sentences, 0 disagreeing. Parity is the
-#    right test and absolute refusal is not: the Turkish arm carries no left
-#    veto, so "sanki Fransa'dayim gibi" is admitted at this tip, and the buffer
-#    must not change that in either direction.
+#    Federasyonu'ndaydim". 63 source sentences x the 22 compounds = 1.386
+#    twins, 0 disagreeing - and the test asserts that product rather than this
+#    sentence, so neither figure can go stale again. Parity is the right test
+#    and absolute refusal is not: the Turkish arm carries no left veto, so
+#    "sanki Fransa'dayim gibi" is admitted at this tip, and the buffer must not
+#    change that in either direction.
 #  * AND THE 792 FROM country.py's SIDE ARE NOT ENOUGH, which is worth saying
 #    because they were offered: those sentences put a SPACE after the locative
 #    ("…nda calisan bir dayim var"), so 792 of 792 enter the buffer branch and
 #    0 reach the person slot. They cannot test this decision at all.
 #  * THE RIGHT BOUNDARY, re-swept with the buffer in place, over
-#    data/vector_store/chroma.sqlite3 (81.426 documents, 271.768 distinct
-#    words, 10.9M tokens) and all 418 folded aliases. Reported as a ladder,
-#    because only the last rung is a zero and a zero on its own says nothing:
-#      <alias> + n + anything      120 tokens, 1.526 occurrences
-#      <alias> + n + [dt][ae]        2 tokens,     7 occurrences
+#    data/vector_store/chroma.sqlite3: 81.426 documents, folded with
+#    `_normalize_tr` and tokenised as `[a-z0-9]+`, giving 262.439 distinct words
+#    and 10.934.980 tokens. THE TOKENISATION IS STATED BECAUSE IT MOVES THE
+#    FIRST RUNG: counting `[a-z0-9']+` instead keeps "turkiye'nin" as one token
+#    and reads 271.768 distinct words, and an earlier revision of this comment
+#    quoted the first rung from that run without saying so, which made it
+#    irreproducible.
+#
+#    Reported as a ladder over the 391 LONG folded aliases - the set
+#    `_alias_key` actually buffers - because only the last rungs are zeros and a
+#    zero on its own says nothing:
+#      <alias> + n + anything       42 tokens, 752 occurrences
+#      <alias> + n + [dt][ae]        0 tokens
 #      <alias> + n + [dt][ae] + y    0 tokens
 #      the full shape, placed        0 tokens
-#    The two on the second rung are what stopped this being a vacuous zero, and
-#    one of them is the finding that gated the buffer: `malinda` x5 is `mali` +
-#    `nda`, the ordinary word "malında". `korentajar` x2 is `kore` + `ntajar`
-#    and `silindir` x38 is `sili` + `ndir`, both one letter short. See
-#    `_alias_key` for what the gate costs and what it was measured to buy.
-#    `_NAME_BOUNDARY_REFUSALS` is what the same sweep produced for the
-#    un-buffered branch.
+#    So for every alias that gets the buffer, the attested collision count is
+#    already 0 at the second rung, and 42 tokens / 752 occurrences is the set
+#    that could have made it otherwise.
+#
+#    THE SAME LADDER OVER ALL 418 ALIASES IS WHERE THE GATE SHOWS ITS WORK,
+#    because the gate's whole claim is that the danger sits in the short keys:
+#      <alias> + n + anything       88 tokens, 1.031 occurrences
+#      <alias> + n + [dt][ae]        2 tokens,     7 occurrences
+#      <alias> + n + [dt][ae] + y    0 tokens
+#    Both second-rung tokens are on FOUR-character keys, which is exactly what
+#    `_alias_key` refuses to buffer: `malinda` x5 is `mali` + `nda`, the
+#    ordinary word "malında", and `korentajar` x2 is `kore` + `ntajar`.
+#    `silindir` x38 (`sili` + `ndir`) is a near miss one rung lower - it never
+#    reaches the second rung at all, because `i` is not `[ae]` - and is named
+#    here only because it is the most frequent `<short alias> + n` token in the
+#    corpus. `_NAME_BOUNDARY_REFUSALS` is what the same sweep produced for the
+#    un-buffered branch. See `_alias_key` for what the gate costs and buys.
 #
 # WHAT IT COSTS, named rather than discovered later: ten long aliases have an
 # attested Turkish word at `<alias>n` - `amerikan`, `italyan`, `kenyan` and
@@ -1071,16 +1091,44 @@ def _world_amount(amount: float) -> str:
 # demonym cannot take a locative without a head noun, so the only Turkish
 # reading of the string is "I am at the American('s)", which is not a
 # nationality claim at all. It is admitted, as a measured cost of 10 aliases out
-# of 209 and 0 attested occurrences in 10.9M words, and pinned by
-# `_DEMONYM_LOCATIVE_COSTS` - not as evidence of presence, but because refusing
-# it would need a rule that reads the word before the name to notice the missing
-# head noun, which is the inference this branch spent four waves taking out.
+# of the 209 long TURKISH ones and 0 attested occurrences in 10.9M words, and
+# ALL TEN are pinned by `_DEMONYM_LOCATIVE_COSTS` - not as evidence of presence,
+# but because refusing it would need a rule that reads the word before the name
+# to notice the missing head noun, which is the inference this branch spent four
+# waves taking out. The list carried four of the ten for one commit while this
+# sentence claimed ten, which is the drift that list now exists to stop.
 #
-# WHAT THE WHOLE CHANGE BUYS, end to end and through the one caller: over 924
-# conversations on the 22 compounds, `_country_lines` produced 78 country lines
-# before and 439 after - 361 gained, 0 lost. The resolver's half alone bought
-# 287 resolves and 0 lines, which is why the two halves shipped together; see
-# the ledger's `ee43c18`, where the same pair had to.
+# AND THE CODE'S REACH IS WIDER THAN THAT COST, which is worth saying because
+# the two numbers are easy to read as the same one. `country.py` gates its
+# Turkish suffix branch per alias with `if turkish else never`; THIS GUARD HAS
+# NO LANGUAGE GATE and applies `_SELF_TR` to every alias of the resolved code,
+# English spellings included - that is pre-existing, not something the buffer
+# brought. What the buffer does is widen it: of the 391 long aliases 182 are
+# English-only, and 41 of those have an attested `<alias>n` word in the corpus
+# (`american` x1.257, `indian` x757, `australian` x476, `russian` x245 …), so
+# this guard would place a speaker on "americandayim" for all 41. NONE OF IT IS
+# REACHABLE and that is measured rather than assumed: `extract_country` returns
+# None for all 41, because its own Turkish branch is gated by language, so
+# `_country_lines` never gets as far as asking this guard. The cost above is
+# scoped to the Turkish aliases for that reason, and the reach is written here
+# so the next reader does not have to re-derive the difference.
+#
+# WHAT THE WHOLE CHANGE BUYS, end to end and through the one caller. The figure
+# worth quoting is the one the suite pins, because it is the one made of Turkish
+# a grower would actually type: the 88 grammatical self-statements in
+# `_BUFFER_LOCATIVE_ACCEPTS` - the 22 compounds, both spellings, singular and
+# plural - go from 0 placed to 88 placed.
+#
+# A WIDER SWEEP READS LARGER AND IS WORTH LESS: over 924 conversations built by
+# forcing the buffer onto every compound in six message shapes and seven
+# histories, `_country_lines` produced 78 country lines before and 439 after.
+# Most of that 361 is `Israil'ndeyim`-shaped - a buffer on a name that carries
+# no possessive, so a typo rather than a sentence - and quoting it as the gain
+# overstates what a user gets by roughly four times. 88 is the honest number.
+#
+# EITHER WAY THE RESOLVER'S HALF ALONE BOUGHT 0 LINES, against 287 resolves,
+# which is why the two halves shipped together; see the ledger's `ee43c18`,
+# where the same pair had to.
 # 0 of 194 supplier or third-party conversations gained a line. The 88 that do
 # gain one all have an earlier user turn stating the location, which is the
 # leniency `_country_lines` documents at its `said` list and not a leak.
@@ -1528,8 +1576,11 @@ def _alias_key(name: str, side: str) -> str:
     is why it sits in country.py's `_AMBIGUOUS_EN` already. It was REACHABLE, not
     merely theoretical: "Mali'de buğday verimi nedir" with an earlier user turn
     "tarlamın malındayım" printed Mali's yield figures and asked no province,
-    where the un-buffered guard printed nothing. `korentajar` (`kore` + `ntajar`)
-    and `silindir` (`sili` + `ndir`) are the same shape one letter short.
+    where the un-buffered guard printed nothing. `korentajar` x2 (`kore` +
+    `ntajar`) is the second attested token of this shape, one letter short of
+    the person slot; `silindir` x38 (`sili` + `ndir`) is a rung lower still,
+    since `i` is not `[ae]`, and is named only for being the commonest
+    `<short alias> + n` token in the corpus. See `_SELF_TR`'s ladder.
 
     `malında` IS ATTESTED, 5 times in the project's own Turkish corpus; the
     copula form that actually fires is attested 0 times in 10.9M words. So the

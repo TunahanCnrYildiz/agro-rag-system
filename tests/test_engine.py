@@ -3728,6 +3728,15 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     assert len(_BARE_NAMES) == 8
     assert len(_SURRENDERED_ACCEPTS) == 39
     assert len(_STANDING_COSTS) == 11
+    # The buffer sets, kept beside the 99 rather than inside it - five
+    # measurements in src/engine.py quote that denominator for other decisions.
+    # Their lengths are asserted here for the reason the others are: `_SELF_TR`
+    # claimed "10 aliases" while `_DEMONYM_LOCATIVE_COSTS` held 4, and no test
+    # mentioned the list, so nothing was red.
+    assert len(_BUFFER_LOCATIVE_ACCEPTS) == 88
+    assert len(_BUFFER_NEAR_MISS_REFUSALS) == 220
+    assert len(_SHORT_ALIAS_BUFFER_REFUSALS) == 72
+    assert len(_DEMONYM_LOCATIVE_COSTS) == 10
 
 
 def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
@@ -3893,7 +3902,9 @@ def test_other_routes_still_get_an_empty_context_block():
 # HAND-KEPT - see tests/test_country.py's copy for why no property of the table
 # can derive it: `Somali`, `Mali`, `Cibuti`, `Burundi`, `Haiti`, `Brunei`,
 # `Fiji` and `Niue` all end in a vowel and take no buffer, and a regex over
-# `-eti|-onu|-eri|-arı` misses `Ekvator Ginesi`.
+# `-eti|-onu|-eri|-arı` matches only 18 of the 22, missing `Çin Anakarası`,
+# `Ekvator Ginesi`, `Fransız Polinezyası` and `Fildişi Sahili`. Nine head nouns
+# are the hand-kept part; the 22 aliases and 19 codes derive from them.
 _POSSESSIVE_HEADS = (
     "cumhuriyeti", "federasyonu", "emirlikleri", "devletleri", "adaları",
     "polinezyası", "sahili", "anakarası", "ginesi",
@@ -3965,11 +3976,31 @@ _SHORT_ALIAS_BUFFER_REFUSALS = [
 # OUTSIDE BOTH COUNTS, as every pinned cost in this file is: a cost is a
 # sentence we admit and wish we did not, so it is not a refusal the guard
 # "passes" by refusing.
+#
+# ALL TEN, AND THE TEN IS THE WHOLE POINT. `_SELF_TR`'s comment quotes "10
+# aliases" and this list carried four of them for one commit, so the claim and
+# the pin disagreed and nothing was red. The ten are every LONG TURKISH alias
+# whose `<alias>n` is an attested word in data/vector_store/chroma.sqlite3 -
+# `amerikan` x47, `italyan` x26, `kenyan` x27, `ugandan` x14, `guatemalan` x13,
+# `venezuelan` x5, `angolan` x4, `libyan` x4, `moldovan` x3, `samoan` x1 - which
+# is the only reason these ten and not the other 199. The corpus is a 775MB
+# sqlite file and no unit test opens it, so the LIST is the artefact and
+# test_the_corpus_the_guards_numbers_are_quoted_over asserts its length.
+#
+# Each entry is the grammatical locative of its own stem - `-nda` after a back
+# vowel, `-nde` after a front one - because a wrong harmony would pin a string
+# Turkish does not write and pass for the wrong reason.
 _DEMONYM_LOCATIVE_COSTS = [
     ("amerikandayım", 231),
+    ("angolandayım", 7),
+    ("guatemalandayım", 89),
     ("italyandayım", 106),
     ("kenyandayım", 114),
+    ("libyandayım", 124),
+    ("moldovandayım", 146),
+    ("samoandayım", 244),
     ("ugandandayım", 226),
+    ("venezuelandayım", 236),
 ]
 
 
@@ -4081,9 +4112,26 @@ def test_the_buffered_refuse_set_can_actually_fail():
 
 def test_the_buffer_is_gated_by_the_name_length():
     """THE FINDING OF THIS ROUND, and it was a REACHABLE leak rather than a
-    theoretical one. Writing the buffer as a bare `n?` in `_SELF_TR` admitted
-    all 72 of these - every short alias plus `n` plus a locative plus a person -
-    and the dearest is `mali`: `mali` + `nda` is the ordinary Turkish word
+    theoretical one.
+
+    TWO DIFFERENT COUNTERFACTUALS SIT BEHIND THIS TEST and an earlier revision
+    of this docstring credited the wrong one with the wrong number. Measured,
+    on these 72 refusals and on the 88 accepts:
+
+      the buffer written as                72 refusals   88 accepts
+      ------------------------------------ ------------  ----------
+      no buffer at all (38cde42)                     0            0
+      a bare `n?` in `_SELF_TR`                     36           44
+      an UNGATED `(?:'?n)?` in `_alias_key`         72           88
+      the shipped, length-gated `(?:'?n)?`           0           88
+
+    So the bare `n?` is not the wide version - it is the BROKEN one: it admits
+    half the refusals (the apostrophe-less half) while losing half the accepts
+    (all 44 that carry an apostrophe, because Turkish writes the apostrophe
+    before the buffer). The variant that admits all 72 is the ungated
+    `(?:'?n)?`, and that is the one this gate exists against.
+
+    The dearest of the 72 is `mali`: `mali` + `nda` is the ordinary Turkish word
     "malında" ("in his goods"), and `mali` is also the adjective for fiscal,
     which is why country.py already keeps it in `_AMBIGUOUS_EN`.
 
@@ -4164,7 +4212,15 @@ def test_the_buffered_twin_gets_the_twin_verdict():
     So every Turkish sentence the shipped corpus holds is re-spelled onto each
     of the 22 compounds, with the buffer inserted where Turkish puts it - AFTER
     the apostrophe, "Adaları'nda" and never "Adalarin'da" - and the verdict must
-    match the original's. 1.760 twins, 0 disagreeing.
+    match the original's. 63 source sentences x the 22 compounds = 1.386 twins,
+    0 disagreeing.
+
+    THE COUNT IS ASSERTED AS A PRODUCT, not as a literal, because the literal
+    was wrong when it shipped: this docstring and `_SELF_TR`'s comment both read
+    "1.760 twins" for one commit, which needs 80 source sentences where the
+    shipped lists hold 63. `assert twins >= 1000` could not catch it. A figure
+    this branch quotes and does not derive goes stale by the next commit, and
+    this is the fifth time that has been the finding.
 
     The apostrophe placement is load-bearing in the TEST, not just in the code:
     the first version of this sweep inserted the buffer before the apostrophe
@@ -4174,6 +4230,7 @@ def test_the_buffered_twin_gets_the_twin_verdict():
                  _NATIONALITY_REFUSALS, _SHAPE_NEAR_MISSES, _MERELY_NAMING,
                  _OBJECT_LOCATIVES, _ACTION_LOCATIVES):
         shapes.extend(rows)
+    assert len(shapes) == 63
     twins = 0
     disagreed = []
     for text, code in shapes:
@@ -4193,7 +4250,10 @@ def test_the_buffered_twin_gets_the_twin_verdict():
             if engine._states_location(
                     rewritten, engine._code_aliases(fcode)) != base:
                 disagreed.append((text, rewritten))
-    assert twins >= 1000, twins          # the denominator must be real
+    # Derived, not quoted: every source sentence names an alias of its own code,
+    # so the twin count is exactly the product. An inequality here is what let
+    # "1.760" ship.
+    assert twins == len(shapes) * len(_possessive_family()) == 1386
     assert disagreed == []
 
 

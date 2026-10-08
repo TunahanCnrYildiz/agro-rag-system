@@ -180,14 +180,21 @@ _PERSON = r"(?:y[iu]m|y[iu]z|s[iu]n|d[iu]r)?"
 #
 # WHAT THE WIDENING ADMITS, measured rather than argued, because an optional `n`
 # IS an extension - `<key>` + `n` + `da` matches now where it did not:
-#  * Over 81.426 chunks of the shipped Turkish corpus (271.768 distinct words,
-#    10.9M tokens): 0 words of the shape `<long key>` + `n` + `[dt][ae]n?`.
+#  * Over 81.426 chunks of the shipped Turkish corpus, folded with
+#    `_normalize_tr` and tokenised as `[a-z0-9']+` - 271.768 distinct words,
+#    10.905.419 tokens. THE TOKENISATION IS PART OF THE FIGURE: keeping the
+#    apostrophe inside the token is what makes "turkiye'nin" one word and the
+#    distinct count 271.768, where splitting on it (`[a-z0-9]+`) gives 262.439
+#    over 10.934.980 tokens. Both are this corpus; a figure quoted without the
+#    rule cannot be re-taken, and one of these was.
+#
+#    0 words of the shape `<long key>` + `n` + `[dt][ae]n?`.
 #    THAT ZERO IS VACUOUS ON ITS OWN - 0 words were eligible to break it - so it
 #    is reported with the set that could have: 16 attested words are
 #    `<long key>` + `n` + something (`amerikan` x47, `kenyan` x27, `italyan`
 #    x26, `ugandan` x14, `turkiyenin` x6 …), and not one continues into a
 #    locative. `turkiyenin` is the near miss: the genitive `-nin` is one letter
-#    from `-nda` in shape and nothing else in 10.9M words comes closer.
+#    from `-nda` in shape and nothing else in 10,9M tokens comes closer.
 #  * CONSTRUCTED eligibility, since the corpus supplied none: 10 long keys have
 #    an attested Turkish word at `<key>n` (`amerikan`, `italyan`, `kenyan`,
 #    `ugandan`, `angolan`, `libyan`, `moldovan`, `samoan`, `venezuelan`,
@@ -363,7 +370,18 @@ _EN_IN = r"(?:in|at)\s+"
 # no property of the table says which final `i` is a possessive and which is a
 # foreign name's last letter - `Somali`, `Mali`, `Cibuti`, `Burundi`, `Haiti`,
 # `Brunei`, `Fiji` and `Niue` all end in a vowel and take no buffer. A regex
-# over `-eti|-onu|-eri|-arı` misses `Ekvator Ginesi`, which is why it is a list.
+# over `-eti|-onu|-eri|-arı` matches only 18 of the 22 - it misses `Çin
+# Anakarası`, `Ekvator Ginesi`, `Fransız Polinezyası` and `Fildişi Sahili` -
+# which is why it is a list. What is hand-kept is NINE HEAD NOUNS; the 22
+# aliases and the 19 codes are derived from them, so the list is short and the
+# figures are not.
+#
+# AND A MISSED HEAD COSTS A MEASUREMENT, NOT A DECISION, which is worth saying
+# so the next reader knows what to worry about: a new possessive-final name
+# (`… Krallığı`, `… Topluluğu`) left out of these nine would drop out of the
+# counts above while still being matched by the code, because `_SUFFIX`'s
+# optional `n` is given to every long key regardless. The risk is a stale
+# number, not a grower in the wrong country.
 #
 # COSTS, named rather than implied: "Hollanda'dan yazıyorum" ("writing from the
 # Netherlands") is a genuine statement of location and is now refused, as is

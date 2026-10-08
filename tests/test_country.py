@@ -767,7 +767,11 @@ def test_the_capital_gate_on_chad_and_jordan_costs_their_lowercase_typists():
 # property of the table says which final `i` is a 3rd-person possessive and
 # which is just a foreign name's last letter. `Somali`, `Mali`, `Cibuti`,
 # `Burundi`, `Haiti`, `Brunei`, `Fiji` and `Niue` all end in a vowel and take no
-# buffer. A regex over `-eti|-onu|-eri|-arı` misses `Ekvator Ginesi`.
+# buffer. A regex over `-eti|-onu|-eri|-arı` matches only 18 of the 22, missing
+# `Çin Anakarası`, `Ekvator Ginesi`, `Fransız Polinezyası` and `Fildişi Sahili`.
+# What is hand-kept is these NINE HEAD NOUNS; the 22 aliases and 19 codes are
+# derived from them, and a head left out here costs a count rather than a
+# decision - the code gives the buffer to every long key either way.
 _POSSESSIVE_HEADS = (
     "cumhuriyeti", "federasyonu", "emirlikleri", "devletleri", "adaları",
     "polinezyası", "sahili", "anakarası", "ginesi",
@@ -957,8 +961,11 @@ def test_what_the_optional_buffer_admits(message, code):
     `libyan`, `moldovan`, `samoan`, `venezuelan`, `guatemalan`), which makes a
     locative on that stem a real form rather than a hypothetical one.
 
-    MEASURED over the 81.426 shipped Turkish corpus chunks - 271.768 distinct
-    words, 10.9M tokens: 0 attested words have this shape, and 0 of the 200
+    MEASURED over the 81.426 shipped Turkish corpus chunks, folded with
+    `_normalize_tr` and tokenised as `[a-z0-9']+` - 271.768 distinct words,
+    10.905.419 tokens, the apostrophe kept INSIDE the token (splitting on it
+    gives 262.439 words over 10.934.980 tokens, and a figure quoted without the
+    rule cannot be re-taken): 0 attested words have this shape, and 0 of the 200
     constructed ones are attested either. THAT ZERO IS REPORTED WITH ITS
     DENOMINATOR because on its own it is vacuous: 0 words were eligible to break
     it. The set that could have is 16 attested words of the form `<long key>` +
