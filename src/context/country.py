@@ -115,12 +115,24 @@ _ORDERED = sorted(_FOLDED, key=len, reverse=True)
 
 
 # --------------------------------------------------------------------------
-# Copied VERBATIM from src/context/location.py. Not imported: the two tables
-# will drift apart - this one is already gaining alias languages, and any
-# tightening made for 199 country names would silently change how the 81
-# provinces are matched, which is the coupling that makes shared regex
-# constants dangerous. The comments come with them because the collisions they
-# describe are the same collisions here.
+# Copied from src/context/location.py, and NO LONGER VERBATIM: `_SUFFIX` now
+# carries a buffer `n` on its locative/ablative branch and location.py's does
+# not. Not imported: the two tables will drift apart - this one is already
+# gaining alias languages, and any tightening made for 199 country names would
+# silently change how the 81 provinces are matched, which is the coupling that
+# makes shared regex constants dangerous. The comments come with them because
+# the collisions they describe are the same collisions here.
+#
+# THE DIVERGENCE IS MEASURED, not assumed, because the last time these two
+# modules parted company one of them kept a paragraph claiming they had not:
+# ALL 81 PROVINCE NAMES ARE SINGLE WORDS and 0 of them end in a 3rd-person
+# possessive, so the buffer the 22 country compounds need has nothing to attach
+# to on the province side. `Adana`, `Bursa`, `Konya` take `-da` directly;
+# nothing in location.py's table is shaped like `Rusya Federasyonu`. Adding the
+# buffer there would widen 81 keys to buy 0 spellings, so location.py is left
+# alone - a decision, taken on this count, and `_PERSON`, `_STRICT_SUFFIX`,
+# `_SHORT`, `_PLACE` and `_TRIM` below are still byte-identical to its copies.
+# tests/test_country.py pins both halves of this: the count and the identity.
 # --------------------------------------------------------------------------
 
 # Personal endings Turkish speakers actually use when saying where they are:
@@ -128,7 +140,83 @@ _ORDERED = sorted(_FOLDED, key=len, reverse=True)
 _PERSON = r"(?:y[iu]m|y[iu]z|s[iu]n|d[iu]r)?"
 
 # Case suffix. MANDATORY - a bare name is handled separately below.
-_SUFFIX = r"(?:[dt][ae]n?|[yn]?[aeiu]n?|l[iu])" + _PERSON
+#
+# THE BUFFER `n` ON THE LOCATIVE/ABLATIVE BRANCH IS THIS MODULE'S OWN, and it is
+# the one place this block is no longer location.py's copy; see the header above.
+# Turkish inserts a buffer consonant between a 3rd-person possessive and a case
+# ending, so the locative of `Rusya Federasyonu` is `Federasyonunda`, never
+# `Federasyonuda`. 22 of the Turkish aliases end in such a possessive - the
+# `… Cumhuriyeti`, `… Federasyonu`, `… Emirlikleri`, `… Devletleri`,
+# `… Adaları`, `Fransız Polinezyası`, `Fildişi Sahili`, `Çin Anakarası` and
+# `Ekvator Ginesi` family, 19 FAO codes - and the APOSTROPHE-LESS form of every
+# one of them resolved to nothing: measured at 38cde42, "Rusya Federasyonunda"
+# and "Rusya Federasyonundayım" -> None while "Rusya Federasyonu'nda" -> 185,
+# because the apostrophe branch leaves everything after the `'` free and this
+# one did not. `[dt][ae]n?` wants `d`/`t` first and is handed `n`;
+# `[yn]?[aeiu]n?` takes the `n` and then wants a vowel and is handed `d`. The
+# dative needed nothing - `[yn]?[aeiu]n?` spells `na` already, so
+# "Rusya Federasyonuna" worked all along, which is why the gap hid.
+#
+# THE RECORDS HAD THIS BACKWARDS until 2026-10-08, and it is worth saying
+# plainly because the wrong description is the reason it sat: the note read "18
+# countries cannot be placed by their full official Turkish name", which points
+# at the apostrophe form. The apostrophe form was never broken. What was broken
+# is the form a grower types on a phone, where nobody reaches for an apostrophe -
+# and location.py's own comment calls that spelling "the ordinary statement of
+# location". The delivery surface is a mobile app.
+#
+# ONLY THE FIRST BRANCH TAKES IT. The dative branch is left exactly as it was,
+# because it already spells its own buffer and widening it would be a second
+# change with no defect behind it.
+#
+# NOT ADDED TO _STRICT_SUFFIX, and that is a grammatical argument and not
+# caution: no alias of 4 characters or fewer ends in a 3rd-person possessive, so
+# there is no buffer for one to carry. All 18 short keys are bare names
+# (`abd`, `bae`, `cad`, `çin`, `fas`, `fiji`, `gana`, `gine`, `ırak`, `iran`,
+# `kore`, `küba`, `laos`, `mali`, `niue`, `peru`, `şili`, `togo`), and they are
+# the keys most exposed to collision with ordinary words - which is what
+# _STRICT_SUFFIX exists for. Measured: adding the buffer there widens nothing
+# any alias needs and the 18 keys gain nothing from this change.
+#
+# WHAT THE WIDENING ADMITS, measured rather than argued, because an optional `n`
+# IS an extension - `<key>` + `n` + `da` matches now where it did not:
+#  * Over 81.426 chunks of the shipped Turkish corpus (271.768 distinct words,
+#    10.9M tokens): 0 words of the shape `<long key>` + `n` + `[dt][ae]n?`.
+#    THAT ZERO IS VACUOUS ON ITS OWN - 0 words were eligible to break it - so it
+#    is reported with the set that could have: 16 attested words are
+#    `<long key>` + `n` + something (`amerikan` x47, `kenyan` x27, `italyan`
+#    x26, `ugandan` x14, `turkiyenin` x6 …), and not one continues into a
+#    locative. `turkiyenin` is the near miss: the genitive `-nin` is one letter
+#    from `-nda` in shape and nothing else in 10.9M words comes closer.
+#  * CONSTRUCTED eligibility, since the corpus supplied none: 10 long keys have
+#    an attested Turkish word at `<key>n` (`amerikan`, `italyan`, `kenyan`,
+#    `ugandan`, `angolan`, `libyan`, `moldovan`, `samoan`, `venezuelan`,
+#    `guatemalan`), so for those 10 a locative on that stem would be a real
+#    word. All 200 constructed forms resolve - `amerikanda` -> 231,
+#    `italyanda` -> 106 - and 0 of the 200 are attested anywhere in the corpus.
+#    This is the cost, named: `-n` on these ten is a demonym, not a possessive,
+#    and a demonym needs a head noun before it can take a locative, so
+#    "İtalyanda kaldı" is the only reading and it is rare. 8 of the 10 are
+#    English demonyms that appear in the corpus' English abstracts and take no
+#    Turkish case ending at all.
+#  * 399 attested corpus words start with a long key; 0 of them resolve newly,
+#    bare or in five ordinary sentence frames (1.995 sentences).
+#  * 792 refusal sentences built to REACH this pattern on the 22-family - the
+#    supplier ablative and the third-party locative, "…ndan tohum aldım",
+#    "…nda çalışan bir dayım var" - place 0 speakers at engine level, old tree
+#    and new tree alike, against 704 eligible. The 396 ablative ones resolve 0
+#    of 396 here, which is _NOT_ABLATIVE doing its work on a branch it could not
+#    reach before this change.
+#
+# RESOLVING IS NOT PLACING, and the gain stops at this module's edge: over 528
+# conversations on the 22-family, 287 gain a resolve and 0 gain a country line,
+# because engine._SELF_TR spells `'?[dt][ae]y[iu][mz]` and has no buffer of its
+# own. That is a PRE-EXISTING divergence, not one this change makes -
+# "Rusya Federasyonu'ndayım" resolved 185 and placed nobody at 38cde42 either -
+# and it is left for its own change, because widening a resolver in the same
+# commit that widens the guard reading it is the shape of mistake this module
+# has already made three times. See the ledger's Wave 4.
+_SUFFIX = r"(?:n?[dt][ae]n?|[yn]?[aeiu]n?|l[iu])" + _PERSON
 
 # Short names collide with ordinary words once folded. For provinces it was
 # "van"+a -> "vana"; for countries it is `fas` inside "burkina fasoda" and `uk`
@@ -255,10 +343,27 @@ _EN_IN = r"(?:in|at)\s+"
 # shape here on purpose. `y` cannot precede `-dan` in any Turkish word, so
 # admitting it costs nothing and the two lines stay readable side by side.
 #
-# ONLY THE APOSTROPHE BRANCH WAS AFFECTED. _SUFFIX cannot spell `nden` at all -
-# `[dt][ae]n?` has no slot for a leading `n` - so the apostrophe-less
-# "dominik cumhuriyetinden tohum aldim" never matched anything and still
-# resolves to nothing. Confirmed, not assumed.
+# BOTH BRANCHES ARE AFFECTED NOW, and this paragraph said the opposite until
+# 2026-10-08. It read "ONLY THE APOSTROPHE BRANCH WAS AFFECTED. _SUFFIX cannot
+# spell `nden` at all" - true when it was written, and made false by the buffer
+# `n` added to _SUFFIX's locative/ablative branch. The apostrophe-less
+# "dominik cumhuriyetinden tohum aldim" still resolves to nothing, so the
+# OUTCOME is unchanged, but the reason is now this lookahead rather than a
+# suffix that could not spell the shape. Re-measured after the change: all 227
+# Turkish aliases, bare buffer ablative, 0 resolve - and this time all 227 were
+# ELIGIBLE, where before the change 0 of them could reach the guard at all. The
+# locative stays accepted, 208 aliases of 227 (the other 19 are the 18 short
+# keys on _STRICT_SUFFIX plus `sudan`, which its capital gate refuses in
+# lowercase). 227 supplier sentences "<alias>ndan tohum aldım" place nobody.
+#
+# THE `22` ABOVE IS RE-COUNTED, not inherited: 22 `tr` aliases end in a 3sg
+# possessive, over 19 FAO codes (`Salomon`/`Solomon Adaları` are both 25,
+# `Çin Anakarası`/`Çin Halk Cumhuriyeti` both 41, `Kongo Demokratik`/
+# `Demokratik Kongo Cumhuriyeti` both 250). The list is hand-kept and must be:
+# no property of the table says which final `i` is a possessive and which is a
+# foreign name's last letter - `Somali`, `Mali`, `Cibuti`, `Burundi`, `Haiti`,
+# `Brunei`, `Fiji` and `Niue` all end in a vowel and take no buffer. A regex
+# over `-eti|-onu|-eri|-arı` misses `Ekvator Ginesi`, which is why it is a list.
 #
 # COSTS, named rather than implied: "Hollanda'dan yazıyorum" ("writing from the
 # Netherlands") is a genuine statement of location and is now refused, as is
