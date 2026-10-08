@@ -73,6 +73,51 @@ _STRICT_SUFFIX = r"(?:[dt][ae]n?|l[iu])" + _PERSON
 _PLACE = (r"(?:il|ili|ilin|ilinde|ilindeyim|ilinden|iline|ilimde|ilimdeyim|ilimizde"
           r"|ilce\w*|bolge\w*|yore\w*|civar\w*|kosul\w*|taraf\w*|ova\w*|havza\w*)")
 
+# THE ABLATIVE IS NOT A LOCATION. `_SUFFIX` spells it as well as the locative -
+# `[dt][ae]n?`, where the optional `n` turns "-da" (in) into "-dan" (from) - and
+# the apostrophe branch accepted anything after the apostrophe, so "Ankara'dan
+# aldım" ("I bought from Ankara") placed the grower in Ankara. That sentence
+# says where the SEED came from.
+#
+# COPIED VERBATIM FROM src/context/country.py, where it is `_NOT_ABLATIVE` and
+# has carried the same shape since ee43c18. Read it there for the reasoning that
+# earned each piece: why the buffer `n` is in it (22 country aliases walked
+# through a version that spelled only `dan|den|tan|ten`), why `[yn]?` is spelled
+# the way `_SUFFIX` spells its own buffer, and why a bare ablative is refused
+# while one carrying a personal ending is kept - "Ankara'danım" ("I am from
+# Ankara") states where the user belongs the way "Ankaralıyım" does, and the
+# trailing `(?!\w)` is what tells them apart: the bare ablative ENDS the word,
+# "Ankara'danım" runs on into `ım`.
+#
+# SHIPPED IN THE SAME COMMIT AS EARLIEST-WINS, because apart it is not a fix.
+# Earliest-wins alone answers the stated province when the user states it first
+# and the SUPPLIER, every time, when the user states the purchase first:
+# measured over all 6 480 ordered pairs of the 81 provinces, "{sup}'dan fide
+# aldım, {loc}'dayım" went 3 240/6 480 right (a coin flip on name length) to
+# 0/6 480. The twin shipped both halves together for exactly this reason -
+# `ee43c18` is titled after the ablative and contains both - and the round
+# ledger records the fixer's note that narrowing the suffix alone "would have
+# fixed nothing while looking like a fix". The reverse half alone is the same
+# trade: net zero, and wrong in a predictable direction instead of half the time.
+#
+# COST, named rather than implied: an ablative that really does state a location
+# is now refused. Measured over the 81 provinces, "{p}'dan yazıyorum" and
+# "{p}'den geldim" went 81/81 placed to 0/81. The province case is weaker than
+# the country one - "İzmir'den geldim" is more often said near İzmir than
+# "Hollanda'dan yazıyorum" is said near the Netherlands - so this is a real loss,
+# and it buys off a systematic one. Refusing a location costs a question:
+# `extract_province` returns None, `src/engine.py` finds no national row in
+# data/crop_norms.json for a Turkish user, and the assistant asks which province.
+# Accepting a supplier prefills the budget card with the wrong province's yields
+# and prices and says nothing.
+#
+# STALE SENTENCE IN THE TWIN, left alone on purpose: country.py's comment above
+# its own `_NOT_ABLATIVE` says this module "diverges … deliberately" and that
+# "location.py's twin of this line is left exactly as it is". That stopped being
+# true here. country.py is out of scope for this change and is not touched, so
+# the correction lives on this side.
+_NOT_ABLATIVE = r"(?![yn]?[dt][ae]n(?!\w))"
+
 _TRIM = " \t\n\r.,!?;:()\"'-…"
 
 
@@ -92,16 +137,48 @@ def _find(text: str) -> str | None:
     the whole message (the natural reply to "hangi ildesiniz?"), or when a place noun
     follows it immediately ("Diyarbakir kosullarinda", "Antalya bolgesinde").
 
-    THE EARLIEST MATCH WINS, NOT THE LONGEST NAME. A sentence may name two
-    provinces and only one of them is where the user is - "Van'dayım ama
-    Ankara'dan aldım", "Konya'dayım ama Adana'dan fide aldım" - and returning on
-    the first key that matched ANYWHERE handed those to whichever name was longer,
-    which is unrelated to what the user said. Measured 2026-09-25, before this
-    revision: both of those answered the second province, so a Konya grower's
-    budget card was prefilled with Adana's yields and prices and nothing said so.
-    So every key is tried and the candidate with the smallest match position is
+    TWO RULES DECIDE A TWO-PROVINCE SENTENCE, and they were built together
+    because apart neither one is a fix. THE EARLIEST MATCH WINS, NOT THE LONGEST
+    NAME, and AN ABLATIVE IS NOT A LOCATION (`_NOT_ABLATIVE` above).
+
+    WHAT THE OLD RULE ACTUALLY WAS, measured rather than named: `_find` returned
+    the first key in `_ORDERED` that matched anywhere, and `_ORDERED` is length
+    descending with ties broken by the order of `PROVINCES`. Over every ordered
+    pair of the 81 provinces in four frames, 25 920 two-province sentences, the
+    old code answered the strictly LONGER name 21 760 times (84 %), the strictly
+    shorter one 0 times, a third province 0 times, and in the remaining 4 160 the
+    two names fold to the SAME length - every one of those decided by table
+    order. So: length in 84 % of them, table order in the rest, and what the user
+    said in neither.
+
+    THE EXAMPLE THIS BUG IS USUALLY TOLD WITH IS ONE OF THE 4 160.
+    "Konya'dayım ama Adana'dan fide aldım" answered Adana - correctly reported,
+    wrongly explained: `konya` and `adana` both fold to five characters, so what
+    chose Adana is `PROVINCES[0]`, not "whichever name was longer". The length
+    reading is right about the class and wrong about that sentence.
+
+    SO EVERY KEY IS TRIED and the candidate with the smallest match position is
     returned. It is the weakest defensible reading of a two-province sentence:
     people state where they are before they qualify it.
+
+    AND POSITION ALONE WOULD HAVE BEEN HALF A FIX. Earliest-wins answers the
+    stated province when the user states it first, and the SUPPLIER every time
+    when the user states the purchase first - "Adana'dan fide aldım, Konya'dayım"
+    is as ordinary as the other order. Measured across the same four frames, two
+    with the location first and two with the origin first: old 12 960 of 25 920
+    right (a coin flip), position alone 12 960 of 25 920, position with
+    `_NOT_ABLATIVE` 25 920 of 25 920. The net of position alone is ZERO, which is
+    why the two ship together and why `country.py`'s `ee43c18` shipped its pair
+    together too.
+
+    IT ALSO OPENS THE WORLD LAYER WHERE IT WAS SHUT. `src/engine.py` reads
+    `_country_lines` only when this function comes back empty, so a Turkish
+    province name in a sentence about a FOREIGN grower's supplier used to swallow
+    the whole decision: "Hollanda'dayım ama Ankara'dan fide aldım" answered Ankara
+    and the FAOSTAT figures were never reached - and earliest-wins could not help,
+    because Ankara is the only province in that sentence. Measured over the 81
+    provinces against five countries in both word orders: 81/81 placed in a
+    Turkish province before, 81/81 reaching the country's figures now.
 
     THE `il` ENUMERATION BELOW CLOSED ONE INSTANCE OF THIS, not the class, and
     the comment on `_PLACE` says so in its own words: "Kahramanmaras ile ilgili
@@ -109,14 +186,34 @@ def _find(text: str) -> str | None:
     returned before a genuine short-name statement was tried. Narrowing `il\\w*`
     stopped that sentence. Position stops the shape.
 
-    LONGEST-FIRST STILL DECIDES TIES, and that is what `_ORDERED` is for.
-    Candidates arrive longest first and a later one must be STRICTLY earlier to
-    win, so a short name sharing a position with a long one does not displace it.
+    THE TIE-BREAK IS DEAD HERE AND IS KEPT FOR SYMMETRY WITH THE TWIN. Candidates
+    arrive longest first and a later one must be STRICTLY earlier to win. In this
+    table that comparison can never fire: two keys can only match at the same
+    offset if one is a prefix of the other, and NO folded province name is a
+    prefix of another (measured: 0; `mus` sits inside `gumushane` but not at its
+    start). Relaxing it to `<=` leaves the suite green and changes 0 of 53 140
+    answers. In `country.py` it is live - `Dominik`/`Dominika` and
+    `Nijer`/`Nijerya` genuinely tie - so the line stays, described for what it is.
+
+    THE PER-BRANCH MINIMUM IS THE LIVE ONE. A key can match more than one branch
+    and the branches report different positions, so `found < start` keeps the
+    earliest of them: "Konya ovasındayım, Adana'ya göre geç oluyor, Konya'da kar
+    var" is Konya by the place-noun branch at offset 0, and taking the maximum
+    instead answers Adana. That mutation changes 6 480 answers in the sweep, so
+    this is the comparison a test has to pin.
 
     PORTED FROM src/context/country.py's `_find`, which was built as this
-    function's twin and inherited this bug on the day it was written. The country
+    function's twin and inherited both bugs on the day it was written. The country
     side was fixed on 2026-09-25 and this side was left alone because that round's
-    plan forbade touching a shipped module mid-round. The two now agree.
+    plan forbade touching a shipped module mid-round. ON POSITION AND ON THE
+    ABLATIVE THE TWO NOW AGREE; two differences remain and both are deliberate.
+    The twin tests capitalisation for the ten country names that are also ordinary
+    English nouns (`_admits`), which has no province equivalent. And its suffix
+    branch ends `(?!['\\w])` where this one ends `(?!\\w)`, because there the
+    shorter of a prefix pair would eat a longer name's vowel as a case suffix and
+    stop before the `'dan` this guard refuses. Measured here: porting it changes
+    answers only for strings built as province + vowel + "'dan" - "Adıyamana'dan"
+    - which no prefix pair in this table can produce and nobody writes.
 
     WHAT THIS DOES NOT CLOSE, first: the other branch of the regex still resolves
     ordinary Turkish words that happen to be a province plus a legal case suffix -
@@ -125,27 +222,43 @@ def _find(text: str) -> str | None:
     produce names, lower frequency, and pre-existing. Do not read this function as
     having solved the collision problem; it solved the branches it names.
 
-    WHAT THIS DOES NOT CLOSE, second - AND IT IS THE ONE A READER WILL REACH FOR:
-    `_SUFFIX` admits the bare ablative, so "Ankara'dan aldım" alone still answers
-    Ankara, and that sentence says where the SEED came from. The country twin
-    refuses it (`_NOT_ABLATIVE` there). It is deliberately NOT fixed here, in this
-    change: position and suffix are two decisions, this commit makes one of them,
-    and narrowing a shipped surface in the same breath as reordering it is how the
-    country guard earned seven review rounds. Measured and left open.
+    WHAT THIS DOES NOT CLOSE, second: a province name in SINGLE quotes now beats
+    a genuine statement after it. "'Van' Kahramanmaraş'tayım" -> Van, measured
+    0/6 480 over the ordered pairs where it used to be 3 240/6 480. The apostrophe
+    branch cannot tell a closing quote from a Turkish case-suffix apostrophe, and
+    earliest-wins amplifies that. DOUBLE quotes are unaffected (6 480/6 480), the
+    twin has the same branch, and closing it here alone would be the divergence
+    this change exists to remove - so it is sized and left open, not deferred with
+    a reason.
+
+    COST IN TIME, both halves: a match anywhere but offset 0 no longer returns
+    early, so it pays for all 81 keys. Best of 5 x 400 calls, old against new:
+    two provinces 0,099 -> 0,219 ms, no match 0,191 -> 0,185, opens with the
+    province 0,164 -> 0,171, province at the end 0,295 -> 0,298, long no-match
+    0,579 -> 0,578. One call per answer, against generation at ~65 tok/s.
     """
     folded = _normalize_tr(text)
     whole = folded.strip(_TRIM)
-    # Where `whole` actually begins, so a message opening with whitespace or a
-    # quote mark still reports the position of its first letter.
-    lead = len(folded) - len(folded.lstrip(_TRIM))
     best_start: int | None = None
     best_name: str | None = None
     for key in _ORDERED:
         k = re.escape(key)
         suffix = _STRICT_SUFFIX if len(key) <= _SHORT else _SUFFIX
-        start = lead if whole == key else None
-        for pattern in (rf"(?<!\w)(?P<name>{k})'",
-                        rf"(?<!\w)(?P<name>{k}){suffix}(?!\w)",
+        # 0, not the offset of the first letter. `whole == key` means the
+        # trimmed message IS this one province name, so no second key can be
+        # present to compare against - measured, 0 of the 81 bare messages have
+        # a second candidate - and the only thing this number can still do is
+        # decide whether the `break` below fires. An earlier version computed
+        # the real offset and commented that a message opening with whitespace
+        # or a quote mark "still reports the position of its first letter";
+        # setting it to 0 and to 10**6 both leave the suite green and change no
+        # answer, so that comment described a consumer that does not exist here.
+        # The twin has one - country.py passes its `lead` to `_admits`, which
+        # indexes into the unfolded text for the capitalisation test on the ten
+        # English-noun country names. This module has no `_admits`.
+        start = 0 if whole == key else None
+        for pattern in (rf"(?<!\w)(?P<name>{k})'{_NOT_ABLATIVE}",
+                        rf"(?<!\w)(?P<name>{k}){_NOT_ABLATIVE}{suffix}(?!\w)",
                         rf"(?<!\w)(?P<name>{k})\s+{_PLACE}(?!\w)"):
             match = re.search(pattern, folded)
             # `name` is the province itself, so the three branches stay
@@ -157,9 +270,12 @@ def _find(text: str) -> str | None:
         if start is not None and (best_start is None or start < best_start):
             best_start, best_name = start, _FOLDED[key]
         if best_start == 0:
-            # Nothing can beat position 0, and any later key that ties it is
-            # shorter and would lose the tie anyway. This keeps the common case -
-            # the message opens with the province - from paying for all 81 keys.
+            # PURELY THE PERFORMANCE OPTIMISATION IT LOOKS LIKE: nothing can beat
+            # offset 0, and no later key can even tie it, since a tie needs a
+            # prefix pair and this table has none. Disabling it leaves the suite
+            # green and changes 0 of 53 140 answers - it only keeps the common
+            # case, a message that opens with the province, from paying for all
+            # 81 keys.
             break
     return best_name
 

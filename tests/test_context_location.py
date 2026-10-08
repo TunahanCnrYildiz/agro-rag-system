@@ -214,71 +214,196 @@ def test_the_province_the_user_states_beats_the_longer_name(text, expected):
     """THE EARLIEST MENTION WINS, NOT THE LONGEST NAME.
 
     `_find` used to return on the first key in `_ORDERED` that matched anywhere,
-    and `_ORDERED` is sorted by length - so a sentence naming two provinces was
-    decided by which name had more letters. Measured 2026-09-25:
+    and `_ORDERED` is length descending with ties broken by the order of
+    `PROVINCES` - so a sentence naming two provinces was decided by which name
+    had more letters, or, when they had the same number, by which one the table
+    lists first. Measured 2026-09-25:
     `extract_province("Van'dayım ama Ankara'dan aldım")` answered **Ankara**.
+
+    Over 25 920 two-province sentences the old code answered the strictly longer
+    name 21 760 times, the strictly shorter one 0 times, and in 4 160 the two
+    names fold to equal length and table order decided. `Konya` and `Adana` are
+    one of those 4 160 - both fold to five characters, and Adana is
+    `PROVINCES[0]` - so the second sentence here is NOT an instance of "the
+    longer name won"; it is an instance of the table deciding.
 
     WHY IT IS WORTH A TEST OF ITS OWN: `extract_province` feeds the budget card's
     prefill and the comparison card, so a Konya grower writing the second sentence
     got Adana's yields and prices filled into a form, with nothing in the answer
     saying which province the numbers came from.
 
-    Measured over every ordered pair of the 81 provinces in three frames, 19 440
-    sentences: before this fix 9 720 of them answered the province the user
-    stated - exactly half, which is what "the longer name wins" predicts on
-    ordered pairs - and after it, all 19 440 do."""
+    THE HEADLINE IS IN `test_both_word_orders_answer_the_stated_province`, not
+    here: these five sentences all state the location FIRST, which is the half of
+    the population that position alone fixes."""
     assert extract_province(text) == expected
 
 
 @pytest.mark.parametrize("text,expected", [
-    # Position ties: both names start at the same offset and the longer one must
-    # keep it. `Van` is inside no other province, but `Kars` opens
-    # `Karsiyaka`-shaped folds and `Afyonkarahisar` opens nothing - the real ties
-    # are names that are prefixes of other names.
+    # The longest names, each standing alone - they must not be displaced by a
+    # shorter key, and nothing else in these sentences can match.
     ("Kahramanmaraş'ta zeytin yetiştiriyorum", "Kahramanmaraş"),
     ("Afyonkarahisar'dayım", "Afyonkarahisar"),
-    # Leading whitespace and a quote mark: the bare-name branch reports the
-    # position of the first LETTER, not of the string.
+    # The bare-name branch reports offset 0 whatever the message opens with.
     ("  Manisa", "Manisa"),
     ('"Manisa"', "Manisa"),
 ])
-def test_a_tie_on_position_keeps_the_longer_name(text, expected):
-    """Candidates are tried longest-first and a later one has to be STRICTLY
-    earlier to win, so a short name sharing a position with a long one cannot
-    displace it. Without that, `Kars` would answer for `Kahramanmaraş` - both
-    begin at offset 0 once folded."""
+def test_a_long_name_is_not_displaced_by_a_shorter_key(text, expected):
+    """THE TIE-BREAK THESE CASES LOOK LIKE IS DEAD CODE HERE, and this test is
+    named for what it actually covers.
+
+    An earlier docstring claimed `Kars` would answer for `Kahramanmaraş` because
+    "both begin at offset 0 once folded". Measured: `_normalize_tr` gives
+    `'kahramanmaras'` and `'kars'`, and `'kahramanmaras'.startswith('kars')` is
+    False. Exactly one key matches at offset 0 of that sentence. Two keys can
+    only tie on position if one is a PREFIX of the other, and no folded province
+    name is a prefix of another (0 pairs; `mus` is inside `gumushane` but not at
+    its start). Relaxing `start < best_start` to `<=` leaves the whole suite
+    green and changes 0 of 53 140 answers.
+
+    The strict comparison stays because `country.py` shares this code shape and
+    there it IS live (`Dominik`/`Dominika`, `Nijer`/`Nijerya`). What is pinned
+    here is only that these four messages answer these four provinces."""
     assert extract_province(text) == expected
 
 
-def test_every_province_wins_against_every_other_when_stated_first():
-    """The class, derived from `PROVINCES` rather than enumerated, so adding a
-    province cannot leave a hole here. Each province is paired with a fixed
-    counterpart in both directions: whichever is stated first is the answer,
-    regardless of which name is longer.
+@pytest.mark.parametrize("text,expected", [
+    ("Konya ovasındayım, Adana'ya göre geç oluyor, Konya'da kar var", "Konya"),
+    ("Rize yöresindeyim, Diyarbakır'a göre çok yağış var, Rize'de ne ekilir?",
+     "Rize"),
+    ("Antalya bölgesindeyim, Mersin'e göre nasıl, Antalya'da sera var",
+     "Antalya"),
+])
+def test_the_earliest_of_a_key_s_own_branches_is_the_one_that_counts(text, expected):
+    """THE LIVE COMPARISON INSIDE `_find`, which nothing else pins.
 
-    One counterpart rather than all 80, because the full 19 440-sentence sweep
-    that measured this fix takes about fifteen seconds and this suite runs on
-    every commit. The sweep's result is quoted in
-    `test_the_province_the_user_states_beats_the_longer_name`."""
+    One key can match several of the three branches at different offsets, and
+    `found < start` keeps the earliest of them. In the first sentence `konya`
+    matches the place-noun branch at offset 0 and the apostrophe branch near the
+    end, while `adana` matches once in between: taking the per-branch MAXIMUM
+    instead answers Adana, and mutating `found < start` to `found > start`
+    changes 6 480 answers in the sweep while leaving every other test green.
+
+    Each of the three answers a DIFFERENT province under that mutation - Adana,
+    Diyarbakır, Mersin - so none of them passes by accident, and all three are
+    sentences a grower could write: the second province is named with `-a göre`
+    ("compared to"), which is not an ablative and so is not what `_NOT_ABLATIVE`
+    refuses."""
+    assert extract_province(text) == expected
+
+
+def test_both_word_orders_answer_the_stated_province():
+    """THE HEADLINE, and it is a NET number over both halves of the population.
+
+    Position alone answers the stated province when the user states it first and
+    the SUPPLIER, every time, when the user states the purchase first - which is
+    equally ordinary Turkish. Measured over every ordered pair of the 81
+    provinces in four frames, 6 480 pairs each, 25 920 sentences:
+
+        {loc}'dayım ama {sup}'dan aldım     old 3240 -> 6480
+        {loc}'dayım, {sup}'dan fide aldım   old 3240 -> 6480
+        {sup}'dan aldım ama {loc}'dayım     old 3240 -> 6480
+        {sup}'dan fide aldım, {loc}'dayım   old 3240 -> 6480
+
+    Net 12 960/25 920 before, 25 920/25 920 after. With earliest-wins but no
+    `_NOT_ABLATIVE` the two bottom frames go to 0/6 480 and the net stays
+    12 960 - which is why both rules ship together.
+
+    Four frames x one counterpart rather than the full sweep, because the sweep
+    takes about fifteen seconds and this suite runs on every commit; the
+    counterpart is derived from `PROVINCES`, so adding a province cannot leave a
+    hole. It covers 160 of the 6 480 ordered pairs. `Kahramanmaraş` is the second
+    longest folded name, so for 79 of the 81 provinces both directions put the
+    longer name in the same place - this test pins the class cheaply, and the
+    numbers above are where the coverage claim lives."""
     for province in PROVINCES:
         other = "Kahramanmaraş" if province != "Kahramanmaraş" else "Van"
-        assert extract_province(f"{province}'dayım ama {other}'dan aldım") == province
-        assert extract_province(f"{other}'dayım ama {province}'dan aldım") == other
+        for loc, sup in ((province, other), (other, province)):
+            assert extract_province(f"{loc}'dayım ama {sup}'dan aldım") == loc
+            assert extract_province(f"{sup}'dan fide aldım, {loc}'dayım") == loc
 
 
 @pytest.mark.parametrize("text", [
     "Ankara'dan aldım",
     "Adana'dan fide getirdim",
+    "Antalya'dan tohum aldım",
+    # No apostrophe: `_SUFFIX` spells the ablative there too.
+    "Ankaradan aldım",
+    # The ablative with nothing else in the sentence to go on.
+    "Kahramanmaraş'dan fide aldım ama nerede ekeceğimi bilmiyorum",
 ])
-def test_the_bare_ablative_still_places_the_user_and_that_is_open(text):
-    """PINNED AS A KNOWN GAP, NOT AS CORRECT BEHAVIOUR. `_SUFFIX` admits the
-    ablative, so a sentence that says where the SEED came from places the user
-    there. The country twin refuses this shape - `_NOT_ABLATIVE` in
-    src/context/country.py - and this side deliberately still does not.
+def test_the_bare_ablative_does_not_place_the_user(text):
+    """A SENTENCE ABOUT WHERE THE SEED CAME FROM IS NOT A LOCATION. This is the
+    `_NOT_ABLATIVE` half of the change; the position half is above.
 
-    It was left out of the commit that fixed the position bug because position
-    and suffix are two different decisions: narrowing a shipped surface in the
-    same breath as reordering it is how the country guard earned seven review
-    rounds. This test exists so the next reader finds the gap measured rather
-    than discovering it."""
-    assert extract_province(text) is not None
+    Returning None here is the point: `src/engine.py` finds no national row for a
+    Turkish user in data/crop_norms.json, so the assistant ASKS which province
+    instead of prefilling the budget card from the supplier's."""
+    assert extract_province(text) is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    # An ablative carrying a personal ending says where the user BELONGS, and the
+    # trailing `(?!\w)` inside _NOT_ABLATIVE is what tells the two apart.
+    ("Ankara'danım", "Ankara"),
+    ("Manisa'danım, serada domates yetiştiriyorum", "Manisa"),
+    # And the locative, which shares the first two letters with the ablative.
+    ("Ankara'dayım", "Ankara"),
+    ("Ankara'da bağım var", "Ankara"),
+    ("Ankarada bağım var", "Ankara"),
+    ("Ankaralıyım", "Ankara"),
+])
+def test_the_ablative_guard_keeps_the_forms_that_do_state_a_location(text, expected):
+    assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "İzmir'den geldim",
+    "Manisa'dan yazıyorum",
+])
+def test_the_price_of_the_ablative_guard_is_a_refused_location(text):
+    """THE COST, PINNED SO IT CANNOT BE FORGOTTEN. These two really do state a
+    location and are now refused. Measured over the 81 provinces: "{p}'dan
+    yazıyorum" and "{p}'den geldim" went 81/81 placed to 0/81.
+
+    The twin writes the same cost for "Hollanda'dan yazıyorum", and the province
+    case is the weaker of the two - "İzmir'den geldim" is more often said near
+    İzmir than its country equivalent. It buys off a systematic error in the
+    other direction, and a refusal costs a question while a supplier silently
+    fills the budget card with the wrong province's figures."""
+    assert extract_province(text) is None
+
+
+def test_a_province_ablative_no_longer_swallows_a_stated_country():
+    """THE WORLD LAYER THIS OPENS. `src/engine.py` reads `_country_lines` only
+    when `extract_province` comes back empty, so a Turkish province name in a
+    foreign grower's sentence used to decide the whole turn - and earliest-wins
+    could not help, because there is only one province in it.
+
+    Measured over the 81 provinces against five countries in both word orders:
+    81/81 placed in a Turkish province before, 81/81 reaching the country's
+    FAOSTAT figures now."""
+    for province in PROVINCES:
+        assert extract_province(f"Hollanda'dayım ama {province}'dan fide aldım") is None
+        assert extract_province(f"{province}'dan fide aldım, Hollanda'dayım") is None
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("'Van' Kahramanmaraş'tayım", "Van"),
+    ('"Van" Kahramanmaraş\'tayım', "Kahramanmaraş"),
+])
+def test_a_single_quoted_name_beats_a_later_statement_and_that_is_open(text, expected):
+    """PINNED AS A MEASURED DEFECT, NOT AS CORRECT BEHAVIOUR - and pinned on the
+    shape that actually moved, which the gap test this replaces did not.
+
+    The apostrophe branch cannot tell a closing single quote from a Turkish
+    case-suffix apostrophe, so a quoted name matches as if it were a statement,
+    and earliest-wins hands it the sentence. Measured over the ordered pairs:
+    "'{q}' {loc}'dayım" went 3 240/6 480 to 0/6 480. Double quotes are
+    unaffected, 6 480/6 480 in both revisions, because `"` is not what the branch
+    reads.
+
+    NOT CLOSED HERE because `country.py`'s apostrophe branch is identical, and
+    narrowing one side only would reopen the divergence this change exists to
+    remove. Sized and left open: a grower quoting a province name is rare, and
+    the cost is one turn's wrong province."""
+    assert extract_province(text) == expected
