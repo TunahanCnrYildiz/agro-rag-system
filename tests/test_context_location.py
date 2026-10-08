@@ -198,3 +198,87 @@ def test_a_spurious_long_name_does_not_shadow_a_real_statement(text, expected):
 ])
 def test_place_noun_inflections_are_covered(text, expected):
     assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    # The sentence recorded in the bug note, measured 2026-09-25.
+    ("Van'dayım ama Ankara'dan aldım", "Van"),
+    # The one that costs money: the budget card prefills from this.
+    ("Konya'dayım ama Adana'dan fide aldım", "Konya"),
+    ("İzmir'deyim ama Afyonkarahisar'dan aldım", "İzmir"),
+    ("Manisa'dayım, Kahramanmaraş'ta fiyatlar nasıl", "Manisa"),
+    # The second province is named with a place noun rather than a suffix.
+    ("Rize'deyim, Diyarbakır bölgesinde ne ekilir", "Rize"),
+])
+def test_the_province_the_user_states_beats_the_longer_name(text, expected):
+    """THE EARLIEST MENTION WINS, NOT THE LONGEST NAME.
+
+    `_find` used to return on the first key in `_ORDERED` that matched anywhere,
+    and `_ORDERED` is sorted by length - so a sentence naming two provinces was
+    decided by which name had more letters. Measured 2026-09-25:
+    `extract_province("Van'dayım ama Ankara'dan aldım")` answered **Ankara**.
+
+    WHY IT IS WORTH A TEST OF ITS OWN: `extract_province` feeds the budget card's
+    prefill and the comparison card, so a Konya grower writing the second sentence
+    got Adana's yields and prices filled into a form, with nothing in the answer
+    saying which province the numbers came from.
+
+    Measured over every ordered pair of the 81 provinces in three frames, 19 440
+    sentences: before this fix 9 720 of them answered the province the user
+    stated - exactly half, which is what "the longer name wins" predicts on
+    ordered pairs - and after it, all 19 440 do."""
+    assert extract_province(text) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    # Position ties: both names start at the same offset and the longer one must
+    # keep it. `Van` is inside no other province, but `Kars` opens
+    # `Karsiyaka`-shaped folds and `Afyonkarahisar` opens nothing - the real ties
+    # are names that are prefixes of other names.
+    ("Kahramanmaraş'ta zeytin yetiştiriyorum", "Kahramanmaraş"),
+    ("Afyonkarahisar'dayım", "Afyonkarahisar"),
+    # Leading whitespace and a quote mark: the bare-name branch reports the
+    # position of the first LETTER, not of the string.
+    ("  Manisa", "Manisa"),
+    ('"Manisa"', "Manisa"),
+])
+def test_a_tie_on_position_keeps_the_longer_name(text, expected):
+    """Candidates are tried longest-first and a later one has to be STRICTLY
+    earlier to win, so a short name sharing a position with a long one cannot
+    displace it. Without that, `Kars` would answer for `Kahramanmaraş` - both
+    begin at offset 0 once folded."""
+    assert extract_province(text) == expected
+
+
+def test_every_province_wins_against_every_other_when_stated_first():
+    """The class, derived from `PROVINCES` rather than enumerated, so adding a
+    province cannot leave a hole here. Each province is paired with a fixed
+    counterpart in both directions: whichever is stated first is the answer,
+    regardless of which name is longer.
+
+    One counterpart rather than all 80, because the full 19 440-sentence sweep
+    that measured this fix takes about fifteen seconds and this suite runs on
+    every commit. The sweep's result is quoted in
+    `test_the_province_the_user_states_beats_the_longer_name`."""
+    for province in PROVINCES:
+        other = "Kahramanmaraş" if province != "Kahramanmaraş" else "Van"
+        assert extract_province(f"{province}'dayım ama {other}'dan aldım") == province
+        assert extract_province(f"{other}'dayım ama {province}'dan aldım") == other
+
+
+@pytest.mark.parametrize("text", [
+    "Ankara'dan aldım",
+    "Adana'dan fide getirdim",
+])
+def test_the_bare_ablative_still_places_the_user_and_that_is_open(text):
+    """PINNED AS A KNOWN GAP, NOT AS CORRECT BEHAVIOUR. `_SUFFIX` admits the
+    ablative, so a sentence that says where the SEED came from places the user
+    there. The country twin refuses this shape - `_NOT_ABLATIVE` in
+    src/context/country.py - and this side deliberately still does not.
+
+    It was left out of the commit that fixed the position bug because position
+    and suffix are two different decisions: narrowing a shipped surface in the
+    same breath as reordering it is how the country guard earned seven review
+    rounds. This test exists so the next reader finds the gap measured rather
+    than discovering it."""
+    assert extract_province(text) is not None

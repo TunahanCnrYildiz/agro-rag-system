@@ -92,27 +92,76 @@ def _find(text: str) -> str | None:
     the whole message (the natural reply to "hangi ildesiniz?"), or when a place noun
     follows it immediately ("Diyarbakir kosullarinda", "Antalya bolgesinde").
 
-    WHAT THIS DOES NOT CLOSE: the other branch of the regex still resolves ordinary
-    Turkish words that happen to be a province plus a legal case suffix - "kilise"
-    (church) -> Kilis, "hataya" (mistake) -> Hatay, "mersini" (myrtle, a PLANT) ->
-    Mersin, "tokati" -> Tokat, "sivasi" -> Sivas. Same harm shape as the produce
-    names, lower frequency, and pre-existing. Do not read this function as having
-    solved the collision problem; it solved one branch of it.
+    THE EARLIEST MATCH WINS, NOT THE LONGEST NAME. A sentence may name two
+    provinces and only one of them is where the user is - "Van'dayım ama
+    Ankara'dan aldım", "Konya'dayım ama Adana'dan fide aldım" - and returning on
+    the first key that matched ANYWHERE handed those to whichever name was longer,
+    which is unrelated to what the user said. Measured 2026-09-25, before this
+    revision: both of those answered the second province, so a Konya grower's
+    budget card was prefilled with Adana's yields and prices and nothing said so.
+    So every key is tried and the candidate with the smallest match position is
+    returned. It is the weakest defensible reading of a two-province sentence:
+    people state where they are before they qualify it.
+
+    THE `il` ENUMERATION BELOW CLOSED ONE INSTANCE OF THIS, not the class, and
+    the comment on `_PLACE` says so in its own words: "Kahramanmaras ile ilgili
+    degil, Van'dayim" answered Kahramanmaras because a spurious long-name hit was
+    returned before a genuine short-name statement was tried. Narrowing `il\\w*`
+    stopped that sentence. Position stops the shape.
+
+    LONGEST-FIRST STILL DECIDES TIES, and that is what `_ORDERED` is for.
+    Candidates arrive longest first and a later one must be STRICTLY earlier to
+    win, so a short name sharing a position with a long one does not displace it.
+
+    PORTED FROM src/context/country.py's `_find`, which was built as this
+    function's twin and inherited this bug on the day it was written. The country
+    side was fixed on 2026-09-25 and this side was left alone because that round's
+    plan forbade touching a shipped module mid-round. The two now agree.
+
+    WHAT THIS DOES NOT CLOSE, first: the other branch of the regex still resolves
+    ordinary Turkish words that happen to be a province plus a legal case suffix -
+    "kilise" (church) -> Kilis, "hataya" (mistake) -> Hatay, "mersini" (myrtle, a
+    PLANT) -> Mersin, "tokati" -> Tokat, "sivasi" -> Sivas. Same harm shape as the
+    produce names, lower frequency, and pre-existing. Do not read this function as
+    having solved the collision problem; it solved the branches it names.
+
+    WHAT THIS DOES NOT CLOSE, second - AND IT IS THE ONE A READER WILL REACH FOR:
+    `_SUFFIX` admits the bare ablative, so "Ankara'dan aldım" alone still answers
+    Ankara, and that sentence says where the SEED came from. The country twin
+    refuses it (`_NOT_ABLATIVE` there). It is deliberately NOT fixed here, in this
+    change: position and suffix are two decisions, this commit makes one of them,
+    and narrowing a shipped surface in the same breath as reordering it is how the
+    country guard earned seven review rounds. Measured and left open.
     """
     folded = _normalize_tr(text)
     whole = folded.strip(_TRIM)
+    # Where `whole` actually begins, so a message opening with whitespace or a
+    # quote mark still reports the position of its first letter.
+    lead = len(folded) - len(folded.lstrip(_TRIM))
+    best_start: int | None = None
+    best_name: str | None = None
     for key in _ORDERED:
         k = re.escape(key)
-        if re.search(rf"(?<!\w){k}'", folded):
-            return _FOLDED[key]
         suffix = _STRICT_SUFFIX if len(key) <= _SHORT else _SUFFIX
-        if re.search(rf"(?<!\w){k}{suffix}(?!\w)", folded):
-            return _FOLDED[key]
-        if whole == key:
-            return _FOLDED[key]
-        if re.search(rf"(?<!\w){k}\s+{_PLACE}(?!\w)", folded):
-            return _FOLDED[key]
-    return None
+        start = lead if whole == key else None
+        for pattern in (rf"(?<!\w)(?P<name>{k})'",
+                        rf"(?<!\w)(?P<name>{k}){suffix}(?!\w)",
+                        rf"(?<!\w)(?P<name>{k})\s+{_PLACE}(?!\w)"):
+            match = re.search(pattern, folded)
+            # `name` is the province itself, so the three branches stay
+            # comparable even though two of them match trailing text.
+            if match is not None:
+                found = match.start("name")
+                if start is None or found < start:
+                    start = found
+        if start is not None and (best_start is None or start < best_start):
+            best_start, best_name = start, _FOLDED[key]
+        if best_start == 0:
+            # Nothing can beat position 0, and any later key that ties it is
+            # shorter and would lose the tie anyway. This keeps the common case -
+            # the message opens with the province - from paying for all 81 keys.
+            break
+    return best_name
 
 
 def extract_province(message: str, history: list[dict] | None = None) -> str | None:
