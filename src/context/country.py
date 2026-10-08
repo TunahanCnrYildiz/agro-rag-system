@@ -220,11 +220,16 @@ _EN_IN = r"(?:in|at)\s+"
 # apostrophe, so "Hollanda'dan tohum aldım" resolved to the Netherlands by
 # exactly the shape `from` does in English.
 #
-# THIS MODULE DIVERGES FROM location.py HERE, deliberately. For a PROVINCE the
-# ablative is fair evidence: "İzmir'den geldim" is usually said by someone in
-# İzmir's orbit, and domestic sentences are rarely about importing. For a
-# COUNTRY the ablative is overwhelmingly a purchase or an import. location.py's
-# twin of this line is left exactly as it is.
+# THE TWO MODULES AGREED ON THIS ON 2026-10-08 and an earlier revision of this
+# paragraph claimed the opposite, so it is worth saying plainly: location.py now
+# refuses the bare ablative too, by this guard ported across. The argument that
+# used to stand here - that for a PROVINCE the ablative is fair evidence,
+# "İzmir'den geldim" being usually said from İzmir's orbit - was not wrong about
+# the sentence, but it was wrong about what the alternative costs. Measured over
+# every ordered pair of the 81 provinces: refusing it turns 12.960 of 25.920
+# two-province sentences from the SUPPLIER's province into the speaker's, against
+# 162 of 972 single-province sentences that now get the location question instead
+# of an answer. See location.py's own comment for that trade and what it gives up.
 #
 # A BARE ablative is refused; an ablative carrying a personal ending is kept.
 # "Hollanda'danım" ("I am from the Netherlands") states where the user belongs
