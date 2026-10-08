@@ -37,7 +37,7 @@ Broken into its parts:
 
 | # | Request | Status |
 | --- | --- | --- |
-| R1 | Data covering the **whole world**, not only Turkey | **DATA BUILT 2026-09-25** (merge `25476be`) — `data/world_norms.json`, 143 crops × 199 countries. No answer surface reads it yet |
+| R1 | Data covering the **whole world**, not only Turkey | **BUILT AND READ** — the data on 2026-09-25 (merge `25476be`), reaching answers on 2026-10-08 (merge `1c1bb70`, 39 commits). `src/context/country.py` resolves the country from the conversation, `norms.lookup(crop, province, country=)` serves its figures, and `src/engine.py`'s `_country_lines` puts them in the prompt with the year and FAOSTAT's own flag |
 | R2 | Broken down **region by region** | **BUILT to the granularity that is published** — country level worldwide (199), province level for Turkey (81). Nobody publishes sub-national yield for the world |
 | R3 | Broken down **product by product** | **BUILT, and smaller than asked** — FAOSTAT publishes yield for **143** crops worldwide, not "all products". Turkey keeps its 246. `data/crop_fao_map.json` ties the two |
 | R4 | **Last 5 years** | **BUILT, exceeded** — world 2016–2024 (9 years), Turkey 2016–2025 (10). FAOSTAT always trails TÜİK by a year |
@@ -117,14 +117,21 @@ See §6.
 | `specs/2026-08-11-budget-and-crop-choice-design.md` | The `budget` and `crop_choice` routes — the **consumers** of the numeric data. Computes only from numbers the user supplies. **Defers R1–R4 again.** |
 | `specs/2026-08-17-numeric-data-layer-design.md` | The Turkish half of the numeric layer — TÜİK, 246 crops × 81 provinces. |
 | `specs/2026-09-23-faostat-world-layer-design.md` | **The world half. R1–R4 land here.** Shipped 2026-09-25. |
+| `specs/2026-09-25-world-layer-readable-design.md` | **The country's figures reaching the answer.** Country resolution, `norms.lookup`'s country scope, the unit on every figure. Shipped 2026-10-08. |
 
 **That headline is now spent.** It read, until 2026-09-25, as a warning that two
 specs had been written around the client's central request without addressing it and
 that R1–R4 had not moved since they were asked for. They have moved: the Turkish half
 shipped on 2026-08-19 and the world half on 2026-09-25. What is still deferred is
-narrower and should be named as such — **no answer surface reads the world layer
-yet.** Country resolution, `norms.lookup`'s country scope, and the currency decision
-for the budget and comparison surfaces are the remaining work.
+narrower than it was. Two of the three things named here as remaining have
+shipped: country resolution and `norms.lookup`'s country scope, on 2026-10-08.
+
+**What is still deferred is the currency decision, and it is deferred on purpose.**
+`NormValue` carries its unit (`kg/da` | `TL/kg` | `USD/kg`) and nothing converts
+anywhere — picking a rate is a product decision with a date attached, and it
+belongs to the round that decides what a user sees. That round also needs the
+budget and comparison cards, which need a client change, which sits behind a
+redeploy this project does not own.
 
 ---
 
@@ -220,7 +227,7 @@ Every claim on the six new pages was checked against the code on 2026-09-25:
 | 4 | *"kaç dönüm diye sormaz"* — field size is remembered | **NOT built.** The profile has no area field; each card asks for area again |
 | 4 | *"Her sohbet profili biraz daha netleştirir"* | **NOT built.** The profile is user-edited; nothing refines it from conversation |
 | 5 | **Fertilization and irrigation calendar, generated from the crop's phenological stages and shifted by the weather** | **NOT built — see below** |
-| 15 | "1.050 otomatik test" | Stale; 1.096 as of 2026-09-25 |
+| 15 | "1.050 otomatik test" | Stale; **1.636** as of 2026-10-08. It has gone stale three times (1.050 → 1.096 → 1.317 → 1.636); a count in a slide is a number nobody re-measures |
 
 ### The season calendar is a data-review task, not a programming task
 
