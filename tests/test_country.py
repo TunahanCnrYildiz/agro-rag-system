@@ -984,30 +984,44 @@ def test_the_bare_demonym_is_not_a_location():
     assert extract_country("turkiyenin") == TURKIYE
 
 
-def test_resolving_a_buffer_locative_is_not_placing_the_speaker():
-    """THE TWO DECISIONS ARE SEPARATE AND THIS BRANCH MOVED ONLY ONE, which is
-    said here because the gain reads bigger than it is. `extract_country`
-    RESOLVES a name; `engine._states_location` PLACES a speaker, and it spells
-    its own suffix `'?[dt][ae]y[iu][mz]`, with no buffer of its own. So the
-    whole 22-alias family resolves and places nobody.
+def test_resolving_a_buffer_locative_also_places_the_speaker_now():
+    """THE TWO DECISIONS ARE STILL SEPARATE, AND BOTH ARE MADE NOW. This test
+    asserted the opposite for one commit, and the correction is worth keeping
+    visible rather than rewriting silently.
 
-    MEASURED, 528 conversations over the family: 287 gain a resolve and 0 gain a
-    country line. THAT IS PRE-EXISTING rather than a cost of this branch -
-    "Rusya Federasyonu'ndayım" resolved 185 and placed nobody at 38cde42 too,
-    through the apostrophe branch - and it is left for its own commit, because
-    widening a resolver and the guard that reads it in one commit is the shape
-    of mistake this module has already made three times. The ledger's Wave 4 is
-    the entry.
+    `extract_country` RESOLVES a name; `engine._states_location` PLACES a
+    speaker. The first commit on this branch gave the resolver its buffer and
+    left the guard alone, reasoning from the ledger's Wave 4 - do not widen a
+    resolver and its guard together. THAT WAS THE WRONG PRECEDENT: Wave 4 is
+    about widening a resolver while NARROWING its guard, two changes in opposite
+    directions. These two are the same direction and two halves of one answer,
+    so the governing precedent is `ee43c18`, where `_NOT_ABLATIVE` and the
+    `best_start` loop had to ship together because either alone was worth
+    nothing.
 
-    A non-possessive alias is the contrast: `Fransa` needs no buffer, so both
-    halves already agree about it."""
+    MEASURED, and that is what settled it: the resolver's buffer alone bought
+    287 resolves and 0 country lines over 528 conversations, because
+    `engine._SELF_TR` had no buffer either. The user gained nothing. With both
+    halves, 924 conversations on the family produce 439 country lines against
+    78 before - 361 gained, 0 lost.
+
+    THE GUARD'S BUFFER IS GATED BY NAME LENGTH and this module's `_SHORT` is
+    what gates it; see `engine._alias_key` and
+    `tests/test_engine.py::test_the_buffer_is_gated_by_the_name_length` for the
+    reachable leak that gate closes."""
     from src import engine
     assert extract_country("Rusya Federasyonundayım") == 185
-    assert not engine._states_location("Rusya Federasyonundayım",
-                                       engine._code_aliases(185))
-    assert not engine._states_location("Rusya Federasyonu'ndayım",
-                                       engine._code_aliases(185))
+    assert engine._states_location("Rusya Federasyonundayım",
+                                   engine._code_aliases(185))
+    # The apostrophe spelling was never broken HERE and was refused THERE, so it
+    # is half the defect rather than a bystander.
+    assert engine._states_location("Rusya Federasyonu'ndayım",
+                                   engine._code_aliases(185))
     assert engine._states_location("Fransadayım", engine._code_aliases(FRANCE))
+    # End to end through the one caller, which is where the first commit's gain
+    # stopped.
+    assert engine._country_lines("Rusya Federasyonundayım", None) != []
+    assert engine._country_lines("Rusya Federasyonu'ndayım", None) != []
 
 
 @pytest.mark.parametrize("message", [
