@@ -3728,6 +3728,15 @@ def test_the_corpus_the_guards_numbers_are_quoted_over():
     assert len(_BARE_NAMES) == 8
     assert len(_SURRENDERED_ACCEPTS) == 39
     assert len(_STANDING_COSTS) == 11
+    # The buffer sets, kept beside the 99 rather than inside it - five
+    # measurements in src/engine.py quote that denominator for other decisions.
+    # Their lengths are asserted here for the reason the others are: `_SELF_TR`
+    # claimed "10 aliases" while `_DEMONYM_LOCATIVE_COSTS` held 4, and no test
+    # mentioned the list, so nothing was red.
+    assert len(_BUFFER_LOCATIVE_ACCEPTS) == 88
+    assert len(_BUFFER_NEAR_MISS_REFUSALS) == 220
+    assert len(_SHORT_ALIAS_BUFFER_REFUSALS) == 72
+    assert len(_DEMONYM_LOCATIVE_COSTS) == 10
 
 
 def test_every_accept_in_the_corpus_is_admitted_and_every_refusal_refused():
@@ -3778,14 +3787,21 @@ def test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own():
     the run of space after it is. A test that searched the pattern alone would
     call all 18 of those refusals admitted - it would be red for the right
     reason today, and green over half a rule the day someone moved the veto into
-    the pattern."""
+    the pattern.
+
+    AND THE KEY COMES FROM `engine._alias_key` FOR THE SAME REASON, which is the
+    third time this one test has had to stop rebuilding a piece of the shipped
+    composition. The buffer `n` and its length gate live in that function, not in
+    `_SELF_TR`, so a `re.escape(alias)` written here would score a regex nobody
+    ships - green over a guard that places nobody on "Rusya Federasyonundayim",
+    and green too if the length gate were deleted."""
     assert len(engine._GUARDS) == 2
     for guard in engine._GUARDS:
-        name = guard[0]
+        name, side = guard[0], guard[1]
         for text, code in _TURKISH_REFUSALS + _ENGLISH_NOT_A_LOCATION:
             folded = engine._normalize_tr(text)
             for alias in engine._code_aliases(code):
-                key = re.escape(alias)
+                key = engine._alias_key(alias, side)
                 assert not engine._guard_hits(guard, key, folded), (name, text)
 
 
@@ -3869,3 +3885,392 @@ def test_other_routes_still_get_an_empty_context_block():
     for route in ("plant_info", "nutrition", "budget", "offscope"):
         assert engine._context_block(
             route, "Bu yıl ne eksem?", None, date(2026, 8, 11)) == "", route
+
+
+# --------------------------------------------------------------------------- #
+# The buffer `n` on the guard's side. `_alias_key` spells it; these measure the
+# decision it makes. Every list is DERIVED from the shipped alias table, so a
+# new alias joins the measurement instead of staling a figure.
+#
+# THE SHIPPED 0/99 LICENSES NOTHING HERE, which is the whole reason this block
+# exists: 0 of the 99 Turkish refusals put an `n` between the name and the
+# locative, so not one of them could have broken the decision `_alias_key`
+# makes. `_SELF_TR`'s own comment said so and deferred the widening until a
+# refuse set existed that could FAIL. This is that set.
+# --------------------------------------------------------------------------- #
+
+# HAND-KEPT - see tests/test_country.py's copy for why no property of the table
+# can derive it: `Somali`, `Mali`, `Cibuti`, `Burundi`, `Haiti`, `Brunei`,
+# `Fiji` and `Niue` all end in a vowel and take no buffer, and a regex over
+# `-eti|-onu|-eri|-arı` matches only 18 of the 22, missing `Çin Anakarası`,
+# `Ekvator Ginesi`, `Fransız Polinezyası` and `Fildişi Sahili`. Nine head nouns
+# are the hand-kept part; the 22 aliases and 19 codes derive from them.
+_POSSESSIVE_HEADS = (
+    "cumhuriyeti", "federasyonu", "emirlikleri", "devletleri", "adaları",
+    "polinezyası", "sahili", "anakarası", "ginesi",
+)
+_BACK, _FRONT, _VOICELESS = set("aıou"), set("eiöü"), set("fstkçşhp")
+
+
+def _tr_aliases():
+    from src.context import country as country_ctx
+    raw = json.loads(country_ctx._TABLE.read_text(encoding="utf-8"))
+    return [(int(code), name.strip())
+            for code, entry in raw.items()
+            for name in (entry.get("tr") or ())
+            if isinstance(name, str) and name.strip()]
+
+
+def _loc(name):
+    """The locative Turkish actually writes on `name`, harmony and the voiceless
+    assimilation included. Spelled out rather than approximated: a `-de` where
+    Turkish wants `-da` would make these lists agree with a looser pattern than
+    the one shipped, and agree for the wrong reason."""
+    low = name.lower()
+    vowels = [c for c in low if c in _BACK | _FRONT]
+    return (("t" if low[-1] in _VOICELESS else "d")
+            + ("a" if (vowels and vowels[-1] in _BACK) else "e"))
+
+
+def _possessive_family():
+    return [(code, name) for code, name in _tr_aliases()
+            if name.lower().endswith(_POSSESSIVE_HEADS)]
+
+
+# 88 ACCEPTS: the 22 compounds x {apostrophe, bare} x {singular, plural}. The
+# apostrophe column is not decoration - it is the spelling that ALREADY worked
+# in country.py and that this guard refused anyway, so it is half the defect.
+_BUFFER_LOCATIVE_ACCEPTS = [
+    (f"{name}{apo}n{_loc(name)}{person}", code)
+    for code, name in _possessive_family()
+    for apo in ("'", "")
+    for person in ("yım", "yız")
+]
+
+# 220 REFUSALS built to reach the buffer, the five in `_SUFFIX_NEAR_MISSES`
+# re-spelled on all 22 compounds in both spellings. These are the only inputs
+# that can fail the person decision this widening makes: each one gets into the
+# buffer AND the locative and is turned away by what follows.
+_BUFFER_NEAR_MISS_REFUSALS = [
+    (frame.format(f"{name}{apo}n{_loc(name)}"), code)
+    for code, name in _possessive_family()
+    for apo in ("'", "")
+    for frame in ("{}ydım, şimdi döndüm",        # PAST
+                  "{}yken buğday ektim",        # while
+                  "{}lar, ben burada kaldım",   # 3rd person plural
+                  "{}ki gibi sera kurayım",     # the relativiser
+                  "{}n fidan getirdim")         # the ablative
+]
+
+# 72 REFUSALS for the LENGTH GATE, which is the finding this round produced
+# rather than a precaution. An `n?` written straight into `_SELF_TR` admitted
+# all 72 of these; `_alias_key`'s gate admits 0.
+_SHORT_ALIAS_BUFFER_REFUSALS = [
+    (f"{alias}{apo}n{_loc(alias)}{person}", code)
+    for code, alias in _tr_aliases()
+    if len(engine._normalize_tr(alias)) <= 4
+    for apo in ("'", "")
+    for person in ("yım", "yız")
+]
+
+# OUTSIDE BOTH COUNTS, as every pinned cost in this file is: a cost is a
+# sentence we admit and wish we did not, so it is not a refusal the guard
+# "passes" by refusing.
+#
+# ALL TEN, AND THE TEN IS THE WHOLE POINT. `_SELF_TR`'s comment quotes "10
+# aliases" and this list carried four of them for one commit, so the claim and
+# the pin disagreed and nothing was red. The ten are every LONG TURKISH alias
+# whose `<alias>n` is an attested word in data/vector_store/chroma.sqlite3 -
+# `amerikan` x47, `italyan` x26, `kenyan` x27, `ugandan` x14, `guatemalan` x13,
+# `venezuelan` x5, `angolan` x4, `libyan` x4, `moldovan` x3, `samoan` x1 - which
+# is the only reason these ten and not the other 199. The corpus is a 775MB
+# sqlite file and no unit test opens it, so the LIST is the artefact and
+# test_the_corpus_the_guards_numbers_are_quoted_over asserts its length.
+#
+# Each entry is the grammatical locative of its own stem - `-nda` after a back
+# vowel, `-nde` after a front one - because a wrong harmony would pin a string
+# Turkish does not write and pass for the wrong reason.
+_DEMONYM_LOCATIVE_COSTS = [
+    ("amerikandayım", 231),
+    ("angolandayım", 7),
+    ("guatemalandayım", 89),
+    ("italyandayım", 106),
+    ("kenyandayım", 114),
+    ("libyandayım", 124),
+    ("moldovandayım", 146),
+    ("samoandayım", 244),
+    ("ugandandayım", 226),
+    ("venezuelandayım", 236),
+]
+
+
+@pytest.mark.parametrize("text,code", [
+    ("Rusya Federasyonu'ndayım", 185),
+    ("Rusya Federasyonundayım", 185),
+    ("Rusya Federasyonu'ndayız", 185),
+    ("Rusya Federasyonundayız", 185),
+    ("Dominik Cumhuriyeti'ndeyim", 56),
+    ("Dominik Cumhuriyetindeyim", 56),
+    ("Solomon Adaları'ndayım", 25),
+    ("Ekvator Ginesindeyim", 61),
+    ("Amerika Birleşik Devletlerindeyim", 231),
+])
+def test_a_buffered_locative_places_the_speaker(text, code):
+    """THE HALF OF THE ANSWER THIS GUARD WAS MISSING, and the reason it had to
+    ship with country.py's half rather than after it. `extract_country` resolved
+    every one of these before and this guard refused every one, so the net gain
+    to a user was zero: measured over 924 conversations on the 22 compounds, the
+    resolver's buffer alone bought 287 resolves and 0 country lines.
+
+    `Rusya Federasyonu'ndayım` IS IN THE LIST ON PURPOSE. The apostrophe
+    spelling was never broken in country.py, so it is easy to read this as the
+    apostrophe-less fix arriving late - but this guard refused BOTH spellings,
+    so the apostrophe user was no better off. He is placed now too."""
+    assert engine._states_location(text, engine._code_aliases(code))
+
+
+def test_every_buffered_locative_in_the_family_places_the_speaker():
+    """All 88, derived, because closing the example is not closing the class and
+    the nine parametrised cases above are examples. 22 compounds x two spellings
+    x singular and plural, each bent into its own harmony."""
+    assert len(_BUFFER_LOCATIVE_ACCEPTS) == 88
+    missed = [text for text, code in _BUFFER_LOCATIVE_ACCEPTS
+              if not engine._states_location(text, engine._code_aliases(code))]
+    assert missed == []
+
+
+@pytest.mark.parametrize("text,code", [
+    ("Rusya Federasyonu'ndaydım, şimdi döndüm", 185),
+    ("Rusya Federasyonundaydım, şimdi döndüm", 185),
+    ("Rusya Federasyonundayken buğday ektim", 185),
+    ("Rusya Federasyonundalar, ben burada kaldım", 185),
+    ("Rusya Federasyonundaki gibi sera kurayım", 185),
+    ("Rusya Federasyonundan fidan getirdim", 185),
+])
+def test_the_buffered_near_misses_are_still_refused(text, code):
+    """`_SUFFIX_NEAR_MISSES` re-spelled with the buffer, which is where this
+    widening could actually have broken: each of these reaches the buffer AND
+    the locative and then has to be turned away by the letters after it.
+
+    THE DENOMINATOR IS THE POINT, and
+    test_the_buffered_refuse_set_can_actually_fail asserts it rather than
+    describing it: 220 of these reach the buffer branch and 88 reach the person
+    slot itself, against 0 of the shipped 99."""
+    assert not engine._states_location(text, engine._code_aliases(code))
+
+
+def test_the_buffered_refuse_set_can_actually_fail():
+    """THE ASSERTION THE PREVIOUS REVISION OF `_SELF_TR`'s COMMENT ASKED FOR, and
+    the one this guard has been burned six times for not making: a refuse set
+    that cannot reach the rule under test measures nothing, and a zero taken
+    over it is worth nothing.
+
+    So the reach is asserted, not the leak alone. Three tiers, because only the
+    last is a zero:
+      * 220 of the 220 buffered near misses ENTER the buffer branch - the name,
+        then `'?n`, then the locative's own letters.
+      * 88 of them reach the PERSON SLOT, `…n[dt][ae]y`, where only the person
+        vowel refuses them. Those 88 are the past tense and the `-ken` form.
+      * 0 of the shipped 99 do either, which is why the old 0/99 licensed
+        nothing and why these lists exist.
+
+    AND THE 792-SENTENCE SET FROM country.py's SIDE IS NOT ENOUGH EITHER: those
+    sentences put a SPACE after the locative ("…nda çalışan bir dayım var"), so
+    all 792 enter the buffer branch and 0 reach the person slot. They are in
+    `_TURKISH_REFUSALS`' spirit but they cannot test this decision, which is why
+    the near misses had to be written."""
+    def enters(text, code):
+        folded = engine._normalize_tr(text)
+        return any(re.search(r"(?<!\w)" + re.escape(alias) + r"'?n[dt][ae]",
+                             folded)
+                   for alias in engine._code_aliases(code))
+
+    def person_slot(text, code):
+        folded = engine._normalize_tr(text)
+        return any(re.search(r"(?<!\w)" + re.escape(alias) + r"'?n[dt][ae]y",
+                             folded)
+                   for alias in engine._code_aliases(code))
+
+    assert len(_BUFFER_NEAR_MISS_REFUSALS) == 220
+    assert sum(1 for t, c in _BUFFER_NEAR_MISS_REFUSALS if enters(t, c)) == 220
+    assert sum(1 for t, c in _BUFFER_NEAR_MISS_REFUSALS
+               if person_slot(t, c)) == 88
+    # and the shipped 99, which is why its zero was vacuous for this change.
+    # IT IS LEFT AT 99 ON PURPOSE rather than absorbing these 292: five other
+    # measurements in src/engine.py quote that denominator for OTHER decisions
+    # (44 of the 99 carry a `-yIm`-shaped word, 4 are a right-boundary shape),
+    # and folding a new class into it would restate all of them. These sets are
+    # kept beside it the way `_STANDING_COSTS` is.
+    assert len(_TURKISH_REFUSALS) == 99
+    assert sum(1 for t, c in _TURKISH_REFUSALS if enters(t, c)) == 0
+    assert sum(1 for t, c in _TURKISH_REFUSALS if person_slot(t, c)) == 0
+    # the leak itself, over the set that can break it
+    leaked = [t for t, c in _BUFFER_NEAR_MISS_REFUSALS
+              if engine._states_location(t, engine._code_aliases(c))]
+    assert leaked == []
+
+
+def test_the_buffer_is_gated_by_the_name_length():
+    """THE FINDING OF THIS ROUND, and it was a REACHABLE leak rather than a
+    theoretical one.
+
+    TWO DIFFERENT COUNTERFACTUALS SIT BEHIND THIS TEST and an earlier revision
+    of this docstring credited the wrong one with the wrong number. Measured,
+    on these 72 refusals and on the 88 accepts:
+
+      the buffer written as                72 refusals   88 accepts
+      ------------------------------------ ------------  ----------
+      no buffer at all (38cde42)                     0            0
+      a bare `n?` in `_SELF_TR`                     36           44
+      an UNGATED `(?:'?n)?` in `_alias_key`         72           88
+      the shipped, length-gated `(?:'?n)?`           0           88
+
+    So the bare `n?` is not the wide version - it is the BROKEN one: it admits
+    half the refusals (the apostrophe-less half) while losing half the accepts
+    (all 44 that carry an apostrophe, because Turkish writes the apostrophe
+    before the buffer). The variant that admits all 72 is the ungated
+    `(?:'?n)?`, and that is the one this gate exists against.
+
+    The dearest of the 72 is `mali`: `mali` + `nda` is the ordinary Turkish word
+    "malında" ("in his goods"), and `mali` is also the adjective for fiscal,
+    which is why country.py already keeps it in `_AMBIGUOUS_EN`.
+
+    IT REACHED A USER, which is why it is closed rather than noted the way
+    `chad`/`jordan` are: "Mali'de buğday verimi nedir" with an earlier user turn
+    "tarlamın malındayım" printed Mali's yield figures and asked no province.
+    The message resolves Mali on its own, so the only sentence that could PLACE
+    the speaker was the spurious one - and `_country_lines` asks every user turn.
+
+    THE GATE IS country.py's OWN `_SHORT`, imported rather than restated: those
+    aliases get `_STRICT_SUFFIX` there for exactly this reason, and not one of
+    them ends in a 3sg possessive, so none can carry a buffer. The attested
+    collision is real (`malında` x5 in the project's Turkish corpus) and the
+    firing shape is not (`malındayım` x0 in 10.9M words), so the gate closes a
+    class whose instance exists and whose instance cannot fire - the direction
+    this guard has been wrong in six times."""
+    assert len(_SHORT_ALIAS_BUFFER_REFUSALS) == 72
+    leaked = [t for t, c in _SHORT_ALIAS_BUFFER_REFUSALS
+              if engine._states_location(t, engine._code_aliases(c))]
+    assert leaked == []
+    # the gate, asserted where it lives rather than through its effect
+    from src.context import country as country_ctx
+    assert engine._alias_key("mali", "suffix") == "mali"
+    assert engine._alias_key("rusya federasyonu", "suffix") == (
+        re.escape("rusya federasyonu") + r"(?:'?n)?")
+    assert engine._alias_key("rusya federasyonu", "prefix") == re.escape(
+        "rusya federasyonu")
+    assert country_ctx._SHORT == 4
+    # and the reachable conversation, pinned end to end
+    assert engine._states_location("malındayım", engine._code_aliases(133)) \
+        is False
+    assert engine._country_lines(
+        "Mali'de buğday verimi nedir",
+        [{"role": "user", "content": "tarlamın malındayım"}]) == []
+    # the short alias still places when it takes a locative of its own
+    assert engine._states_location("Mali'deyim", engine._code_aliases(133))
+
+
+@pytest.mark.parametrize("text,code", _DEMONYM_LOCATIVE_COSTS)
+def test_a_demonym_locative_places_the_speaker_and_that_is_a_cost(text, code):
+    """PINNED AS A COST, and it is the one question this round had to DECIDE
+    rather than measure. Ten long aliases have an attested Turkish word at
+    `<alias>n` - `amerikan`, `italyan`, `kenyan`, `ugandan` and six more - so
+    the buffer makes `amerikandayım` place a speaker in the United States.
+
+    IT IS NOT THE `-lI` QUESTION, although it looks like it. `-lI` was refused
+    one commit earlier because a nationality is not a location: "Amerikalıyım"
+    predicates the SPEAKER - he is American wherever he stands - and a Dutch
+    grower in Antalya says "Hollandalıyım" truthfully. `-ndayım` predicates a
+    PLACE and says the speaker is in it, so it is evidence of presence in the
+    way `-lI` never was.
+
+    WHAT IT COSTS instead is a misreading, not a wrong category: `-n` on these
+    ten is a DEMONYM, and a demonym cannot take a locative without a head noun,
+    so the only Turkish reading of "İtalyanda" is "at the Italian('s)".
+    Measured: 0 of the 20 constructed forms occur in 10.9M words of the
+    project's Turkish corpus, and 8 of the 10 stems are English demonyms that
+    reach that corpus through its English abstracts and take no Turkish case
+    ending at all.
+
+    ADMITTED ANYWAY, because refusing it needs a rule that reads the word before
+    the name to decide whether a head noun is missing - and inference about the
+    rest of the sentence is what four waves of this guard took out. The bare
+    demonym is still refused, which is the part that would actually be said."""
+    assert engine._states_location(text, engine._code_aliases(code))
+    assert not engine._states_location(
+        text.replace("ndayım", "n").replace("ndeyim", "n"),
+        engine._code_aliases(code))
+
+
+def test_the_buffered_twin_gets_the_twin_verdict():
+    """PARITY, which is the right test here and absolute refusal is not. The
+    Turkish arm carries no left veto, so "sanki Fransa'dayım gibi" and "babam
+    Fransa'dayım diyor" are ADMITTED at this tip - a standing cost of this
+    branch, not something the buffer introduces. What the buffer must not do is
+    change any of that in either direction.
+
+    So every Turkish sentence the shipped corpus holds is re-spelled onto each
+    of the 22 compounds, with the buffer inserted where Turkish puts it - AFTER
+    the apostrophe, "Adaları'nda" and never "Adalarin'da" - and the verdict must
+    match the original's. 63 source sentences x the 22 compounds = 1.386 twins,
+    0 disagreeing.
+
+    THE COUNT IS ASSERTED AS A PRODUCT, not as a literal, because the literal
+    was wrong when it shipped: this docstring and `_SELF_TR`'s comment both read
+    "1.760 twins" for one commit, which needs 80 source sentences where the
+    shipped lists hold 63. `assert twins >= 1000` could not catch it. A figure
+    this branch quotes and does not derive goes stale by the next commit, and
+    this is the fifth time that has been the finding.
+
+    The apostrophe placement is load-bearing in the TEST, not just in the code:
+    the first version of this sweep inserted the buffer before the apostrophe
+    and reported 44 disagreements that were all its own bug."""
+    shapes = []
+    for rows in (_SUFFIX_NEAR_MISSES, _PAST_TENSE_REFUSALS,
+                 _NATIONALITY_REFUSALS, _SHAPE_NEAR_MISSES, _MERELY_NAMING,
+                 _OBJECT_LOCATIVES, _ACTION_LOCATIVES):
+        shapes.extend(rows)
+    assert len(shapes) == 63
+    twins = 0
+    disagreed = []
+    for text, code in shapes:
+        folded = engine._normalize_tr(text)
+        aliases = sorted(engine._code_aliases(code), key=len, reverse=True)
+        hit = next((a for a in aliases if a in folded), None)
+        if hit is None:
+            continue
+        base = engine._states_location(text, engine._code_aliases(code))
+        for fcode, name in _possessive_family():
+            rewritten = re.sub(
+                r"(?<!\w)" + re.escape(hit) + r"('?)",
+                lambda m: engine._normalize_tr(name) + (
+                    m.group(1) + "n" if m.group(1) else "n"),
+                folded, count=1)
+            twins += 1
+            if engine._states_location(
+                    rewritten, engine._code_aliases(fcode)) != base:
+                disagreed.append((text, rewritten))
+    # Derived, not quoted: every source sentence names an alias of its own code,
+    # so the twin count is exactly the product. An inequality here is what let
+    # "1.760" ship.
+    assert twins == len(shapes) * len(_possessive_family()) == 1386
+    assert disagreed == []
+
+
+def test_the_guard_patterns_are_scored_through_the_shipped_alias_key():
+    """THE COMPOSITION IS READ OUT OF engine, NOT REBUILT - the same rule
+    test_the_two_surviving_patterns_hold_the_refuse_set_on_their_own states, now
+    applied to the piece that moved. Half of what the Turkish guard matches is
+    no longer in its pattern: the buffer and its length gate live in
+    `_alias_key`, so a test that passed `re.escape(alias)` would score a regex
+    nobody ships - green over a guard that places nobody on
+    "Rusya Federasyonundayım", and green too if the length gate were deleted."""
+    assert len(engine._GUARDS) == 2
+    for guard in engine._GUARDS:
+        name, side = guard[0], guard[1]
+        for text, code in _BUFFER_NEAR_MISS_REFUSALS + \
+                _SHORT_ALIAS_BUFFER_REFUSALS:
+            folded = engine._normalize_tr(text)
+            for alias in engine._code_aliases(code):
+                assert not engine._guard_hits(
+                    guard, engine._alias_key(alias, side), folded), (name, text)

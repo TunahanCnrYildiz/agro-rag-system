@@ -997,18 +997,141 @@ def _world_amount(amount: float) -> str:
 # decision was already sound; what was missing was the evidence.
 #
 # REJECTED HERE, RECORDED AS A LEAD: the `-n` buffer, `'?n?[dt][ae]y[iu][mz]`.
-# A Turkish compound name carrying a 3sg possessive takes it, so 18 countries
-# cannot be placed in their full official name - "Rusya Federasyonu'ndayim",
-# "Cin Halk Cumhuriyeti'ndeyim", "Amerika Birlesik Devletleri'ndeyim" and 15
-# more, every one of which `extract_country` resolves and this guard refuses.
-# Sized: 198 of 198 named countries ARE placeable through some short alias in
-# `_ASK_LOCATION`'s own shape ("Rusya'dayim", "ABD'deyim"), so the hole bites
-# only the user who types the full compound, and he has a short form available.
-# The widening leaks 0 of the 99 - AND THAT ZERO IS THE VACUOUS KIND THIS GUARD
-# HAS BEEN BURNED BY FIVE TIMES: 0 of the 99 refusals put an `n` between the
-# name and the locative at all, so not one of them could have broken the
-# decision the widening would make. A widening cannot be licensed by this refuse
-# set, so it waits for refusals built against it rather than riding in on a zero.
+# A Turkish compound name carrying a 3sg possessive takes it, and THE WIDENING
+# THIS PARAGRAPH USED TO DEFER IS NOW SHIPPED - see `_alias_key`, which spells
+# the buffer and gates it by name length. What it defers to is written below,
+# because the condition it set was met rather than waived.
+#
+# The hole it closes: 22 `tr` aliases over 19 FAO codes end in a 3sg possessive,
+# so their case ending needs a buffer `n` - "Rusya Federasyonu'ndayim", "Cin
+# Halk Cumhuriyeti'ndeyim", "Amerika Birlesik Devletleri'ndeyim" and 19 more.
+# `extract_country` resolved every one of them and this guard refused every one,
+# so the assistant asked a Russian grower which Turkish province he farms in.
+# (The figure read "18 countries" here until 2026-10-08 and in two other
+# comments; it is 22 aliases / 19 codes, counted from the table by
+# tests/test_country.py and no longer written down anywhere by hand.)
+#
+# THE ZERO THIS WIDENING WAS NOT ALLOWED TO RIDE IN ON: it leaks 0 of the 99,
+# and that zero is worthless, exactly as the previous revision of this paragraph
+# said - 0 of the 99 refusals put an `n` between the name and the locative, so
+# not one of them could break the decision the `n?` makes. The refuse set was
+# not widened to make the zero look better; it was widened until it could FAIL.
+#
+# WHAT IT WAS MEASURED AGAINST INSTEAD, built to reach the buffer branch and
+# kept in tests/test_engine.py beside the 99 rather than folded into it - five
+# other measurements here quote that denominator for other decisions:
+#  * 220 NEAR MISSES, the five in `_SUFFIX_NEAR_MISSES` re-spelled on all 22
+#    compounds in both spellings - `…ndaydim` (past), `…ndayken` (while),
+#    `…ndalar` (3pl), `…ndaki` (relativiser), `…ndan` (ablative). Reported in
+#    tiers, because only the leak is a zero: 220 of 220 ENTER the buffer branch,
+#    88 of them reach the PERSON SLOT (`…n[dt][ae]y`, where only the person
+#    vowel turns them away), and 0 are admitted. Those 88 are the first
+#    non-vacuous denominator this branch has ever had.
+#  * 88 ACCEPTS, `-ndayim`/`-ndayiz` with and without the apostrophe on all 22.
+#    0 admitted before, 88 now. THE APOSTROPHE COLUMN IS HALF THE DEFECT: that
+#    spelling was never broken in country.py, so it is easy to read this as a
+#    fix for the apostrophe-less form arriving late - but this guard refused
+#    both, so the apostrophe user was no better off either.
+#  * 72 SHORT-ALIAS REFUSALS, which is what turned an `n?` in the pattern into
+#    `_alias_key`'s gated buffer. See that function; the leak was reachable.
+#  * PARITY WITH THE NON-BUFFER TWIN on every shape the shipped corpus holds:
+#    whatever this guard does to "Fransa'daydim" it must do to "Rusya
+#    Federasyonu'ndaydim". 63 source sentences x the 22 compounds = 1.386
+#    twins, 0 disagreeing - and the test asserts that product rather than this
+#    sentence, so neither figure can go stale again. Parity is the right test
+#    and absolute refusal is not: the Turkish arm carries no left veto, so
+#    "sanki Fransa'dayim gibi" is admitted at this tip, and the buffer must not
+#    change that in either direction.
+#  * AND THE 792 FROM country.py's SIDE ARE NOT ENOUGH, which is worth saying
+#    because they were offered: those sentences put a SPACE after the locative
+#    ("…nda calisan bir dayim var"), so 792 of 792 enter the buffer branch and
+#    0 reach the person slot. They cannot test this decision at all.
+#  * THE RIGHT BOUNDARY, re-swept with the buffer in place, over
+#    data/vector_store/chroma.sqlite3: 81.426 documents, folded with
+#    `_normalize_tr` and tokenised as `[a-z0-9]+`, giving 262.439 distinct words
+#    and 10.934.980 tokens. THE TOKENISATION IS STATED BECAUSE IT MOVES THE
+#    FIRST RUNG: counting `[a-z0-9']+` instead keeps "turkiye'nin" as one token
+#    and reads 271.768 distinct words, and an earlier revision of this comment
+#    quoted the first rung from that run without saying so, which made it
+#    irreproducible.
+#
+#    Reported as a ladder over the 391 LONG folded aliases - the set
+#    `_alias_key` actually buffers - because only the last rungs are zeros and a
+#    zero on its own says nothing:
+#      <alias> + n + anything       42 tokens, 752 occurrences
+#      <alias> + n + [dt][ae]        0 tokens
+#      <alias> + n + [dt][ae] + y    0 tokens
+#      the full shape, placed        0 tokens
+#    So for every alias that gets the buffer, the attested collision count is
+#    already 0 at the second rung, and 42 tokens / 752 occurrences is the set
+#    that could have made it otherwise.
+#
+#    THE SAME LADDER OVER ALL 418 ALIASES IS WHERE THE GATE SHOWS ITS WORK,
+#    because the gate's whole claim is that the danger sits in the short keys:
+#      <alias> + n + anything       88 tokens, 1.031 occurrences
+#      <alias> + n + [dt][ae]        2 tokens,     7 occurrences
+#      <alias> + n + [dt][ae] + y    0 tokens
+#    Both second-rung tokens are on FOUR-character keys, which is exactly what
+#    `_alias_key` refuses to buffer: `malinda` x5 is `mali` + `nda`, the
+#    ordinary word "malında", and `korentajar` x2 is `kore` + `ntajar`.
+#    `silindir` x38 (`sili` + `ndir`) is a near miss one rung lower - it never
+#    reaches the second rung at all, because `i` is not `[ae]` - and is named
+#    here only because it is the most frequent `<short alias> + n` token in the
+#    corpus. `_NAME_BOUNDARY_REFUSALS` is what the same sweep produced for the
+#    un-buffered branch. See `_alias_key` for what the gate costs and buys.
+#
+# WHAT IT COSTS, named rather than discovered later: ten long aliases have an
+# attested Turkish word at `<alias>n` - `amerikan`, `italyan`, `kenyan` and
+# seven more - so "amerikandayim" now PLACES a speaker where it only resolved
+# before. `-n` there is a DEMONYM, not a possessive, and this is the same
+# question `-lI` was decided on one commit earlier: a nationality is not a
+# location. The two differ in what follows, and it decides them differently.
+# "Amerikaliyim" predicates the SPEAKER - he is American, wherever he stands -
+# while "amerikandayim" predicates a PLACE and says the speaker is in it; a
+# demonym cannot take a locative without a head noun, so the only Turkish
+# reading of the string is "I am at the American('s)", which is not a
+# nationality claim at all. It is admitted, as a measured cost of 10 aliases out
+# of the 209 long TURKISH ones and 0 attested occurrences in 10.9M words, and
+# ALL TEN are pinned by `_DEMONYM_LOCATIVE_COSTS` - not as evidence of presence,
+# but because refusing it would need a rule that reads the word before the name
+# to notice the missing head noun, which is the inference this branch spent four
+# waves taking out. The list carried four of the ten for one commit while this
+# sentence claimed ten, which is the drift that list now exists to stop.
+#
+# AND THE CODE'S REACH IS WIDER THAN THAT COST, which is worth saying because
+# the two numbers are easy to read as the same one. `country.py` gates its
+# Turkish suffix branch per alias with `if turkish else never`; THIS GUARD HAS
+# NO LANGUAGE GATE and applies `_SELF_TR` to every alias of the resolved code,
+# English spellings included - that is pre-existing, not something the buffer
+# brought. What the buffer does is widen it: of the 391 long aliases 182 are
+# English-only, and 41 of those have an attested `<alias>n` word in the corpus
+# (`american` x1.257, `indian` x757, `australian` x476, `russian` x245 …), so
+# this guard would place a speaker on "americandayim" for all 41. NONE OF IT IS
+# REACHABLE and that is measured rather than assumed: `extract_country` returns
+# None for all 41, because its own Turkish branch is gated by language, so
+# `_country_lines` never gets as far as asking this guard. The cost above is
+# scoped to the Turkish aliases for that reason, and the reach is written here
+# so the next reader does not have to re-derive the difference.
+#
+# WHAT THE WHOLE CHANGE BUYS, end to end and through the one caller. The figure
+# worth quoting is the one the suite pins, because it is the one made of Turkish
+# a grower would actually type: the 88 grammatical self-statements in
+# `_BUFFER_LOCATIVE_ACCEPTS` - the 22 compounds, both spellings, singular and
+# plural - go from 0 placed to 88 placed.
+#
+# A WIDER SWEEP READS LARGER AND IS WORTH LESS: over 924 conversations built by
+# forcing the buffer onto every compound in six message shapes and seven
+# histories, `_country_lines` produced 78 country lines before and 439 after.
+# Most of that 361 is `Israil'ndeyim`-shaped - a buffer on a name that carries
+# no possessive, so a typo rather than a sentence - and quoting it as the gain
+# overstates what a user gets by roughly four times. 88 is the honest number.
+#
+# EITHER WAY THE RESOLVER'S HALF ALONE BOUGHT 0 LINES, against 287 resolves,
+# which is why the two halves shipped together; see the ledger's `ee43c18`,
+# where the same pair had to.
+# 0 of 194 supplier or third-party conversations gained a line. The 88 that do
+# gain one all have an earlier user turn stating the location, which is the
+# leniency `_country_lines` documents at its `said` list and not a leak.
 #
 # AND THE SUFFIX'S OWN NEAR MISSES, the other way one decision can fail - the
 # letters `[dt][ae]` followed by something that is not `-yIm`. All five refused,
@@ -1035,6 +1158,13 @@ def _world_amount(amount: float) -> str:
 # WHAT STAYS IS THE LOCATIVE ALONE - `-da/-de/-ta/-te` fused to the name and
 # carrying the person. One decision, one shape, and the reach count above is
 # measured against it.
+#
+# THE BUFFER `n` IS NOT IN THIS PATTERN, and that is deliberate rather than an
+# omission: it is spelled in `_alias_key`, because it belongs to the NAME. A
+# possessive's linking consonant is part of the possessive, the case ending is
+# `-da` either way - and, the reason that matters here, the buffer is only legal
+# on a name long enough to carry a possessive. Read `_alias_key` for the
+# reachable leak an ungated `n?` in this line was measured to open.
 _SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
 
 # The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
@@ -1429,6 +1559,59 @@ _GUARDS: tuple[tuple[str, str, str, str | None], ...] = (
 )
 
 
+def _alias_key(name: str, side: str) -> str:
+    """The escaped alias as a guard should look for it - WITH the buffer `n` on
+    the Turkish side when the name is long enough to carry a 3sg possessive.
+
+    THE BUFFER BELONGS TO THE NAME, NOT TO THE SUFFIX, which is why it is spelled
+    here and not in `_SELF_TR`. Turkish inserts it between a 3rd-person
+    possessive and a case ending, so the `n` in "Rusya Federasyonu'nda" is the
+    possessive's linking consonant; the case ending is `-da` either way.
+
+    AND IT IS GATED BY LENGTH, which is the whole reason this function exists
+    rather than an `n?` in the pattern. Measured with the buffer ungated:
+    `_states_location("malindayim", <Mali's aliases>)` was True, because `mali`
+    + `n` + `da` + `yim` is also the ordinary Turkish word "malında" ("in his
+    goods") plus a copula - and `mali` is the Turkish adjective for fiscal, which
+    is why it sits in country.py's `_AMBIGUOUS_EN` already. It was REACHABLE, not
+    merely theoretical: "Mali'de buğday verimi nedir" with an earlier user turn
+    "tarlamın malındayım" printed Mali's yield figures and asked no province,
+    where the un-buffered guard printed nothing. `korentajar` x2 (`kore` +
+    `ntajar`) is the second attested token of this shape, one letter short of
+    the person slot; `silindir` x38 (`sili` + `ndir`) is a rung lower still,
+    since `i` is not `[ae]`, and is named only for being the commonest
+    `<short alias> + n` token in the corpus. See `_SELF_TR`'s ladder.
+
+    `malında` IS ATTESTED, 5 times in the project's own Turkish corpus; the
+    copula form that actually fires is attested 0 times in 10.9M words. So the
+    gate closes a class whose instance is real and whose firing shape is not,
+    which is the direction this guard has been wrong in six times.
+
+    THE LENGTH IS READ FROM country.py, NOT RESTATED, because this is the same
+    decision `_SHORT` already makes there: aliases of four characters and fewer
+    get `_STRICT_SUFFIX` precisely because they collide with ordinary words once
+    folded, and not one of them ends in a 3sg possessive, so none can carry a
+    buffer. Importing the constant is what stops the two from drifting into
+    disagreeing about which names are the dangerous ones.
+    """
+    key = re.escape(name)
+    if side != "suffix":
+        return key
+    from src.context import country as country_ctx
+    if len(name) <= country_ctx._SHORT:
+        return key
+    # `(?:'?n)?` AND NOT `n?`: Turkish puts the apostrophe BEFORE the buffer on a
+    # proper noun - "Rusya Federasyonu'nda", never "Federasyonun'da" - so the
+    # group has to be able to swallow the apostrophe with the `n`. A bare `n?`
+    # here reads the apostrophe form as no buffer at all and refuses it, which is
+    # the spelling that was already working before this change.
+    #
+    # `_SELF_TR` keeps its own leading `'?` and the two do not collide: on
+    # "Fransa'dayim" this group fails (no `n` after the `'`) and matches empty,
+    # and the pattern's `'?` takes the apostrophe as it always did.
+    return key + r"(?:'?n)?"
+
+
 def _guard_regex(side: str, pattern: str, key: str) -> str:
     """The regex one guard pattern searches for around the escaped name `key`.
 
@@ -1510,9 +1693,8 @@ def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
     if not folded:
         return False
     for name in aliases:
-        key = re.escape(name)
         for guard in _GUARDS:
-            if _guard_hits(guard, key, folded):
+            if _guard_hits(guard, _alias_key(name, guard[1]), folded):
                 return True
     return False
 

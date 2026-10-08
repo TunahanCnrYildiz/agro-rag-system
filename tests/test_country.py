@@ -754,3 +754,309 @@ def test_the_capital_gate_on_chad_and_jordan_costs_their_lowercase_typists():
     assert extract_country("Jordan said the yield in Jordan is low") == 112
     assert not engine._states_location("Jordan said the yield in Jordan is low",
                                        engine._code_aliases(112))
+
+
+# --------------------------------------------------------------------------
+# The buffer `n` on _SUFFIX's locative/ablative branch. Everything below is
+# DERIVED from the shipped table rather than written out, so a new alias joins
+# the measurement instead of staling a figure - the mistake that put "34
+# substring pairs" and "18 countries" into the records.
+# --------------------------------------------------------------------------
+
+# HAND-KEPT, and country.py's _NOT_ABLATIVE comment says why it must be: no
+# property of the table says which final `i` is a 3rd-person possessive and
+# which is just a foreign name's last letter. `Somali`, `Mali`, `Cibuti`,
+# `Burundi`, `Haiti`, `Brunei`, `Fiji` and `Niue` all end in a vowel and take no
+# buffer. A regex over `-eti|-onu|-eri|-arı` matches only 18 of the 22, missing
+# `Çin Anakarası`, `Ekvator Ginesi`, `Fransız Polinezyası` and `Fildişi Sahili`.
+# What is hand-kept is these NINE HEAD NOUNS; the 22 aliases and 19 codes are
+# derived from them, and a head left out here costs a count rather than a
+# decision - the code gives the buffer to every long key either way.
+_POSSESSIVE_HEADS = (
+    "cumhuriyeti", "federasyonu", "emirlikleri", "devletleri", "adaları",
+    "polinezyası", "sahili", "anakarası", "ginesi",
+)
+_BACK, _FRONT, _VOICELESS = set("aıou"), set("eiöü"), set("fstkçşhp")
+
+
+def _turkish_aliases():
+    """(FAO code, the alias as Turkish spells it) for every `tr` alias."""
+    import json
+    from src.context import country as country_ctx
+    raw = json.loads(country_ctx._TABLE.read_text(encoding="utf-8"))
+    return [(int(code), name.strip())
+            for code, entry in raw.items()
+            for name in (entry.get("tr") or ())
+            if isinstance(name, str) and name.strip()]
+
+
+def _locative(alias):
+    """The grammatical apostrophe-less locative of `alias`, with the buffer `n`
+    when it ends in a 3rd-person possessive.
+
+    Vowel harmony and the voiceless assimilation are spelled out rather than
+    approximated: a `-de` written where Turkish wants `-da` would make this
+    suite agree with a regex looser than the one shipped, and agree for the
+    wrong reason."""
+    low = alias.lower()
+    buffer_n = "n" if low.endswith(_POSSESSIVE_HEADS) else ""
+    vowels = [c for c in low if c in _BACK | _FRONT]
+    return (alias + buffer_n
+            + ("t" if low[-1] in _VOICELESS else "d")
+            + ("a" if (vowels and vowels[-1] in _BACK) else "e"))
+
+
+def _possessive_family():
+    return [(code, alias) for code, alias in _turkish_aliases()
+            if alias.lower().endswith(_POSSESSIVE_HEADS)]
+
+
+def test_the_possessive_compound_family_is_twenty_two_aliases():
+    """The figure country.py's _NOT_ABLATIVE and _SUFFIX comments both carry,
+    counted from the table so neither can go stale the way "34 substring pairs"
+    did. 22 aliases over 19 FAO codes: `Salomon`/`Solomon Adaları` are both 25,
+    `Çin Anakarası`/`Çin Halk Cumhuriyeti` both 41, and `Kongo Demokratik`/
+    `Demokratik Kongo Cumhuriyeti` both 250."""
+    family = _possessive_family()
+    assert len(family) == 22
+    assert len({code for code, _ in family}) == 19
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Rusya Federasyonunda", 185),
+    ("Rusya Federasyonundayım", 185),
+    ("Dominik Cumhuriyetindeyim", 56),
+    ("Solomon Adalarındayım", 25),
+    ("Amerika Birleşik Devletlerinde", 231),
+    ("Ekvator Ginesindeyim", 61),
+])
+def test_the_apostrophe_less_buffer_locative_resolves(message, code):
+    """THE DEFECT THIS BRANCH EXISTS FOR, and the records had it backwards. The
+    note read "18 countries cannot be placed by their full official Turkish
+    name", which points at the apostrophe form - and the apostrophe form was
+    never broken: measured at 38cde42, "Rusya Federasyonu'nda" -> 185 while
+    "Rusya Federasyonunda" -> None. The apostrophe branch leaves everything
+    after the `'` free; _SUFFIX could not spell the buffer `n` at all.
+
+    The spelling that was failing is the one a grower types on a phone, and
+    location.py's own comment calls it "the ordinary statement of location"."""
+    assert extract_country(message) == code
+
+
+def test_every_possessive_compound_resolves_without_an_apostrophe():
+    """All 22, derived - because closing the example is not closing the class,
+    and the six parametrised cases above are examples. Each alias is bent into
+    its own grammatical locative, so this fails if the buffer stops reaching one
+    harmony class rather than only if it stops reaching all of them."""
+    for code, alias in _possessive_family():
+        assert extract_country(_locative(alias)) == code, alias
+
+
+def test_the_buffer_locative_resolves_for_208_of_the_227_folded_aliases():
+    """THE GAIN, counted over the whole table and not over the family. Every
+    alias is given a buffer it may not need - the regex makes the `n` optional,
+    so `Almanyanda` is accepted as a typo of `Almanya'da` - and 208 of the 227
+    folded Turkish keys resolve that way.
+
+    THE 19 THAT DO NOT are the 18 short keys, which keep _STRICT_SUFFIX
+    untouched, plus `sudan`, whose capital gate refuses a lowercase English
+    noun. That is the pre-existing cost pinned above as "sudanda yasiyorum",
+    not something this branch takes away."""
+    from src.context import country as country_ctx
+    folded = {country_ctx._normalize_tr(alias): alias
+              for _code, alias in _turkish_aliases()}
+    assert len(folded) == 227
+    resolved = [key for key, alias in folded.items()
+                if extract_country(key + "n" + _locative(alias)[-2:]) is not None]
+    assert len(resolved) == 208, len(resolved)
+
+
+def test_the_bare_buffer_ablative_is_still_a_supplier():
+    """_NOT_ABLATIVE after the widening, and the point of this test is its
+    DENOMINATOR. The same zero was true before the branch for a reason that had
+    nothing to do with the guard: _SUFFIX could not spell `ndan`, so 0 of these
+    inputs reached the lookahead and the zero measured nothing. All 228 reach it
+    now and all 228 are still refused - the first time this branch's half of the
+    guard has been measured at all."""
+    aliases = [alias for _code, alias in _turkish_aliases()]
+    assert len(aliases) == 228          # every one can now reach the guard
+    assert [a for a in aliases if extract_country(_locative(a) + "n")] == []
+    assert [a for a in aliases
+            if extract_country(_locative(a) + "n tohum aldım")] == []
+
+
+@pytest.mark.parametrize("message", [
+    "Rusya Federasyonundan tohum aldım",
+    "Dominik Cumhuriyetinden tohum aldım",
+    "Solomon Adalarından fide aldım",
+    "Birleşik Arap Emirliklerinden aldım",
+    "Amerika Birleşik Devletlerinden tohum aldım",
+    "Çin Anakarasından gübre alıyoruz",
+])
+def test_the_apostrophe_less_buffer_ablative_is_a_supplier(message):
+    """The twin of test_the_ablative_with_a_buffer_n_is_also_a_supplier, which
+    pins the APOSTROPHE spelling of the same six. These were refused before this
+    branch too, but by a suffix that could not match rather than by the guard.
+    Now the guard is what refuses them, which is a different line of code to
+    keep green and was never covered."""
+    assert extract_country(message) is None
+
+
+def test_the_buffer_is_not_on_the_short_keys():
+    """NOT CAUTION, GRAMMAR. _STRICT_SUFFIX serves the keys of four characters
+    and fewer, which are the ones that collide with ordinary words once folded -
+    and not one of them ends in a 3rd-person possessive, so there is no buffer
+    for them to carry. The grammar says the widening would buy nothing there,
+    and the collision risk says it would be the worst place to make it."""
+    from src.context import country as country_ctx
+    # The LEADING buffer, not the ablative's own trailing `n?` in `[dt][ae]n?`,
+    # which has always been there and is a different letter doing a different
+    # job - spelling `-dan` from `-da` rather than joining a possessive.
+    assert country_ctx._STRICT_SUFFIX.startswith("(?:[dt][ae]n?")
+    assert "(?:n?[dt]" not in country_ctx._STRICT_SUFFIX
+    assert country_ctx._SUFFIX.startswith("(?:n?[dt][ae]n?")
+    short = [alias for _code, alias in _turkish_aliases()
+             if len(country_ctx._normalize_tr(alias)) <= country_ctx._SHORT]
+    assert len({country_ctx._normalize_tr(a) for a in short}) == 18
+    assert [a for a in short if a.lower().endswith(_POSSESSIVE_HEADS)] == []
+
+
+def test_the_province_twin_needs_no_buffer_and_keeps_the_shared_constants():
+    """THE DIVERGENCE, MEASURED AND PINNED, because the last time these two
+    modules parted company one of them kept a paragraph claiming they had not -
+    country.py's header asserted a verbatim copy that had stopped being one, and
+    that was a Critical two days ago.
+
+    All 81 province names are single words and none ends in a 3rd-person
+    possessive, so the buffer the 22 country compounds need has nothing to
+    attach to on the province side: adding it there would widen 81 keys to buy
+    0 spellings. So `_SUFFIX` diverges on purpose and everything else in that
+    copied block is still byte-identical - which is the half a reader is most
+    likely to assume rather than check, and so the half worth asserting."""
+    from src.context import country as country_ctx
+    from src.context import location as location_ctx
+
+    assert len(location_ctx.PROVINCES) == 81
+    assert [p for p in location_ctx.PROVINCES if " " in p] == []
+    assert [p for p in location_ctx.PROVINCES
+            if p.lower().endswith(_POSSESSIVE_HEADS)] == []
+
+    assert country_ctx._SUFFIX != location_ctx._SUFFIX
+    assert country_ctx._SUFFIX == location_ctx._SUFFIX.replace(
+        "(?:[dt][ae]n?", "(?:n?[dt][ae]n?", 1)
+    for shared in ("_PERSON", "_STRICT_SUFFIX", "_SHORT", "_PLACE", "_TRIM"):
+        assert getattr(country_ctx, shared) == getattr(location_ctx, shared), shared
+
+
+@pytest.mark.parametrize("message, code", [
+    ("amerikanda", 231),
+    ("italyanda", ITALY),
+    ("kenyanda", KENYA),
+])
+def test_what_the_optional_buffer_admits(message, code):
+    """THE COST OF THE WIDENING, pinned as a cost rather than claimed away. An
+    optional `n` IS an extension, so the question is whether a newly accepted
+    string can be an ordinary Turkish word - and for ten long keys `<key>n` is
+    one already (`amerikan`, `italyan`, `kenyan`, `ugandan`, `angolan`,
+    `libyan`, `moldovan`, `samoan`, `venezuelan`, `guatemalan`), which makes a
+    locative on that stem a real form rather than a hypothetical one.
+
+    MEASURED over the 81.426 shipped Turkish corpus chunks, folded with
+    `_normalize_tr` and tokenised as `[a-z0-9']+` - 271.768 distinct words,
+    10.905.419 tokens, the apostrophe kept INSIDE the token (splitting on it
+    gives 262.439 words over 10.934.980 tokens, and a figure quoted without the
+    rule cannot be re-taken): 0 attested words have this shape, and 0 of the 200
+    constructed ones are attested either. THAT ZERO IS REPORTED WITH ITS
+    DENOMINATOR because on its own it is vacuous: 0 words were eligible to break
+    it. The set that could have is 16 attested words of the form `<long key>` +
+    `n` + something - `amerikan` x47, `kenyan` x27, `italyan` x26, `ugandan`
+    x14, `turkiyenin` x6 - and not one of them continues into a locative.
+
+    WHY THE COST IS SMALL, which is a different claim from there being none:
+    `-n` on these ten is a demonym, not a possessive, and a demonym needs a head
+    noun before it can take a locative, so "İtalyanda kaldı" is the only reading
+    and it is rare. Eight of the ten are English demonyms that reach this corpus
+    through its English abstracts and take no Turkish case ending at all."""
+    assert extract_country(message) == code
+
+
+def test_the_bare_demonym_is_not_a_location():
+    """The other side of the cost above: the buffer widened the LOCATIVE, not
+    the bare name, so the demonym on its own still resolves to nothing."""
+    assert extract_country("amerikan") is None
+    assert extract_country("italyan") is None
+    # And the near miss, which resolved before this branch and still does: the
+    # genitive `-nin` comes through `[yn]?[aeiu]n?`, not through the buffer, so
+    # it is not this branch's to claim or to break.
+    assert extract_country("turkiyenin") == TURKIYE
+
+
+def test_resolving_a_buffer_locative_also_places_the_speaker_now():
+    """THE TWO DECISIONS ARE STILL SEPARATE, AND BOTH ARE MADE NOW. This test
+    asserted the opposite for one commit, and the correction is worth keeping
+    visible rather than rewriting silently.
+
+    `extract_country` RESOLVES a name; `engine._states_location` PLACES a
+    speaker. The first commit on this branch gave the resolver its buffer and
+    left the guard alone, reasoning from the ledger's Wave 4 - do not widen a
+    resolver and its guard together. THAT WAS THE WRONG PRECEDENT: Wave 4 is
+    about widening a resolver while NARROWING its guard, two changes in opposite
+    directions. These two are the same direction and two halves of one answer,
+    so the governing precedent is `ee43c18`, where `_NOT_ABLATIVE` and the
+    `best_start` loop had to ship together because either alone was worth
+    nothing.
+
+    MEASURED, and that is what settled it: the resolver's buffer alone bought
+    287 resolves and 0 country lines over 528 conversations, because
+    `engine._SELF_TR` had no buffer either. The user gained nothing. With both
+    halves, 924 conversations on the family produce 439 country lines against
+    78 before - 361 gained, 0 lost.
+
+    THE GUARD'S BUFFER IS GATED BY NAME LENGTH and this module's `_SHORT` is
+    what gates it; see `engine._alias_key` and
+    `tests/test_engine.py::test_the_buffer_is_gated_by_the_name_length` for the
+    reachable leak that gate closes."""
+    from src import engine
+    assert extract_country("Rusya Federasyonundayım") == 185
+    assert engine._states_location("Rusya Federasyonundayım",
+                                   engine._code_aliases(185))
+    # The apostrophe spelling was never broken HERE and was refused THERE, so it
+    # is half the defect rather than a bystander.
+    assert engine._states_location("Rusya Federasyonu'ndayım",
+                                   engine._code_aliases(185))
+    assert engine._states_location("Fransadayım", engine._code_aliases(FRANCE))
+    # End to end through the one caller, which is where the first commit's gain
+    # stopped.
+    assert engine._country_lines("Rusya Federasyonundayım", None) != []
+    assert engine._country_lines("Rusya Federasyonu'ndayım", None) != []
+
+
+@pytest.mark.parametrize("message", [
+    "Rusya Federasyonunda çalışan bir dayım var",
+    "Dominik Cumhuriyetinde yapılan bir araştırma okudum",
+    "Amerika Birleşik Devletlerinde buğday satıyorum",
+    "Solomon Adalarında bir sayım gördüm",
+])
+def test_a_buffer_locative_about_somebody_else_places_nobody(message):
+    """The refusals built to REACH the buffer, which is the measurement that
+    licenses the widening at all: running a refuse set that cannot reach the new
+    pattern measures nothing, and three waves on this branch read exactly such a
+    zero as a guarantee.
+
+    extract_country RESOLVES these by design - a country IS named in them. The
+    decision that matters is the guard's, and 792 constructed sentences of these
+    shapes place 0 speakers against 704 eligible, old tree and new tree alike."""
+    from src import engine
+    code = extract_country(message)
+    assert code is not None
+    assert not engine._states_location(message, engine._code_aliases(code))
+
+
+def test_the_relative_suffix_is_still_not_a_location_without_an_apostrophe():
+    """A measured NON-gain, recorded so it is not later mistaken for a
+    regression: `-ndaki` is a relative, not a statement of location, and
+    `_PERSON` has no slot for `ki`. The apostrophe branch takes it because it
+    takes anything after the `'`; the suffix branch does not, and that is what
+    location.py does with `-daki` too."""
+    assert extract_country("Rusya Federasyonu'ndaki") == 185
+    assert extract_country("Rusya Federasyonundaki") is None
