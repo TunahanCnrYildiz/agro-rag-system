@@ -28,7 +28,7 @@ from functools import lru_cache
 
 from src import norms
 from src.budget import FieldError, format_qty, format_tr
-from src.engine import _TR_SUFFIXES, _normalize_tr
+from src.engine import _TR_SUFFIXES, _family_head, _label_head, _normalize_tr
 
 
 @lru_cache(maxsize=1)
@@ -44,15 +44,114 @@ def _families() -> tuple[tuple[str, str], ...]:
 
     Cached on the assumption the underlying table never changes mid-process.
     If a caller ever reloads the table (as the test fixture does), it must
-    also call `_families.cache_clear()` or this keeps answering from the
-    stale one.
+    also call `_families.cache_clear()` - and `_not_this_plant.cache_clear()`,
+    which is derived from this - or they keep answering from the stale one.
     """
     out: dict[str, str] = {}
     for _crop_id, label in norms.available_crops():
-        family = re.split(r"\s*[(,]", label)[0].strip()
+        family = _label_head(label)
         if family:
             out.setdefault(_normalize_tr(family), family)
     return tuple(sorted(out.items(), key=lambda item: -len(item[0])))
+
+
+# Not a family name and cannot become one: `_families` folds real labels, which
+# are never empty (`if family:` there) and never carry a space-free sentinel.
+_COVER_ONLY = "\x00cover"
+
+# The two places a label writes a plant name OTHER than its own family: the
+# parenthetical variant (`Altın Çilek (Yer Kirazı)`) and the exclusion clause
+# (`... Yer Fıstığı Ve Hindistan Cevizi Hariç`). Split on comma, slash and `ve`
+# because both forms list several - `Frenk İnciri (Hint, Mısır İnciri)`.
+_LABEL_VARIANT = re.compile(r"\(([^()]*)\)")
+_LABEL_EXCLUSION = re.compile(r"([^(),]+?)\s+Hariç")
+_VARIANT_SPLIT = re.compile(r"\s*[,/]\s*|\s+[Vv]e\s+")
+
+
+def _families_inside(folded: str) -> set[str]:
+    """Every family name `folded` contains as a whole, bounded match.
+
+    Deliberately does NOT consult `_not_this_plant()` - that would be circular,
+    since this is the test that decides what goes in it.
+    """
+    return {family for family, _display in _families()
+            if re.search(rf"(?<!\w){re.escape(family)}(?:{_TR_SUFFIXES})?(?!\w)",
+                         folded)}
+
+
+@lru_cache(maxsize=1)
+def _not_this_plant() -> tuple[str, ...]:
+    """Turkish plant names that CONTAIN a family name and are a DIFFERENT plant,
+    and that the table has no family of its own for - so the containment rule in
+    `named_crops` cannot drop the inner match, because nothing matched outside it.
+
+    `hindistan cevizi` is the coconut and was the first one found. Measured
+    2026-10-03: a user writing "hindistan cevizi ekmek istiyorum" was told
+    `Ceviz` - the walnut - and the world layer printed France's WALNUT yield and
+    price under it. The two plants share nothing but four letters.
+
+    THIS WAS A HAND LIST OF ONE AND ITS COMMENT SAID THE RULE COULD NOT BE
+    DERIVED FROM THE TABLE. That was wrong twice over, and the class it left
+    open had three more live members. The table writes alternate plant names in
+    two places and both are machine-readable; `hindistan cevizi` itself comes out
+    of one of them. Measured 2026-10-03 over the shipped 246 labels:
+
+        alternate names harvested                               72
+        of those, a family of their own (the containment rule
+            already covers them: `Tatlı Patates`, `Barbunya`)    5
+        of the remaining 67, containing a family name            4
+        of the 63 that do not, any that change an answer         0
+
+    The four are `hindistan cevizi` -> `Ceviz`, `yer kirazı` (physalis, the
+    variant of `Altın Çilek`) -> `Kiraz`, `cennet elması` (persimmon, the variant
+    of `Trabzon Hurması`) -> `Elma`, and `mısır inciri` (prickly pear, a variant
+    of `Frenk İnciri`) -> `Mısır` AND `İncir`. The last was not found by reading:
+    it hides behind a comma inside `Frenk İnciri (Hint, Mısır İnciri)`, and
+    `Mısır` is also the Turkish name of Egypt, so it reached the world layer by
+    two separate doors.
+
+    `Malta Eriği` is harvested - it is the parenthetical variant of `Yenidünya` -
+    and is NOT in the result, because it contains no family name: the family is
+    `Erik` and Turkish softens the k, so `erigi` never matches the `erik`
+    pattern. The rule reaches the same conclusion the hand comment reached by
+    argument, which is the check that it is the same rule.
+
+    AND THE RULE NEEDED A THIRD TEST, WHICH A FIXTURE TABLE FOUND. An exclusion
+    clause names a plant that is EXCLUDED from the label's item, and that plant
+    may be a genuine subtype of a family we carry: `Buğday, Durum Buğdayı Hariç`
+    yields `durum buğdayı`, which contains `Buğday` and IS a buğday - so covering
+    it would turn a correct answer into no answer. On the shipped table it is
+    harmless, because `Durum Buğdayı` is a family of its own and the first test
+    drops it; on a table without that family the first test does not fire. So a
+    harvested name is kept only when it contains a family OTHER THAN the family
+    of the label it was harvested from. A parenthetical variant is another name
+    for the SAME plant, so a different family's name inside it is coincidental by
+    construction - which is why all three new members come from that source and
+    the one false positive came from the other.
+
+    WHAT THE RULE DOES NOT DO is answer with the RIGHT family. "yer kirazı ekmek
+    istiyorum" returns () rather than `Altın Çilek`, exactly as the coconut
+    returns () rather than nothing-at-all-sensible. Mapping a variant to its own
+    family is a feature and not this fix: the defect is a WRONG figure, and ()
+    costs a question where `Kiraz` costs France's cherry yield.
+
+    Cached, and on the same assumption `_families` is cached on - and it reads
+    `_families`, so a caller that reloads the table must clear BOTH.
+    """
+    families = dict(_families())
+    harvest: dict[str, set[str]] = {}          # name -> its source labels' own
+    for _crop_id, label in norms.available_crops():
+        own = _family_head(label)
+        pieces = [inner for inner in _LABEL_VARIANT.findall(label)
+                  if "Hariç" not in inner]    # a clause, read by the next line
+        pieces += _LABEL_EXCLUSION.findall(label)
+        for piece in pieces:
+            for part in _VARIANT_SPLIT.split(piece):
+                harvest.setdefault(_normalize_tr(part.strip()), set()).add(own)
+    keep = [name for name, sources in harvest.items()
+            if name and name not in families
+            and _families_inside(name) - sources]
+    return tuple(sorted(keep, key=lambda name: -len(name)))
 
 
 def named_crops(message: str) -> tuple[str, ...]:
@@ -72,6 +171,10 @@ def named_crops(message: str) -> tuple[str, ...]:
     least one of its occurrences is not covered by another matched family's
     span, and the result is ordered by each surviving family's earliest
     surviving occurrence.
+
+    A span may also come from `_not_this_plant()`, which is a different plant the
+    table holds no family for: it covers the family inside it and is never
+    itself returned.
     """
     folded = _normalize_tr(message or "")
     if not folded:
@@ -82,6 +185,10 @@ def named_crops(message: str) -> tuple[str, ...]:
         pattern = rf"(?<!\w){re.escape(folded_family)}(?:{_TR_SUFFIXES})?(?!\w)"
         for match in re.finditer(pattern, folded):
             occurrences.append((match.start(), match.end(), folded_family, display))
+    for phrase in _not_this_plant():
+        pattern = rf"(?<!\w){re.escape(phrase)}(?:{_TR_SUFFIXES})?(?!\w)"
+        for match in re.finditer(pattern, folded):
+            occurrences.append((match.start(), match.end(), _COVER_ONLY, ""))
 
     def covered(occurrence: tuple[int, int, str, str]) -> bool:
         start, end, family, _display = occurrence
@@ -92,7 +199,7 @@ def named_crops(message: str) -> tuple[str, ...]:
     earliest_free_start: dict[str, int] = {}
     for occurrence in occurrences:
         start, _end, family, display = occurrence
-        if covered(occurrence):
+        if family == _COVER_ONLY or covered(occurrence):
             continue
         displays[family] = display
         if family not in earliest_free_start or start < earliest_free_start[family]:
@@ -195,7 +302,7 @@ def _figures(row, latest_year: int | None) -> CropFigures:
     # cells for a round; a test pins them together.
     per_tree = row.yield_kg_tree is not None
     yield_value = row.yield_kg_tree if per_tree else row.yield_kg_da
-    price = row.price_tl_kg
+    price = row.price_per_kg
     # A price from an older year is not a smaller number, it is a different
     # currency: P2b measured Ordu's `Arpa (Diğer)` prefilling a 2018 price nine
     # times too low into a bold revenue figure. Yield is left alone - it does

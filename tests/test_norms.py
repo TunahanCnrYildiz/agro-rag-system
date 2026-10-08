@@ -265,9 +265,9 @@ def test_a_national_scope_measure_ignores_the_province(tmp_path, monkeypatch):
     provincial reading of a national figure."""
     _write(tmp_path, monkeypatch, GOOD)
     n = norms.lookup("domates", "Manisa")
-    assert n.price_tl_kg.amount == 12.40
-    assert n.price_tl_kg.scope == "tr"
-    assert n.price_tl_kg.region == "Türkiye"
+    assert n.price_per_kg.amount == 12.40
+    assert n.price_per_kg.scope == "tr"
+    assert n.price_per_kg.region == "Türkiye"
 
 
 def test_a_null_latest_year_walks_back_and_carries_that_year(tmp_path, monkeypatch):
@@ -286,7 +286,7 @@ def test_an_all_null_series_yields_no_norm_rather_than_zero(tmp_path, monkeypatc
     payload["crops"]["domates"]["price_tl_kg"]["TR"] = [None, None, None]
     _write(tmp_path, monkeypatch, payload)
     n = norms.lookup("domates", "Manisa")
-    assert n.price_tl_kg is None
+    assert n.price_per_kg is None
     assert n.yield_kg_da is not None
 
 
@@ -324,6 +324,22 @@ def test_the_shipped_file_uses_canonical_province_names():
 def test_the_shipped_file_carries_crops_and_a_decade():
     assert len(norms.available_crops()) > 100
     assert len(norms._load()["years"]) == 10
+
+
+def test_every_served_value_names_its_unit():
+    """A price and a yield must never be indistinguishable. `unit` has no
+    default precisely so a new measure cannot quietly inherit the wrong one."""
+    norm = norms.lookup("bugday, durum bugdayi haric", "Konya")
+    assert norm is not None
+    assert norm.yield_kg_da.unit == "kg/da"
+    assert norm.price_per_kg.unit == "TL/kg"
+
+
+def test_a_per_tree_yield_names_its_own_unit():
+    norm = norms.lookup("avokado", "Antalya")
+    assert norm is not None
+    assert norm.yield_kg_tree is not None
+    assert norm.yield_kg_tree.unit == "kg/ağaç"
 
 
 def test_a_shipped_yield_is_in_a_plausible_range():
@@ -382,7 +398,7 @@ def test_a_single_prior_value_yields_no_range(tmp_path, monkeypatch):
     """One number is not a range, and rendering '202,26-202,26' would dress a
     single observation as a spread."""
     _write(tmp_path, monkeypatch, ALTERNATE)
-    norm = norms.lookup("findik", "Ordu").price_tl_kg
+    norm = norms.lookup("findik", "Ordu").price_per_kg
     assert norm.amount == 202.26
     assert (norm.recent_min, norm.recent_max) == (None, None)
 
@@ -525,12 +541,12 @@ def test_a_figure_far_below_its_own_five_year_range_is_flagged():
     2.954 tons to 27 while the recorded orchard area GREW - the trees are there
     and the harvest is not. The most recent published figure is not an
     expectation when there was almost nothing to measure."""
-    value = norms.NormValue(1.0, 2025, "il", "Bilecik", 20.0, 37.0)
+    value = norms.NormValue(1.0, 2025, "il", "Bilecik", "kg/ağaç", 20.0, 37.0)
     assert norms.far_below_recent(value) is True
 
 
 def test_an_ordinary_figure_is_not_flagged():
-    value = norms.NormValue(31.0, 2025, "il", "Karabük", 27.0, 28.0)
+    value = norms.NormValue(31.0, 2025, "il", "Karabük", "kg/ağaç", 27.0, 28.0)
     assert norms.far_below_recent(value) is False
 
 
@@ -538,7 +554,7 @@ def test_a_figure_with_no_range_is_never_flagged():
     """With nothing to compare against there is nothing to warn about. The
     range is the warning's own evidence."""
     assert norms.far_below_recent(
-        norms.NormValue(1.0, 2025, "il", "Bilecik")) is False
+        norms.NormValue(1.0, 2025, "il", "Bilecik", "kg/ağaç")) is False
 
 
 def test_no_value_is_not_flagged():
@@ -548,8 +564,8 @@ def test_no_value_is_not_flagged():
 def test_the_threshold_is_exercised_from_both_sides():
     """A midpoint of 100: 19 is below one fifth of it, 21 is not. Pins the
     constant itself, so it cannot drift without a test noticing."""
-    below = norms.NormValue(19.0, 2025, "il", "Bilecik", 80.0, 120.0)
-    above = norms.NormValue(21.0, 2025, "il", "Bilecik", 80.0, 120.0)
+    below = norms.NormValue(19.0, 2025, "il", "Bilecik", "kg/da", 80.0, 120.0)
+    above = norms.NormValue(21.0, 2025, "il", "Bilecik", "kg/da", 80.0, 120.0)
     assert norms.far_below_recent(below) is True
     assert norms.far_below_recent(above) is False
 
@@ -559,7 +575,7 @@ def test_a_zero_range_cannot_divide_by_zero():
     refuses a range whose ends are equal - but this function is public and must
     not raise on a value someone constructs."""
     assert norms.far_below_recent(
-        norms.NormValue(1.0, 2025, "il", "Bilecik", 0.0, 0.0)) is False
+        norms.NormValue(1.0, 2025, "il", "Bilecik", "kg/da", 0.0, 0.0)) is False
 
 
 def test_a_value_at_its_own_range_minimum_is_never_flagged():
@@ -572,5 +588,5 @@ def test_a_value_at_its_own_range_minimum_is_never_flagged():
     the midpoint to sit above recent_min itself. The fix adds the ordering the
     sentence already asserts: below recent_min, not just below one fifth of
     the midpoint."""
-    value = norms.NormValue(1.0, 2025, "il", "Kahramanmaraş", 1.0, 12.0)
+    value = norms.NormValue(1.0, 2025, "il", "Kahramanmaraş", "kg/ağaç", 1.0, 12.0)
     assert norms.far_below_recent(value) is False

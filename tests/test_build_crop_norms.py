@@ -120,7 +120,7 @@ def test_the_output_passes_the_loader_that_will_read_it(tmp_path, monkeypatch):
     n = norms.lookup("durum bugdayi", "Adana")
     assert n.yield_kg_da.amount == 322.0
     assert n.yield_kg_da.year == 2025
-    assert n.price_tl_kg is None
+    assert n.price_per_kg is None
     # Undo the cache poisoning, not just the monkeypatch: _load is an
     # lru_cache, so leaving the cache holding this tmp_path's tiny table
     # would answer every later test - in this file and any other - from a
@@ -285,7 +285,7 @@ def test_a_crop_with_only_a_price_still_loads(tmp_path, monkeypatch):
     n = norms.lookup("kivi", "Adana")
     assert n is not None
     assert n.yield_kg_da is None
-    assert n.price_tl_kg.amount == 30.0
+    assert n.price_per_kg.amount == 30.0
     # See the same line in test_the_output_passes_the_loader_that_will_read_it:
     # _load is an lru_cache, so this tmp_path's single-crop table would
     # otherwise answer every later test in the process.

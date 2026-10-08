@@ -31,6 +31,9 @@ from pathlib import Path
 from src.config import DATA_DIR
 
 _PATH = DATA_DIR / "crop_norms.json"
+_WORLD = DATA_DIR / "world_norms.json"
+_FAO_MAP = DATA_DIR / "crop_fao_map.json"
+TURKIYE_AREA = 223   # FAOSTAT carries Türkiye; TÜİK is better and wins. See _resolve.
 
 NATIONAL_KEY = "TR"
 NATIONAL_LABEL = "Türkiye"
@@ -97,6 +100,46 @@ def _load() -> dict:
         return {}
 
 
+@lru_cache(maxsize=1)
+def _load_world() -> dict:
+    """The world layer, or an empty mapping. A broken file must not break
+    answering, the same rule _load() follows for the Turkish one.
+
+    Kept as the raw structure (meta/items/countries/yield/price) rather than
+    reshaped into crop_norms.json's shape: the two files have different axes
+    - a Turkish measure is a scope plus a year-indexed list, a world one is a
+    "<item>|<area>" key plus a year-string-keyed dict - and forcing one shape
+    onto the other would hide that difference instead of representing it.
+    """
+    try:
+        raw = json.loads(Path(_WORLD).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return {}
+        if not all(isinstance(raw.get(k), dict) for k in ("yield", "price", "countries")):
+            return {}
+        return raw
+    except Exception:  # noqa: BLE001 - a broken data file must not break answering
+        return {}
+
+
+@lru_cache(maxsize=1)
+def _load_fao_map() -> dict:
+    """Turkish crop id -> {"fao": item code or None, ...}, or an empty mapping.
+
+    Returns the inner "map" table rather than the whole file: every caller
+    wants one crop's entry, and the "generated" key that sits beside "map" in
+    the file is provenance for a diff, not something a lookup needs.
+    """
+    try:
+        raw = json.loads(Path(_FAO_MAP).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return {}
+        table = raw.get("map")
+        return table if isinstance(table, dict) else {}
+    except Exception:  # noqa: BLE001 - a broken data file must not break answering
+        return {}
+
+
 @dataclass(frozen=True)
 class NormValue:
     """One figure and where it came from. The provenance travels with the value
@@ -105,12 +148,51 @@ class NormValue:
     year: int
     scope: str          # "il" | "tr"
     region: str         # "Manisa" | "Türkiye"
+    # WHICH unit, written down rather than inferred from the field name that
+    # holds it. `CropNorm.price_per_kg` is lira for a Turkish figure and
+    # dollars for a FAOSTAT one, and nothing else in the value says so.
+    # No default: a default would let a price inherit "kg/da" in silence,
+    # and a claim that is almost true is this project's recurring defect.
+    unit: str
     # The spread of the five years BEFORE this one. Not the last five of the
     # series: this figure is the one being prefilled, and a range that contains
     # it cannot say whether it is typical. None when fewer than two of those
     # years carry a value - one number is not a range.
     recent_min: float | None = None
     recent_max: float | None = None
+    # FAOSTAT's provenance letter for THIS cell - "A" a country's own report,
+    # "E" FAO's estimate, "X" an outside organization, "B" a series break, "I"
+    # imputed; data/world_norms.json's meta.flags glosses all five.
+    #
+    # 51,3% OF THE YIELD CELLS THAT ARE ACTUALLY PRINTED carry "E", so a world
+    # figure printed without it would be attributed to a country that never
+    # reported it. The population matters and an earlier revision of this
+    # comment measured the wrong one: it said 41,3%, which is 29.842 of the
+    # 72.335 non-null yield cells in the file and exactly right as arithmetic -
+    # but `_pick_world` only ever returns the LATEST non-null cell of a series,
+    # and over those 8.453 cells "E" is 4.333, 51,3%. The claim this number
+    # supports is about printed figures, so the printed set is the one to count.
+    # True as stated and measuring the wrong set is the "almost true" class this
+    # project names as its recurring defect.
+    #
+    # THE PRICE TABLE IS A DIFFERENT STORY and is not covered by either figure:
+    # of its 33.209 non-null cells none is "E" at all (33.163 "A", 43 "B", 3
+    # "I"), and all 4.673 printed cells are "A". So the estimate gloss is a
+    # yield-side concern today.
+    #
+    # None for every TÜİK figure: that file publishes no per-cell flag. None
+    # therefore means "this source carries no flag", NEVER "official" - a
+    # surface that prints a word for None would be inventing provenance.
+    #
+    # WHY A FIELD RATHER THAN RE-READING THE CELL AT THE POINT OF USE. Reaching
+    # back into the file would mean rebuilding the "<item>|<area>" key and
+    # re-running _pick_world's walk to the most recent non-null year, so the
+    # rule deciding WHICH year answers would exist in two places. They agree
+    # until one changes, and then a figure from one year prints a flag from
+    # another, silently and provably wrong. far_below_recent's docstring records
+    # what that cost the last time two surfaces decided one measure separately.
+    # Defaulted, and last, so every existing positional construction stands.
+    flag: str | None = None
 
 
 # ONE FIFTH, AND THIS NUMBER IS TUNED RATHER THAN ARGUED. Measured over the
@@ -162,7 +244,7 @@ class CropNorm:
     crop: str
     label: str
     yield_kg_da: NormValue | None
-    price_tl_kg: NormValue | None
+    price_per_kg: NormValue | None
     # Defaulted so the four-argument constructions in the tests keep working,
     # and because most crops genuinely do not have one.
     yield_kg_tree: NormValue | None = None
@@ -191,7 +273,8 @@ def _recent_range(series: list, index: int) -> tuple[float | None, float | None]
     return (None, None) if lo == hi else (lo, hi)
 
 
-def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | None:
+def _pick(measure: dict, years: list[int], province: str | None,
+          unit: str) -> NormValue | None:
     """The province's row when the measure has one, otherwise the national row,
     then the most recent non-null year in it."""
     provincial = (measure.get("scope") == "il"
@@ -209,14 +292,85 @@ def _pick(measure: dict, years: list[int], province: str | None) -> NormValue | 
                 year=years[i],
                 scope="il" if provincial else "tr",
                 region=key if provincial else NATIONAL_LABEL,
+                unit=unit,
                 recent_min=low,
                 recent_max=high,
             )
     return None
 
 
+def _pick_world(cells: dict | None, area: int, unit: str) -> NormValue | None:
+    """The most recent year in one `"<item>|<area>"` series.
+
+    `cells` is that series already: a year-string -> [amount, flag] mapping,
+    with its own year axis rather than the Turkish file's - FAOSTAT ends at
+    2024 where TÜİK reaches 2025, and the year returned must be the cell's
+    own, never borrowed from `years` the way `_pick` uses it.
+
+    No `recent_min`/`recent_max`: the five-year spread printed beside a Turkish
+    figure comes from the same source as the figure. Mixing a FAOSTAT range
+    into a surface built for TÜİK's would put two different things behind one
+    label, so the range is left None until a surface asks for it.
+    """
+    if not isinstance(cells, dict) or not cells:
+        return None
+    countries = _load_world().get("countries", {})
+    country_entry = countries.get(str(area))
+    region = country_entry.get("label") if isinstance(country_entry, dict) else None
+    if not isinstance(region, str):
+        return None
+    for year_str in sorted(cells, key=lambda y: int(y), reverse=True):
+        cell = cells.get(year_str)
+        if (isinstance(cell, list) and len(cell) >= 1
+                and isinstance(cell[0], (int, float)) and not isinstance(cell[0], bool)
+                and math.isfinite(cell[0])):
+            try:
+                year = int(year_str)
+            except (TypeError, ValueError):
+                continue
+            return NormValue(
+                amount=float(cell[0]),
+                year=year,
+                scope="ulke",
+                region=region,
+                unit=unit,
+                # cell is [amount, flag]. A cell short of a second element, or
+                # carrying something that is not a letter, yields None rather
+                # than a guess: an unflagged figure is printed as unflagged.
+                flag=(cell[1] if len(cell) >= 2 and isinstance(cell[1], str)
+                      and cell[1].strip() else None),
+            )
+    return None
+
+
+def _resolve_world(crop_id: str, entry: dict, country: int) -> CropNorm:
+    """One crop's figures from the world layer, for one country.
+
+    `entry` is the Turkish crop_norms.json entry, kept only for its label -
+    the crop is named the same way whichever layer answers for it. A crop
+    with no FAO mapping, or a mapping with no cell for this area, comes back
+    as a CropNorm whose measures are None rather than as None itself: the
+    crop exists, the figure does not, and the caller prefills what it can.
+    """
+    mapping = _load_fao_map().get(crop_id)
+    fao_item = mapping.get("fao") if isinstance(mapping, dict) else None
+    yield_val = None
+    price_val = None
+    if fao_item is not None:
+        world = _load_world()
+        key = f"{fao_item}|{country}"
+        yield_val = _pick_world(world.get("yield", {}).get(key), country, "kg/da")
+        price_val = _pick_world(world.get("price", {}).get(key), country, "USD/kg")
+    return CropNorm(
+        crop=crop_id,
+        label=entry["label"],
+        yield_kg_da=yield_val,
+        price_per_kg=price_val,
+    )
+
+
 def _resolve(crop_id: str, entry: dict, years: list[int],
-             province: str | None) -> CropNorm:
+             province: str | None, country: int | None = None) -> CropNorm:
     """One crop's norms for one province.
 
     Shared by lookup() and province_table() so the two cannot drift: the budget
@@ -226,28 +380,37 @@ def _resolve(crop_id: str, entry: dict, years: list[int],
     between the two functions could never surface as the server rejecting a
     figure it had itself just sent.
     """
+    # A province beats a country beats nothing. Türkiye as a country resolves
+    # to the national TÜİK row, never to FAOSTAT's area 223 - that series is a
+    # cross-check and the previous spec settled it.
+    if province is None and country is not None and country != TURKIYE_AREA:
+        return _resolve_world(crop_id, entry, country)
     return CropNorm(
         crop=crop_id,
         label=entry["label"],
-        yield_kg_da=_pick(entry["yield_kg_da"], years, province),
-        price_tl_kg=_pick(entry["price_tl_kg"], years, province),
-        yield_kg_tree=(_pick(entry["yield_kg_tree"], years, province)
+        yield_kg_da=_pick(entry["yield_kg_da"], years, province, "kg/da"),
+        price_per_kg=_pick(entry["price_tl_kg"], years, province, "TL/kg"),
+        yield_kg_tree=(_pick(entry["yield_kg_tree"], years, province, "kg/ağaç")
                        if "yield_kg_tree" in entry else None),
     )
 
 
-def lookup(crop: str, province: str | None) -> CropNorm | None:
+def lookup(crop: str, province: str | None, country: int | None = None) -> CropNorm | None:
     """Norms for a crop, or None when the file does not carry it.
 
     A measure that resolves to nothing is None on the result rather than absent,
     so the caller prefills the fields it can and leaves the rest to the user.
+
+    `country` is a FAOSTAT area code, consulted only when `province` resolves
+    to nothing - a province is always TÜİK and always wins. See _resolve for
+    why Türkiye as a country still serves TÜİK, not FAOSTAT's own area 223.
     """
     data = _load()
     entry = data.get("crops", {}).get(crop)
     if entry is None:
         return None
     years = data["years"]
-    return _resolve(crop, entry, years, province)
+    return _resolve(crop, entry, years, province, country)
 
 
 def latest_year() -> int | None:

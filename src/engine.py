@@ -276,6 +276,31 @@ CROP_LEXICON = {
     "fındık": "hazelnut",
 }
 
+def _label_head(label: str) -> str:
+    """A crop label cut back to its family's name, as the table spells it.
+
+    "Buğday, Durum Buğdayı Hariç" -> "Buğday"; "Domates (Salçalık)" ->
+    "Domates"; "Fasulye" -> "Fasulye". The exclusion clause and the
+    parenthetical variant both narrow a label to one id INSIDE a family, and
+    every caller is asking which family a label belongs to.
+
+    ONE COPY OF THIS SPLIT, because there were SIX and one of them was written
+    one wave ago - three in this module, two in src/crop_compare.py, one in the
+    country guard that has since been deleted. They can diverge silently and in
+    the dangerous direction: change the split set in one place and a label stops
+    being recognised as its family's, which reads as "not this crop" and opens
+    whatever gate was asking. The module argues against exactly this twenty
+    lines from one of the copies, in `_code_aliases`' docstring ("a second copy
+    of the fold would be a second thing to keep in step").
+    """
+    return re.split(r"\s*[(,]", label)[0].strip()
+
+
+def _family_head(label: str) -> str:
+    """`_label_head` folded, which is the form every comparison wants."""
+    return _normalize_tr(_label_head(label))
+
+
 # Common Turkish inflectional suffixes, longest-first, so the matcher can see a
 # crop name through a case/plural/possessive ending ("asma" in "asmada") WITHOUT
 # firing on a different morpheme ("kahve" in "kahverengi" - "rengi" is not here,
@@ -688,6 +713,27 @@ def _context_block(route: str, message: str, history: list[dict] | None,
     Weather is best-effort by design (see src/context/weather.py) - its absence
     removes one line and never blocks the answer. The province is asked for in
     chat rather than guessed: a wrong province produces confidently wrong timing.
+
+    `fert_plan` DOES NOT CONSULT THE WORLD LAYER, and that is a decision rather
+    than an oversight - a foreign grower asking a fertiliser question is still
+    told his province is unknown and still asked for it. Written down here
+    because `crop_choice` right below does the opposite, so the asymmetry would
+    otherwise look like one branch having been forgotten.
+
+    The reason is that there is nothing to put in the ask's place. The world
+    layer carries two measures, yield and producer price (see
+    data/world_norms.json), and neither answers a fertiliser question: there is
+    no dose, no soil-analysis norm and no phenology in it. `weather.forecast` is
+    keyed on the 81 Turkish provinces and has no row for anywhere else, and
+    `_framing_suffix` ties a fert_plan answer with rows behind it to a reviewed
+    TURKISH programme. Suppressing the ask would therefore delete the one
+    sentence that keeps the answer general, and put nothing where it was - the
+    model would be left free to read Turkish doses as if they applied.
+
+    So the cost is named rather than removed: a grower outside Türkiye is asked
+    one question he cannot answer on this route, and the assistant's advice stays
+    general. That costs a turn. Printing a country's yield beside a fertiliser
+    dose would cost the dose's provenance.
     """
     # Deferred: src/context/location.py imports _normalize_tr from THIS module at
     # load time, so a top-level import here is a real cycle.
@@ -716,11 +762,1287 @@ def _context_block(route: str, message: str, history: list[dict] | None,
         if fc:
             lines.append(f"Hava durumu: {fc}.")
     else:
+        # THIS ROUTE ASKS FOR THE PROVINCE ONLY, and `_ASK_LOCATION`'s invitation
+        # to name a country deliberately does NOT reach it. `_country_lines` has
+        # exactly one caller - `_crop_choice_block` - so a `fert_plan` user who
+        # answered "Fransa'dayim" would be asked again on the next turn, having
+        # been told to say the thing this route cannot read. A question whose
+        # answer is discarded is worse than a narrower question.
+        #
+        # The world layer reaching `fert_plan` is a separate round: that route
+        # serves a fertilization and irrigation plan, and FAOSTAT publishes
+        # neither - it publishes yield and price, which is what `crop_choice`
+        # needs. See docs/client-requirements.md §8 on the season programme.
         lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
                      "oldugunu sor, tavsiyeni genel tut.")
     lines.append("Bitkinin fenolojik donemi bilinmiyorsa cevabinda sor "
                  "(fide, cicek, meyve tutumu gibi).")
     return "\n".join(lines)
+
+
+# FAOSTAT's flag letters, in Turkish. data/world_norms.json's meta.flags carries
+# the English glosses; these are their twins, and they live here because this is
+# the only surface that says them out loud.
+#
+# THERE IS NO ENTRY FOR None, and there must not be. A TÜİK figure carries no
+# flag at all, and a word for "no flag" would read as a provenance claim nobody
+# made. An UNKNOWN letter is printed as itself (see _flag_note) rather than
+# dropped: a flag FAOSTAT adds later must show up as an unexplained letter, not
+# vanish into silence.
+#
+# EVERY GLOSS SAYS ONLY WHAT ITS LETTER SAYS. Two of them used to say more:
+#
+#  * `B` was glossed "resmi deger, seride kopus var". FAOSTAT's own meta.flags
+#    reads "Time series break" and nothing else - the letter marks a
+#    discontinuity in the series, not who produced the cell, so calling the
+#    value official was a provenance claim the flag does not make. Harmless on
+#    the shipped file and only there: measured 2026-10-02 against
+#    data/world_norms.json, all 43 `B` cells are in the price table, none of
+#    them is the latest non-null year of its series, so `_pick_world` returns
+#    none of them today. A rebuild that lands one last would print the claim.
+#  * `I` was glossed "FAO'nun atadigi deger" for "Value imputed by a receiving
+#    agency" - which narrows "a receiving agency" to FAO and softens "imputed"
+#    to "assigned". Same file, 3 `I` cells, all in the price table and none
+#    latest, so this one is unreachable today too.
+_FAO_FLAGS = {
+    "A": "ulkenin resmi bildirimi",
+    "B": "seride kopus var, deger onceki yillarla karsilastirilamaz",
+    "E": "FAO tahmini, ulkenin kendi bildirimi degil",
+    "I": "veriyi alan kurulusun tamamladigi deger",
+    "X": "dis kurulustan alinmis deger",
+}
+
+
+def _flag_note(flag: str | None) -> str:
+    """The provenance clause for one FAOSTAT cell, or "" when there is none."""
+    if not flag:
+        return ""
+    return _FAO_FLAGS.get(flag, f"FAOSTAT isareti {flag}")
+
+
+def _world_amount(amount: float) -> str:
+    """One world figure, Turkish-formatted, without rounding it into a lie.
+
+    Yields run to five digits and prices sit below one dollar - measured on the
+    shipped file, the smallest latest price is 0,0088 USD/kg - so a single
+    decimal count cannot serve both: two decimals prints that price as "0,01"
+    and four prints a yield as "597,3500". Split at 1, which is the only place
+    the two ranges meet.
+
+    NO THOUSANDS SEPARATOR, and this is the part that matters for a figure a
+    language model reads. `format_tr` writes Turkish convention - thousands dot,
+    decimal comma - so `format_qty(4000.0)` is "4.000", which under English
+    convention reads as four, not four thousand. That is a 1000x error with
+    nothing in the string to disambiguate it, because a whole number has no
+    decimal comma following to mark the dot as a group separator. It is not a
+    corner either: measured 2026-10-02 over data/world_norms.json, 3.104 of the
+    8.453 latest yield cells are >= 1000 and 206 of those are whole numbers, the
+    exact "4.000" shape. Dropping the separator leaves "4000" and "47889,02",
+    which read the same under both conventions.
+    `.replace(".", "")` is safe rather than blunt: `format_tr` emits "." ONLY as
+    the group separator - the decimals go after a comma - so there is no other
+    dot in the string to eat.
+
+    FIXED HERE AND NOT IN src/budget.py: `format_tr` and `format_qty` write the
+    budget form and the comparison card, which are read by a person on a screen
+    where the Turkish convention is right and the surrounding text supplies the
+    convention. This is the only surface whose reader is the model.
+    """
+    from src.budget import format_qty, format_tr
+    text = format_qty(amount) if amount >= 1 else format_tr(amount, 4)
+    return text.replace(".", "")
+
+
+# The shapes in which a user says THEY ARE in a country, as opposed to merely
+# naming one. Lives here rather than in src/context/country.py because that
+# module resolves a country from five different shapes and returns only an area
+# code - nothing it exposes says WHICH shape answered, or where in the text it
+# matched - and that module is not this change's to alter.
+#
+# WHAT GOES WRONG WITHOUT THIS TEST, measured on e021bca:
+#
+#   "gecen yil Almanyaya bugday sattim, bu yil bugday mi eksem"
+#       -> Germany: "Kullanici Turkiye disinda", Germany's wheat figures, and
+#          the province question gone.
+#   "Hollanda'daki gibi sera kurmak istiyorum, domates ekeyim mi"  -> Netherlands
+#   "Amerika'da bugday fiyatlari nasil, ben bugday ekeyim mi"      -> USA
+#
+# All three are plausibly Turkish farmers, and the country each one names is a
+# buyer, a greenhouse they admire and a price reference. The recall that resolves
+# them belongs to src/context/country.py; what belongs HERE is that a resolved
+# country was allowed to REPLACE the province question.
+#
+# TWO PATTERNS, AND NEITHER OF THEM INFERS ANYTHING. This guard is the smallest
+# it has ever been, and that is the decision this wave carries out rather than an
+# accident of pruning. Over five waves it grew rules that worked out from Turkish
+# morphology WHERE THE SPEAKER IS: a window of N words after the locative, a
+# tense, a participle shape, a residence-verb whitelist, an owned-land branch, a
+# bare-name branch gated on the assistant's own question. FOUR REVIEWS WERE RUN
+# AND ALL FOUR FOUND A CRITICAL IN THIS GUARD, and every one was one defect:
+#
+#   THE MEASUREMENT THAT LICENSED A RULE DID NOT TEST THE DECISION IT MADE.
+#
+#   * the shape branch's "0 of 27 refusals"  - 1 of the 27 could reach it
+#   * its successor's "0 of 42"              - NONE reached the shipped gate
+#   * the land branch's "16 reach / 0 admitted" - the 16 reach the `<possessed>
+#     var` SHAPE. Its real decision was to read the WHOLE CLAUSE with no
+#     adjacency, and 0 of the 86 refusals put a whitelisted land noun behind an
+#     object locative, so nothing could fail: "Fransa'da uretilen tohumu ektigim
+#     bir tarlam var" and eleven like it were admitted, 12 of 12.
+#   * the verb whitelist's "20 of 86"        - 20 SIMPLE verbs and not one
+#     light-verb construction, so `-mAyA calis-` was free and "Almanya'da satmaya
+#     calisiyorum", the canonical Turkish exporter, was placed in Germany.
+#   * the volitional skip's "0 accepts and 0 refusals either way" - a SKIP can
+#     only ever ADMIT, and 0 of the 86 put an `ist`-prefixed word in a participle
+#     slot, so `istenen` and `istedigim` rode in free.
+#
+# None of those zeros was wrong arithmetic. Each counted the inputs that ENTER
+# the branch instead of the inputs that could BREAK the decision under test - and
+# from inside a rule that reads a sentence it cannot parse, that difference is
+# not visible. So the inference is gone, and what remains are the two patterns
+# whose decision is small enough for a refuse set to test:
+#
+#  * _SELF_TR - the LOCATIVE person suffix FUSED TO THE NAME, nothing in
+#    between: "Fransa'dayim", "Ganadayim". It reads no window, no verb, no
+#    clause, no conversation. Across five waves it produced ZERO Criticals, and
+#    it is the only branch here that produced none. Its `-lI` arm - the
+#    nationality - was dropped afterwards; see the comment on the pattern.
+#  * _SELF_EN - its English twin: an enumerated first-person subject, then
+#    `in`/`at`/`from`, then the name, adjacent.
+#
+# WHAT THIS COSTS: 39 OF THE 41 TURKISH ACCEPTS. They are counted, listed and
+# pinned as costs in `_SURRENDERED_ACCEPTS` (tests/test_engine.py).
+# "Fransa'da yasiyorum", "Fransa'da ciftciyim", "Fransa'da tarlam var",
+# "Fransa'da yasayan bir ciftciyim" and 35 more are real statements of location,
+# and every one of them now gets the location question back instead of figures.
+# That is the largest single loss on this branch and the direction is deliberate:
+#
+#   A REFUSAL COSTS ONE QUESTION. A WRONG ADMISSION IS SILENT, WRONG AND STICKY.
+#   `_country_lines` asks every user turn, so a sentence read wrongly once
+#   carries the rest of the conversation and prints "hangi ilde oldugunu SORMA"
+#   beside another country's average figures to a grower in Turkiye, with nothing
+#   to retract it. The question is recovered the moment the user writes
+#   "Fransa'dayim" - and `_ASK_LOCATION` now asks for exactly that spelling,
+#   which is why the question text changed in the same commit as the deletion.
+#
+# THE REFUSE SET IS 99 AND 0 OF IT IS ADMITTED. Deleting rules cannot admit
+# anything, so every one of the 86 refusals the five waves earned still refuses;
+# five of the thirteen new ones are the suffix's own near misses, listed below,
+# four are the `-lI` nationality dropped after this wave, and four are the name's
+# RIGHT boundary (see below again). Re-measured
+# PER BRANCH rather than as a pair, because deleting a rule moves which rule
+# refuses a sentence even when it admits nothing: each surviving pattern admits
+# 0 of the 99 on its own, so neither is carrying a class only the other held.
+#
+# REJECTED: keeping the bare-name branch - "Fransa" alone, counted as a location
+# because the assistant had just asked where the user is. The idea is right and
+# ITS EVIDENCE CANNOT EXIST. The assistant's question is generated, not a string
+# this repo owns, so the gate had to match place WORDS - and then it fires on any
+# turn that merely mentions a place. Measured: 10 of 10 realistic non-asking
+# turns opened it, and one of the ten is `crop_compare.ASK_FOR_CROPS`, a SHIPPED
+# literal returned verbatim as an assistant turn - it asks which two CROPS and
+# contains "ilinizde". With that turn in the history, "Fransa" typed as an answer
+# to the CROP question placed the user in France for the conversation. A gate
+# that a shipped string of our own defeats is not a gate, and no test could have
+# caught it from the gate's side: its refuse set held six negatives and not one
+# of them used a place word in a non-asking role. The recovery lives in
+# `_ASK_LOCATION` instead, which costs one extra turn and cannot misfire.
+#
+# REJECTED: accepting the place-noun form src/context/location.py accepts
+# ("Fransa kosullarinda"). For a province it is how growers state where they are;
+# for a country "Fransa kosullarinda bugday ekilir mi" is a Turkish grower asking
+# ABOUT France, which is the class of the three sentences above.
+#
+# REJECTED: adding the country lines and keeping a SOFTENED ask beside them. The
+# ask is for a Turkish province, and no softening of that question is not still
+# wrong to put to a grower in France.
+#
+# NOT GATED ON WHETHER THE ALIAS IS SPELLED IN TURKISH, which country.py does
+# gate its own suffix branch on. This test can only NARROW a code that module has
+# already returned, so a Turkish suffix admitted on an English spelling cannot
+# introduce a country that was not resolved.
+#
+# THE REACH COUNT THAT BELONGS BESIDE THIS BRANCH'S ZERO, and it counts the
+# inputs that could break THIS decision rather than the inputs that reach the
+# branch. The decision is "the person suffix sits on the NAME, with nothing in
+# between". What could break it is a `-yIm`-shaped word somewhere ELSE in the
+# sentence, because a rule that read the clause instead of the name would admit
+# those. Measured over the 99 refusals: 44 carry one - `dayim`, `tayim`,
+# `koyum`, `sayim`, `payim`, `soyum`, `yayim`, `ekeyim`, `kurayim`, `ekmeliyim`,
+# `ciftciyim`, `ureticiyim`, `sucluyum`, `tohumcuyum` - and _SELF_TR admits 0 of
+# the 99. That is the measurement the five deleted rules never had: the 44 are
+# exactly the inputs a looser reading of this one decision would get wrong.
+# FOURTEEN FORMS, AND THE LIST USED TO NAME THIRTEEN: restricted to the thirteen
+# it printed the count is 41, not 44, and the form it left out is `yayim`
+# ("Hollanda'da cikan bir yayim var"). The number was derived by a test and the
+# enumeration was prose, so only the prose went stale - and the enumeration is
+# the half a reader uses.
+#
+# AND THE NAME HAS A RIGHT BOUNDARY TOO, which is the third way this one decision
+# can fail and the refuse set could not reach it until now. `(?<!\w)<alias>`
+# anchors the LEFT side; nothing anchors the right side of the NAME, so a token
+# that merely STARTS with an alias and runs on into the locative letters would be
+# read as that country. Measured: 4 of the 99 refusals are of that shape, 0 of
+# them admitted, and before they were written down the count was 0 - so this
+# branch's zero said nothing about its right boundary. The four, and each is a
+# sentence a grower could type:
+#   Cine'deyim          `cin` + `e'deyim`  - a district of Aydin, not China
+#   Nijerya'dayim       `nijer` + `ya'dayim` - Nigeria, handed Niger's aliases
+#   Maliyedeyim         `mali` + `yedeyim` - the Treasury, not Mali
+#   Cadirdayim          `cad` + `irdayim`  - a tent, not Chad
+# The project's own Turkish corpus was swept for the leak as well
+# (data/vector_store/chroma.sqlite3, 81 426 documents, all 418 folded aliases):
+# 0 documents match this pattern at all, and of the tokens that end in the
+# locative-plus-person letters not one has a country alias as its prefix. So the
+# decision was already sound; what was missing was the evidence.
+#
+# REJECTED HERE, RECORDED AS A LEAD: the `-n` buffer, `'?n?[dt][ae]y[iu][mz]`.
+# A Turkish compound name carrying a 3sg possessive takes it, so 18 countries
+# cannot be placed in their full official name - "Rusya Federasyonu'ndayim",
+# "Cin Halk Cumhuriyeti'ndeyim", "Amerika Birlesik Devletleri'ndeyim" and 15
+# more, every one of which `extract_country` resolves and this guard refuses.
+# Sized: 198 of 198 named countries ARE placeable through some short alias in
+# `_ASK_LOCATION`'s own shape ("Rusya'dayim", "ABD'deyim"), so the hole bites
+# only the user who types the full compound, and he has a short form available.
+# The widening leaks 0 of the 99 - AND THAT ZERO IS THE VACUOUS KIND THIS GUARD
+# HAS BEEN BURNED BY FIVE TIMES: 0 of the 99 refusals put an `n` between the
+# name and the locative at all, so not one of them could have broken the
+# decision the widening would make. A widening cannot be licensed by this refuse
+# set, so it waits for refusals built against it rather than riding in on a zero.
+#
+# AND THE SUFFIX'S OWN NEAR MISSES, the other way one decision can fail - the
+# letters `[dt][ae]` followed by something that is not `-yIm`. All five refused,
+# and pinned in `test_the_fused_suffix_is_the_whole_decision`:
+#   Fransa'daydim   PAST, "I was in France"     `y` then `d`, not a vowel
+#   Fransa'dayken   "while I was in France"     `y` then `k`
+#   Fransa'dalar    THIRD person plural         no `y` at all
+#   Fransa'daki     the relativiser             no `y` at all
+#   Fransa'dan      ablative                    not a locative
+#
+# `-lI` IS A NATIONALITY AND IS NOW REFUSED. "Hollandaliyim" is "I am Dutch",
+# not "I am in the Netherlands" - it states where the speaker is FROM, and a
+# Dutch grower farming in Antalya says it truthfully while standing in Turkiye.
+# It was admitted for four waves and declared in every revision of this comment
+# as "weaker evidence of presence", which is the shape of a thing nobody had
+# decided. It is decided now, on this wave's own rule: a nationality is an
+# INFERENCE about location, and inference is what came out.
+#
+# IT IS THE SAME TRADE AS THE BARE NAME, and taken for the same reason: the
+# speaker writes "Fransaliyim", gets `_ASK_LOCATION` back, writes "Fransa'dayim"
+# and is placed. One turn, against a class of silent wrong placements for every
+# foreign national living in Turkiye who has not named a province.
+#
+# WHAT STAYS IS THE LOCATIVE ALONE - `-da/-de/-ta/-te` fused to the name and
+# carrying the person. One decision, one shape, and the reach count above is
+# measured against it.
+_SELF_TR = r"'?[dt][ae]y[iu][mz](?!\w)"
+
+# The English twin, and it is NARROWER than country.py's `(?:in|at)\s+`: a bare
+# preposition says where something is, not where the USER is. "I buy seed from
+# India" and "the protein in Turkey feed" are the shapes that rule exists for,
+# and country.py's own _EN_ORIGIN comment records measuring them. Only an
+# enumerated first-person subject counts here, and the preposition after it must
+# be `in` or `at`.
+#
+# `from` USED TO BE ADMITTED BESIDE THEM AND IS NOW REFUSED, on the same rule
+# that dropped `-lI` from _SELF_TR: `from` STATES AN ORIGIN, AND AN ORIGIN IS NOT
+# A LOCATION. "I am from Kenya" is this branch's own old justification and it is
+# the English translation of "Hollandaliyim" - a grower says it truthfully while
+# standing somewhere else, so placing him on it is an INFERENCE, which is the
+# thing this guard stopped making. The sentence that settled it:
+#
+#   "I am from the Netherlands, my farm is in Antalya"
+#
+# was admitted, resolved 150, and printed "Kullanici Turkiye disinda: Netherlands
+# (Kingdom of the) ... hangi ilde oldugunu SORMA" to a grower who had written
+# where his field is IN THE SAME SENTENCE - and `_country_lines` asks every user
+# turn, so it stuck for the whole conversation. The arm survived the `-lI`
+# decision by one commit because the zero that licensed it was taken over inputs
+# that could not break it: 0 of the 25 refusals put a whitelisted subject
+# immediately before `from`, and the two that carried the word `from` at all were
+# refused by the SUBJECT decision instead. That is the fifth instance of the
+# family named above _SELF_TR, and the refuse set now has a class for it.
+#
+# Dropping it cost nothing measurable: 0 of the 14 accepts pinned AT THE TIME
+# used `from` (the set is 16 now and still 0, re-measured this wave),
+# and 0 of the 25 refusals were being held by it. `extract_country` still
+# RESOLVES "I am from Kenya" - resolving a name and placing a speaker are
+# different questions and only the second one is this guard's, which is the same
+# split the `-lI` decision drew.
+#
+# THE POSSESSED-NOUN SUBJECTS ARE GONE, and this is where the paragraph
+# recommending them used to stand. It said `my farm is in` / `my field is in` /
+# `our farm is in` "are the same whitelist logic one step along ... the
+# possessive is what does the work", in the present tense and affirmatively,
+# a hundred lines above its own refutation - for one commit, because the commit
+# that deleted them was a single hunk at the bottom of this comment. What
+# replaced them, why, and what it cost are below.
+#
+# ITS REFUSE SET IS 58 NOW, AND IT HAD NONE AT ALL FIVE WAVES AGO. It is one of
+# the two surviving branches, so it is measured the way the Turkish side is,
+# with the reach counts beside the zero rather than the entry counts. THERE ARE
+# FOUR DECISIONS HERE AND NOT THREE - the subject, the adjacency, WHICH
+# PREPOSITION COUNTS AS PRESENCE, and WHOSE `i` IT IS - and the fourth had no
+# count beside it at all until the seventh review. Each is counted against the
+# NAME, because a count taken over the sentence instead inflates on a second
+# clause that says nothing about the decision:
+#
+#   refusals                                                         58
+#   admitted by the branch                                            0
+#   naming a country extract_country resolves (the rest test nothing) 54
+#   ANY SUBJECT, THEN `in`/`at`, THEN THE NAME -                      35
+#     the only inputs that can break the PERSON decision. Partitioned
+#     below, because a total can be right while its cells lie.
+#   A FIRST-PERSON SUBJECT IN THE SENTENCE AND A BARE `in`/`at` IN
+#   FRONT OF THE NAME -                                               23
+#     the only inputs that can break the ADJACENCY decision: a verb and
+#     an object stand between the subject and the preposition, as in "I
+#     sell wheat in Germany" or "I studied in France". 5 of the 23 are
+#     that shape; the other 18 are the two classes below, which this
+#     wording also reaches and says nothing about.
+#   A WHITELISTED SUBJECT, THEN `from`, THEN THE NAME -               10
+#     the only inputs that can break the PREPOSITION decision, and this
+#     count was 0 until `from` was dropped: "I am from Kenya", "we are
+#     from France", "I am from the Netherlands, my farm is in Antalya"
+#     and seven more.
+#   THE PATTERN MATCHES AND A MOOD WORD OR AN ATTRIBUTING VERB TOUCHES
+#   THE SUBJECT -                                                     18
+#     the only inputs that can break the MOOD and ATTRIBUTION
+#     decisions, i.e. what a rule without `_EN_NOT_THE_SPEAKER` would
+#     admit. Over the 42 that shipped `(?<!if\s)` this count was 2, and
+#     both carried the literal `if` the code happened to read - which is
+#     how four other spellings of the mood and a whole attribution class
+#     were admitted under a comment claiming the line was the mood.
+#
+# THE PERSON COUNT WENT 13 -> 19 -> 35 AND THE PARTITION IS THE MEASUREMENT.
+# A reach count can be neither stale nor vacuous and still lie by being
+# partitioned wrongly, which the sixth review found and the seventh found again
+# one level down. The 35 splits by the sub-decision each refusal can break, and
+# it splits exactly:
+#
+#   13  (a) a THIRD PARTY in the subject slot - "he is in France", "the
+#           farm is in France", "the company is based in France"
+#    5  (b) a first-person possessive inside a LARGER subject - "the
+#           supplier of my farm is in France"; the sixth review's Critical
+#    8  (c) an ATTRIBUTED `i`, which is somebody ELSE's - "he said 'i am
+#           in France'"; the seventh review's Important 1
+#    9  (d) a SUPPOSED mood - "assuming i am in France"; the seventh
+#           review's Critical. 9 and not 10 because "if i'm in France the
+#           prices are different" has no space before the `'m`, so the
+#           loose person frame does not model it.
+#
+# Cells (c) and (d) were the EMPTY ones at `4a1af74`: (c) held nothing at all
+# and (d) held the single `if` sentence the code read, and both had measured
+# live admissions placing a grower abroad and suppressing the province question
+# for the rest of the conversation. An empty cell under a correct total is the
+# shape this guard has now been reviewed for seven times.
+#
+# THE ADJACENCY COUNT READ 8, THEN 5, AND READS 23 NOW, and the reader is owed
+# the partition rather than the total: 5 (a) + 0 (b) + 8 (c) + 10 (d). The 5
+# measure adjacency; the 18 would be admitted by a rule that relaxed adjacency
+# alone, so they belong in the count by its own definition while testing
+# nothing about adjacency. That overlap is the argument FOR the fourth count,
+# not against the third. The old wording - "a first-person word anywhere in the
+# sentence AND a preposition anywhere in the sentence" - returns 27 over the 58
+# and 5 over the old 25, and "I buy seed from France" satisfies it while being
+# refused by the SUBJECT decision; the same for the person count, whose loose
+# wording returns 39 over the 58 against 13 over the old 25. (43, not 39, if the
+# loose wording is taken with the preposition set the old rule actually had:
+# before `c218ae0` this branch admitted `from`. Two reviews printed that number
+# measured with the NEW set, which is neither the old rule nor anything shipped.
+# The point it serves is stronger at 43.)
+#
+# TEMPORARY PRESENCE IS ADMITTED, AND THAT IS A DECISION, not a gap. "I am in
+# France for the fair", "I am in France this week", "we are in France visiting a
+# supplier" all resolve France, and the fifth class a review found missing from
+# this set is missing because it belongs on the OTHER side. Two reasons, and the
+# first is the stronger: the Turkish twin "Fransa'dayim, fuara geldim" is
+# admitted by _SELF_TR and cannot be refused without reading the rest of the
+# sentence, which is the inference this wave deleted - so refusing the English
+# one would make the two surviving branches disagree about the same speaker. And
+# a grower who IS in France this week is in France: FAOSTAT's French figures are
+# the right context for the question he is asking from there. What is wrong
+# about it is only that `_country_lines` makes it stick for the whole
+# conversation, which is that function's own recorded open item and not this
+# pattern's to fix. Pinned as accepts in `_ENGLISH_ACCEPTS`, not as a gap.
+#
+# AND SO ARE THE FUTURE AND THE FIRST WORD OF A LONGER FOREIGN PLACE NAME -
+# THREE DECLARED ACCEPTS, DOWN FROM FOUR. They are declared on the same rule as
+# temporary presence and for one measured reason: REFUSING THEM NEEDS THE TAIL
+# OF THE SENTENCE, and reading the tail is what this branch's history rejected
+# with a table.
+#
+#   I am in India tomorrow                                100
+#   I am in Lebanon, Ohio                                 121
+#   we are in Peru, Indiana                               170
+#
+# `tomorrow` and `, Ohio` ARE the tail, and every candidate tail word was
+# measured damaging - `and`, the comma and the full stop included - because "my
+# field is in Egypt for..." and "the protein in turkey for..." have the same
+# tail. Bringing the tail back brings back the inference the wave before this
+# one deleted. `I am in Lebanon, Ohio` is one level down from the `Georgia`
+# decision in `country._NOT_THIS_PLACE`: FAOSTAT has no US-state area, and US
+# towns named after countries are the same hazard with a comma instead of a word
+# boundary. These two were written with `my farm is` until the sixth review,
+# which made them refusals of the SUBJECT rule and stopped them measuring the
+# tail decision they exist for.
+#
+# THE CONDITIONAL USED TO BE THE FOURTH AND IS A REFUSAL NOW, and the argument
+# that kept it was written here: "the damage is also small ... a grower asking
+# 'If I am in France next year, should I plant wheat' IS THINKING ABOUT FRANCE,
+# and FAOSTAT's French figures are the right context". It lost on the second
+# half. He is thinking about France and he is not IN it, so the block prints
+# "Kullanici Turkiye disinda: France ... hangi ilde oldugunu SORMA" - it tells a
+# grower in Turkiye not to say which province he is in - and `_country_lines`
+# asks every user turn, so it sticks for the conversation. That is the same harm
+# the `from` arm was deleted for, and it was sitting under a paragraph calling
+# it small.
+#
+# THE SUBJECT MUST BE A FIRST-PERSON PRONOUN. The possessed-noun subjects -
+# `my farm is`, `our farm is`, `my field is`, `my fields are` - were dropped
+# after the sixth review, and they were dropped as a CLASS rather than patched:
+#
+#   `(?<!\w)` IS A WORD BOUNDARY, NOT A CLAUSE BOUNDARY, so a possessed-noun
+#   subject can sit at the tail of a larger phrase whose real subject is
+#   somebody else. Measured at the sixth review:
+#
+#     refuse  my supplier is in France              <- pinned refusal
+#     ADMIT   the supplier of my farm is in France  <- same meaning, one genitive away
+#     refuse  the farm is in France                 <- pinned refusal
+#     ADMIT   the owner of my farm is in France
+#     ADMIT   the man who rents my farm is in France
+#
+#   "The company that owns my farm is in the Netherlands, my field is in
+#   Antalya" placed the user in the Netherlands and printed "hangi ilde
+#   oldugunu SORMA" - the exact harm the previous commit deleted `from` to
+#   stop, reached through a different door, and sticky for the conversation
+#   because `_country_lines` asks every user turn.
+#
+# A PRONOUN SUBJECT CANNOT BE THE TAIL OF ANOTHER SUBJECT: `my farm` can be
+# possessed by a larger phrase, `i` cannot be possessed by anything. THAT CLAIM
+# IS ABOUT POSSESSION AND IT IS TRUE; THE CONCLUSION DRAWN FROM IT - "so the
+# whitelisted subject is the writer" - IS FALSE, and the seventh review measured
+# it. A pronoun cannot be possessed but it can be ATTRIBUTED, and attribution
+# puts somebody else's `i` in the subject slot without possessing anything:
+#
+#     ADMIT   he says i am in France
+#     ADMIT   he said "i am in France" in his email
+#     ADMIT   my supplier wrote: i am in France, send the order
+#     ADMIT   the form says i live in France
+#     ADMIT   translate "i am in France" into Turkish
+#     ADMIT   he said "i am in the Netherlands", my field is in Antalya
+#
+# The last is the sixth review's own Critical sentence with an attribution in
+# place of the genitive, and it reached the prompt end to end. 0 of the 42
+# refusals carried an attributing verb at all, so nothing in the suite could
+# break this sub-decision - which is why the claim could carry the whole class
+# cut for a commit. `_ATTRIBUTED_SUBJECT_REFUSALS` is that cell now, and the
+# comment says which half of the claim was measured: possession was, speakerhood
+# was argued.
+#
+# WHAT THE PRONOUN RULE COSTS, counted: 2 of the English accepts - "my farm is
+# in France" and "my field is in France" - both pinned as costs. They say where
+# the speaker's land is, which is exactly what this guard wants to know. The
+# reason written here used to be that "nothing distinguishes them from the five
+# admissions above without parsing the clause", AND THAT IS MEASURABLY FALSE by
+# the same argument that overturned the `if` claim one paragraph down. A
+# CONSUMED clause-start alternative is not a lookbehind, so its width is free:
+#
+#   (?:^|(?<=[.,;!?]\s))(?:my\s+farm\s+is|our\s+farm\s+is
+#                         |my\s+field\s+is|my\s+fields\s+are)\s+(?:in|at)\s+
+#
+# Measured beside the left veto: both costs recovered, 0 of the 58 refusals
+# leaked, 0 of the 5 `_POSSESSED_SUBJECT_LEAKS` admitted, and the fresh
+# attribution leak the seventh review warned this anchor would open - "Ahmet
+# said, my farm is in France", "he wrote: my farm is in France" - is refused,
+# because `_EN_NOT_THE_SPEAKER` reads that token too. SO THE REASON THEY ARE
+# STILL REFUSED IS THE ORDER OF THE WAVES AND NOT THE PARSE: this wave narrowed
+# the English arm twice, and narrowing and widening in the same wave is the
+# mistake this branch made three times. Measured, written down, next round. In
+# the meantime the speaker writes "I am in France" and is placed.
+#
+# `if` WAS REFUSED BY THE WORD AND IS REFUSED BY THE MOOD NOW. The sixth review
+# overturned the claim that refusing the conditional "means reading the tail" -
+# correctly, `if` stands immediately to the LEFT of the subject - and shipped
+# `(?<!if\s)`, under a comment saying the line was "the mood rather than the
+# length of the word". IT WAS THE WORD, and the seventh review measured the
+# difference: `suppose`, `supposing`, `assuming`, `in case`, `unless` and
+# `whether` were all admitted, placed the speaker abroad, suppressed the
+# province question and stuck for the conversation; and `if  i am in France`
+# with two spaces was admitted too, because a lookbehind in `re` must be
+# FIXED-WIDTH and `_normalize_tr` does not collapse runs of space. One spelling
+# at one width is what a lookbehind can say.
+#
+# SO THE DECISION MOVED OUT OF THE PATTERN AND INTO ONE TOKEN. `_GUARDS` carries
+# a left veto per guard and `_guard_hits` applies it to the text to the LEFT of
+# the match, anchored with `$`: a mood word or an attributing verb TOUCHING the
+# subject, through any run of space and through the comma, colon or quote a
+# writer puts between. That is not reading the sentence - it is the same fixed
+# window the lookbehind read, with the width free, which is the half a
+# lookbehind could not express. Measured: 0 of the 16 accepts lost, 0 of the 58
+# refusals leaked, and `(?<!if\s)`'s own two false blocks - "the tarif i am in
+# France", "a motif i am in France", the only shapes that could collide - are
+# admitted again, which is a side effect and not the reason.
+#
+# AND THE COST SIDE OF THAT VETO HAD ONE INPUT BEFORE THIS WAVE. Every one of
+# the twelve accepts began at the start of the message, so there was nothing to
+# the left of the subject to veto and any left rule at all would have measured
+# free - except `When I am in France I plant wheat`, which is 1 of 12.
+# `_LEFT_CONTEXT_ACCEPTS` puts a token there on purpose, so the count is 5 of 16
+# now: `actually i am in France`, `the buyer said nothing, i am in France` (an
+# attributing verb in the sentence but not touching the subject) and `when the
+# fair opens, i am in France` (a whole clause between the mood slot and the
+# subject), beside `when` and `whenever`.
+#
+# `when I am in France` AND `whenever I am in France` STAY ADMITTED, and that is
+# a decision: the mood words suppose a country the speaker is not in, while the
+# temporals say he does go there. Both are pinned as declared accepts, because
+# they are the only two inputs that can break the mood decision in the admitting
+# direction.
+#
+# WHAT THE VETO DOES NOT CLOSE, written down rather than implied. The token must
+# TOUCH the subject, so an attribution at a distance - "he told me that, in his
+# email, i am in France" - is not read; reading further is reading the clause.
+# And THE TURKISH ARM HAS NO LEFT VETO AT ALL, which is not an omission: Turkish
+# is verb-final, so "Fransa'dayim dedi" puts the attributing verb to the RIGHT
+# of the match where a left veto cannot see it. The mood asymmetry is the other
+# way round and is now CLOSED rather than declared - "Fransa'daysam ne ekerim"
+# and "Fransa'da olsaydim bugday ekerdim" are refused for free by morphology,
+# and English refuses its twins now, so the two branches agree about a speaker
+# who supposes a country. They differ about one who is QUOTED, and only the
+# English one gets that.
+_EN_SUBJECT = (r"(?<!\w)(?:i\s+am|i'm|we\s+are|we're|i\s+live"
+               r"|we\s+live|i\s+farm|we\s+farm)(?:\s+based)?\s+")
+
+# WHICH PREPOSITIONS MEAN PRESENCE, in one place because three reach counts and
+# `_SELF_EN` all have to mean the same thing by it. Two of those counts used to
+# spell `(?:in|at)` inline in the test, so widening this would have left them
+# measuring the old rule, green - the sixth review's finding, and the one-line
+# fix it asked for. `from` is deliberately absent; see above.
+_EN_PREP = r"(?:in|at)"
+
+# Split from the preposition so the reach counts above can be taken against the
+# REAL subject list rather than a copy of it: the preposition decision's count is
+# measured by composing this with `from`, and a second copy of the subject list
+# in the test would drift from this one silently.
+_SELF_EN = _EN_SUBJECT + _EN_PREP + r"\s+"
+
+# THE TOKEN IMMEDIATELY LEFT OF THE SUBJECT, and what it can take back. This is
+# not a reading of the sentence: it is the one token touching the match, read
+# with the width free, which is the only thing a fixed-width lookbehind could
+# not do. See the two paragraphs above `_EN_SUBJECT` for the two decisions it
+# makes and what each one measured.
+_SUPPOSED_MOOD = r"if|unless|suppose|supposing|assuming|whether|in\s+case"
+_ATTRIBUTING_VERB = (r"say|says|said|saying|write|writes|wrote|written"
+                     r"|tell|tells|told|claim|claims|claimed"
+                     r"|reply|replies|replied|state|states|stated"
+                     r"|add|adds|added|mention|mentions|mentioned|translate")
+# The separator is everything that can stand between that token and the subject:
+# any run of space, the comma a writer puts after `if`, the colon before a quoted
+# line, and both the ASCII and the phone's curly quotes. It is a RUN and not one
+# character, which is the half of this that a lookbehind cannot express at all.
+_EN_NOT_THE_SPEAKER = (rf"(?<!\w)(?:{_SUPPOSED_MOOD}|{_ATTRIBUTING_VERB})"
+                       r"[\s,:;\"'‘’“”(]*$")
+
+# THE LOCATION QUESTION, in one place because it is asked from two routes and
+# must read the same in both. It used to be written out twice, as
+# "Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu sor" plus a route
+# suffix on one of them.
+#
+# IT NOW ASKS FOR THE COUNTRY TOO, AND IT ASKS FOR IT IN ONE SPELLING. That is
+# the recovery for the bare-name branch this wave deleted: a user outside Turkiye
+# cannot answer "which province", and a bare "Fransa" is no longer read as an
+# answer, so the question itself has to steer the reply into the one shape the
+# guard above still accepts. "Fransa'dayim" is _SELF_TR's own pattern, which is
+# why the example is written out rather than described - the model copies an
+# example and paraphrases an instruction.
+#
+# WHAT IT COSTS, counted: ONE EXTRA TURN for a foreign grower who answers the
+# location question with a bare country name. He writes "Fransa", gets the
+# question again, writes "Fransa'dayim", and is placed. Against that: the gate
+# that used to read the bare "Fransa" also read it after
+# `crop_compare.ASK_FOR_CROPS`, so the turn it saved was bought with a class of
+# wrong placements nothing in the suite could see.
+#
+# "yurt disindaysa" RATHER THAN "Turkiye disindaysa", deliberately: the string
+# "Turkiye disinda" is what the answer block prints when a country IS settled,
+# and four tests assert it is absent from a block that asks this question. Two
+# meanings for one substring would make those tests pass for the wrong reason.
+#
+# USED BY `crop_choice` ONLY. `fert_plan` asks for the province in its own words
+# and does not invite a country, because `_country_lines` has one caller and it
+# is not that route - see the comment at that call site.
+#
+# SO THE INVITATION IS RE-ASKED ACROSS ROUTES, AND THIS WAVE CREATED THAT. The
+# same-route loop is closed: a `fert_plan` user is never told to write
+# "Fransa'dayim", and that route's string is byte-identical to main's. But
+# ROUTING IS PER MESSAGE. A grower invited to name his country on a `crop_choice`
+# turn, who answers "Fransa'dayim" and then asks when to fertilise, is routed to
+# `fert_plan` and asked for a TURKISH PROVINCE - the question he cannot answer,
+# one turn after answering the one we asked him to. Measured in one conversation
+# and pinned in `test_answering_the_country_invitation_is_re_asked_on_fert_plan`;
+# before this wave the invitation did not exist, so the contradiction is new even
+# though the `fert_plan` ask is not.
+#
+# IT IS NOT FIXED BY WIDENING `_country_lines` TO `fert_plan`, because that is a
+# separate round rather than a line of code: `fert_plan` serves a fertilisation
+# and irrigation plan and FAOSTAT publishes neither, so there is nothing for the
+# world layer to say on that route - only a province question to stop asking,
+# with nothing to put in its place. See the call site in `_context_block`.
+#
+# AND THE RECOVERY THIS QUESTION CARRIES IS MEASURED IN ONE LINK OF THREE. The
+# whole compensation for the 39 surrendered accepts is this instruction, and the
+# chain is: (1) the model must relay the example rather than paraphrase it,
+# (2) the user must comply, (3) the spelling must generalise to his own country.
+# Only (3) is measurable in this repo and it measures 198 of 198 countries
+# placeable in this shape, robust to wrong vowel harmony and to the phone's
+# U+2019. (1) AND (2) ARE UNMEASURED - they are prompt behaviour and belong in
+# the eval harness - so the sentence below is where 39 accepts went, and nothing
+# here tests that they come back.
+_ASK_LOCATION = ("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu "
+                 "sor; yurt disindaysa ulkesini Fransa'dayim gibi yazmasini "
+                 "iste, tavsiyeni genel tut.")
+
+# The two patterns and WHICH SIDE OF THE NAME each one sits on. `_SELF_TR` is a
+# suffix, `_SELF_EN` a prefix, so the word boundary goes on the name's free side
+# in each case - and that composition is what `_states_location` actually
+# searches for, which is why it has one reader (`_guard_regex`) rather than being
+# spelled out at every place that needs it. The per-pattern test used to
+# re-compose both itself: a change to the COMPOSITION - adding a boundary on the
+# English side, say - would have left that test green while it measured a regex
+# nobody ships, which is this guard's own standing defect in miniature.
+#
+# AND EACH ONE CARRIES ITS OWN LEFT VETO, which is where the mood and the
+# attribution decisions live. They cannot live in the pattern: Python's `re`
+# wants a FIXED width behind a lookbehind, and the two things that have to be
+# read - a mood word of two to nine letters, and a run of whitespace or
+# punctuation after it - are both variable. So the fourth field is a regex
+# matched against the text to the LEFT of the match, anchored with `$` so it
+# reads only what touches the match. `None` for the Turkish side, and that is a
+# decision rather than an omission: the Turkish arm is a SUFFIX, so the token
+# that would carry attribution ("Fransa'dayim dedi") stands to the RIGHT of the
+# match and this field cannot see it. Written down in `_SELF_TR`'s own terms,
+# and not repaired here - see the asymmetry paragraph above `_EN_SUBJECT`.
+_GUARDS: tuple[tuple[str, str, str, str | None], ...] = (
+    ("_SELF_TR", "suffix", _SELF_TR, None),
+    ("_SELF_EN", "prefix", _SELF_EN, _EN_NOT_THE_SPEAKER),
+)
+
+
+def _guard_regex(side: str, pattern: str, key: str) -> str:
+    """The regex one guard pattern searches for around the escaped name `key`.
+
+    `side` is "suffix" when the pattern follows the name and "prefix" when it
+    precedes it; the boundary assertion goes on whichever side of the NAME the
+    pattern does not already cover. Read `_GUARDS` for both, and do not pass a
+    pattern that is not in it - the boundaries here are the only thing stopping
+    an alias from matching inside a longer word, and they are decided per side.
+    """
+    if side == "suffix":
+        return rf"(?<!\w){key}{pattern}"
+    return rf"{pattern}{key}(?!\w)"
+
+
+def _guard_hits(guard: tuple[str, str, str, str | None], key: str,
+                folded: str) -> bool:
+    """Whether one `_GUARDS` entry fires on `folded` around the escaped `key`.
+
+    THE WHOLE DECISION ONE GUARD MAKES, in one reader, because it is no longer
+    just a regex: the pattern says what shape places a speaker, and the entry's
+    fourth field says what token standing immediately to the LEFT of that shape
+    takes it back. `_states_location` and the per-pattern test both call this,
+    so neither can be green over a rule nobody ships - which is the standing
+    defect this guard has been reviewed for seven times, and it has already been
+    this test's own defect once.
+
+    EVERY MATCH IS TRIED, not the first: a vetoed match refuses that match and
+    not the sentence. "he said i am in Germany, but i am in France" is placed in
+    France and not in Germany, because the veto reads the left of the match it
+    is deciding rather than the left of the sentence.
+    """
+    _label, side, pattern, veto = guard
+    for match in re.finditer(_guard_regex(side, pattern, key), folded):
+        if veto is not None and re.search(veto, folded[:match.start()]):
+            continue
+        return True
+    return False
+
+
+def _code_aliases(code: int) -> tuple[str, ...]:
+    """Every folded name the FAO area `code` answers to.
+
+    Read out of src/context/country.py's own folded table rather than rebuilt
+    from data/country_aliases.json: the two guards below and that module must
+    agree on what counts as a name for this country, and a second copy of the
+    fold would be a second thing to keep in step.
+
+    An EMPTY TABLE yields no aliases, which is how that module degrades when its
+    data file is broken - and then both guards below refuse, the country lines
+    are dropped and the province question stands. That is the same direction
+    country._load chose for itself.
+    """
+    from src.context import country as country_ctx
+    return tuple(name for name, (area, _turkish) in country_ctx._FOLDED.items()
+                 if area == code)
+
+
+def _states_location(text: str, aliases: tuple[str, ...]) -> bool:
+    """Whether `text` says the SPEAKER is in the country `aliases` names.
+
+    TWO PATTERNS AND NO INFERENCE: the Turkish person suffix fused to the name
+    itself, and the English self-declaration. Anything else is refused and the
+    assistant asks where the user is. See _SELF_TR for the five waves of rules
+    that tried to work this out from the rest of the sentence, the four
+    Criticals they produced, and what deleting them cost.
+
+    PLUS ONE TOKEN TO THE LEFT, and that is not a reading of the sentence: a
+    mood word or an attributing verb TOUCHING the match says the `i` is supposed
+    or is somebody else's, and `_guard_hits` takes the match back. One token,
+    with its width free, which is the whole difference from the fixed-width
+    lookbehind this replaced. See the two paragraphs above `_EN_SUBJECT`.
+
+    One text, not a conversation. The `asked` parameter this used to take - and
+    with it the bare-name branch it served - is gone: there was no evidence for
+    it that could exist, because the question it depended on is written by the
+    model and not by this repo. See _SELF_TR.
+    """
+    folded = _normalize_tr(text or "")
+    if not folded:
+        return False
+    for name in aliases:
+        key = re.escape(name)
+        for guard in _GUARDS:
+            if _guard_hits(guard, key, folded):
+                return True
+    return False
+
+
+def _fao_item(crop_id: str) -> object:
+    """The FAOSTAT item `crop_id` reads, or None when the map holds none for it.
+
+    ONE READER OF data/crop_fao_map.json'S SHAPE, for the two tests below. Both
+    of them used to write this walk out, identically, so the file's shape was
+    recorded in two places and a change to it needed finding in both.
+
+    A broken entry reads as no mapping rather than raising: `norms._resolve_world`
+    takes the same table and produces no figure without an item, so the callers'
+    answer to "no item" is already the right answer to "unusable item".
+    """
+    from src import norms
+    mapping = norms._load_fao_map().get(crop_id)
+    return mapping.get("fao") if isinstance(mapping, dict) else None
+
+
+def _one_fao_item(crop_ids: list[str]) -> bool:
+    """Whether every one of these crop ids that maps to FAOSTAT at all maps to
+    the SAME item - i.e. whether they all read one cell.
+
+    Asked of a crop FAMILY, to decide whether the family's name describes the
+    figure or only half of it. See the call site for the five families that fail
+    this and what printing the family name cost them.
+
+    An id with no FAO mapping is not counted: `Buğday (Hasıl/Yeşilot)` is green
+    fodder and maps to nothing, so it cannot disagree with item 15 about what a
+    wheat cell holds.
+
+    A BROKEN OR EMPTY MAP RETURNS True, and that is unreachable rather than a
+    chosen default: `norms._resolve_world` reads the same table and produces no
+    figure at all without an item, so the caller has already returned [] before
+    this can be asked.
+    """
+    items = {item for crop_id in crop_ids
+             if (item := _fao_item(crop_id)) is not None}
+    return len(items) <= 1
+
+
+def _shared_item_label(crop_ids: list[str], answering: str) -> str | None:
+    """FAOSTAT's own name for the item `answering` reads, but ONLY when more than
+    one of `crop_ids` reads that same item. None otherwise.
+
+    THE QUESTION _one_fao_item ASKS IS ABOUT THE FAMILY; this one is about the
+    CELL, and the two are not the same question. `_one_fao_item` says whether the
+    family's name describes the figure. It can say no - the family spans two
+    items - and the answering id's own label STILL be narrower than the cell,
+    because that one item is shared by several Turkish ids. `Biber` spans items
+    401 and 689, so the family name is too broad; and item 401 is shared by four
+    Turkish peppers, so `Biber (Dolmalık)` beside 401's figure is too narrow. The
+    third case is neither name, and this is the test for it.
+
+    Re-measured 2026-10-03 over the shipped tables - 187 families against every
+    FAOSTAT area, 8425 (family, country) rows that produce a figure - 321 rows
+    are in that third case, over three families: `Biber` (item 401, 131 rows,
+    four ids), `Fasulye` (176, 127, two) and `Bakla` (181, 63, two).
+
+    THE REVISION OF THIS NUMBER SAID 331, AND THAT WAS THE COUNT BEFORE THE
+    CANDIDATE PREFERENCE at the call site existed. Both changes shipped in the
+    same commit: once a candidate carrying BOTH measures is preferred over an
+    earlier one carrying only a yield, ten rows answer through a DIFFERENT id and
+    leave the third case. 331 is still reproducible by asking this question of
+    the old first-match candidate, which is not the one the caller passes.
+
+    `Bakla, Kuru (Yemlik)` was the worst of them, because
+    data/crop_fao_map.json's own note on item 181 says FAOSTAT does not separate
+    food-grade broad beans from feed-grade ones - so the printed name was
+    contradicted by the map that supplied the figure.
+
+    THE LABEL COMES FROM data/world_norms.json's `items` TABLE, which carries
+    FAOSTAT's name for every item it ships figures for - `{"401": {"label":
+    "Chillies and peppers, green ..."}}`. It is English, and that is the same
+    choice the country name on the first line makes for the same reason: the name
+    is part of the figure's provenance, and no file here publishes a Turkish name
+    for an FAOSTAT item.
+
+    A MISSING LABEL RETURNS None and the caller falls back to the id's label.
+    Measured: of every item with a yield or price cell in the shipped world
+    layer, zero are absent from the `items` table and zero carry an empty label,
+    so this path is unreachable today - and the fallback is the narrow name
+    rather than [] because a figure with a name that is too precise still answers
+    the question, where no figure at all does not.
+    """
+    from src import norms
+    item = _fao_item(answering)
+    if item is None:
+        return None
+    if sum(1 for crop_id in crop_ids if _fao_item(crop_id) == item) <= 1:
+        return None
+    entry = norms._load_world().get("items", {}).get(str(item))
+    label = entry.get("label") if isinstance(entry, dict) else None
+    return label or None
+
+
+def _country_lines(message: str, history: list[dict] | None) -> list[str]:
+    """Where the user is when it is not a Turkish province, and what FAOSTAT
+    publishes for the crop they named there. Empty list when the location itself
+    is missing - and it NEVER raises, the way _named_crops does not.
+
+    Read only after `extract_province` came back empty: a province is TÜİK and
+    TÜİK always wins, which is the rule `norms.lookup` states and this caller
+    must not contradict.
+
+    A STATED LOCATION ALONE IS WORTH A LINE, with no figure under it. An earlier
+    revision returned [] whenever there was no figure to print and justified it
+    in this docstring by saying "the country's NAME only exists on a figure - it
+    is FAOSTAT's label, carried on the value". THAT IS FALSE, and it cost the
+    worst turn in the route: a grower answered "hangi ildesiniz?" with
+    "Fransa'dayım" and was asked the same question straight back, because he had
+    named no crop and the country line went with the figures. The name is in
+    data/world_norms.json's `countries` table - `{"68": {"label": "France",
+    "m49": "250"}}` - and needs no figure to exist. So the location line stands
+    on its own, and the three ways a figure can be missing - no crop named, no
+    cell for the crop in this country, nothing positive in the cell - all now
+    print it without figures instead of falling back to the province question.
+
+    AND THAT CHANGE MOVED THE PRICE OF A WRONG ADMISSION BY `_states_location`
+    FROM NOTHING TO EVERY TURN, which is the half of the trade the revision
+    introducing it did not write down. Before it, a message with no crop name
+    returned [] whatever the guard said, so a wrong admission on such a message
+    was INVISIBLE - the province question stood and the user saw no difference.
+    Now every wrong admission prints "Kullanici Turkiye disinda ... hangi ilde
+    oldugunu SORMA", and because `said` below is every user turn it sticks for
+    the rest of the conversation with no way to retract it.
+
+    This is still the right trade: the turn it fixes - "hangi ildesiniz?"
+    answered with "Fransa'dayım" - is a certainty, where a wrong admission is a
+    guard's error rate, and the guard's refuse set is measured for exactly that
+    reason. But it is why a defect in `_states_location` is Critical on this
+    branch and was merely Important before it, and why the same wave that made
+    this change should not have ALSO widened that guard: it added a second
+    Turkish branch in the same commit, and that branch admitted twelve sentences
+    of the class the first branch had just been narrowed to refuse. Measure the
+    guard's refuse set against any new branch BEFORE widening it, and measure it
+    against the DECISION the branch makes - see _SELF_TR, where four reviews in
+    a row found a rule licensed by a zero none of the refusals could break.
+
+    AND IT IS WHY THAT GUARD IS A WHITELIST NOW. Four waves patched it as a
+    refuse-list and each one left a class open; the bare-name class in
+    particular was invisible for exactly the reason above, since `Mısır` as a
+    whole message names no crop this function would have printed before the
+    figure-less line existed. See _SELF_TR for the inversion, and for why the
+    whitelist that followed it has since been cut to two patterns that infer
+    nothing.
+
+    NO TURN CARRIES A QUESTION CONTEXT ANY MORE. This function used to pair each
+    user turn with the assistant turn in front of it, because the bare-name
+    branch counted "Fransa" only after the assistant had asked where the user
+    is. That branch is gone - see _SELF_TR for the shipped literal of our own
+    that defeated its gate - so every turn is now asked on its own text and this
+    function reads no assistant turn at all.
+
+    THE FIGURE-LESS LINE DOES NOT SAY "FAOSTAT" and does not ask the answer to
+    carry FAOSTAT's spelling, which the full first line does. The parenthesis
+    there exists because several FAOSTAT areas collapse to one Turkish name
+    (`Congo`, `Çin`) and a figure must be attributable to the right one. With no
+    figure there is nothing to attribute, so the instruction would be noise - and
+    it would put the word FAOSTAT in a block holding no FAOSTAT figure.
+
+    TÜRKİYE AS A COUNTRY IS NOT A COUNTRY HERE. `data/crop_norms.json`'s
+    national row is empty by construction, so a Turkish user who has not named
+    a province resolves to no figure and the assistant asks - exactly today's
+    behaviour, and this function returns [] before it can change it.
+
+    A COUNTRY STICKS FOR THE WHOLE CONVERSATION AND THERE IS NO WAY TO TAKE IT
+    BACK. `said` below is every user turn, not just this one, so once a grower
+    has stated his country anywhere in the history, every later turn carries it -
+    and that is deliberate (see the guard's own comment: `extract_country`
+    returns the most RECENT mention, which need not be the turn that stated where
+    he is, so stopping at the resolving turn would throw the conversation away).
+
+    The cost is that nothing retracts it. A user who writes "Fransa'dayım" and
+    then "aslında Konya'dayım" is served by TÜİK, because a resolved province
+    wins before this function is called at all - but one who corrects himself to
+    another COUNTRY, or who was placed abroad by a sentence he did not mean that
+    way, keeps the first country for as long as the conversation lasts. There is
+    no "I am not there any more" to write. Shortening the window to the resolving
+    turn was measured and rejected for the reason above; the live protection is
+    `_states_location`, which is why its refuse set is measured as carefully as
+    it is. A new session is the only reset.
+
+    ONE CROP, THE FIRST NAMED. A crop_choice message naming two crops never
+    reaches this block at all: answer() forks it to the comparison card above.
+    So the choice between families only ever decides which of the ids INSIDE
+    one family answers.
+
+    WHICH ID INSIDE THE FAMILY ANSWERS IS NOT ALWAYS DECIDED BY THE DATA, and an
+    earlier revision of this docstring claimed it was - "settled by whichever of
+    them FAOSTAT holds a cell for". That holds where exactly one id in the family
+    maps to an FAO item: `Buğday (Hasıl/Yeşilot)` is green fodder and maps to
+    nothing, `Buğday, Durum Buğdayı Hariç` maps to item 15. It does NOT hold
+    where two ids SHARE one item, which data/crop_fao_map.json says happens -
+    item 15 carries the note that FAOSTAT does not split durum from other wheat
+    and both Turkish wheat ids point at it, and item 388 carries the same note
+    for table against processing tomatoes. There the loop below returns whichever
+    id `norms.available_crops()` happens to reach first, which is label order.
+    It does not matter for the FIGURE, because the two ids read the same cell -
+    which is why the printed name is the FAMILY's and not the id's; see below.
+
+    THE PRINTED CROP NAME MUST DESCRIBE THE CELL, WHICH IS SOMETIMES THE
+    FAMILY'S NAME AND SOMETIMES THE ID'S. Both halves of this were got wrong in
+    turn, and the two failures point opposite ways:
+
+      * The id's label can be NARROWER than the cell. `Buğday, Durum Buğdayı
+        Hariç - FAOSTAT ulke ortalama verimi: 597,35 kg/da` for France, where
+        item 15 is all wheat durum included, and `Domates (Salçalık) - ...
+        47.889,02 kg/da` for the Netherlands, where item 388 is all tomatoes and
+        overwhelmingly fresh. A paraphrase - "Fransa'da durum dışı buğdayın
+        verimi 597 kg/da" - is a claim data/crop_fao_map.json disclaims in
+        writing, on both items.
+      * The family's name can be BROADER than the cell. Five of the 187 families
+        map to TWO items, so the figure belongs to half the family: measured,
+        `Fasulye - ... 241,36 kg/da` for France is its DRY bean where its fresh
+        bean is 1242,07 the same year.
+
+    So the name is chosen per family by `_one_fao_item`, not by a rule about
+    names. See the call site, which carries the five families and their figures.
+
+    REJECTED: keeping the id's label everywhere and adding a sentence saying the
+    FAO item is broader. It needs the model to carry a qualification through a
+    paraphrase, which is the thing prompt text is worst at; a name that describes
+    the cell needs it to carry nothing.
+
+    THE COUNTRY IS PRINTED AS FAOSTAT SPELLS IT - `France`, not `Fransa` - and
+    that is deliberate rather than laziness. The label is part of the figure's
+    provenance and travels on the value itself; translating it here would mint
+    a Turkish name for `Iran (Islamic Republic of)` and `China, mainland` that
+    no file in this repo publishes, and the alias table cannot supply one
+    either - it is folded lowercase and holds several spellings per country.
+    These lines are PROMPT context, not user-facing text, so the model is told
+    in the same line to write the country's Turkish name in its answer.
+    """
+    try:
+        from src import norms
+        from src.context import country as country_ctx
+
+        code = country_ctx.extract_country(message, history)
+        if code is None or code == norms.TURKIYE_AREA:
+            return []
+        aliases = _code_aliases(code)
+
+        # GUARD: a resolved country may only REPLACE the province question when
+        # the user said that is where they are. See _SELF_TR for the three
+        # measured sentences this refuses and what the refusal costs.
+        #
+        # EVERY USER TURN IS ASKED, not only the one `extract_country` resolved
+        # from, and that leniency is deliberate. The code that came back is the
+        # most RECENT mention; a statement of location made earlier in the same
+        # conversation is still the user's. "Fransa'dayım" / "Fransa'da fiyatlar
+        # nasıl" / "buğday mı eksem" resolves France off the middle turn, which
+        # is not a location statement, while the first turn plainly is - and
+        # stopping at the resolving turn would throw that conversation away.
+        # It cannot admit the wrong country: only `code`'s own aliases are
+        # tested, so a France statement can never licence Germany.
+        #
+        # Assistant turns are skipped for the reason country.extract_country
+        # skips them: the assistant names countries while answering, and reading
+        # its own words back would place the grower wherever its last example was.
+        # NO TURN NEEDS THE TURN IN FRONT OF IT any more. The pairing that used
+        # to live here existed for the bare-name branch alone, which is deleted -
+        # see _SELF_TR - so each turn is now asked on nothing but its own text.
+        said = [message] + [turn.get("content", "") for turn in (history or [])
+                            if turn.get("role") == "user"]
+        if not any(_states_location(text, aliases) for text in said):
+            return []
+
+        # FROM HERE THE LOCATION IS SETTLED, SO THE PROVINCE QUESTION IS WRONG
+        # WHATEVER ELSE IS MISSING. This is the whole return value when there is
+        # no figure to print, and it is returned at all three of the exits below
+        # rather than []. The figure is a bonus; the location is the finding.
+        #
+        # The worst turn it fixes: "hangi ildesiniz?" answered with
+        # "Fransa'dayım" used to get "Kullanicinin ili BILINMIYOR - cevabinda
+        # hangi ilde oldugunu sor" - the same question straight back, because no
+        # crop was named and the country line travelled with the figures.
+        #
+        # The name is read from the `countries` table, which is the same string
+        # `region` carries on a value, so the two paths cannot drift apart; see
+        # the docstring for why this line says less than the full one.
+        country_entry = norms._load_world().get("countries", {}).get(str(code))
+        country_label = (country_entry.get("label")
+                         if isinstance(country_entry, dict) else None)
+        if not country_label:
+            # Unreachable while the world layer answers at all - `_load_world`
+            # refuses a file without a `countries` dict, and every area with a
+            # cell is in it. Without a name there is no line to print, so this
+            # degrades to the old behaviour rather than to a nameless sentence.
+            return []
+        located = [
+            f"Kullanici Turkiye disinda: {country_label}. Cevabinda ulkenin "
+            "Turkce adini kullan. TUIK il verisi bu ulke icin yok, hangi ilde "
+            "oldugunu SORMA. Bu blokta bu ulke icin verim veya fiyat rakami "
+            "YOK - kendin rakam yazma, gerekirse kullanicinin kendi "
+            "rakamlarini sor.",
+        ]
+
+        # GUARD: a country whose Turkish name is ALSO a crop name must not supply
+        # that crop. Measured on e021bca, "Mısır'dayım, bu yıl ne eksem?" - which
+        # names no crop at all - printed Egypt's MAIZE yield and price, because
+        # `Mısır` is the label for maize as well as the Turkish name for Egypt.
+        # That handed the model one crop's figures and nothing else for an open
+        # "what should I plant", against the same block's own
+        # "BELIRLI BIR URUN ONERME", and on no basis whatever. Worse, `Mısır`
+        # printed directly under `Egypt` reads as Egypt's own name, so the model
+        # may report the maize yield as the country's.
+        #
+        # WHAT IS DROPPED is a family whose name folds to a name this RESOLVED
+        # country answers to - not any country's name. `Fas` inside `Fasulye` and
+        # `Hindistan` inside `Hindistan Cevizi` are untouched, because the family
+        # names are `Fasulye` and `Hindistan Cevizi` and neither is an alias of
+        # Morocco or India. Only the whole-name collisions go, which on the
+        # shipped tables means `Mısır`.
+        #
+        # THE SPAN WOULD BE BETTER AND IS NOT AVAILABLE: dropping only the
+        # OCCURRENCE the country resolver consumed needs to know where it
+        # matched, and src/context/country.py returns an area code and nothing
+        # else. So the cost is a measured over-refusal: "Mısır'dayım, mısır mı
+        # ekmeliyim" names Egypt and maize, and loses the figures for both,
+        # falling back to the province question. That is the same outcome
+        # `test_a_country_with_no_crop_named_is_unchanged` already accepts for a
+        # country named with no crop, and it is the safe direction - a question
+        # instead of a figure nobody asked for.
+        families = tuple(
+            name for name in _named_crops(message)
+            if _family_head(name) not in aliases
+        )
+        # AND THE FORK UPSTREAM COSTS MORE THAN ONE SENTENCE. answer() sends a
+        # message naming TWO crops to the comparison card before this function is
+        # reached, and that card is province-only - so a real Egyptian wheat
+        # grower writing "Mısır'dayım, buğday mı ekmeliyim" never arrives here at
+        # all and gets `crop_compare.NO_PROVINCE`, which asks for a Turkish
+        # province. The fork is older than this branch and is not this change's
+        # to move; it is written down because the drop above is not the only
+        # place a Turkish country name costs an Egyptian grower his figures, and
+        # a reader of this guard alone would conclude it was.
+        if not families:
+            return located
+        family_name = _label_head(families[0])
+        family = _normalize_tr(family_name)
+        matched = [(crop_id, label) for crop_id, label in norms.available_crops()
+                   if _family_head(label) == family]
+        # A CANDIDATE CARRYING BOTH MEASURES IS PREFERRED OVER AN EARLIER ONE
+        # CARRYING ONE. The loop used to stop at the first id with `yield or
+        # price`, which is label order, so a family whose dry id has only a yield
+        # answered with that yield and no price while a sibling id held both.
+        # Measured 2026-10-03 over the shipped tables - 187 families against every
+        # FAOSTAT area, 8425 (family, country) rows that produce a figure at all -
+        # 33 rows are in exactly that position, `Bakla` and `Bezelye` across most
+        # of them.
+        #
+        # ONLY THE TIE IS BROKEN DIFFERENTLY. If no candidate carries both, the
+        # first with either one still answers, which is the old behaviour
+        # unchanged; and a candidate with both is still taken in label order, so
+        # nothing here invents a preference between two complete ids.
+        #
+        # IT MOVES THE FIGURE AS WELL AS THE SECOND LINE, because a different id
+        # can read a different FAO cell - that is the point, not a side effect:
+        # one cell answering both questions is a coherent pair, where a yield from
+        # one cell beside no price at all leaves the block half-built for no
+        # reason the data gives.
+        candidates = []
+        for crop_id, _label in matched:
+            candidate = norms.lookup(crop_id, None, country=code)
+            if candidate is not None and (candidate.yield_kg_da
+                                          or candidate.price_per_kg):
+                candidates.append(candidate)
+        norm = next((c for c in candidates
+                     if c.yield_kg_da and c.price_per_kg),
+                    candidates[0] if candidates else None)
+        if norm is None:
+            return located
+
+        # WHICH NAME GOES BESIDE THE FIGURE, and it is NOT unconditionally the
+        # family's. The family name is right only when every mapped id in the
+        # family reads the SAME FAO cell, which is the wheat and tomato case -
+        # item 15 does not split durum from other wheat and item 388 does not
+        # split table from processing tomatoes, so `Buğday` and `Domates` describe
+        # the cell exactly and the id's own label would narrow it.
+        #
+        # FIVE FAMILIES SPAN TWO ITEMS, measured 2026-10-02 over
+        # data/crop_fao_map.json and data/crop_norms.json - 187 families, 5 of
+        # them: `Fasulye` (176 dry / 423 fresh), `Soğan` (403 / 402), `Bezelye`
+        # (187 / 417), `Bakla` (181 / 420), `Biber` (401 fresh / 689 dried). There
+        # the bare family name is WORSE than the id's label, because the figure
+        # itself belongs to half the family. `available_crops()` is sorted by
+        # label, so which half answers is label order, not the question: measured,
+        # "Fransa'dayim, fasulye ekeyim mi" printed `Fasulye - … 241,36 kg/da`,
+        # which is France's DRY bean, where its fresh bean in the same year is
+        # 1242,07 - five times as much, and a bare Turkish "fasulye" in a planting
+        # question is usually the fresh one. `Soğan` printed 3363,2 (dry) against
+        # 2105,36 fresh, `Bezelye` 292,48 (dry) against 637,42.
+        #
+        # So the two failures are opposite and both real: the id's label can be
+        # narrower than the cell, and the family name can be broader than it. The
+        # test is the mapping, asked per family, and it keeps each name on a cell
+        # it actually describes.
+        #
+        # AND THERE IS A THIRD CASE, WHERE NEITHER NAME DESCRIBES THE CELL. The
+        # family test above is asked of the family; it can fail - the family spans
+        # two items - and the answering id's label still be narrower than the one
+        # item it reads, because several Turkish ids share that item. `Biber`
+        # spans 401 and 689, so the family name is too broad, and item 401 is
+        # shared by four Turkish peppers, so `Biber (Dolmalık)` is too narrow:
+        # measured, "Fransa'dayim, biber ekmek istiyorum" printed
+        # `Biber (Dolmalık) - … 1502,9 kg/da` for a cell FAOSTAT calls "Chillies
+        # and peppers, green". 321 of the 8425 rows are in this case, across
+        # `Biber` (401, four ids), `Fasulye` (176, two) and `Bakla` (181, two) -
+        # counted for the candidate the preference above actually chooses, which
+        # is what makes it 321 and not the 331 an earlier revision wrote here.
+        # There the cell has its OWN name and FAOSTAT publishes it, so the choice
+        # is not between two wrong Turkish names - see _shared_item_label.
+        crop_ids = [crop_id for crop_id, _label in matched]
+        if _one_fao_item(crop_ids):
+            crop_name, item_label = family_name, None
+        else:
+            # Kept, rather than folded into the expression below, because the
+            # line after `*figures` must know whether the name beside the figure
+            # is FAOSTAT's English one or a Turkish label - the two need opposite
+            # instructions, and `crop_name` alone cannot tell them apart.
+            item_label = _shared_item_label(crop_ids, norm.crop)
+            crop_name = item_label or norm.label
+
+        measures = [("ortalama verimi", norm.yield_kg_da),
+                    ("ortalama ciftci fiyati", norm.price_per_kg)]
+        figures = []
+        for what, value in measures:
+            # A figure that is not positive is not printed. FAOSTAT publishes
+            # a handful of zero yields and this module's own rule is that a
+            # missing norm is never zero - "ulke ortalama verimi 0 kg/da" in a
+            # prompt is an invitation to answer that nothing grows there.
+            if value is None or value.scope != "ulke" or value.amount <= 0:
+                continue
+            note = _flag_note(value.flag)
+            # THE YEAR IS THE CELL'S OWN and is printed beside every figure,
+            # never once for the block: FAOSTAT ends at 2024 where TÜİK reaches
+            # 2025, and the two measures need not even share a year with each
+            # other - Ghana's sorghum yield is 2024 and its price 2022.
+            figures.append(
+                f"{crop_name} - FAOSTAT ulke {what}: "
+                f"{_world_amount(value.amount)} {value.unit} "
+                f"({value.year}{', ' + note if note else ''})."
+            )
+        if not figures:
+            return located
+
+        region = (norm.yield_kg_da or norm.price_per_kg).region
+        return [
+            # THE FAOSTAT LABEL IS ASKED FOR IN THE ANSWER TOO, in parentheses
+            # beside the Turkish name, and that is not decoration. Several
+            # FAOSTAT areas collapse to ONE Turkish name - `Congo` and
+            # `Democratic Republic of the Congo` are both "Kongo", `China` and
+            # `China, mainland` are both "Çin" - so a prompt that is right about
+            # which area the figure came from can still produce an answer that
+            # names the wrong country, with nothing in the answer to tell. The
+            # label travels into the answer so the reader can see which one.
+            #
+            # The label is NOT repeated a second time in this sentence: it
+            # already stands at the head of the line, and `Netherlands (Kingdom
+            # of the)` printed again inside parentheses nests them.
+            f"Kullanici Turkiye disinda: {region} - FAOSTAT'in yazdigi ad. "
+            "Cevabinda ulkenin Turkce adini kullan ve yanina parantez icinde "
+            "FAOSTAT'in bu adini aynen ekle. TUIK il verisi bu ulke icin yok, "
+            "hangi ilde oldugunu SORMA.",
+            *figures,
+            # THE CROP NAME GETS THE COUNTRY NAME'S OWN INSTRUCTION, and only in
+            # the one case that needs it. `_shared_item_label` prints FAOSTAT's
+            # English name for the cell - `Chillies and peppers, green (Capsicum
+            # spp. and Pimenta spp.)` - because no file here publishes a Turkish
+            # name for an FAO item, which is the same reason the country line
+            # prints `France`. But the country line also TELLS the model what to
+            # do with that name, and this one did not: a name chosen for
+            # provenance was handed over with no instruction, so the English
+            # label could reach a Turkish grower verbatim.
+            #
+            # IT IS CONDITIONAL, and that is the point. In every other case the
+            # name beside the figure is already Turkish - `Buğday` from the
+            # family or `Domates (Salçalık)` from the id - and asking for
+            # "FAOSTAT's name in parentheses" there would have the model invent
+            # one. Only `item_label` is FAOSTAT's own.
+            #
+            # THE SECOND SENTENCE IS NOT DECORATION: this name is printed
+            # precisely because the item is BROADER than any one Turkish variety
+            # - item 401 is shared by four Turkish peppers - so a model that
+            # translates it back to the narrowest variety undoes the fix.
+            #
+            # The nested parentheses in the ANSWER are a cost accepted here the
+            # way the country line already accepts them for `Netherlands
+            # (Kingdom of the)`: the alternative is an answer that cannot say
+            # which cell the number came from.
+            *(["Rakamlarin yanindaki urun adi FAOSTAT'in kendi kalem adi, "
+               "Ingilizce. Cevabinda urunun Turkce adini kullan ve yanina "
+               "parantez icinde FAOSTAT'in bu adini aynen ekle. Bu kalem "
+               "birden fazla Turkce cesidi birlikte sayar, rakami tek bir "
+               "ceside mal etme."] if item_label else []),
+            # "tahmin" is deliberately NOT used in these two sentences, although
+            # it is the natural Turkish word for it: the E flag's own clause
+            # above is the only place that word may appear, so a test can tell an
+            # estimate apart from a country's own report by looking for it.
+            #
+            # "kaynagi belliyse" RATHER THAN "kaynagi", because the older
+            # unconditional wording was false for part of its own output. An
+            # unflagged cell and an unknown letter both exist - _pick_world
+            # returns flag=None for a cell FAOSTAT ships without one, and
+            # _flag_note prints an unrecognised letter as itself - so the
+            # parenthesis beside such a figure is just "(2024)". A line promising
+            # a source beside every number would have the model look for one that
+            # is not there, or invent it.
+            "Bu rakamlar ULKE ORTALAMASIDIR, tarlaya ozel bir rakam degil; her "
+            "rakamin yani sira kendi yili, kaynagi belliyse kaynagi da yazili - "
+            "rakami baska bir yila veya TUIK'e mal etme.",
+            # THE TWO FIGURES MUST NOT BE MULTIPLIED, and the caution line above
+            # does not close this on its own: it immunises each figure against
+            # being read as field-specific, and says nothing about their product.
+            # Verim and fiyat sit on adjacent lines, so 597,35 x 0,2313 is one
+            # step away and reads as 138 USD/da of income - a gross figure with
+            # no cost side at all, which is exactly the shape a farmer acts on.
+            # This project's own budget route exists because money answers need
+            # both sides; see src/budget.py.
+            "Verimle fiyati carpip donum basi gelir hesaplama ve yazma: masraf "
+            "tarafi bu satirlarda yok, boyle bir carpim kazanc gibi okunur.",
+        ]
+    except Exception as exc:  # noqa: BLE001
+        # The same bargain _named_crops makes: a failure here costs these lines
+        # and nothing else, and it SAYS SO rather than looking like a country
+        # that simply did not resolve.
+        print(f"[engine] country context failed, continuing without it: {exc}")
+        return []
 
 
 def _crop_choice_block(message: str, history: list[dict] | None,
@@ -744,8 +2066,22 @@ def _crop_choice_block(message: str, history: list[dict] | None,
     if province:
         lines.append(f"Kullanicinin ili: {province}.")
     else:
-        lines.append("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde "
-                     "oldugunu sor.")
+        # Only once the province came back empty, and only as a REPLACEMENT for
+        # the line that asks for one: a block that both names France and asks a
+        # French grower which Turkish province he is in contradicts itself.
+        # With no country, or with a country we hold no figure for, nothing
+        # changes - the ask stands exactly as it did.
+        #
+        # AND ONLY WHEN THE USER SAID THAT IS WHERE HE IS. Replacing the ask on
+        # any mention of any country was measured wrong three times over - see
+        # _SELF_TR, which names the sentences and what refusing them costs.
+        # _country_lines returns [] for those now, so they land in the else
+        # branch below and get the ask back, unchanged.
+        world = _country_lines(message, history)
+        if world:
+            lines.extend(world)
+        else:
+            lines.append(_ASK_LOCATION)
     lines.append("Bu bir urun secimi sorusu. Karari belirleyen faktorleri anlat "
                  "ve eksik olanlari sor: toprak yapisi ve analiz, sulama imkani, "
                  "arazi buyuklugu, onceki urun ve munavebe, pazara mesafe, "
@@ -888,7 +2224,7 @@ def _budget_result(payload: dict | None, message: str = "",
         from src.context import location
         table = norms.province_table(location.extract_province(message, history))
         latest_year = norms.latest_year()
-        if table and not any(row.yield_kg_da or row.price_tl_kg or row.yield_kg_tree
+        if table and not any(row.yield_kg_da or row.price_per_kg or row.yield_kg_tree
                               for row in table):
             # No province resolved (or the resolved one, and the national
             # fallback, both carry nothing): every row's yield (per-dekar or

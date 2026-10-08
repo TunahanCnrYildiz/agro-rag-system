@@ -147,7 +147,24 @@ Note the asymmetry and keep it: the **JSON key stays `price_tl_kg`** — that fi
 PYTHONIOENCODING=utf-8 grep -rn "price_tl_kg" --include="*.py" src tests evals
 ```
 
-Rename **only the attribute access** (`.price_tl_kg`, `price_tl_kg=`). Leave every string literal `"price_tl_kg"` alone — those index the JSON file. `tests/test_build_crop_norms.py` is entirely about the JSON key and should not change at all; if your edit touches it, you renamed too much.
+Rename **only `CropNorm`'s attribute** (`.price_tl_kg`, `price_tl_kg=` on a `CropNorm`).
+Two things keep their name and both are easy to sweep up by mistake:
+
+- **Every string literal `"price_tl_kg"`** indexes the JSON file. `data/crop_norms.json`
+  is TÜİK only and its prices really are lira.
+- **`BudgetInputs.price_tl_kg` in `src/budget.py:145` is a different field on a
+  different type** — the price the user typed into the budget form, which
+  `src/budget.py:739` prints with the word `TL` beside it. It is lira by
+  construction, not by assumption. A foreign user's form will need a currency of
+  its own, and that is the round that decides what a user sees.
+
+`tests/test_build_crop_norms.py` contains **both kinds**: seven JSON-key reads that
+stay, and **two genuine `CropNorm` attribute reads at lines 123 and 288**
+(`n.price_tl_kg` where `n = norms.lookup(...)`) that must be renamed. Leaving those
+two raises `AttributeError` inside a test whose own trailing lines clear
+`norms._load`'s `lru_cache` — the cleanup is skipped, the cache stays poisoned with
+that test's tiny table, and seven further tests in `tests/test_compare_route.py`
+fail for a reason that has nothing to do with them.
 
 - [ ] **Step 5: Run the full suite**
 
@@ -225,12 +242,17 @@ def test_the_fao_label_matches_the_world_file(aliases, world_countries):
 
 def test_no_name_is_claimed_by_two_countries(aliases):
     """An ambiguous name resolves to whichever entry is tried first, which is
-    an arbitrary answer dressed as a confident one."""
+    an arbitrary answer dressed as a confident one.
+
+    Two COUNTRIES may not share a name. One country repeating a name across its
+    own `tr` and `en` is ordinary and must stay allowed: roughly 45 of these are
+    spelled identically in both languages — Panama, Kenya, Malta, Belize, Yemen,
+    Sudan. Forbidding that forces an invented variant into one of the lists and
+    the name people actually type stops matching."""
     seen: dict[str, str] = {}
     for code, entry in aliases.items():
-        for name in entry["tr"] + entry["en"]:
-            key = name.strip().casefold()
-            assert key not in seen, f"{name!r} claimed by {seen.get(key)} and {code}"
+        for key in {name.strip().casefold() for name in entry["tr"] + entry["en"]}:
+            assert seen.get(key, code) == code,                 f"{key!r} claimed by {seen.get(key)} and {code}"
             seen[key] = code
 
 
@@ -283,6 +305,8 @@ One entry per code, in the order that command prints. Four rules:
 
 1. **`fao` is copied exactly** from the listing. A test compares them character for character.
 2. **`tr` is what a Turkish speaker types.** `Fransa`, `Özbekistan`, `Mısır`, `Hollanda`, `Yunanistan`. Where the everyday name differs from the formal one, list both.
+
+   **Where the two languages spell it the same, write the same spelling in both lists.** Panama, Kenya, Malta, Belize, Yemen, Sudan and about forty others are identical in Turkish and English. Put `Panama` in `tr` **and** in `en`. Never reach for an archaic or formal variant to make the lists differ — an earlier draft of this plan forbade the repetition by accident and it produced `British Honduras` for Belize, a name dropped in 1973, so an English speaker typing `Belize` would not have matched.
 3. **`en` is what an English speaker types**, which is often not FAOSTAT's label: FAOSTAT writes `Iran (Islamic Republic of)`, `China, mainland`, `Bolivia (Plurinational State of)`, `Democratic People's Republic of Korea`. Put `Iran`, `China`, `Bolivia`, `North Korea` in `en`. Nobody types a parenthesis.
 4. **A name belongs to exactly one country.** The `test_no_name_is_claimed_by_two_countries` gate is strict on purpose. FAOSTAT splits `China, mainland` (41), `China, Hong Kong SAR` (96), `China, Macao SAR` (128) and `China, Taiwan Province of` (214): give the bare `China` / `Çin` to **mainland, code 41**, and qualify the others (`Hong Kong`, `Makao`).
 
@@ -300,7 +324,7 @@ Do not invent a country that is not in the listing, and do not skip one because 
 - [ ] **Step 5: Run the tests**
 
 Run: `python -m pytest tests/test_country_aliases.py -q`
-Expected: PASS, 12 passed
+Expected: PASS, 11 passed
 
 - [ ] **Step 6: Report what you wrote**
 
@@ -405,6 +429,54 @@ def test_the_same_words_resolve_when_stated_as_a_place(message, code):
     assert extract_country(message) == code
 
 
+@pytest.mark.parametrize("message", [
+    "I use turkey manure on my field",
+    "we buy litter from turkey farms",
+])
+def test_an_english_name_that_is_also_livestock_never_places_the_user(message):
+    """`Turkey` is the English twin of `Mısır`. In an agriculture assistant
+    "turkey manure", "turkey litter" and "turkey farms" are ordinary phrases,
+    and `from turkey farms` satisfies a bare preposition rule. The country
+    name must stay in the table, so the guard belongs here."""
+    assert extract_country(message) is None
+
+
+def test_the_same_word_still_places_the_user_when_it_is_the_country():
+    assert extract_country("I am in Turkey") == TURKIYE
+    assert extract_country("Türkiye'deyim") == TURKIYE
+
+
+@pytest.mark.parametrize("message", [
+    "Kuzey Kıbrıs'tayım",
+    "KKTC'deyim",
+])
+def test_northern_cyprus_is_refused_rather_than_placed(message):
+    """FAOSTAT has no TRNC area, so the table cannot hold one. `Kıbrıs` fires
+    inside `Kuzey Kıbrıs` under any boundary rule, which would hand a Turkish
+    Cypriot grower — a likely user of this product — the Republic's yields
+    while saying nothing. Refusing to place is the honest answer; the
+    assistant then asks."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message, code", [
+    ("Dominika'dayım", 55),
+    ("Dominik Cumhuriyeti'ndeyim", 56),
+    ("Nijer'deyim", 158),
+    ("Nijerya'dayım", 159),
+])
+def test_a_longer_name_wins_over_the_shorter_one_inside_it(message, code):
+    """`Dominik` sits inside `Dominika` and `Nijer` inside `Nijerya`, and the
+    lenient suffix branch would accept the trailing letter as a case ending.
+    `location.py` sorts its keys longest-first for exactly this and nothing
+    pins that ordering; these four do."""
+    assert extract_country(message) == code
+
+
+def test_cyprus_itself_still_resolves():
+    assert extract_country("Kıbrıs'tayım") == 50
+
+
 def test_the_current_message_beats_history():
     history = [{"role": "user", "content": "Fransa'dayım"}]
     assert extract_country("Mısır'dayım", history) == EGYPT
@@ -502,10 +574,31 @@ _EN_PLACE = r"(?:in|from|at)\s+"
 - `_find(text)` — the same four branches as `location.py._find` (apostrophe, case suffix, whole message, place noun), plus `re.search(rf"(?<!\w){_EN_PLACE}{k}(?!\w)", folded)`.
 - `extract_country(message, history)` — identical in shape to `extract_province`: the current message first, then user turns backwards. **Assistant turns are never evidence**, exactly as in `location.py`.
 
+**Two hazards the tests above pin, and the mechanism is yours to choose.** The plan
+supplies the contract, not the implementation:
+
+- **`Kuzey Kıbrıs` / `KKTC`.** There is no TRNC area in FAOSTAT, so this is a refusal,
+  not a match. Whatever you write must make `Kıbrıs'tayım` resolve to 50 while
+  `Kuzey Kıbrıs'tayım` resolves to nothing.
+- **English `Turkey`.** `(?:in|from|at)\s+turkey(?!\w)` matches `from turkey farms`,
+  because a space is not a word character. Find a rule that keeps `I am in Turkey`
+  working and drops the livestock phrases. Do not solve it by removing `Turkey`
+  from the table.
+
+Measured and already settled, so do not spend effort re-deriving: `location.py`'s
+existing `(?<!\w)` plus strict-suffix guards already block `fas` inside
+`burkina fasoda` and `uk` inside `arnavutlukta`. Reuse them; the alias table's
+78 substring pairs — 35 of them pointing at two different countries, 43 one
+country's own aliases — are handled by the longest-first ordering you inherit.
+(This plan said 34 until commit `2526ab6` counted them: the code, the `_ORDERED`
+comment, `_matchers`' docstring and
+`test_the_substring_pair_count_the_ordering_is_justified_by` all say 78/35, and
+this line was the last place the retired number survived.)
+
 - [ ] **Step 4: Run the tests**
 
 Run: `python -m pytest tests/test_country.py -q`
-Expected: PASS, 17 passed
+Expected: PASS, 27 passed
 
 If a collision test fails, **do not weaken it**. The guard it exercises is the reason this module is written the way it is; a failure means the regex is wrong, not the test.
 
@@ -568,12 +661,23 @@ def test_a_province_always_wins_over_a_country():
     assert norm.price_per_kg.unit == "TL/kg"
 
 
-def test_turkiye_as_a_country_serves_tuik_not_faostat():
-    """FAOSTAT carries Türkiye too. It is a cross-check, not a source."""
+def test_turkiye_as_a_country_never_reaches_the_world_layer():
+    """FAOSTAT carries Türkiye (area 223) too, and it is a cross-check rather
+    than a source — so naming Türkiye must not fetch it.
+
+    What comes back is a CropNorm with empty measures, not a FAOSTAT figure,
+    because `data/crop_norms.json`'s national row is empty BY CONSTRUCTION:
+    553 measures carry a "TR" key and not one holds a value.
+    `scripts/build_crop_norms.py` ships it that way on purpose — "a mean of the
+    provinces is a number nobody published". A Turkish user who has not named
+    a province therefore gets nothing and the assistant asks, which is the same
+    thing `location.py` already does and yields better data than an average.
+
+    Do not "fix" this by averaging the provinces."""
     norm = norms.lookup(WHEAT, None, country=TURKIYE)
-    assert norm.yield_kg_da.scope == "tr"
-    assert norm.yield_kg_da.region == "Türkiye"
-    assert norm.price_per_kg.unit == "TL/kg"
+    assert norm is not None
+    for measure in (norm.yield_kg_da, norm.price_per_kg, norm.yield_kg_tree):
+        assert measure is None or measure.scope != "ulke"
 
 
 def test_no_country_and_no_province_is_todays_behaviour():
@@ -650,7 +754,7 @@ def _load_world() -> dict:
     answering, the same rule _load() follows for the Turkish one."""
 ```
 
-Load both files behind `lru_cache` the way `_load()` already does, returning `{}` on any failure. **Add them to whatever fixture clears `_load`'s cache in `tests/conftest.py`** so a test cannot see another test's file.
+Load both files behind `lru_cache` the way `_load()` already does, returning `{}` on any failure. **Clear their caches the way this project already does.** The fixture is `_clear_the_norms_cache` in `tests/test_norms.py`, local to that file by deliberate design — see `docs/superpowers/specs/2026-09-02-refusal-naming-and-cache-fixture-design.md`. Add a matching local fixture to your new test file rather than touching `tests/conftest.py`.
 
 Then a world picker beside `_pick`:
 
