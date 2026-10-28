@@ -115,6 +115,38 @@ _NON_DOSE_AMOUNT_PHRASES = ("kac gun", "kac gunde", "gunde bir", "kac ay",
 # (2026-08-25), finding 1.
 _FERTILIZER_PRODUCT_STEM = ("gubre",)
 
+# "Gübre" QUALIFIED BY A NUTRIENT is a fertilizer CLASS, not a product the user
+# holds, and the comment above already draws that line for the bare element:
+# "Dekara kaç kilo azot gerekir?" asks about the element. "Dekara kaç kilogram
+# azotlu gübre uygulanmalıdır?" asks the same thing with the word "gübre" in it,
+# and the stem test above could not tell them apart. Measured 2026-10-28: the
+# eval case quant_mera_nitrogen_dose passed 8/8 on the 2026-08-13 baseline and
+# failed after the dose route landed (2026-08-25), answered in 0 s by the dose
+# card's fixed intro instead of the corpus - a regression nothing caught for two
+# months, because the routing set held no nutrient-class question carrying
+# "gübre", so run_routing's "product_dose: zero wrong entries" had zero eligible
+# inputs.
+#
+# THE SUB-DECISION IS WHETHER "gübre" IS BARE. The qualifier alone is not enough:
+# "Azotlu gübremi dekara ne kadar atmalıyım?" carries it too, and that is the
+# user's OWN fertilizer - possessed, so a dose question. So the class reading
+# needs the qualifier immediately before a BARE "gübre" (or its plural); a case
+# or possessive ending on it (-yi, -mi, -den) marks a fertilizer in hand and
+# keeps the dose card.
+#
+# THE ELEMENTS ARE THE PLANT NUTRIENTS, A CLOSED CHEMICAL SET, not phrasings
+# collected from sentences: macro (N, P, K), secondary (S, Ca, Mg) and the
+# micronutrients Turkish names fertilizers after. Closing only "azotlu" would
+# have left "kükürtlü gübre" hijacked by the same rule. Kept LOCAL to this rule
+# rather than added to _NUTRITION_STEMS, which feeds two other routes. The
+# adjacency to "gübre" is the gate, so an element word elsewhere in a sentence
+# cannot fire it.
+_NUTRIENT_ELEMENTS = ("azot", "fosfor", "potasyum", "potas", "kukurt",
+                      "kalsiyum", "magnezyum", "demir", "cinko", "bor",
+                      "mangan", "bakir")
+_FERTILIZER_CLASS = re.compile(
+    r"(?<!\w)(?:" + "|".join(_NUTRIENT_ELEMENTS) + r")l[iu]\s+gubre(?:ler)?(?!\w)")
+
 
 @lru_cache(maxsize=1)
 def _product_pattern():
@@ -186,9 +218,13 @@ def classify_by_rules(message: str) -> Route | None:
         _has_stem(folded, _AMOUNT_PHRASES) or _has_word(folded, _AMOUNT_WORDS))
     if product_named and (_has_stem(folded, _DOSE_PHRASES) or generic_amount):
         return "product_dose"
+    # A NAMED product never reaches this: clause A above already returned. So
+    # the class carve-out only ever decides the no-product half, which is the
+    # half that reads "gübre" as a product - see _FERTILIZER_CLASS.
     if not product_named and (
             _has_stem(folded, _DOSE_PHRASES)
-            and _has_stem(folded, _FERTILIZER_PRODUCT_STEM)):
+            and _has_stem(folded, _FERTILIZER_PRODUCT_STEM)
+            and not _FERTILIZER_CLASS.search(folded)):
         return "product_dose"
 
     if _has_stem(folded, _CROP_CHOICE_PHRASES):

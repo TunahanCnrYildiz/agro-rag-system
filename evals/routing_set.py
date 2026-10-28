@@ -66,6 +66,19 @@ ROUTING_CASES = [
     {"query": "HİGRO BARF ne zaman uygulanır?", "route": "plant_info"},
     {"query": "Dekara kaç kilo azot gerekir?", "route": "nutrition"},
 
+    # --- product_dose: a nutrient-qualified fertilizer is a CLASS -----------
+    # Authored 2026-10-28, after the answer eval caught quant_mera_nitrogen_dose
+    # answered by the dose card's fixed intro. No case above carried a
+    # nutrient-qualified "gübre" with a rate, so the "zero wrong entries" this
+    # set reported for product_dose had zero eligible inputs - the lesson the
+    # block above records, met again one rule over. Both halves are here: a
+    # BARE qualified "gübre" is a class (nutrition); a possessed or definite one
+    # is the user's own (product_dose).
+    {"query": "Buğdaya dekara kaç kg azotlu gübre verilir?", "route": "nutrition"},
+    {"query": "Dekara kaç kg kükürtlü gübre uygulanır?", "route": "nutrition"},
+    {"query": "Azotlu gübremi dekara ne kadar atmalıyım?", "route": "product_dose"},
+    {"query": "Elimdeki fosforlu gübreyi dekara ne kadar vereyim?", "route": "product_dose"},
+
     # --- crop_choice: what to plant -----------------------------------------
     {"query": "Bu yıl tarlama ne eksem iyi olur?", "route": "crop_choice"},
     {"query": "Hangi ürünü yetiştirmeliyim?", "route": "crop_choice"},
