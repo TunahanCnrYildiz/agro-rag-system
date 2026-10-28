@@ -140,7 +140,34 @@ class Settings(BaseSettings):
     # would trade a truncated ANSWER for a truncated PROMPT, and that is the
     # worse failure - it drops the system instructions silently instead of
     # visibly cutting a sentence.
+    #
+    # RE-MEASURED 2026-10-28, after _country_lines grew the crop_choice block.
+    # The worst case assembled from real parts, each at its observed maximum -
+    # the longest block (a shared-FAO-item country, 1,409 chars), a retrieved
+    # context at the k x chunk_size cap (4,046 chars) and 2,995 chars of history
+    # - is 4,517 prompt tokens: 7,589 of 8,192 with this value, 603 spare. The
+    # 439 above stays the floor; its context was token-denser.
+    #
+    # THE 08-13 BOUND HELD ONLY FOR THE MOBILE CLIENT, and that was the real
+    # finding. The server capped nothing and the web widget sends its whole
+    # conversation, so on LM Studio: at 7 web exchanges prompt + this value
+    # passed the window, at 11 the reply was cut at the window edge
+    # (finish=length), and from 16 the server answered HTTP 200 having
+    # silently dropped the MIDDLE of the prompt. A canary at the top of the
+    # system prompt survived that cut, so on LM Studio it is old turns that go,
+    # not the system instructions - the warning above is right in kind and
+    # wrong in detail for this server, and unmeasured for production's.
+    # history_budget_chars below is the fix.
     max_tokens: int = Field(default=3072)
+    # The SERVER's history budget, in characters of turn content - the same rule
+    # mobile-app/src/chatStore.ts applies before sending (recentWithinBudget):
+    # walk back from the newest turn, stop at the first one that would overflow,
+    # never cut a turn in half. It bounds what reaches the MODEL only; routing,
+    # retrieval and location are still read off the full history, so a province
+    # said twenty turns ago still places the user. A third value that cannot
+    # move without re-measuring the window, alongside max_tokens and
+    # SEND_BUDGET_CHARS.
+    history_budget_chars: int = Field(default=3000)
     request_timeout: float = Field(default=120.0)
 
     # --- Retrieval params --- #
