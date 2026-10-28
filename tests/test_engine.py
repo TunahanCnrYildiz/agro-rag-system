@@ -1523,14 +1523,29 @@ def test_the_location_question_asks_for_the_country_in_a_shape_the_guard_accepts
 
     A grower outside Turkiye cannot answer "which province", and since this wave
     a bare "Fransa" is not an answer either. So the question asks for the country
-    AND SHOWS THE SPELLING - "Fransa'dayim" is `_SELF_TR`'s own pattern, written
-    out rather than described because a model copies an example and paraphrases
-    an instruction.
+    AND SHOWS THE SPELLING - "Fransa'dayim" is `_SELF_TR`'s own pattern.
+
+    AN EARLIER REVISION SAID "a model copies an example and paraphrases an
+    instruction", and that was measured false on 2026-10-28: told to ask for the
+    country "Fransa'dayim gibi", gemma-4-12b-qat wrote the example in only 4 of
+    20 answers, left it out in 14, and in 2 shortened it to "ornegin Fransa gibi"
+    - the bare name, which the guard refuses. A model paraphrases an example too,
+    and the part it drops is the suffix, which is the only part that matters. So
+    the line now orders the example verbatim AND names the bare name as the
+    failure, and this test pins both halves.
 
     The example is asserted against the guard rather than quoted, so the two can
-    never drift: if the pattern narrows, this fails."""
-    assert "Fransa'dayim" in engine._ASK_LOCATION
+    never drift: if the pattern narrows, this fails. And the bare name it warns
+    against is asserted REFUSED, so the warning stays true."""
+    # Written with the dotless i because the model copies it verbatim into an
+    # answer a Turkish user reads; the guard folds, so the ASCII spelling a user
+    # might type still places. Both are asserted.
+    assert "\"Fransa'dayım\"" in engine._ASK_LOCATION
+    assert engine._states_location("Fransa'dayım", engine._code_aliases(68))
     assert engine._states_location("Fransa'dayim", engine._code_aliases(68))
+    assert "AYNEN" in engine._ASK_LOCATION
+    assert "(Fransa) yetmez" in engine._ASK_LOCATION
+    assert not engine._states_location("Fransa", engine._code_aliases(68))
     assert "hangi ilde" in engine._ASK_LOCATION
     assert "ulkesini" in engine._ASK_LOCATION
 

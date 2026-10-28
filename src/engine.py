@@ -1529,9 +1529,30 @@ _EN_NOT_THE_SPEAKER = (rf"(?<!\w)(?:{_SUPPOSED_MOOD}|{_ATTRIBUTING_VERB})"
 # U+2019. (1) AND (2) ARE UNMEASURED - they are prompt behaviour and belong in
 # the eval harness - so the sentence below is where 39 accepts went, and nothing
 # here tests that they come back.
+#
+# THE EXAMPLE IS NOW ORDERED VERBATIM, because "gibi" was measured not to be
+# enough. On 2026-10-28, 5 crop_choice messages x 4 samples on
+# gemma-4-12b-qat, with every example the model wrote fed back to the guard:
+# 20/20 answers asked where the user is and 20/20 invited a country, but only
+# 4/20 gave "Fransa'dayim". 14/20 gave no example at all, and 2/20 wrote
+# "ornegin Fransa gibi" - a BARE name, which the guard refuses, so the model was
+# steering the user into a reply that gets this question asked again. The line
+# therefore names the failure it is guarding against: the suffix is the part
+# that does the work, and the model dropped it. Re-measured on the same 20:
+# 20/20 close the loop, 0 refused, 0 with no example.
+#
+# THE EXAMPLE IS WRITTEN WITH TURKISH LETTERS, unlike the rest of this line, and
+# that is not an oversight. The rest is ASCII by habit - `_normalize_tr` folds
+# for MATCHING only, nothing requires prompt text to be folded - and the example
+# is the one word the model is told to copy verbatim. Written as "Fransa'dayim"
+# it was copied verbatim, misspelling and all, in 6 of 20 answers a Turkish user
+# would read. The guard folds, so both spellings place; the dotless i is for the
+# reader.
 _ASK_LOCATION = ("Kullanicinin ili BILINMIYOR - cevabinda hangi ilde oldugunu "
-                 "sor; yurt disindaysa ulkesini Fransa'dayim gibi yazmasini "
-                 "iste, tavsiyeni genel tut.")
+                 "sor; yurt disindaysa ulkesini yazmasini iste ve cevabina su "
+                 "ornegi tirnak icinde AYNEN koy: \"Fransa'dayım\". Ornegi "
+                 "kisaltma: yalnizca ulke adi (Fransa) yetmez, sonundaki -dayım "
+                 "eki gerekli. Tavsiyeni genel tut.")
 
 # The two patterns and WHICH SIDE OF THE NAME each one sits on. `_SELF_TR` is a
 # suffix, `_SELF_EN` a prefix, so the word boundary goes on the name's free side
