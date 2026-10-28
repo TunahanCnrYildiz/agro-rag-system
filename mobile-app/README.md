@@ -20,11 +20,20 @@ npm run ios        # iOS simulator (macOS only)
 
 ## API endpoint
 
-Set `EXPO_PUBLIC_API_BASE` (in `mobile-app/.env` — see `.env.example` — or the
-shell / EAS build env) to wherever the backend runs; `src/api.ts` reads it at
-bundle time and falls back to a LAN IP only when it is unset. `127.0.0.1` only
-works when the app and API share a machine (e.g. web preview); a physical device
-or emulator needs a reachable address:
+Set `EXPO_PUBLIC_API_BASE` to wherever the backend runs; `src/api.ts` reads it at
+**bundle time** and falls back to a LAN IP only when it is unset.
+
+- **Builds (APK / IPA):** it lives in `eas.json`'s build profiles, already set to
+  the hosted API. That is the one place a build should take it from.
+- **A one-off local run:** set it in the shell, for that one command only:
+  `EXPO_PUBLIC_API_BASE=http://127.0.0.1:8000 node node_modules/expo/bin/cli start --web --clear`
+- **Never in `mobile-app/.env`.** Because the value is read at bundle time,
+  whatever that file holds is baked into the next build: a local address left
+  there ships to real phones, which then cannot reach the backend, and nothing in
+  the build says so. `.env.example` is kept only to document the values.
+
+`127.0.0.1` only works when the app and API share a machine (e.g. web preview); a
+physical device or emulator needs a reachable address:
 
 - Android emulator → `http://10.0.2.2:8000`
 - Physical device → `http://<your-machine-LAN-IP>:8000`
