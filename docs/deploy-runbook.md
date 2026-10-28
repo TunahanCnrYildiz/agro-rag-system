@@ -15,6 +15,19 @@ deploy. Nothing here changes local dev — local stays the default.
 1. **Persistent disk for the store.** `data/vector_store` (~1.4 GB) is gitignored.
    Attach a persistent volume and copy or re-ingest the store onto it. The
    container mounts it (see `docker-compose.yml` / your host's volume config).
+   - **The volume is ALL of `data/`, not just the store - and it must carry the
+     tracked JSON files too.** `.dockerignore` keeps `data/` out of the image
+     and `docker-compose.yml` mounts `./data:/app/data`, so at runtime every
+     file under `data/` comes from the host. The app reads tracked files from
+     there: `crop_norms.json`, `world_norms.json`, `crop_fao_map.json`,
+     `country_aliases.json`, `product_doses.json`, `fertplan_table.json`. A
+     volume holding only the store starts fine and **raises nothing** - measured
+     2026-10-28 with those files deleted: `extract_country("Fransa'dayım")`
+     returns `None`, `norms.lookup` returns `None`, and a French grower is asked
+     for his Turkish province. The TÜİK figures, the FAOSTAT world layer, country
+     recognition and the dose card are all silently off. The simplest way to
+     keep them is for the host's `./data` to be the repo checkout's own `data/`,
+     so `git pull` updates the JSON files beside the store.
 2. **Backend env (host secret store, never committed):**
    - `CHAT_PROVIDER=openrouter`, `OPENROUTER_API_KEY=...`, `OPENROUTER_MODEL=...`
    - `EMBEDDING_BASE_URL=...`, `EMBEDDING_API_KEY=...`, `EMBEDDING_MODEL=BAAI/bge-m3`,
@@ -66,31 +79,60 @@ What that build predates: the three cards themselves, the `/api/chat` rate
 limit, and the crop-norms data layer in its entirety — `data/crop_norms.json`
 does not exist in it. The file was created on 2026-08-19, fifteen days after
 that build, and thirteen commits have rewritten it since.
-Redeploying brings all of that at once, plus three config defaults that moved
-underneath the features and won't announce themselves.
+It also predates the whole FAOSTAT world layer (`world_norms.json`, country
+recognition from the conversation, a foreign grower's country figures in the
+answer) and the server-side history budget - all landed in September and
+October 2026.
+Redeploying brings all of that at once, plus four config defaults that moved
+underneath the features and won't announce themselves. Every one of the data
+features needs its JSON file on the volume - see step 1 of the checklist above.
 
-**Three defaults that changed underneath the features:**
+**Four defaults that changed underneath the features:**
 
 1. **`max_tokens`: 2048 → 3072 — this one needs a decision, not just a
    redeploy.** `src/config.py` raised the reply budget from 2048 to 3072, and
-   the number is measured, not preference: the crop_choice question is the
-   longest context block at 3,452 prompt tokens on its own, 4,681 once the
-   mobile client's full history budget rides along, and 4,681 + 3,072 = 7,753
-   of 8,192, so 439 tokens spare. That headroom was measured against the LOCAL
-   model's 8,192-token window. This repository does not know what
-   `OPENROUTER_MODEL` names, so confirming the hosted model's window is on you
-   — it is not an assertion this file can make for you. If that window is
-   smaller, the failure does not look like the old one: instead of an ANSWER
-   visibly cut mid-sentence, the PROMPT is silently truncated and drops the
-   system instructions first.
-   `SEND_BUDGET_CHARS` in `mobile-app/src/chatStore.ts` is the other half of
-   this number and cannot move independently of `max_tokens`.
+   the number is measured, not preference.
+   **Re-measured 2026-10-28** after the country lines grew the crop_choice
+   block: the worst prompt assembled from real parts, each at its observed
+   maximum (the longest block, a retrieved context at the k × chunk_size cap,
+   a full 3,000-character history), is **4,517 tokens; 4,517 + 3,072 = 7,589,
+   so the hosted model needs a context window of at least ~7,600 tokens.** On
+   the LOCAL model's 8,192 that leaves 603 spare. The 2026-08-13 figure (4,681,
+   439 spare) stays the conservative floor; its context was token-denser.
+   This repository does not know what `OPENROUTER_MODEL` names, so confirming
+   the hosted model's window is on you — it is not an assertion this file can
+   make for you.
+   **What an overshoot does, measured on LM Studio only:** a prompt that fits
+   but leaves less than `max_tokens` of room gets its ANSWER cut at the window
+   edge (`finish_reason: length`); a prompt larger than that is accepted with
+   HTTP 200 and its MIDDLE silently dropped. A canary at the top of the system
+   prompt survived that cut, so on LM Studio it is old turns that go, not the
+   system instructions — an earlier revision of this item said the opposite,
+   without having measured it. **The hosted server's overshoot behaviour is
+   unmeasured**; it may reject, or cut from the start.
+   Three values move together and none may be raised without re-measuring
+   this: `max_tokens`, `history_budget_chars` (item 4) and `SEND_BUDGET_CHARS`
+   in `mobile-app/src/chatStore.ts`.
 2. `vector_store_url` and `vector_store_sha256` now carry real defaults, so a
    container starting on an empty volume downloads the real archive instead of
    falling back to the fetch-and-ingest path. An improvement, and still a
    behaviour change worth knowing about before it happens.
 3. `rate_limit_per_minute` defaults to 60. Nothing needs setting;
    `RATE_LIMIT_PER_MINUTE=0` disables it.
+4. **`history_budget_chars` defaults to 3000 — the server now bounds the
+   conversation the model sees.** Until 2026-10-28 that bound lived in the mobile
+   client alone; the web widget sends `history.slice()`, its whole conversation,
+   and the server appended every turn. Measured on LM Studio, +290 prompt tokens
+   per web exchange: at 7 exchanges prompt + `max_tokens` passed the window, at
+   11 the answer was cut, from 16 the server silently dropped the middle of the
+   prompt. Now the newest whole turns that fit 3,000 characters reach the model,
+   by the mobile client's own rule, so a web prompt no longer grows with the
+   chat: on one question it measured flat at or under 4,050 tokens from 0 to 40
+   exchanges, and the bound for any question is item 1's 4,517.
+   **A behaviour change worth knowing:** in a long web conversation the model no
+   longer sees old turns. Routing, retrieval and location are still read off the
+   FULL history, so a province or country the user stated long ago is still
+   found. Mobile is unaffected — it already sends within this budget.
 
 **Note on `--proxy-headers` — not a step.** `docker-entrypoint.sh` starts the
 backend as `exec uvicorn src.main:app --host 0.0.0.0 --port "${PORT:-8000}"` —
@@ -115,6 +157,13 @@ go stale.
 3. The startup log line: `[main] rate limit: 60 requests/minute on
    /api/chat, counted globally rather than per caller. Set
    RATE_LIMIT_PER_MINUTE=0 to disable.`
+4. **The data files are on the volume** — this is the check nothing else makes,
+   because their absence raises no error (see step 1):
+   `docker compose exec api ls /app/data` must list `crop_norms.json`,
+   `world_norms.json`, `crop_fao_map.json`, `country_aliases.json`,
+   `product_doses.json` and `fertplan_table.json` beside `vector_store`. Then
+   one behavioural check: ask "Fransa'dayım, bu yıl buğday mı ekmeliyim?" — the
+   answer must name France's FAOSTAT figures, not ask for a Turkish province.
 
 **What this does not do.** The rate limit lives on `main`, not in production,
 so the live endpoint stays open to unlimited requests until this redeploy
