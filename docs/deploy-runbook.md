@@ -62,8 +62,17 @@ deploy. Nothing here changes local dev — local stays the default.
      a warning while it is `*`).
 3. **Deploy the backend** (Docker image builds from the repo `Dockerfile`).
    Confirm `GET /health` returns the expected provider + model.
-4. **Mobile build:** set `EXPO_PUBLIC_API_BASE` to the hosted URL (EAS build env
-   or `mobile-app/.env`) and rebuild. See `mobile-app/.env.example`.
+4. **Mobile build:** set `EXPO_PUBLIC_API_BASE` to the hosted URL **in the EAS
+   build env** - `mobile-app/eas.json`, which already carries
+   `https://poc.runiksoft.com` for the current host - and rebuild.
+   **Never in `mobile-app/.env`.** Expo reads `EXPO_PUBLIC_*` at BUNDLE time, so
+   whatever that file holds is baked into the next APK: a local or LAN base left
+   there ships to real phones and the app cannot reach the backend, with nothing
+   in the build to say so. For a one-off local run, set it in the shell for that
+   command only. After building, check the extracted
+   `assets/index.android.bundle` for the hosted host AND for the absence of any
+   local one - checking only that the right one is present can pass for the
+   wrong reason, since `src/api.ts`'s committed fallback is a LAN IP.
 5. **Web widget:** point its backend URL at the hosted API.
 6. **Verify quality held:** run `python -m evals.run_eval` against the hosted
    config before announcing the deploy.
