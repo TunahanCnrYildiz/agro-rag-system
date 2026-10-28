@@ -2340,14 +2340,48 @@ def _build_messages(
         system_content = f"{context_block}\n\n{system_content}"
 
     messages: list[dict] = [{"role": "system", "content": system_content}]
-    # Carry prior turns for conversational continuity.
-    for turn in history or []:
-        role = turn.get("role")
-        content = turn.get("content")
-        if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
+    # Carry prior turns for conversational continuity - the most recent ones that
+    # fit the history budget. See _within_history_budget.
+    messages.extend(_within_history_budget(history, settings.history_budget_chars))
     messages.append({"role": "user", "content": message})
     return messages
+
+
+def _within_history_budget(history: list[dict] | None, budget: int) -> list[dict]:
+    """The newest whole turns whose content fits in `budget` characters.
+
+    THIS IS THE ONLY PLACE THE CONVERSATION IS BOUNDED for the model. Before it,
+    the 3,000-character budget lived in the mobile client alone; the web widget
+    sends its entire history and nothing here capped it. Measured 2026-10-28 on
+    LM Studio, +290 prompt tokens per web exchange: at 7 exchanges prompt +
+    max_tokens passed the 8,192 window, at 11 the answer was cut at the window
+    edge, and from 16 the server returned 200 having silently dropped the middle
+    of the prompt. See config.py's history_budget_chars.
+
+    THE SAME RULE AS mobile-app/src/chatStore.ts's recentWithinBudget, on
+    purpose: walk back from the newest turn and STOP at the first that would
+    overflow, rather than skip it and keep going - dropping a turn from the
+    middle hands the model a conversation that jumps. A turn is never cut in
+    half. So a mobile history, already trimmed by that rule, passes through
+    unchanged.
+
+    It bounds the MODEL'S VIEW ONLY. Callers still hand the full history to the
+    router, to retrieval and to _context_block, so a location stated in a turn
+    this drops is still found - and lands in the system prompt, which no budget
+    here touches.
+    """
+    turns = [{"role": t.get("role"), "content": t.get("content")}
+             for t in history or []
+             if t.get("role") in ("user", "assistant") and t.get("content")]
+    kept: list[dict] = []
+    used = 0
+    for turn in reversed(turns):
+        cost = len(turn["content"])
+        if used + cost > budget:
+            break
+        used += cost
+        kept.insert(0, turn)
+    return kept
 
 
 # --------------------------------------------------------------------------- #

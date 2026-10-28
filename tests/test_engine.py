@@ -4289,3 +4289,112 @@ def test_the_guard_patterns_are_scored_through_the_shipped_alias_key():
             for alias in engine._code_aliases(code):
                 assert not engine._guard_hits(
                     guard, engine._alias_key(alias, side), folded), (name, text)
+
+
+# --------------------------------------------------------------------------- #
+# The server-side history budget
+# --------------------------------------------------------------------------- #
+def _mobile_recent_within_budget(history, budget=3000):
+    """A line-for-line Python mirror of mobile-app/src/chatStore.ts's
+    recentWithinBudget, so the server rule can be checked AGAINST the client's
+    rather than against a restatement of itself."""
+    out, used = [], 0
+    for turn in reversed(history):
+        cost = len(turn["content"])
+        if used + cost > budget:
+            break
+        used += cost
+        out.insert(0, turn)
+    return out
+
+
+def _turns(*sizes):
+    """Alternating user/assistant turns of exactly the given lengths, each
+    tagged so a test can tell which ones survived."""
+    return [{"role": "user" if i % 2 == 0 else "assistant",
+             "content": f"T{i}:" + "x" * (size - len(f"T{i}:"))}
+            for i, size in enumerate(sizes)]
+
+
+def test_a_history_under_the_budget_reaches_the_model_whole():
+    history = _turns(400, 900, 300, 1200)          # 2,800 chars
+    msgs = engine._build_messages("soru", history, "CTX", [])
+    assert msgs[1:-1] == history
+
+
+def test_a_history_over_the_budget_keeps_the_newest_whole_turns():
+    """The newest turns that fit, as a contiguous run ending at the latest turn,
+    and never a turn cut in half."""
+    history = _turns(1000, 1000, 1000, 1000, 1000)  # 5,000 chars
+    kept = engine._within_history_budget(history, 3000)
+    assert kept == history[-3:]
+    assert sum(len(t["content"]) for t in kept) <= 3000
+    assert all(t in history for t in kept)          # nothing truncated
+
+
+def test_the_budget_stops_at_the_first_overflow_rather_than_skipping_it():
+    """A long turn in the middle ends the walk; an older short turn beyond it is
+    NOT picked up, because dropping a turn from the middle would hand the model a
+    conversation that jumps. The mobile client draws the same line."""
+    history = _turns(200, 2900, 100, 100)
+    kept = engine._within_history_budget(history, 3000)
+    assert kept == history[-2:]
+    assert history[0] not in kept
+
+
+def test_a_mobile_trimmed_history_passes_through_unchanged():
+    """THE MOBILE CLIENT IS ALREADY WITHIN THIS BUDGET, by the same rule, so for
+    it the server budget must be a no-op - otherwise the two would disagree about
+    the same conversation. Checked against a mirror of the client's own function
+    over several shapes, not against this module's description of it."""
+    for sizes in [(1500, 1500, 1500), (100,) * 40, (2999,), (3001, 10),
+                  (800, 1200, 400, 900, 300), (1000, 1000, 1000, 1)]:
+        history = _turns(*sizes)
+        mobile_sends = _mobile_recent_within_budget(history)
+        assert engine._within_history_budget(mobile_sends, 3000) == mobile_sends
+        # and on the raw history the two rules agree outright
+        assert engine._within_history_budget(history, 3000) == mobile_sends
+
+
+def test_the_budget_bounds_the_model_but_not_where_the_user_is(monkeypatch):
+    """IT BOUNDS THE MODEL'S VIEW ONLY. A province stated in a turn the budget
+    drops must still place the user: answer() reads location off the FULL
+    history and writes it into the system prompt, which the budget never
+    touches. Asserted on what the model is actually sent."""
+    sent = {}
+
+    class _Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    sent["messages"] = kwargs["messages"]
+                    return _fake_llm("Cevap.").chat.completions.create()
+
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine, "_get_llm", lambda: _Client())
+    history = [{"role": "user", "content": "Konya'dayım"},
+               {"role": "assistant", "content": "a" * 1500},
+               {"role": "user", "content": "anladım"},
+               {"role": "assistant", "content": "b" * 1500}]
+    engine.answer("Bu yıl buğday mı ekmeliyim?", history)
+    msgs = sent["messages"]
+    assert "Kullanicinin ili: Konya." in msgs[0]["content"]      # still placed
+    assert {"role": "user", "content": "Konya'dayım"} not in msgs  # but not sent
+    assert sum(len(m["content"]) for m in msgs[1:-1]) <= 3000
+
+
+def test_the_web_widgets_unbounded_history_is_bounded_on_the_server():
+    """The regression this exists for. The web widget sends history.slice() - the
+    whole conversation - and the server used to append every turn, so 16 web
+    exchanges drove LM Studio to silently drop the middle of the prompt.
+    Twenty exchanges of ~1,200-character answers now reach the model as at most
+    3,000 characters of history."""
+    history = []
+    for _ in range(20):
+        history += [{"role": "user", "content": "Peki bunun için ne önerirsin?"},
+                    {"role": "assistant", "content": "y" * 1200}]
+    msgs = engine._build_messages("soru", history, "CTX", [])
+    assert sum(len(m["content"]) for m in msgs[1:-1]) <= 3000
+    assert msgs[-2] == history[-1]                  # the newest turn is kept
