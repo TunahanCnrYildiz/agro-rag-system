@@ -262,3 +262,80 @@ def test_ne_miktarda_and_orani_are_dose_questions(query):
     # were missing from the amount signal, so real dose questions fell through
     # to the default corpus route. Measured 2026-08-25 (post-fix review).
     assert router.classify_by_rules(query) == "product_dose"
+
+
+# A nutrient-qualified "gübre" with a rate - the class the dose route hijacked.
+_FERTILIZER_CLASS_QUESTIONS = [
+    "Meranın otlatma kapasitesini artırmak için dekara kaç kilogram azotlu gübre uygulanmalıdır?",
+    "Buğdaya dekara kaç kg azotlu gübre verilir?",
+    "Dekara ne kadar fosforlu gübre atılmalı?",
+    "Mısıra dekara kaç kilo potasyumlu gübre gerekir?",
+    "Potaslı gübre dekara ne kadar verilmeli?",
+    "Dekara kaç kg kükürtlü gübre uygulanır?",
+    "Kalsiyumlu gübre dekara ne kadar atılır?",
+    "Magnezyumlu gübre dekara kaç kilo verilmeli?",
+    "Dekara ne kadar çinkolu gübre gerekir?",
+    "Borlu gübre dekara kaç kilo atılır?",
+    "Demirli gübre dekara ne kadar uygulanmalı?",
+    "Azotlu gübreler dekara ne kadar verilir?",
+]
+
+# The user's OWN fertilizer - possessed, definite or named. The first four carry
+# the same nutrient qualifier as the class above, so they are the inputs that
+# can break the bare-"gübre" sub-decision.
+_FERTILIZER_IN_HAND_QUESTIONS = [
+    "Azotlu gübremi dekara ne kadar atmalıyım?",
+    "Aldığım azotlu gübreyi dekara kaç kilo vereyim?",
+    "Bu azotlu gübreden dekara ne kadar atmalıyım?",
+    "Elimdeki fosforlu gübreyi dekara ne kadar vereyim?",
+    "Gübreyi dekara kaç litre vermeliyim?",
+    "Domates için gübreden dekara ne kadar atmalıyım?",
+    "HİGRO BARF dekara ne kadar kullanmalıyım?",
+    "HİGRO FUBBY'nin dekara dozu nedir?",
+]
+
+
+@pytest.mark.parametrize("query", _FERTILIZER_CLASS_QUESTIONS)
+def test_a_nutrient_qualified_fertilizer_is_a_class_not_a_dose(query):
+    """A REGRESSION THAT STOOD TWO MONTHS. quant_mera_nitrogen_dose passed 8/8 on
+    the 2026-08-13 answer-eval baseline; the dose route landed 2026-08-25 and
+    from then on the first sentence above got the dose card's fixed intro in 0 s
+    instead of an answer. The no-product half of the dose rule reads "gübre" as
+    a product, and "azotlu gübre" is a fertilizer CLASS - the same thing
+    "Dekara kaç kilo azot gerekir?" asks, which already routes to nutrition."""
+    assert router.classify_by_rules(query) == "nutrition"
+
+
+@pytest.mark.parametrize("query", _FERTILIZER_IN_HAND_QUESTIONS)
+def test_a_fertilizer_in_hand_keeps_the_dose_card(query):
+    """THE SUB-DECISION IS WHETHER "gübre" IS BARE. The qualifier alone does not
+    make a class: "Azotlu gübremi" is the user's own nitrogen fertilizer, and the
+    dose card is the right answer to it."""
+    assert router.classify_by_rules(query) == "product_dose"
+
+
+def test_the_class_questions_reach_the_rule_they_test():
+    """WITHOUT THIS, THE TWO TESTS ABOVE COULD PASS ON NOTHING. This branch has
+    met the vacuous zero more than once: a refusal set that cannot reach the
+    rule under test proves nothing about it, and the routing set's own
+    "product_dose: zero wrong entries" was one, with no nutrient-class question
+    in it. So every class question is asserted to satisfy BOTH conditions of the
+    no-product dose clause - a dose phrase and the "gübre" stem - which is to
+    say each one would route product_dose but for the carve-out. And the
+    carve-out is asserted to be the reason, by the class pattern matching it.
+
+    The sub-decision gets the same treatment: the in-hand questions that carry a
+    nutrient qualifier are asserted NOT to match the class pattern, so the
+    bare-"gübre" gate is what keeps them a dose."""
+    from src.engine import _normalize_tr
+    for query in _FERTILIZER_CLASS_QUESTIONS:
+        folded = _normalize_tr(query)
+        assert router._has_stem(folded, router._DOSE_PHRASES), query
+        assert router._has_stem(folded, router._FERTILIZER_PRODUCT_STEM), query
+        assert router._FERTILIZER_CLASS.search(folded), query
+    qualified_in_hand = [q for q in _FERTILIZER_IN_HAND_QUESTIONS
+                         if any(e + "l" in _normalize_tr(q)
+                                for e in router._NUTRIENT_ELEMENTS)]
+    assert len(qualified_in_hand) == 4
+    for query in qualified_in_hand:
+        assert not router._FERTILIZER_CLASS.search(_normalize_tr(query)), query
