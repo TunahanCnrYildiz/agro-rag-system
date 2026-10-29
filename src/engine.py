@@ -26,6 +26,7 @@ try:
         build_language_instruction,
         settings,
     )
+    from .language import detect_language
 except ImportError:  # pragma: no cover
     from config import (  # type: ignore
         ARTICLES_JSON,
@@ -35,6 +36,7 @@ except ImportError:  # pragma: no cover
         build_language_instruction,
         settings,
     )
+    from language import detect_language  # type: ignore
 
 
 # --------------------------------------------------------------------------- #
@@ -89,46 +91,6 @@ class ChatResult:
             "compare_form": self.compare_form,
             "article": self.article.as_api() if self.article else None,
         }
-
-
-# --------------------------------------------------------------------------- #
-# Language detection (lightweight, dependency-free)
-# --------------------------------------------------------------------------- #
-_TURKISH_HINT = re.compile(r"[çÇğĞıİöÖşŞüÜ]")
-
-# Function words unlikely to collide with common English words (excludes
-# e.g. "her", "kim", "once", "mi" which are also everyday English tokens/names).
-_TURKISH_STOPWORDS = {
-    "bir", "ve", "bu", "su", "cok", "gibi", "icin", "için", "ile", "ama",
-    "fakat", "ancak", "veya", "degil", "değil", "var", "yok",
-    "nasil", "nasıl", "neden", "nicin", "niçin", "nerede",
-    "iyi", "kotu", "kötü", "buyuk", "büyük", "kucuk", "küçük",
-    "sonra", "simdi", "şimdi", "tum", "tüm", "kendi", "benim", "senin",
-    "lutfen", "lütfen", "merhaba", "selam", "tesekkur", "teşekkür",
-    "evet", "hayir", "hayır", "mumkun", "mümkün", "gerek", "lazim", "lazım",
-}
-
-# Agriculture/botany word stems, matched as token prefixes so suffixed forms
-# (yapraklarim, topragim, sarariyor, ...) are caught even without diacritics.
-_TURKISH_STEMS = (
-    "yapra", "topra", "gubre", "gübre", "bitki", "sarar", "sari", "sarı",
-    "besin", "domates", "cice", "çiçe", "tohum", "hastal", "zararl", "sera",
-    "meyve", "sebze", "urun", "ürün", "hasat", "ekim", "sulama", "mahsul",
-    "verim",
-)
-
-
-def detect_language(text: str) -> str:
-    """Return a coarse language hint ('Turkish' / 'English') used only to
-    nudge the model; the model still does its own detection."""
-    if _TURKISH_HINT.search(text):
-        return "Turkish"
-    tokens = re.findall(r"[a-zA-ZçÇğĞıİöÖşŞüÜ]+", text.lower())
-    if set(tokens) & _TURKISH_STOPWORDS:
-        return "Turkish"
-    if any(t.startswith(stem) for t in tokens for stem in _TURKISH_STEMS):
-        return "Turkish"
-    return "English"
 
 
 # --------------------------------------------------------------------------- #
