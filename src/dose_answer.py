@@ -231,12 +231,14 @@ SEASON_REFUSAL = (
 )
 
 # Written to stand alone: a deployed client that cannot draw the card shows only
-# this, so it names what it needs instead of pointing at a widget.
+# this, so it names what it uses instead of pointing at a widget - without
+# asking for it, because the mobile card can arrive with the area already
+# filled from the profile (see budget.ASK_FOR_NUMBERS).
 ASK_FOR_INPUTS = (
-    "Hangi üründen ne kadar almanız gerektiğini hesaplayabilirim. Üç şeye "
-    "ihtiyacım var: ürün, tarlanızın grubu (sebze, meyve veya tarla bitkisi) ve "
-    "alanı. Bunları verirseniz üreticinin dekara yayımladığı dozu alanınızla "
-    "çarpar, bir uygulamada gereken miktarı söylerim."
+    "Hangi üründen ne kadar almanız gerektiğini hesaplayabilirim. Hesap üç şeyle "
+    "yapılır: ürün, tarlanızın grubu (sebze, meyve veya tarla bitkisi) ve alanı. "
+    "Üreticinin dekara yayımladığı dozu alanla çarpar, bir uygulamada gereken "
+    "miktarı söylerim."
 )
 
 # The failure mode of this route is silence, never a guess: there is no fallback
