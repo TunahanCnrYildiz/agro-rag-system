@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from src import norms
-from src.budget import FieldError, format_qty, format_tr
+from src.budget import FieldError, currency_symbol, format_qty, format_tr, source_note
 from src.engine import _TR_SUFFIXES, _family_head, _label_head, _normalize_tr
 
 
@@ -211,10 +211,18 @@ def named_crops(message: str) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class CompareInputs:
-    """Two crop ids the farmer chose, and the province their figures come from."""
+    """Two crop ids the farmer chose, and the place their figures come from:
+    a province (TÜİK, lira) or, for a farmer abroad, a country as FAOSTAT
+    spells it (FAOSTAT, dollars)."""
     first: str
     second: str
     province: str | None = None
+    currency: str = "TRY"
+
+
+# Whose figures, in the words the answer uses. The currency follows the source:
+# TÜİK publishes provinces in lira, FAOSTAT countries in dollars (budget._MONEY).
+_PLACE_WORD = {"TRY": "il", "USD": "ülke"}
 
 
 def _known(table) -> dict[str, str]:
@@ -222,7 +230,8 @@ def _known(table) -> dict[str, str]:
     return {row.crop: row.label for row in (table or ())}
 
 
-def validate(raw: object, table) -> tuple[CompareInputs | None, list[FieldError]]:
+def validate(raw: object, table,
+             currency: str = "TRY") -> tuple[CompareInputs | None, list[FieldError]]:
     """Read both selections, collect every error. Never raises.
 
     The ids are checked against the table rather than believed: they arrive
@@ -241,7 +250,8 @@ def validate(raw: object, table) -> tuple[CompareInputs | None, list[FieldError]
             errors.append(FieldError(field, f"{label} seçin."))
         elif value not in known:
             errors.append(FieldError(
-                field, f"{label} için bu ilde yayımlanmış bir rakam yok."))
+                field, f"{label} için bu {_PLACE_WORD[currency]}de yayımlanmış "
+                       f"bir rakam yok."))
         else:
             chosen.append(value)
 
@@ -251,7 +261,7 @@ def validate(raw: object, table) -> tuple[CompareInputs | None, list[FieldError]
 
     if errors:
         return None, errors
-    return CompareInputs(first=chosen[0], second=chosen[1]), []
+    return CompareInputs(first=chosen[0], second=chosen[1], currency=currency), []
 
 
 def form_spec(errors: list[FieldError], table, submitted: object = None,
@@ -393,13 +403,24 @@ ASK_FOR_CROPS = (
     "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
     "ilinizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
 )
+ASK_FOR_CROPS_COUNTRY = (
+    "Karşılaştırayım: hangi iki ürünü düşünüyorsunuz? İkisini seçerseniz "
+    "ülkenizde yayımlanmış verim ve fiyat rakamlarını yan yana koyarım."
+)
+ATTRIBUTION_COUNTRY = (
+    "Rakamlar FAOSTAT'ın yayımladığı ülke ortalamalarıdır; tek bir tarlanın "
+    "verimi veya sizin alacağınız fiyat için öngörü değildir."
+)
 
-# Written to stand alone: without a province there is no provincial figure to
-# print, and guessing one produces confidently wrong numbers.
+# Written to stand alone: without a place there is no published figure to
+# print, and guessing one produces confidently wrong numbers. It names the
+# country option too, with its example written out in full - a farmer abroad
+# has no province to give, and the location matcher reads "Fransa'dayım".
 NO_PROVINCE = (
-    "Karşılaştırma yapabilmem için hangi ilde olduğunuzu bilmem gerekiyor; "
-    "verim ve fiyat rakamları ilden ile değişiyor. İlinizi yazarsanız o ilin "
-    "yayımlanmış rakamlarını yan yana koyarım."
+    "Karşılaştırma yapabilmem için nerede olduğunuzu bilmem gerekiyor; verim ve "
+    "fiyat rakamları yerden yere değişiyor. İlinizi ya da yurt dışındaysanız "
+    "ülkenizi yazarsanız (örneğin \"Fransa'dayım\") oranın yayımlanmış "
+    "rakamlarını yan yana koyarım."
 )
 
 # The failure mode of this route is silence, never a guess.
@@ -409,7 +430,30 @@ COMPUTE_FAILED = (
 )
 
 
-def _crop_block(figures: CropFigures) -> list[str]:
+def _price_text(p, currency: str) -> str:
+    """A price as the source publishes it: lira per kg, dollars per ton - a
+    dollar price per kg at two decimals rounds away up to 15% (see
+    budget._PRICE_UNIT)."""
+    cur = currency_symbol(currency)
+    if currency == "USD":
+        return f"{format_tr(p.amount * 1000, 2)} {cur}/ton"
+    return f"{format_tr(p.amount, 2)} {cur}/kg"
+
+
+def _price_source(p) -> str:
+    """The price's provenance. TÜİK's stays "TÜİK <year>" as it always read; a
+    FAOSTAT one names the country and any estimate flag."""
+    return source_note(p) if p.scope == "ulke" else f"TÜİK {p.year}"
+
+
+def _revenue_text(amount: float, currency: str) -> str:
+    """Whole lira - a provincial gross per dekar in the hundred-thousands gains
+    nothing from kuruş - but cents for dollars, where a per-dekar figure can be
+    in the tens and whole dollars would round away several percent."""
+    return f"{format_tr(amount, 2 if currency == 'USD' else 0)} {currency_symbol(currency)}"
+
+
+def _crop_block(figures: CropFigures, currency: str = "TRY") -> list[str]:
     """One crop's lines. Says what is missing rather than printing a blank.
 
     BRANCH ORDER IS LOAD-BEARING. A genuine absence outranks everything; then
@@ -431,17 +475,18 @@ def _crop_block(figures: CropFigures) -> list[str]:
     case where there is no range to say it about.
     """
     if figures.missing == "verim":
-        return [f"**{figures.label}**: bu il için yayımlanmış verim rakamı yok."]
+        return [f"**{figures.label}**: bu {_PLACE_WORD[currency]} için yayımlanmış "
+                f"verim rakamı yok."]
 
     if figures.per_tree:
         y = figures.yield_value
         head = (f"**{figures.label}**: verim {format_qty(y.amount)} kg/ağaç "
-                f"(TÜİK {y.year}, {y.region})")
+                f"({source_note(y)})")
         if figures.price_value is not None:
             # A comma, not the revenue line's `×`: that sign announces a
             # product, and this route computes none for a per-tree crop.
-            head += (f", fiyat {format_tr(figures.price_value.amount, 2)} TL/kg "
-                     f"(TÜİK {figures.price_value.year})")
+            head += (f", fiyat {_price_text(figures.price_value, currency)} "
+                     f"({_price_source(figures.price_value)})")
         lines = [head]
         if y.recent_min is not None and y.recent_max is not None:
             lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
@@ -453,7 +498,7 @@ def _crop_block(figures: CropFigures) -> list[str]:
 
     if figures.missing == "fiyat":
         return [f"**{figures.label}**: verim {format_qty(figures.yield_value.amount)} "
-                f"kg/da (TÜİK {figures.yield_value.year}, {figures.yield_value.region}), "
+                f"kg/da ({source_note(figures.yield_value)}), "
                 f"ancak güncel yıl için yayımlanmış fiyat yok, bu yüzden gelir "
                 f"hesaplamıyorum."]
 
@@ -463,9 +508,9 @@ def _crop_block(figures: CropFigures) -> list[str]:
         # not gain anything from kurus, and the extra digits read as precision
         # a provincial average does not have.
         f"**{figures.label}** · dekara brüt gelir "
-        f"**{format_tr(figures.revenue_tl_da, 0)} TL**",
-        f"   verim {format_qty(y.amount)} kg/da (TÜİK {y.year}, {y.region}) × "
-        f"fiyat {format_tr(p.amount, 2)} TL/kg (TÜİK {p.year})",
+        f"**{_revenue_text(figures.revenue_tl_da, currency)}**",
+        f"   verim {format_qty(y.amount)} kg/da ({source_note(y)}) × "
+        f"fiyat {_price_text(p, currency)} ({_price_source(p)})",
     ]
     if y.recent_min is not None and y.recent_max is not None:
         lines.append(f"   verimde önceki 5 yıl: {format_qty(y.recent_min)}–"
@@ -498,9 +543,9 @@ def render(inputs: CompareInputs, figures: tuple[CropFigures, CropFigures]) -> s
     where = f" ({inputs.province})" if inputs.province else ""
     lines = [f"İki ürünün yayımlanmış rakamları{where}:", ""]
     for crop in figures:
-        lines.extend(_crop_block(crop))
+        lines.extend(_crop_block(crop, inputs.currency))
         lines.append("")
-    lines.append(ATTRIBUTION)
+    lines.append(ATTRIBUTION_COUNTRY if inputs.currency == "USD" else ATTRIBUTION)
     revenues = [crop.revenue_tl_da is not None for crop in figures]
     if all(revenues):
         lines.extend(["", NOT_PROFIT])
