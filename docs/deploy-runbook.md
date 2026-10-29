@@ -104,10 +104,13 @@ features needs its JSON file on the volume - see step 1 of the checklist above.
    **Re-measured 2026-10-28** after the country lines grew the crop_choice
    block: the worst prompt assembled from real parts, each at its observed
    maximum (the longest block, a retrieved context at the k × chunk_size cap,
-   a full 3,000-character history), is **4,517 tokens; 4,517 + 3,072 = 7,589,
-   so the hosted model needs a context window of at least ~7,600 tokens.** On
-   the LOCAL model's 8,192 that leaves 603 spare. The 2026-08-13 figure (4,681,
-   439 spare) stays the conservative floor; its context was token-denser.
+   a full 3,000-character history), is 4,517 tokens - **but that left out the
+   mobile profile turn, which rides on top of the 3,000** (item 4). Measured
+   2026-10-29 on the same assembly: a typical 98-char profile adds 35 tokens
+   (4,552), one at 386 of its 400-char cap adds 158 (**4,675; 4,675 + 3,072 =
+   7,747, so the hosted model needs a context window of at least ~7,800
+   tokens**). On the LOCAL model's 8,192 that leaves 445 spare - about the
+   2026-08-13 floor (4,681, 439 spare), which stays the conservative figure.
    This repository does not know what `OPENROUTER_MODEL` names, so confirming
    the hosted model's window is on you — it is not an assertion this file can
    make for you.
@@ -141,7 +144,16 @@ features needs its JSON file on the volume - see step 1 of the checklist above.
    **A behaviour change worth knowing:** in a long web conversation the model no
    longer sees old turns. Routing, retrieval and location are still read off the
    FULL history, so a province or country the user stated long ago is still
-   found. Mobile is unaffected — it already sends within this budget.
+   found. **Mobile passes through unchanged, because its profile turn is
+   exempt.** The app sends the profile ("Adım …, …'dayım, … yetiştiriyorum")
+   first, ahead of a conversation it has already trimmed to 3,000, so a long
+   mobile chat is over this budget by exactly that turn. The first revision of
+   this budget counted it like any turn and dropped it - the oldest - first:
+   measured 2026-10-29 at 7 exchanges, the province survived (it is read off
+   the full history) but the name and crops left the model's view. That
+   revision never reached production. The exemption covers only a leading user
+   turn ending in the app's own closing sentence, up to 400 characters; a
+   longer one is budgeted like any other.
 
 **Note on `--proxy-headers` — not a step.** `docker-entrypoint.sh` starts the
 backend as `exec uvicorn src.main:app --host 0.0.0.0 --port "${PORT:-8000}"` —

@@ -4342,18 +4342,79 @@ def test_the_budget_stops_at_the_first_overflow_rather_than_skipping_it():
     assert history[0] not in kept
 
 
-def test_a_mobile_trimmed_history_passes_through_unchanged():
+def _mobile_profile_turns(profile):
+    """A line-for-line mirror of mobile-app/app/(tabs)/chat.tsx's profileTurns."""
+    if not profile.get("name"):
+        return []
+    parts = [f"Adım {profile['name']}."]
+    if profile.get("province"):
+        parts.append(f"{profile['province']}'dayım.")
+    if profile.get("crops"):
+        parts.append(f"{profile['crops']} yetiştiriyorum.")
+    parts.append("Bunu aklında tut, her cevapta tekrar etme.")
+    return [{"role": "user", "content": " ".join(parts)}]
+
+
+def _mobile_payload(profile, history):
+    """What the mobile client actually sends: chat.tsx's requestHistory, the
+    profile turn FIRST and then the trimmed conversation. A mirror of
+    recentWithinBudget alone is the wrong partition - it leaves out the one
+    turn the budget is most likely to drop, because it is the oldest."""
+    return _mobile_profile_turns(profile) + _mobile_recent_within_budget(history)
+
+
+_PROFILE = {"name": "Ahmet", "province": "Konya", "crops": "domates, biber"}
+
+
+def test_a_mobile_payload_passes_through_unchanged():
     """THE MOBILE CLIENT IS ALREADY WITHIN THIS BUDGET, by the same rule, so for
     it the server budget must be a no-op - otherwise the two would disagree about
-    the same conversation. Checked against a mirror of the client's own function
-    over several shapes, not against this module's description of it."""
-    for sizes in [(1500, 1500, 1500), (100,) * 40, (2999,), (3001, 10),
-                  (800, 1200, 400, 900, 300), (1000, 1000, 1000, 1)]:
-        history = _turns(*sizes)
-        mobile_sends = _mobile_recent_within_budget(history)
-        assert engine._within_history_budget(mobile_sends, 3000) == mobile_sends
-        # and on the raw history the two rules agree outright
-        assert engine._within_history_budget(history, 3000) == mobile_sends
+    the same conversation. Checked against a mirror of the client's own payload,
+    profile turn included, over several shapes - not against this module's
+    description of it."""
+    for profile in (_PROFILE, {}):
+        for sizes in [(1500, 1500, 1500), (100,) * 40, (2999,), (3001, 10),
+                      (800, 1200, 400, 900, 300), (1000, 1000, 1000, 1),
+                      (1000, 1000, 1000)]:
+            sends = _mobile_payload(profile, _turns(*sizes))
+            assert engine._within_history_budget(sends, 3000) == sends, (
+                profile, sizes)
+
+
+def test_the_profile_turn_survives_a_full_mobile_history():
+    """THE REGRESSION THIS PINS: with the trimmed conversation at its 3,000 and
+    the profile turn on top, the payload is over the budget, and a plain walk
+    back from the newest turn drops the profile - the OLDEST turn - first.
+    Measured 2026-10-29 at 7 exchanges (3,076 chars): the province survived,
+    because location is read off the full history into the system prompt, but
+    the name and the crops left the model's view."""
+    history = _turns(1000, 1000, 1000)
+    sends = _mobile_payload(_PROFILE, history)
+    assert sum(len(t["content"]) for t in sends) > 3000
+    msgs = engine._build_messages("soru", sends, "CTX", [])
+    assert msgs[1]["content"] == sends[0]["content"]
+    assert "domates, biber" in msgs[1]["content"]
+
+
+def test_only_a_short_leading_profile_turn_is_exempt():
+    """The exemption is bounded, or it is a way around the budget: any client can
+    end a turn with the mobile's sentence. Only the FIRST turn qualifies, only a
+    user's, and only up to _PROFILE_TURN_MAX_CHARS - beyond that it is budgeted
+    like any other turn."""
+    sentinel = "Bunu aklında tut, her cevapta tekrar etme."
+    cap = engine._PROFILE_TURN_MAX_CHARS
+    history = _turns(1000, 1000, 1000)
+    at_cap = {"role": "user", "content": "x" * (cap - len(sentinel)) + sentinel}
+    over_cap = {"role": "user", "content": "x" * (cap + 1 - len(sentinel)) + sentinel}
+    assert engine._within_history_budget([at_cap] + history, 3000)[0] == at_cap
+    assert over_cap not in engine._within_history_budget([over_cap] + history, 3000)
+    # not first: the walk stops at the overflow as for any turn
+    late = {"role": "user", "content": "Adım Ahmet. " + sentinel}
+    assert late not in engine._within_history_budget(
+        _turns(10) + [late] + _turns(3000), 3000)
+    # an assistant turn ending that way is not a profile
+    said = {"role": "assistant", "content": "Adım Ahmet. " + sentinel}
+    assert said not in engine._within_history_budget([said] + history, 3000)
 
 
 def test_the_budget_bounds_the_model_but_not_where_the_user_is(monkeypatch):
