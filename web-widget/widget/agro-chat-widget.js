@@ -89,6 +89,13 @@
     "}" +
     ".product-chip:hover { background: #eef6e7; }" +
     ".product-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: " + BRAND.green + "; flex-shrink: 0; }" +
+    ".article-link {" +
+    "  align-self: flex-start; max-width: 88%; display: flex; flex-direction: column; gap: 2px; background: #fff;" +
+    "  border: 1px solid " + BRAND.greenLight + "; border-radius: 10px; padding: 8px 10px; text-decoration: none;" +
+    "}" +
+    ".article-link:hover { background: #eef6e7; }" +
+    ".article-link .kicker { color: #6b7a6b; font-size: 11px; }" +
+    ".article-link .title { color: " + BRAND.dark + "; font-size: 12.5px; font-weight: 600; }" +
     ".input-row { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e6e6e6; flex-shrink: 0; background: #fff; }" +
     ".input-row input {" +
     "  flex: 1; border: 1px solid #d7dcd0; border-radius: 20px; padding: 10px 14px; font-size: 13.5px; outline: none;" +
@@ -210,6 +217,23 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // At most one Akademi post, sent after the products and only when it clearly
+  // matches the question. It opens on the company's own site: the widget lives
+  // there, and has no article screen of its own.
+  function addArticle(messagesEl, article) {
+    // The link comes over the wire; only a web address becomes an href.
+    if (!article || !/^https?:\/\//.test(article.link || "")) return;
+    var a = el("a", { class: "article-link", href: article.link, target: "_blank", rel: "noopener" });
+    var kicker = el("span", { class: "kicker" });
+    kicker.textContent = "Akademi'den ilgili yazı";
+    var title = el("span", { class: "title" });
+    title.textContent = article.title;
+    a.appendChild(kicker);
+    a.appendChild(title);
+    messagesEl.appendChild(a);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   function initWidget() {
     var host = document.createElement("div");
     host.id = "agro-chat-widget-host";
@@ -268,6 +292,8 @@
                 try { evt = JSON.parse(line.slice(6)); } catch (e) { return; }
                 if (evt.type === "products") {
                   addProducts(ui.messages, evt.recommended_products);
+                } else if (evt.type === "article") {
+                  addArticle(ui.messages, evt.article);
                 } else if (evt.type === "token") {
                   if (firstToken) {
                     botBubble.classList.remove("typing");
