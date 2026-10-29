@@ -71,6 +71,10 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [restored, setRestored] = useState(false);
   const { profile } = useAuth();
+  const profileArea =
+    profile?.area && profile.areaUnit
+      ? { value: profile.area, unit: profile.areaUnit }
+      : null;
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -283,6 +287,7 @@ export default function ChatScreen() {
               {m.form && (
                 <BudgetCard
                   form={m.form}
+                  profileArea={profileArea}
                   disabled={loading}
                   onSubmit={(payload, summary) => {
                     if (loading) return;
@@ -305,6 +310,7 @@ export default function ChatScreen() {
               {m.doseForm && (
                 <DoseCard
                   form={m.doseForm}
+                  profileArea={profileArea}
                   disabled={loading}
                   onSubmit={(payload, summary) => {
                     if (loading) return;

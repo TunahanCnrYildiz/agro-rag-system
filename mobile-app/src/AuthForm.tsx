@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "./theme";
+import { AREA_UNITS, AreaUnit } from "./profileArea";
 
 export function Field({
   label,
@@ -33,6 +34,52 @@ export function Field({
         autoCorrect={false}
         {...props}
       />
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+/** A Field whose unit is a SELECTION beside it, as on the cards: "20" alone
+ *  would mean 20 dönüm or 200 dönüm depending on what the reader assumed. */
+export function AreaField({
+  label,
+  hint,
+  value,
+  onChangeText,
+  unit,
+  onUnitChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  unit: AreaUnit;
+  onUnitChange: (u: AreaUnit) => void;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.areaRow}>
+        <TextInput
+          style={[styles.input, styles.areaInput]}
+          placeholder="Örn. 20"
+          placeholderTextColor={colors.muted}
+          keyboardType="numeric"
+          value={value}
+          onChangeText={onChangeText}
+        />
+        {AREA_UNITS.map((u) => (
+          <Pressable
+            key={u.id}
+            onPress={() => onUnitChange(u.id)}
+            style={[styles.unit, unit === u.id && styles.unitActive]}
+          >
+            <Text style={[styles.unitText, unit === u.id && styles.unitTextActive]}>
+              {u.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
@@ -122,6 +169,19 @@ const styles = StyleSheet.create({
     color: colors.dark,
   },
   hint: { color: colors.muted, fontSize: 12, marginTop: 5 },
+  areaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  areaInput: { flex: 1, minWidth: 0 },
+  unit: {
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  unitActive: { backgroundColor: colors.green, borderColor: colors.green },
+  unitText: { color: colors.dark, fontSize: 14 },
+  unitTextActive: { color: colors.white, fontWeight: "600" },
   error: { color: "#b3261e", fontSize: 13, marginBottom: 10 },
   button: {
     backgroundColor: colors.green,

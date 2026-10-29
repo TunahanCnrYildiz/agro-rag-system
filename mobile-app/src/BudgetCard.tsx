@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { BudgetPayload, CropOption, FormSpec, NormCell } from "./api";
+import { FROM_PROFILE_NOTE, ProfileArea, areaForCard } from "./profileArea";
 import { colors } from "./theme";
 import { fold } from "./turkish";
 
@@ -19,21 +20,41 @@ interface Props {
   // stays rendered and tappable, so it needs the same submit gate as the
   // text input/send button.
   disabled: boolean;
+  // The area from the farmer's profile, if they gave one.
+  profileArea?: ProfileArea | null;
 }
 
-export default function BudgetCard({ form, onSubmit, disabled }: Props) {
+export default function BudgetCard({ form, onSubmit, disabled, profileArea }: Props) {
+  // Only a FRESH area field takes the profile's value. A rejected form echoes
+  // its unit back, and whatever it echoes - even an empty box the farmer
+  // cleared on purpose - is theirs and stays.
+  const areaField = form.fields.find((f) => f.id === "area");
+  const seededArea =
+    areaField && !areaField.value && areaField.unit === undefined
+      ? areaForCard(profileArea, areaField.units)
+      : null;
   // Seeded from the server's `value`, which is empty in P1 and prefilled by the
   // norm layer in P2 - so this card needs no change when that lands.
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(form.fields.map((f) => [f.id, f.value]))
+    Object.fromEntries(
+      form.fields.map((f) => [f.id, f.id === "area" && seededArea ? seededArea.value : f.value])
+    )
   );
   // A rejected form echoes back the unit the farmer had selected; fall back to
   // the field's first unit otherwise. Without this a rejection would snap
   // every chip back to its default and silently contradict the value sitting
   // next to it.
   const [units, setUnits] = useState<Record<string, string>>(() =>
-    Object.fromEntries(form.fields.map((f) => [f.id, f.unit ?? f.units[0].id]))
+    Object.fromEntries(
+      form.fields.map((f) => [
+        f.id,
+        f.id === "area" && seededArea ? seededArea.unit : f.unit ?? f.units[0].id,
+      ])
+    )
   );
+  // Said under the field until the farmer touches it, so a number they did not
+  // type in this card is never presented as if they had.
+  const [areaFromProfile, setAreaFromProfile] = useState(seededArea !== null);
   // Resolved once, from props, so both initializers below agree on which
   // crop (if any) the rejected form was echoing back.
   const echoedCrop = form.crop
@@ -193,6 +214,7 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
               onChangeText={(t) => {
                 setValues((p) => ({ ...p, [f.id]: t }));
                 setSources((p) => ({ ...p, [f.id]: "user" }));
+                if (f.id === "area") setAreaFromProfile(false);
               }}
               placeholder="0"
               placeholderTextColor="#9aa"
@@ -207,6 +229,7 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
                     if (units[f.id] === u.id) return;
                     setUnits((p) => ({ ...p, [f.id]: u.id }));
                     setSources((p) => ({ ...p, [f.id]: "user" }));
+                    if (f.id === "area") setAreaFromProfile(false);
                   }}
                   style={[
                     styles.unit,
@@ -227,6 +250,8 @@ export default function BudgetCard({ form, onSubmit, disabled }: Props) {
           </View>
           {f.error ? (
             <Text style={styles.error}>{f.error}</Text>
+          ) : f.id === "area" && areaFromProfile ? (
+            <Text style={styles.note}>{FROM_PROFILE_NOTE}</Text>
           ) : (
             sources[f.id] === "norm" && (() => {
               const cell = f.id === "yield_total" ? selected?.yield : f.id === "price" ? selected?.price : null;

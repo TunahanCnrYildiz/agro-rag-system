@@ -23,7 +23,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Field } from "../src/AuthForm";
+import { AreaField, Field } from "../src/AuthForm";
+import { AREA_ERROR, AreaUnit, isValidArea } from "../src/profileArea";
 import { ScreenHeader } from "../src/ScreenHeader";
 import { colors } from "../src/theme";
 import { forgetProfile, useAuth } from "../src/auth";
@@ -35,6 +36,8 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState(profile?.email ?? "");
   const [province, setProvince] = useState(profile?.province ?? "");
   const [crops, setCrops] = useState(profile?.crops ?? "");
+  const [area, setArea] = useState(profile?.area ?? "");
+  const [areaUnit, setAreaUnit] = useState<AreaUnit>(profile?.areaUnit ?? "donum");
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
 
@@ -50,8 +53,9 @@ export default function ProfileScreen() {
     if (!name.trim()) return setDetailError("Adınızı ve soyadınızı yazın.");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return setDetailError("Geçerli bir e-posta adresi yazın.");
+    if (area.trim() && !isValidArea(area)) return setDetailError(AREA_ERROR);
     setDetailError(null);
-    await updateProfile({ name, email, province, crops });
+    await updateProfile({ name, email, province, crops, area, areaUnit });
     setSavedMsg("Bilgileriniz kaydedildi.");
     setTimeout(() => setSavedMsg(null), 2500);
   }
@@ -130,6 +134,14 @@ export default function ProfileScreen() {
             value={crops}
             onChangeText={setCrops}
             autoCapitalize="none"
+          />
+          <AreaField
+            label="Tarla alanı"
+            hint="Hesap kartlarındaki alan kutusu buradan dolar."
+            value={area}
+            onChangeText={setArea}
+            unit={areaUnit}
+            onUnitChange={setAreaUnit}
           />
           {detailError ? <Text style={styles.error}>{detailError}</Text> : null}
           {savedMsg ? <Text style={styles.ok}>{savedMsg}</Text> : null}

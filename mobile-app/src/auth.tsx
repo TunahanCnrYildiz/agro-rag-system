@@ -32,6 +32,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
+import type { AreaUnit } from "./profileArea";
 
 const STORAGE_KEY = "eta.profile.v2";
 
@@ -45,6 +46,10 @@ export type Profile = {
    *  GROWS is at least as decisive as where they are, and it is the field the
    *  budget route's crop slot will eventually be filled from. */
   crops?: string;
+  /** As typed ("20", "2,5"), with its unit beside it - never stored without
+   *  one. Fills the cards' area field; see src/profileArea.ts. */
+  area?: string;
+  areaUnit?: AreaUnit;
 };
 
 type StoredProfile = Profile & { salt: string; digest: string };
@@ -56,6 +61,8 @@ type SignUpInput = {
   password: string;
   province?: string;
   crops?: string;
+  area?: string;
+  areaUnit?: AreaUnit;
 };
 
 type AuthState = {
@@ -83,6 +90,15 @@ type AuthState = {
    *  null when the e-mail does not match. */
   resetPassword: (email: string) => Promise<string | null>;
 };
+
+/** The area and its unit go in together or not at all: a unit with no number
+ *  is noise, and a number with no unit is the ambiguity the unit exists for. */
+function withArea(area?: string, unit?: AreaUnit) {
+  const value = area?.trim();
+  return value && unit
+    ? { area: value, areaUnit: unit }
+    : { area: undefined, areaUnit: undefined };
+}
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
@@ -166,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: input.email.trim(),
       province: input.province?.trim() || undefined,
       crops: input.crops?.trim() || undefined,
+      ...withArea(input.area, input.areaUnit),
       salt,
       digest: await digest(salt, input.password),
     };
@@ -177,6 +194,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: stored.email,
       province: stored.province,
       crops: stored.crops,
+      area: stored.area,
+      areaUnit: stored.areaUnit,
     });
   }, []);
 
@@ -196,6 +215,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: stored.email ?? "",
       province: stored.province,
       crops: stored.crops,
+      area: stored.area,
+      areaUnit: stored.areaUnit,
     });
     return true;
   }, []);
@@ -209,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: patch.email.trim(),
       province: patch.province?.trim() || undefined,
       crops: patch.crops?.trim() || undefined,
+      ...withArea(patch.area, patch.areaUnit),
     };
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     setProfile({
@@ -217,6 +239,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: merged.email,
       province: merged.province,
       crops: merged.crops,
+      area: merged.area,
+      areaUnit: merged.areaUnit,
     });
   }, []);
 

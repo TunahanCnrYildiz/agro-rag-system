@@ -11,6 +11,7 @@ import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { DoseFormSpec, DosePayload } from "./api";
+import { FROM_PROFILE_NOTE, ProfileArea, areaForCard } from "./profileArea";
 import { colors } from "./theme";
 // Shared with BudgetCard: typing "higro" has to find "HİGRO", and the dotted
 // I is exactly what a plain toLowerCase() gets wrong.
@@ -25,14 +26,24 @@ interface Props {
   // A stale card from an earlier turn stays rendered and tappable, so it needs
   // the same submit gate as the text input.
   disabled: boolean;
+  // The area from the farmer's profile, if they gave one.
+  profileArea?: ProfileArea | null;
 }
 
-export default function DoseCard({ form, onSubmit, disabled }: Props) {
+export default function DoseCard({ form, onSubmit, disabled, profileArea }: Props) {
+  // Only a FRESH card takes the profile's area. A rejected one always carries
+  // at least one error, and what it echoes - even an area the farmer cleared on
+  // purpose - is theirs and stays.
+  const fresh = !form.errors.product && !form.errors.group && !form.errors.area;
+  const seeded =
+    fresh && !form.area.value ? areaForCard(profileArea, form.area.units) : null;
   const [product, setProduct] = useState(form.product);
   const [query, setQuery] = useState(form.product);
   const [group, setGroup] = useState(form.group);
-  const [area, setArea] = useState(form.area.value);
-  const [unit, setUnit] = useState(form.area.unit);
+  const [area, setArea] = useState(seeded?.value ?? form.area.value);
+  const [unit, setUnit] = useState<string>(seeded?.unit ?? form.area.unit);
+  // Said under the field until the farmer touches it - the budget card's rule.
+  const [areaFromProfile, setAreaFromProfile] = useState(seeded !== null);
 
   // The list closes when the box already reads as the chosen product and
   // reopens the moment the text differs - the budget card's rule.
@@ -111,7 +122,10 @@ export default function DoseCard({ form, onSubmit, disabled }: Props) {
             style={styles.input}
             keyboardType="numeric"
             value={area}
-            onChangeText={setArea}
+            onChangeText={(t) => {
+              setArea(t);
+              setAreaFromProfile(false);
+            }}
             placeholder="0"
             placeholderTextColor="#9aa"
           />
@@ -119,7 +133,11 @@ export default function DoseCard({ form, onSubmit, disabled }: Props) {
             {form.area.units.map((u) => (
               <Pressable
                 key={u.id}
-                onPress={() => setUnit(u.id)}
+                onPress={() => {
+                  if (unit === u.id) return;
+                  setUnit(u.id);
+                  setAreaFromProfile(false);
+                }}
                 style={[styles.unit, unit === u.id && styles.unitActive]}
               >
                 <Text style={[styles.unitText, unit === u.id && styles.unitTextActive]}>
@@ -129,7 +147,11 @@ export default function DoseCard({ form, onSubmit, disabled }: Props) {
             ))}
           </View>
         </View>
-        {form.errors.area ? <Text style={styles.error}>{form.errors.area}</Text> : null}
+        {form.errors.area ? (
+          <Text style={styles.error}>{form.errors.area}</Text>
+        ) : areaFromProfile ? (
+          <Text style={styles.note}>{FROM_PROFILE_NOTE}</Text>
+        ) : null}
       </View>
 
       <Pressable
@@ -177,6 +199,8 @@ const styles = StyleSheet.create({
   unitText: { fontSize: 12, color: colors.dark },
   unitTextActive: { color: "#fff", fontWeight: "600" },
   error: { fontSize: 12, color: "#c0392b" },
+  // BudgetCard's provenance-note style.
+  note: { fontSize: 11, color: "#6b7a6b" },
   match: {
     paddingHorizontal: 10,
     paddingVertical: 9,

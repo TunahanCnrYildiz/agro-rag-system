@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Pressable, Text } from "react-native";
 import { router } from "expo-router";
-import { AuthScreen, Field, authStyles } from "../../src/AuthForm";
+import { AreaField, AuthScreen, Field, authStyles } from "../../src/AuthForm";
 import { useAuth } from "../../src/auth";
+import { AREA_ERROR, AreaUnit, isValidArea } from "../../src/profileArea";
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
@@ -13,6 +14,8 @@ export default function RegisterScreen() {
   const [password2, setPassword2] = useState("");
   const [province, setProvince] = useState("");
   const [crops, setCrops] = useState("");
+  const [area, setArea] = useState("");
+  const [areaUnit, setAreaUnit] = useState<AreaUnit>("donum");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -25,11 +28,12 @@ export default function RegisterScreen() {
       return setError("Geçerli bir e-posta adresi yazın.");
     if (password.length < 4) return setError("Şifre en az 4 karakter olmalı.");
     if (password !== password2) return setError("Şifreler birbirini tutmuyor.");
+    if (area.trim() && !isValidArea(area)) return setError(AREA_ERROR);
 
     setError(null);
     setBusy(true);
     try {
-      await signUp({ name, userId, email, password, province, crops });
+      await signUp({ name, userId, email, password, province, crops, area, areaUnit });
       router.replace("/(tabs)");
     } catch {
       setError("Profil kaydedilemedi. Lütfen tekrar deneyin.");
@@ -112,7 +116,14 @@ export default function RegisterScreen() {
         value={crops}
         onChangeText={setCrops}
         autoCapitalize="none"
-        onSubmitEditing={submit}
+      />
+      <AreaField
+        label="Tarla alanı (isteğe bağlı)"
+        hint="Hesap kartlarında alan bir daha sorulmaz, buradan gelir."
+        value={area}
+        onChangeText={setArea}
+        unit={areaUnit}
+        onUnitChange={setAreaUnit}
       />
     </AuthScreen>
   );
