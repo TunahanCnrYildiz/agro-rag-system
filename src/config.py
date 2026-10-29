@@ -33,6 +33,8 @@ DOCS_DIR: Path = PROJECT_ROOT / "docs"
 BOOKS_DIR: Path = DOCS_DIR / "books"
 PRODUCTS_DIR: Path = DOCS_DIR / "products"
 PRODUCTS_JSON: Path = PRODUCTS_DIR / "products.json"
+ARTICLES_DIR: Path = DOCS_DIR / "articles"
+ARTICLES_JSON: Path = ARTICLES_DIR / "articles.json"
 
 
 class Settings(BaseSettings):

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { MarkdownText } from "../../src/MarkdownText";
 import { ScreenHeader } from "../../src/ScreenHeader";
 import { colors } from "../../src/theme";
@@ -27,6 +28,7 @@ import {
   DosePayload,
   DoseFormSpec,
   FormSpec,
+  RecommendedArticle,
   RecommendedProduct,
   sendChatMessageStream,
 } from "../../src/api";
@@ -39,6 +41,7 @@ interface Message {
   role: "user" | "bot";
   text: string;
   products?: RecommendedProduct[];
+  article?: RecommendedArticle;
   form?: FormSpec;
   doseForm?: DoseFormSpec;
   compareForm?: CompareFormSpec;
@@ -208,6 +211,12 @@ export default function ChatScreen() {
           prev.map((m) => (m.id === botId ? { ...m, compareForm, question: text } : m))
         );
       },
+      // Sent after the answer and its products, so the message exists.
+      onArticle: (article) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, article } : m))
+        );
+      },
       onDone: () => {
         historyRef.current.push({ role: "user", content: text });
         historyRef.current.push({ role: "assistant", content: accumulated });
@@ -283,6 +292,25 @@ export default function ChatScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+              )}
+              {m.article && (
+                // Opens inside the app, on the Akademi tab's own article
+                // screen - the company's content stays in the company's app.
+                <TouchableOpacity
+                  style={styles.articleLink}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/article/[id]",
+                      params: { id: encodeURIComponent(m.article!.link) },
+                    })
+                  }
+                >
+                  <Ionicons name="book-outline" size={16} color={colors.green} />
+                  <View style={styles.articleBody}>
+                    <Text style={styles.articleLabel}>Akademi'den ilgili yazı</Text>
+                    <Text style={styles.articleTitle}>{m.article.title}</Text>
+                  </View>
+                </TouchableOpacity>
               )}
               {m.form && (
                 <BudgetCard
@@ -424,6 +452,23 @@ const styles = StyleSheet.create({
   },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
   productText: { color: colors.dark, fontSize: 12.5, flexShrink: 1 },
+  articleLink: {
+    alignSelf: "flex-start",
+    maxWidth: "88%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.greenLight,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  articleBody: { flexShrink: 1 },
+  articleLabel: { color: colors.muted, fontSize: 11 },
+  articleTitle: { color: colors.dark, fontSize: 12.5, fontWeight: "600" },
   inputRow: {
     flexDirection: "row",
     gap: 8,

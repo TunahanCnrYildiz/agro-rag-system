@@ -20,7 +20,7 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from .config import DOCS_DIR
+    from .config import ARTICLES_DIR, ARTICLES_JSON
     from .scrape_utils import (
         BASE_URL,
         REQUEST_DELAY_SECONDS,
@@ -29,7 +29,7 @@ try:
         make_session,
     )
 except ImportError:  # pragma: no cover
-    from config import DOCS_DIR  # type: ignore
+    from config import ARTICLES_DIR, ARTICLES_JSON  # type: ignore
     from scrape_utils import (  # type: ignore
         BASE_URL,
         REQUEST_DELAY_SECONDS,
@@ -37,9 +37,6 @@ except ImportError:  # pragma: no cover
         fetch,
         make_session,
     )
-
-ARTICLES_DIR = DOCS_DIR / "articles"
-ARTICLES_JSON = ARTICLES_DIR / "articles.json"
 
 # Block elements that become their own paragraph in the stored content.
 BLOCK_TAGS = ("p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote")
