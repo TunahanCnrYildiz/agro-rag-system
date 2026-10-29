@@ -172,6 +172,59 @@ def test_answer_has_no_article_under_a_refusal_or_a_fallback(monkeypatch):
     assert engine.answer("Toprağımın pH'ı yüksek, ne yapmalıyım?").article is None
 
 
+@pytest.mark.parametrize("message, route, crops", [
+    ("Bu yıl nohut ekmeli miyim?", "plant_info", ("Nohut",)),
+    ("Buğday ekeceğim, ne önerirsin?", "plant_info", ("Buğday",)),
+    ("Gelecek yıl tarlama mısır ekmeye karar verdim.", "plant_info", ("Mısır",)),
+    ("Bahçeme ceviz dikmek istiyorum, ne dersin?", "plant_info", ("Ceviz",)),
+    ("Konya'da arpa ekmeyi düşünüyorum.", "plant_info", ("Arpa",)),
+    ("Bu yil fasulye ekecegim", "plant_info", ("Fasulye",)),
+    ("Bu yıl buğday mı ekmeliyim?", "crop_choice", ("Buğday",)),
+])
+def test_a_planting_decision_offers_the_crops_it_names(message, route, crops):
+    assert engine._crop_offer(route, message) == crops
+
+
+@pytest.mark.parametrize("message", [
+    "Domates yapraklarım sararıyor, ne yapmalıyım?",
+    "Elma ağacımı ne zaman budamalıyım?",
+    "Biberimde yaprak biti var.",
+    "Mısırda çinko eksikliği belirtisi nedir?",
+    "Nohut hasadı ne zaman yapılır?",
+    "Domatese ne kadar su vermeliyim?",
+    "Toprağıma dikkat etmem gereken ne var? Buğday ekili.",
+    "Ekim ayında buğday ekilir mi?",
+])
+def test_naming_a_crop_is_not_choosing_it(message):
+    """Asking about a crop is information, not a decision to plant it. These
+    are the eligible inputs a loose rule would offer on; none may."""
+    assert engine._crop_offer("plant_info", message) == ()
+
+
+def test_a_country_is_not_a_crop():
+    """Mısır is maize and Egypt. "Mısır'dayım" places the farmer; it does not
+    choose a crop."""
+    assert engine._crop_offer("crop_choice", "Mısır'dayım, bu yıl ne eksem?") == ()
+    assert engine._crop_offer("crop_choice", "Mısır ekmeli miyim?") == ("Mısır",)
+
+
+def test_a_list_of_crops_is_not_a_decision():
+    assert engine._crop_offer(
+        "crop_choice", "Domates, biber, patlıcan, kabak mı ekeyim?") == ()
+
+
+def test_answer_offers_under_a_model_answer_but_not_a_refusal(monkeypatch):
+    _model_answer(monkeypatch, "Nohut kurak koşullara dayanıklıdır.")
+    assert engine.answer("Bu yıl nohut ekmeli miyim?").crop_offer == ("Nohut",)
+
+    _model_answer(monkeypatch, "[OFFSCOPE] Ben bir bitki asistanıyım.")
+    assert engine.answer("Bu yıl nohut ekmeli miyim?").crop_offer == ()
+
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda m: (_ for _ in ()).throw(RuntimeError("LLM down")))
+    assert engine.answer("Bu yıl nohut ekmeli miyim?").crop_offer == ()
+
+
 def test_card_routes_carry_no_article(monkeypatch):
     """A budget card is not a model answer; it never asks for an article."""
     monkeypatch.setattr(engine, "match_article",
@@ -617,6 +670,26 @@ def test_stream_answer_sends_no_article_under_a_refusal(monkeypatch):
 
     out = "".join(engine.stream_answer("Araba nasil tamir edilir?"))
     assert '"type": "article"' not in out
+
+
+def test_stream_answer_offers_the_crop_after_the_answer(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["Nohut kurak ", "kosullara dayaniklidir."]))
+    events = _sse_events("".join(engine.stream_answer("Bu yıl nohut ekmeli miyim?")))
+    assert [e["type"] for e in events][-2:] == ["crop_offer", "done"]
+    assert events[-2]["crops"] == ["Nohut"]
+
+
+def test_stream_answer_offers_nothing_under_a_refusal(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["[OFFSCOPE] Ben bir bitki ",
+                                                  "asistaniyim, yardimci olamam."]))
+    out = "".join(engine.stream_answer("Bu yıl nohut ekmeli miyim?"))
+    assert '"type": "crop_offer"' not in out
 
 
 def test_stream_answer_sends_no_article_when_the_model_is_down(monkeypatch):
@@ -1351,7 +1424,7 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     # Must be a non-budget question; the budget route short-circuits before the stubs above.
     r = engine.answer("Elma ağacı ne zaman budanır?")
     assert set(r.as_api()) == {"answer", "recommended_products", "form", "dose_form",
-                               "compare_form", "article"}
+                               "compare_form", "article", "crop_offer"}
     assert "Kompost" in r.answer  # Corpus path exercises the stubs, not the budget route.
 
 
