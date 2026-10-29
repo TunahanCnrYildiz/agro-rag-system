@@ -124,3 +124,22 @@ def test_both_transports_answer_identically(no_llm):
                            COMPARE_Q, None, None, None, _payload())))
                        if e["type"] == "token")
     assert direct == streamed
+
+
+def test_a_computed_comparison_offers_both_crops_by_family(no_llm):
+    """PDF p5: the crop the farmer settles on goes into the profile. The client
+    asks before saving; the server only offers - by family, so TÜİK's
+    "Domates (Sofralık)" reaches the profile as "Domates"."""
+    result = engine.answer(COMPARE_Q, None, None, None, _payload())
+    assert result.crop_offer == ("Domates", "Biber")
+
+
+def test_the_card_itself_offers_nothing(no_llm):
+    """The farmer has not compared anything yet."""
+    assert engine.answer(COMPARE_Q).crop_offer == ()
+
+
+def test_the_stream_offers_the_same_crops_after_the_comparison(no_llm):
+    events = _events(list(engine.stream_answer(COMPARE_Q, None, None, None, _payload())))
+    assert [e["type"] for e in events][-2:] == ["crop_offer", "done"]
+    assert events[-2]["crops"] == ["Domates", "Biber"]

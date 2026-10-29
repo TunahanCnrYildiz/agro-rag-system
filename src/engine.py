@@ -81,6 +81,10 @@ class ChatResult:
     # At most one, and only under a model answer. Optional on the wire, so an
     # already-deployed client, which never reads it, is unaffected.
     article: RecommendedArticle | None = None
+    # Crops the farmer may add to their profile with one tap - only when they
+    # are deciding what to plant (see _crop_offer). The CLIENT asks; nothing is
+    # saved here. Optional on the wire, like the cards.
+    crop_offer: tuple[str, ...] = ()
 
     def as_api(self) -> dict:
         return {
@@ -90,6 +94,7 @@ class ChatResult:
             "dose_form": self.dose_form,
             "compare_form": self.compare_form,
             "article": self.article.as_api() if self.article else None,
+            "crop_offer": list(self.crop_offer),
         }
 
 
@@ -2600,6 +2605,39 @@ def _named_crops(message: str) -> tuple[str, ...]:
         return ()
 
 
+# A farmer saying they will plant something - folded, so typed with or without
+# Turkish letters. Questions that only NAME a crop ("domatesimin yapraklari
+# sariyor") are information, not a choice, and get no offer.
+_PLANT_INTENT = re.compile(
+    r"(?<!\w)(?:ek|dik)(?:ecegim|ecegiz|meye karar|meyi dusun|meyi planl"
+    r"|mek istiyorum|meli miyim|sem mi|eyim)")
+# At most this many crops are offered at once: a message listing seven crops
+# is not a decision about seven crops.
+_MAX_CROP_OFFER = 2
+
+
+def _crop_offer(route: str, message: str) -> tuple[str, ...]:
+    """The crops a model answer may offer for the profile (PDF p5: "asistanla
+    konuşarak ürününü seçer; seçim profiline işlenir"): those the message
+    names, when it is a crop-choice question or says the farmer will plant.
+    Never raises - a detector failure costs the offer, not the answer."""
+    try:
+        if route != "crop_choice" and not _PLANT_INTENT.search(_normalize_tr(message)):
+            return ()
+        crops = _named_crops(message)
+        # "Mısır" is maize and Egypt: in "Mısır'dayım, ne eksem?" it is where
+        # the farmer is, not what they will plant. A crop that is also the
+        # country this message places them in is not offered.
+        from src.context import country as country_ctx
+        code = country_ctx.extract_country(message, [])
+        if code is not None:
+            places = set(_code_aliases(code))
+            crops = tuple(c for c in crops if _normalize_tr(c) not in places)
+        return crops if len(crops) <= _MAX_CROP_OFFER else ()
+    except Exception:  # noqa: BLE001
+        return ()
+
+
 def _compare_result(payload: dict | None, message: str = "",
                     history: list[dict] | None = None) -> ChatResult:
     """The crop-comparison route: no retrieval, no product match, no model call.
@@ -2628,8 +2666,15 @@ def _compare_result(payload: dict | None, message: str = "",
         if inputs is not None:
             inputs = crop_compare.CompareInputs(inputs.first, inputs.second, province)
             figures = crop_compare.compute(inputs, table, norms.latest_year())
+            # By family, not TÜİK's row label: "Domates (Sofralık)" goes into a
+            # profile as "Domates".
+            labels = crop_compare._known(table)
+            offer = tuple(dict.fromkeys(
+                (crop_compare.named_crops(labels.get(c, "")) or (labels.get(c, ""),))[0]
+                for c in (inputs.first, inputs.second) if labels.get(c)))
             return ChatResult(answer=crop_compare.render(inputs, figures),
-                              recommended_products=[], route="crop_choice")
+                              recommended_products=[], route="crop_choice",
+                              crop_offer=offer)
     except Exception:  # noqa: BLE001 - a broken validation or sum must not become a guess
         return ChatResult(answer=crop_compare.COMPUTE_FAILED,
                           recommended_products=[], route="crop_choice")
@@ -2764,9 +2809,12 @@ def answer(message: str, history: list[dict] | None = None,
     # the CATALOG has nothing for a pruning or pest question, and the Akademi
     # has posts on exactly such topics.
     article = match_article(message) if has_advice and not off_scope else None
+    # The same two gates: nothing to add under a refusal or a fallback.
+    offer = _crop_offer(route, message) if has_advice and not off_scope else ()
 
     return ChatResult(answer=answer_text.strip(), recommended_products=products,
-                      route=route, route_how=route_how, article=article)
+                      route=route, route_how=route_how, article=article,
+                      crop_offer=offer)
 
 
 def stream_answer(
@@ -2810,6 +2858,8 @@ def stream_answer(
         yield _sse({"type": "token", "content": result.answer})
         if result.compare_form is not None:
             yield _sse({"type": "compare_form", "form": result.compare_form})
+        if result.crop_offer:
+            yield _sse({"type": "crop_offer", "crops": list(result.crop_offer)})
         yield _sse({"type": "done"})
         return
 
@@ -2942,6 +2992,9 @@ def stream_answer(
         article = match_article(message)
         if article is not None:
             yield _sse({"type": "article", "article": article.as_api()})
+        offer = _crop_offer(route, message)
+        if offer:
+            yield _sse({"type": "crop_offer", "crops": list(offer)})
 
     yield _sse({"type": "done"})
 

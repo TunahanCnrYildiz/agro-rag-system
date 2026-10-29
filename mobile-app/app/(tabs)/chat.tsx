@@ -20,6 +20,7 @@ import { getGreeting } from "../../src/greeting";
 import { openExternalUrl } from "../../src/openExternalUrl";
 import { useAuth } from "../../src/auth";
 import { clearChat, loadChat, recentWithinBudget, saveChat } from "../../src/chatStore";
+import { hasCrop, withCrop } from "../../src/cropProfile";
 import {
   BudgetPayload,
   ChatTurn,
@@ -42,6 +43,7 @@ interface Message {
   text: string;
   products?: RecommendedProduct[];
   article?: RecommendedArticle;
+  cropOffer?: string[];
   form?: FormSpec;
   doseForm?: DoseFormSpec;
   compareForm?: CompareFormSpec;
@@ -73,7 +75,10 @@ function newId() {
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [restored, setRestored] = useState(false);
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
+  // Crops added from the chat this session, so the button turns into a
+  // confirmation instead of just vanishing.
+  const [addedCrops, setAddedCrops] = useState<string[]>([]);
   const profileArea =
     profile?.area && profile.areaUnit
       ? { value: profile.area, unit: profile.areaUnit }
@@ -118,6 +123,20 @@ export default function ChatScreen() {
       history: historyRef.current,
     });
   }, [messages, restored]);
+
+  // The farmer's tap is the consent: nothing reaches the profile without it.
+  async function addCropToProfile(crop: string) {
+    if (!profile) return;
+    await updateProfile({
+      name: profile.name,
+      email: profile.email,
+      province: profile.province,
+      crops: withCrop(profile.crops, crop),
+      area: profile.area,
+      areaUnit: profile.areaUnit,
+    });
+    setAddedCrops((prev) => [...prev, crop]);
+  }
 
   async function startNewChat() {
     await clearChat();
@@ -217,6 +236,11 @@ export default function ChatScreen() {
           prev.map((m) => (m.id === botId ? { ...m, article } : m))
         );
       },
+      onCropOffer: (cropOffer) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, cropOffer } : m))
+        );
+      },
       onDone: () => {
         historyRef.current.push({ role: "user", content: text });
         historyRef.current.push({ role: "assistant", content: accumulated });
@@ -311,6 +335,26 @@ export default function ChatScreen() {
                     <Text style={styles.articleTitle}>{m.article.title}</Text>
                   </View>
                 </TouchableOpacity>
+              )}
+              {m.cropOffer && m.cropOffer.length > 0 && (
+                <View style={styles.cropOffers}>
+                  {m.cropOffer.map((crop) =>
+                    addedCrops.includes(crop) ? (
+                      <Text key={crop} style={styles.cropAdded}>
+                        ✓ {crop} profilinize eklendi.
+                      </Text>
+                    ) : hasCrop(profile?.crops, crop) ? null : (
+                      <TouchableOpacity
+                        key={crop}
+                        style={styles.cropChip}
+                        onPress={() => addCropToProfile(crop)}
+                      >
+                        <Ionicons name="add-circle-outline" size={16} color={colors.green} />
+                        <Text style={styles.cropChipText}>Profilime ekle: {crop}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </View>
               )}
               {m.form && (
                 <BudgetCard
@@ -467,6 +511,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   articleBody: { flexShrink: 1 },
+  cropOffers: { alignSelf: "flex-start", maxWidth: "88%", gap: 6, marginBottom: 10 },
+  cropChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.greenLight,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  cropChipText: { color: colors.dark, fontSize: 12.5, fontWeight: "600" },
+  cropAdded: { color: colors.green, fontSize: 12.5, fontWeight: "600" },
   articleLabel: { color: colors.muted, fontSize: 11 },
   articleTitle: { color: colors.dark, fontSize: 12.5, fontWeight: "600" },
   inputRow: {

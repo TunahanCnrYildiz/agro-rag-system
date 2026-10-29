@@ -171,6 +171,8 @@ export interface ChatStreamHandlers {
   onDoseForm?: (form: DoseFormSpec) => void;
   onCompareForm?: (form: CompareFormSpec) => void;
   onArticle?: (article: RecommendedArticle) => void;
+  // Crops the farmer may add to their profile with a tap (see cropProfile.ts).
+  onCropOffer?: (crops: string[]) => void;
   onDone: () => void;
   onError: (err: Error) => void;
 }
@@ -212,6 +214,8 @@ export function sendChatMessageStream(
         handlers.onCompareForm?.(evt.form);
       } else if (evt.type === "article") {
         handlers.onArticle?.(evt.article);
+      } else if (evt.type === "crop_offer") {
+        handlers.onCropOffer?.(evt.crops);
       }
     }
     processedEvents = complete.length;
