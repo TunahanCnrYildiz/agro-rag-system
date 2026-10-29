@@ -2672,17 +2672,32 @@ def _compare_result(payload: dict | None, message: str = "",
     from src.context import location
 
     province = location.extract_province(message, history)
-    if not province:
-        return ChatResult(answer=crop_compare.NO_PROVINCE,
-                          recommended_products=[], route="crop_choice")
+    currency = "TRY"
+    latest_year = norms.latest_year()
+    if province:
+        table = norms.province_table(province)
+        place = province
+    else:
+        # A farmer abroad (PDF p14): their country's FAOSTAT figures, in
+        # dollars, by the budget card's rule (see _budget_result). A province
+        # is asked first and always wins.
+        from src.context import country as country_ctx
+        country = country_ctx.extract_country(message, history)
+        if country is None or country == norms.TURKIYE_AREA:
+            return ChatResult(answer=crop_compare.NO_PROVINCE,
+                              recommended_products=[], route="crop_choice")
+        currency = "USD"
+        table = norms.country_table(country)
+        latest_year = norms.country_price_year(country)
+        place = norms.country_label(country)
 
-    table = norms.province_table(province)
     submitted = bool(payload)
     try:
-        inputs, errors = crop_compare.validate(payload or {}, table)
+        inputs, errors = crop_compare.validate(payload or {}, table, currency)
         if inputs is not None:
-            inputs = crop_compare.CompareInputs(inputs.first, inputs.second, province)
-            figures = crop_compare.compute(inputs, table, norms.latest_year())
+            inputs = crop_compare.CompareInputs(inputs.first, inputs.second, place,
+                                                currency)
+            figures = crop_compare.compute(inputs, table, latest_year)
             # By family, not TÜİK's row label: "Domates (Sofralık)" goes into a
             # profile as "Domates".
             labels = crop_compare._known(table)
@@ -2696,11 +2711,15 @@ def _compare_result(payload: dict | None, message: str = "",
         return ChatResult(answer=crop_compare.COMPUTE_FAILED,
                           recommended_products=[], route="crop_choice")
 
-    return ChatResult(answer=crop_compare.ASK_FOR_CROPS, recommended_products=[],
+    return ChatResult(answer=(crop_compare.ASK_FOR_CROPS_COUNTRY if currency == "USD"
+                              else crop_compare.ASK_FOR_CROPS),
+                      recommended_products=[],
                       route="crop_choice",
+                      # The card's "province" is the place it shows ("France
+                      # için yayımlanmış rakamlar"); a country fits it as is.
                       compare_form=crop_compare.form_spec(
                           errors if submitted else [], table,
-                          payload if submitted else None, province))
+                          payload if submitted else None, place))
 
 
 def _dose_result(payload: dict | None) -> ChatResult:

@@ -443,6 +443,15 @@ def country_table(country: int) -> tuple[CropNorm, ...]:
     return tuple(sorted(rows, key=lambda row: row.label))
 
 
+def country_label(country: int) -> str | None:
+    """The country as FAOSTAT spells it ("France") - the same label every
+    figure from it carries as its region - or None when the file has no such
+    area."""
+    entry = _load_world().get("countries", {}).get(str(country))
+    label = entry.get("label") if isinstance(entry, dict) else None
+    return label if isinstance(label, str) else None
+
+
 # A country's prices are prefilled only from its own latest reported year, and
 # only while that year is within this many years of FAOSTAT's own latest.
 _WORLD_PRICE_LAG = 2

@@ -159,6 +159,11 @@ def _fields(currency: str) -> tuple[FieldSpec, ...]:
     return _FIELDS_FOR[currency]
 
 
+def currency_symbol(currency: str) -> str:
+    """How a currency is written after an amount: "TL" or "USD"."""
+    return _MONEY[currency]["symbol"]
+
+
 def _fields_by_id(currency: str) -> dict[str, FieldSpec]:
     return {f.id: f for f in _fields(currency)}
 
@@ -424,7 +429,7 @@ def _price_cell(norm, currency: str) -> dict | None:
     return _norm_cell(norm, unit_id, unit_text, 2, show_range=False, scale=scale)
 
 
-def _source_note(norm) -> str:
+def source_note(norm) -> str:
     """Where a figure came from, for the line under the field and the answer's
     framing. A FAOSTAT figure names its source and the country as FAOSTAT spells
     it (see engine._country_lines for why), and says so when the figure is
@@ -467,7 +472,7 @@ def _norm_cell(norm, unit_id: str, unit_text: str, decimals: int | None,
         # The unit travels WITH the value. Dropping 28,4 into a field still
         # reading "kg" would claim a whole orchard yielded 28 kilos.
         "unit": unit_id,
-        "note": _source_note(norm),
+        "note": source_note(norm),
         "recent": recent,
     }
 
