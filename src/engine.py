@@ -2553,11 +2553,28 @@ def _budget_result(payload: dict | None, message: str = "",
 
     table = ()
     latest_year = None
+    # Lira unless the farmer is abroad. Decided apart from the table, so a
+    # broken norm layer costs the prefill but never turns a dollar card into a
+    # lira one.
+    currency = "TRY"
     try:
         from src import norms
         from src.context import location
-        table = norms.province_table(location.extract_province(message, history))
-        latest_year = norms.latest_year()
+        province = location.extract_province(message, history)
+        country = None
+        if province is None:
+            from src.context import country as country_ctx
+            country = country_ctx.extract_country(message, history)
+        if country is not None and country != norms.TURKIYE_AREA:
+            # A farmer abroad (PDF p14): their country's FAOSTAT figures, in the
+            # dollars FAOSTAT publishes. A province always wins - it is asked
+            # first, and TÜİK is the better source wherever it applies.
+            currency = "USD"
+            table = norms.country_table(country)
+            latest_year = norms.country_price_year(country)
+        else:
+            table = norms.province_table(province)
+            latest_year = norms.latest_year()
         if table and not any(row.yield_kg_da or row.price_per_kg or row.yield_kg_tree
                               for row in table):
             # No province resolved (or the resolved one, and the national
@@ -2577,7 +2594,7 @@ def _budget_result(payload: dict | None, message: str = "",
 
     submitted = bool(payload)
     try:
-        inputs, errors = budget.validate(payload or {}, table)
+        inputs, errors = budget.validate(payload or {}, table, currency)
         if inputs is not None:
             result = budget.compute(inputs)
             return ChatResult(answer=budget.render(inputs, result),
@@ -2591,7 +2608,7 @@ def _budget_result(payload: dict | None, message: str = "",
                       form=budget.form_spec(errors if submitted else [],
                                             table,
                                             payload if submitted else None,
-                                            latest_year))
+                                            latest_year, currency))
 
 
 def _named_crops(message: str) -> tuple[str, ...]:

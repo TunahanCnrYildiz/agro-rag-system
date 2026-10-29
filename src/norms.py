@@ -426,6 +426,60 @@ def latest_year() -> int | None:
     return years[-1] if years else None
 
 
+def country_table(country: int) -> tuple[CropNorm, ...]:
+    """Every crop resolved for one FAOSTAT country, sorted by label - the
+    budget card's crop list for a farmer abroad.
+
+    The same contract as province_table(): identical to lookup() for each id,
+    so a submitted figure is verified against the very row the card was built
+    from. Empty for Türkiye, which is TÜİK's (see _resolve) and served by
+    province_table().
+    """
+    if country == TURKIYE_AREA:
+        return ()
+    data = _load()
+    rows = tuple(_resolve_world(crop_id, entry, country)
+                 for crop_id, entry in data.get("crops", {}).items())
+    return tuple(sorted(rows, key=lambda row: row.label))
+
+
+# A country's prices are prefilled only from its own latest reported year, and
+# only while that year is within this many years of FAOSTAT's own latest.
+_WORLD_PRICE_LAG = 2
+
+
+def country_price_year(country: int) -> int | None:
+    """The one year a country's prices may be prefilled from, or None.
+
+    THE COUNTRY'S OWN LATEST, not the dataset's. Countries report prices on
+    different lags - measured 2026-10-29: France, Germany, Spain 2024; Egypt,
+    Iran, Azerbaijan, Ukraine 2023; Russia 2022. budget._crop_rows prefills a
+    price only from one year so that stale nominal figures never mix with
+    current ones; with the dataset's 2024 as that year, Egypt would get no
+    price at all. Within one country the rule is the TÜİK one: only its latest
+    year, never an older figure for a crop it has not reported since.
+
+    None when that year is more than _WORLD_PRICE_LAG behind FAOSTAT's latest:
+    a price that old is not prefilled at all - absence, never a guess.
+    """
+    world = _load_world()
+    years = world.get("meta", {}).get("years")
+    if not years or country == TURKIYE_AREA:
+        return None
+    suffix = f"|{country}"
+    latest = None
+    for key, cells in world.get("price", {}).items():
+        if not key.endswith(suffix) or not isinstance(cells, dict):
+            continue
+        for year_str, cell in cells.items():
+            if isinstance(cell, list) and cell and isinstance(cell[0], (int, float)):
+                year = int(year_str)
+                latest = year if latest is None else max(latest, year)
+    if latest is None or latest < years[-1] - _WORLD_PRICE_LAG:
+        return None
+    return latest
+
+
 def province_table(province: str | None) -> tuple[CropNorm, ...]:
     """Every crop the file carries, resolved for one province, sorted by label.
 
