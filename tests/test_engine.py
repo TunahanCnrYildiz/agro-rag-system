@@ -5,6 +5,8 @@ import json
 import re
 from datetime import date
 
+import pytest
+
 from src import engine
 from src.engine import _cosine, _strip_markers, detect_language
 
@@ -80,6 +82,102 @@ def test_match_products_threshold(monkeypatch):
 def test_match_products_empty_when_no_catalog(monkeypatch):
     monkeypatch.setattr(engine, "_load_products", lambda: ())
     assert engine.match_products("query", "") == []
+
+
+# --------------------------------------------------------------------------- #
+# Akademi article matching
+# --------------------------------------------------------------------------- #
+def _articles(*vecs):
+    return tuple({"title": f"Yazi {i}", "source_url": f"url{i}", "_embedding": v}
+                 for i, v in enumerate(vecs))
+
+
+def test_match_article_returns_the_best_post_above_the_bar(monkeypatch):
+    monkeypatch.setattr(engine, "_load_articles",
+                        lambda: _articles([0.0, 1.0], [1.0, 0.0], [0.9, 0.44]))
+    monkeypatch.setattr(engine, "_get_embeddings_client", lambda: _Emb([1.0, 0.05]))
+    got = engine.match_article("soru")
+    assert (got.title, got.link) == ("Yazi 1", "url1")
+
+
+def test_match_article_returns_none_below_the_bar(monkeypatch):
+    """The bar decides, not the ranking: a best post that does not clear it is
+    still no post - cos([1, 1.6], [1, 0]) is 0.53, under 0.65."""
+    monkeypatch.setattr(engine, "_load_articles", lambda: _articles([1.0, 0.0]))
+    monkeypatch.setattr(engine, "_get_embeddings_client", lambda: _Emb([1.0, 1.6]))
+    assert engine.MIN_ARTICLE_SIMILARITY > 0.53
+    assert engine.match_article("soru") is None
+
+
+def test_match_article_is_none_without_articles_or_embeddings(monkeypatch):
+    monkeypatch.setattr(engine, "_load_articles", lambda: ())
+    assert engine.match_article("soru") is None
+
+    class _Down:
+        def embed_query(self, text):
+            raise ConnectionError("embedding server down")
+
+    monkeypatch.setattr(engine, "_load_articles", lambda: _articles([1.0, 0.0]))
+    monkeypatch.setattr(engine, "_get_embeddings_client", lambda: _Down())
+    assert engine.match_article("soru") is None
+
+
+def test_dealer_posts_and_duplicate_titles_are_not_eligible():
+    """Posts written for dealers never go under a farmer's answer, and the
+    scrape's one post held under two URLs is offered once."""
+    data = [
+        {"title": "Toprak pH'ı ve Bitki Besleme", "source_url": "a"},
+        {"title": "Bayi Motivasyon Stratejileri", "source_url": "b"},
+        {"title": "Gübre Satışlarında Sıkça Sorulan Sorular", "source_url": "c"},
+        {"title": "Dijital Çağda E-Ticaret", "source_url": "d"},
+        {"title": "Gübre Uygulamalarında Yeni Teknolojiler", "source_url": "e"},
+        {"title": "GÜBRE UYGULAMALARINDA YENİ TEKNOLOJİLER", "source_url": "f"},
+        {"title": "Soil satisfaction survey", "source_url": "g"},
+        {"title": "Başlıksız adres", "source_url": ""},
+    ]
+    kept = [a["source_url"] for a in engine._eligible_articles(data)]
+    assert kept == ["a", "e", "g"]
+
+
+def _model_answer(monkeypatch, text):
+    monkeypatch.setattr(engine, "retrieve_context", lambda *a, **k: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda *a, **k: [])
+    monkeypatch.setattr(engine, "_complete_text", lambda m: text)
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: engine.RecommendedArticle("Yazi", "url"))
+
+
+def test_answer_carries_the_article_under_a_model_answer(monkeypatch):
+    _model_answer(monkeypatch, "Kompost kullanabilirsiniz.")
+    r = engine.answer("Toprağımın pH'ı yüksek, ne yapmalıyım?")
+    assert r.as_api()["article"] == {"title": "Yazi", "link": "url"}
+
+
+def test_answer_keeps_the_article_under_a_noproduct_answer(monkeypatch):
+    """[NOPRODUCT] says the CATALOG has nothing for the question; the Akademi
+    can still have a post on it, so the marker does not hide the article."""
+    _model_answer(monkeypatch, "[NOPRODUCT] Budama kış sonunda yapılır.")
+    r = engine.answer("Elma ağacı ne zaman budanır?")
+    assert r.recommended_products == []
+    assert r.article is not None
+
+
+def test_answer_has_no_article_under_a_refusal_or_a_fallback(monkeypatch):
+    _model_answer(monkeypatch, "[OFFSCOPE] Ben bir bitki asistanıyım.")
+    assert engine.answer("Araba nasıl tamir edilir?").article is None
+
+    _model_answer(monkeypatch, "")
+    monkeypatch.setattr(engine, "_complete_text",
+                        lambda m: (_ for _ in ()).throw(RuntimeError("LLM down")))
+    assert engine.answer("Toprağımın pH'ı yüksek, ne yapmalıyım?").article is None
+
+
+def test_card_routes_carry_no_article(monkeypatch):
+    """A budget card is not a model answer; it never asks for an article."""
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: pytest.fail("card route asked for an article"))
+    r = engine.answer("Buğday ekmenin dekara maliyeti nedir?")
+    assert r.form is not None and r.article is None
 
 
 # --------------------------------------------------------------------------- #
@@ -472,6 +570,67 @@ def test_stream_answer_emits_products_without_marker(monkeypatch):
 
     assert '"type": "products"' in out        # control: products still flow
     assert _sse_tokens(out) == "Azot eksikligi olabilir."
+
+
+def _sse_events(out):
+    return [json.loads(line[len("data: "):]) for line in out.splitlines()
+            if line.startswith("data: ")]
+
+
+def test_stream_answer_sends_the_article_after_products_before_done(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: engine.RecommendedArticle("Yazi", "aurl"))
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["Azot eksikligi ", "olabilir."]))
+
+    types = [e["type"] for e in _sse_events("".join(engine.stream_answer("Bugdayda gubreleme?")))]
+    assert types[-3:] == ["products", "article", "done"]
+
+
+def test_stream_answer_keeps_the_article_under_a_noproduct_answer(monkeypatch):
+    """answer()'s rule on the stream: no products, but the article stays."""
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products",
+                        lambda m, c: [engine.RecommendedProduct("P", "url")])
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: engine.RecommendedArticle("Yazi", "aurl"))
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["[NOPRODUCT] Budama ",
+                                                  "kis sonunda yapilir."]))
+
+    out = "".join(engine.stream_answer("Asmada budama ne zaman yapilir?"))
+    assert '"type": "products"' not in out
+    assert '"type": "article"' in out
+
+
+def test_stream_answer_sends_no_article_under_a_refusal(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: engine.RecommendedArticle("Yazi", "aurl"))
+    monkeypatch.setattr(engine, "_get_llm",
+                        lambda: _fake_stream_llm(["[OFFSCOPE] Ben bir bitki ",
+                                                  "asistaniyim, yardimci olamam."]))
+
+    out = "".join(engine.stream_answer("Araba nasil tamir edilir?"))
+    assert '"type": "article"' not in out
+
+
+def test_stream_answer_sends_no_article_when_the_model_is_down(monkeypatch):
+    monkeypatch.setattr(engine, "retrieve_context", lambda m, **kw: "ctx")
+    monkeypatch.setattr(engine, "match_products", lambda m, c: [])
+    monkeypatch.setattr(engine, "match_article",
+                        lambda q: engine.RecommendedArticle("Yazi", "aurl"))
+
+    def _down():
+        raise ConnectionError("LLM down")
+
+    monkeypatch.setattr(engine, "_get_llm", _down)
+    out = "".join(engine.stream_answer("Bugdayda gubreleme?"))
+    assert '"type": "article"' not in out
 
 
 # --------------------------------------------------------------------------- #
@@ -1192,7 +1351,7 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     # Must be a non-budget question; the budget route short-circuits before the stubs above.
     r = engine.answer("Elma ağacı ne zaman budanır?")
     assert set(r.as_api()) == {"answer", "recommended_products", "form", "dose_form",
-                               "compare_form"}
+                               "compare_form", "article"}
     assert "Kompost" in r.answer  # Corpus path exercises the stubs, not the budget route.
 
 

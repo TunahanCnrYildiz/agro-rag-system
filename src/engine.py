@@ -19,6 +19,7 @@ from openai import OpenAI
 
 try:
     from .config import (
+        ARTICLES_JSON,
         EmbeddingModelMismatchError,
         PRODUCTS_JSON,
         SYSTEM_PROMPT,
@@ -27,6 +28,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from config import (  # type: ignore
+        ARTICLES_JSON,
         EmbeddingModelMismatchError,
         PRODUCTS_JSON,
         SYSTEM_PROMPT,
@@ -40,6 +42,17 @@ except ImportError:  # pragma: no cover
 # --------------------------------------------------------------------------- #
 @dataclass
 class RecommendedProduct:
+    title: str
+    link: str
+
+    def as_api(self) -> dict:
+        return {"title": self.title, "link": self.link}
+
+
+@dataclass
+class RecommendedArticle:
+    """An Akademi article from the company's own blog. `link` is its
+    source_url - the key the mobile app's article screen looks it up by."""
     title: str
     link: str
 
@@ -63,6 +76,9 @@ class ChatResult:
     # card does: an already-deployed APK reads `form` and draws a BUDGET card
     # from whatever arrives there.
     compare_form: dict | None = None
+    # At most one, and only under a model answer. Optional on the wire, so an
+    # already-deployed client, which never reads it, is unaffected.
+    article: RecommendedArticle | None = None
 
     def as_api(self) -> dict:
         return {
@@ -71,6 +87,7 @@ class ChatResult:
             "form": self.form,
             "dose_form": self.dose_form,
             "compare_form": self.compare_form,
+            "article": self.article.as_api() if self.article else None,
         }
 
 
@@ -200,6 +217,92 @@ def match_products(query: str, botany_context: str = "", k: int | None = None) -
         for score, p in scored[:k]
         if score >= MIN_PRODUCT_SIMILARITY
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Akademi article matching (embedding-based, same client as the catalog)
+# --------------------------------------------------------------------------- #
+# MEASURED 2026-10-29 on bge-m3, against a labelled set kept in
+# evals/article_set.py (run: python -m evals.run_article_match). Two choices
+# came out of it, neither obvious:
+#
+# The QUESTION ALONE is embedded - not question + retrieved context, as
+# match_products does. Context dragged every query toward the generic
+# fertilizer articles: at every threshold it showed 5-23 wrong articles where
+# the question alone showed 0.
+#
+# 0.65 is the threshold, and it is set for NO WRONG ARTICLE rather than for
+# reach. The highest-scoring wrong match seen was 0.627, so nothing lower holds
+# that line. The price is reach: 16 of 24 labelled questions got their article
+# on the set it was picked on, and 3 of 14 on a held-out set written afterwards -
+# 0 wrong on both. A question that gets nothing is answered as before; a wrong
+# article under an answer is the failure the PDF rules out ("cevaba uymuyorsa
+# hiçbir ürün gösterilmez"). Re-measure before lowering it.
+MIN_ARTICLE_SIMILARITY = 0.65
+
+# Seven of the blog's posts are written for DEALERS - motivation, e-commerce,
+# sales FAQs - and none belongs under a farmer's answer. Matched on the folded
+# title, so a new dealer post is excluded without a code change. Folded "satış"
+# is "satis", the head of English "satisfy"/"satisfaction" too - hence (?!f).
+_DEALER_ARTICLE = re.compile(r"\b(?:bayi|satis(?!f)|e-ticaret)")
+
+
+def _eligible_articles(data: list[dict]) -> list[dict]:
+    """Articles that may be shown to a farmer: not addressed to dealers, and
+    each title once - the scrape holds one post twice under two URLs."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for a in data:
+        title = _normalize_tr(str(a.get("title", "")))
+        if not title or not a.get("source_url") or _DEALER_ARTICLE.search(title) \
+                or title in seen:
+            continue
+        seen.add(title)
+        out.append(a)
+    return out
+
+
+@lru_cache(maxsize=1)
+def _load_articles() -> tuple[dict, ...]:
+    """Load the eligible articles and embed each one once. The blob is title,
+    excerpt and the head of the body: the body's opening carried the topic where
+    a short excerpt did not (22 of 24 right at top-1, against 21)."""
+    if not ARTICLES_JSON.exists():
+        print(f"[engine] articles not found at {ARTICLES_JSON}")
+        return ()
+    try:
+        data = json.loads(ARTICLES_JSON.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"[engine] could not read articles: {exc}")
+        return ()
+    articles = _eligible_articles(data if isinstance(data, list) else [])
+    if not articles:
+        return ()
+    blobs = [f"{a['title']}\n{a.get('excerpt') or ''}\n{(a.get('content') or '')[:800]}"
+             for a in articles]
+    try:
+        embeddings = _get_embeddings_client().embed_documents(blobs)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] article embedding failed: {exc}")
+        return ()
+    return tuple({**a, "_embedding": emb} for a, emb in zip(articles, embeddings))
+
+
+def match_article(query: str) -> RecommendedArticle | None:
+    """The one Akademi article that clears MIN_ARTICLE_SIMILARITY, or None."""
+    articles = _load_articles()
+    if not articles or not query.strip():
+        return None
+    try:
+        query_embedding = _get_embeddings_client().embed_query(query)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[engine] query embedding failed: {exc}")
+        return None
+    score, best = max(((_cosine(query_embedding, a["_embedding"]), a) for a in articles),
+                      key=lambda x: x[0])
+    if score < MIN_ARTICLE_SIMILARITY:
+        return None
+    return RecommendedArticle(title=best["title"], link=best["source_url"])
 
 
 # --------------------------------------------------------------------------- #
@@ -2694,8 +2797,14 @@ def answer(message: str, history: list[dict] | None = None,
         # a programme that does not exist.
         answer_text = f"{answer_text.rstrip()}\n\n{suffix}"
 
+    # Not under a refusal and not under one of our own fallback messages - the
+    # same two gates as the products. NOT gated on [NOPRODUCT]: that marker says
+    # the CATALOG has nothing for a pruning or pest question, and the Akademi
+    # has posts on exactly such topics.
+    article = match_article(message) if has_advice and not off_scope else None
+
     return ChatResult(answer=answer_text.strip(), recommended_products=products,
-                      route=route, route_how=route_how)
+                      route=route, route_how=route_how, article=article)
 
 
 def stream_answer(
@@ -2864,6 +2973,13 @@ def stream_answer(
             {"type": "products",
              "recommended_products": [p.as_api() for p in products]}
         )
+
+    # answer()'s gates, on the streamed answer. A new event type: both clients
+    # skip an event they do not know, so an already-deployed build is unaffected.
+    if has_advice and not off_scope and full_answer:
+        article = match_article(message)
+        if article is not None:
+            yield _sse({"type": "article", "article": article.as_api()})
 
     yield _sse({"type": "done"})
 

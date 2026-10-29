@@ -27,6 +27,14 @@ export interface RecommendedProduct {
   link: string;
 }
 
+/** An Akademi post under an answer. `link` is its source_url, the key the
+ *  article screen looks it up by. At most one, and often none: the server
+ *  sends it only when the post clearly matches the question. */
+export interface RecommendedArticle {
+  title: string;
+  link: string;
+}
+
 export interface ChatResponse {
   answer: string;
   recommended_products: RecommendedProduct[];
@@ -162,6 +170,7 @@ export interface ChatStreamHandlers {
   onForm?: (form: FormSpec) => void;
   onDoseForm?: (form: DoseFormSpec) => void;
   onCompareForm?: (form: CompareFormSpec) => void;
+  onArticle?: (article: RecommendedArticle) => void;
   onDone: () => void;
   onError: (err: Error) => void;
 }
@@ -201,6 +210,8 @@ export function sendChatMessageStream(
         handlers.onDoseForm?.(evt.form);
       } else if (evt.type === "compare_form") {
         handlers.onCompareForm?.(evt.form);
+      } else if (evt.type === "article") {
+        handlers.onArticle?.(evt.article);
       }
     }
     processedEvents = complete.length;

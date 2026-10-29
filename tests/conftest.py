@@ -19,6 +19,16 @@ def _isolate_answer_log(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_articles(monkeypatch):
+    """Every model answer now asks match_article for an Akademi post, and the
+    first call embeds all of them - a real request to the embedding server from
+    any test that reaches answer() or stream_answer(). Green only while LM Studio
+    happens to be running, and slow even then. Tests of the matching itself
+    patch _load_articles with their own list."""
+    monkeypatch.setattr("src.engine._load_articles", lambda: ())
+
+
+@pytest.fixture(autouse=True)
 def _fresh_chat_rate_limit():
     """`src/main.py` holds ONE rate limiter for the process, so without this
     every test in the suite spends from the same ceiling and the suite passes

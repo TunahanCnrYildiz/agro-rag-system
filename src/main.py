@@ -105,6 +105,12 @@ class ProductOut(BaseModel):
     link: str
 
 
+class ArticleRef(BaseModel):
+    """An Akademi article under an answer; `link` is its source_url."""
+    title: str
+    link: str
+
+
 class ChatResponse(BaseModel):
     answer: str
     recommended_products: list[ProductOut]
@@ -114,6 +120,9 @@ class ChatResponse(BaseModel):
     dose_form: dict | None = None
     # Optional so an already-deployed client, which never reads it, is unaffected.
     compare_form: dict | None = None
+    # At most one Akademi article, only under a model answer. Optional for the
+    # same reason as the cards.
+    article: ArticleRef | None = None
 
 
 class CatalogProduct(BaseModel):
