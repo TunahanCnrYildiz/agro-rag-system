@@ -1,6 +1,8 @@
 """Unit tests for src/budget.py (no store, no model, no network)."""
 
-from src import budget
+import pytest
+
+from src import budget, dose_answer
 from src.norms import CropNorm, NormValue
 
 
@@ -595,6 +597,21 @@ def test_the_ask_sentence_stands_on_its_own():
     sentence, so it has to be an honest answer rather than a widget caption."""
     assert len(budget.ASK_FOR_NUMBERS) > 40
     assert "form" not in budget.ASK_FOR_NUMBERS.lower()
+
+
+@pytest.mark.parametrize("text, names", [
+    (budget.ASK_FOR_NUMBERS, ("alan", "toplam ürün", "satış fiyatı", "masraf")),
+    (dose_answer.ASK_FOR_INPUTS, ("ürün", "grubu", "alan")),
+])
+def test_the_card_intros_name_their_figures_without_asking_for_them(text, names):
+    """Each still names every figure, so a client that cannot draw the card
+    shows an honest answer. None asks for them: the mobile card arrives with
+    the area filled from the profile, and "I need your area" above a box that
+    already holds it reads as if the app had not heard."""
+    for name in names:
+        assert name in text, name
+    for ask in ("ihtiyacım var", "verirseniz", "girin", "yazın"):
+        assert ask not in text, ask
 
 
 def test_a_per_dekar_yield_equals_the_same_total_entered_directly():

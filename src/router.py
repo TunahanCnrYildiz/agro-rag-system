@@ -36,8 +36,21 @@ _BUDGET_STEMS = ("maliyet", "masraf", "butce", "kazanc",
 # See routing review, finding 1.
 # Whole-word only: folding 'kâr' gives 'kar', which is a left prefix of karar,
 # karnabahar, karisim, kardes. A stem match here would be a silent false positive.
-_BUDGET_WORDS = ("kar", "karli", "karlilik", "karlimi")
-_BUDGET_PHRASES = ("kac para", "ne kadar tutar", "ne kadar kazan")
+_BUDGET_WORDS = ("kar", "karli", "karlilik", "karlimi",
+                 # 'gelir' itself stays out (above), but its NOUN-only forms
+                 # cannot be the verb: "geliri", "gelirimi", "gelirimiz",
+                 # "gelirini" never mean "comes". "gelirim" is left out - it is
+                 # also "I come".
+                 "geliri", "gelirimi", "gelirimiz", "gelirini")
+# The verb 'gelir' ("meyveye gelir", "kendine gelir", "denk gelir") never sits
+# beside these words, so each phrase is income alone: "...ne kadar gelir elde
+# ederim?" is a farmer's most natural way to ask the budget question, and it
+# was answered as off-scope. Measured 2026-10-29 on 20 verb-'gelir' plant
+# questions (0 routed to budget) and 9 income ones (9 routed), see
+# tests/test_router.py.
+_BUDGET_PHRASES = ("kac para", "ne kadar tutar", "ne kadar kazan",
+                   "gelir elde", "gelir bekle", "gelir getir", "gelir sagla",
+                   "ne kadar gelir", "yillik gelir")
 
 _NUTRITION_STEMS = ("gubre", "besle", "azot", "fosfor", "potasyum",
                     "npk", "kompost", "besin")

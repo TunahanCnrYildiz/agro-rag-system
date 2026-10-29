@@ -682,13 +682,14 @@ def framing(inputs: BudgetInputs) -> str:
     )
 
 # Written to stand alone: a deployed client that cannot draw the form shows only
-# this, so it names the figures it needs instead of pointing at a widget. The
-# wording also survives P2 - when norms arrive the fields come prefilled and the
-# sentence still reads correctly.
+# this, so it names the figures it uses instead of pointing at a widget. It
+# names them without ASKING for them: the mobile card now arrives with the area
+# filled from the farmer's profile and the yield and price from the norms, and
+# "I need your area" over a box that already holds it reads as if the app had
+# not heard.
 ASK_FOR_NUMBERS = (
-    "Hesaplayabilmem için birkaç rakama ihtiyacım var: ektiğiniz alan, aldığınız "
-    "toplam ürün, ürünün satış fiyatı ve masrafınız. Bu rakamları verirseniz "
-    "gelirinizi ve kâr marjınızı hesaplayabilirim."
+    "Gelirinizi ve kâr marjınızı şu rakamlarla hesaplayabilirim: ektiğiniz alan, "
+    "aldığınız toplam ürün, ürünün satış fiyatı ve masrafınız."
 )
 
 # The failure mode of this route is silence, never a guess: there is no fallback

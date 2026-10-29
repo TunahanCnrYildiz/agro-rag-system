@@ -84,6 +84,55 @@ def test_budget_stems_do_not_leak_plant_questions(query):
     assert classify_by_rules(query) != "budget"
 
 
+# The verb 'gelir' - comes, comes into fruit, stems from, falls on - in every
+# shape a plant question uses it. These are the inputs the income phrases
+# below could leak into; without them a 0 would count nothing.
+_VERB_GELIR = [
+    "Elma ağacım ne zaman meyveye gelir?",
+    "Ceviz fidanı kaç yılda verime gelir?",
+    "Zeytin kaç yaşında ürüne gelir?",
+    "Domates fidesi ne kadar sürede çiçeğe gelir?",
+    "Bu belirtiler hangi eksiklikten ileri gelir?",
+    "Yaprak sararması aşırı sulamadan mı gelir?",
+    "Kiraz ne zaman hasada gelir?",
+    "Bu hastalık nereden gelir?",
+    "Asma ne kadar zamanda meyveye gelir?",
+    "Bir dönüm bağdan ne kadar üzüm gelir?",
+    "Toprak işlemeden sonra yabancı ot geri gelir mi?",
+    "Dondan etkilenen fidan kendine gelir mi?",
+    "Hasattan sonra ağaç ne kadar sürede tekrar verime gelir?",
+    "Kök çürüklüğü fazla sudan mı ileri gelir?",
+    "Fide şaşırtıldıktan sonra ne zaman kendine gelir?",
+    "Yaprak dökümü hangi aya denk gelir?",
+    "Budama zamanı hangi aya gelir?",
+    "Çiçeklenme yağmura denk gelirse ne olur?",
+    "Bu sene meyve az gelirse gübre mi eksik?",
+    "Arılar bahçeye hangi çiçeklerle gelir?",
+]
+
+
+@pytest.mark.parametrize("query", _VERB_GELIR)
+def test_the_verb_gelir_is_not_money(query):
+    assert classify_by_rules(query) != "budget"
+
+
+@pytest.mark.parametrize("query", [
+    "Domatesten bu yıl ne kadar gelir elde ederim?",
+    "Zeytinlikten yıllık ne kadar gelir beklerim?",
+    "Ceviz bahçesi ne kadar gelir getirir?",
+    "Lavanta ekmek iyi gelir sağlar mı?",
+    "Dekar başına yıllık gelir ne olur?",
+    "Fındıktan elde ettiğim geliri hesaplar mısın?",
+    "Gelirimi hesaplayabilir misin?",
+    "Buğdaydan gelirimiz ne kadar olur?",
+    "Biber ekersem ne kadar gelir elde edebilirim?",
+])
+def test_gelir_meaning_income_opens_the_budget_card(query):
+    """A farmer's most natural way to ask the budget question. Until
+    2026-10-29 every one of these was answered as off-scope."""
+    assert classify_by_rules(query) == "budget"
+
+
 @pytest.mark.parametrize("query", [
     "Malç filmi serada nasıl kullanılır?",
     "Fide takımı nasıl hazırlanır?",
