@@ -148,6 +148,11 @@ class Settings(BaseSettings):
     # - is 4,517 prompt tokens: 7,589 of 8,192 with this value, 603 spare. The
     # 439 above stays the floor; its context was token-denser.
     #
+    # PLUS THE MOBILE PROFILE TURN, which that assembly left out and which
+    # rides on top of the history budget (see history_budget_chars). Measured
+    # 2026-10-29: a typical 98-char profile 4,552 (568 spare); one at 386 of
+    # its 400-char cap 4,675 - 7,747 of 8,192, 445 spare.
+    #
     # THE 08-13 BOUND HELD ONLY FOR THE MOBILE CLIENT, and that was the real
     # finding. The server capped nothing and the web widget sends its whole
     # conversation, so on LM Studio: at 7 web exchanges prompt + this value
@@ -164,9 +169,12 @@ class Settings(BaseSettings):
     # walk back from the newest turn, stop at the first one that would overflow,
     # never cut a turn in half. It bounds what reaches the MODEL only; routing,
     # retrieval and location are still read off the full history, so a province
-    # said twenty turns ago still places the user. A third value that cannot
-    # move without re-measuring the window, alongside max_tokens and
-    # SEND_BUDGET_CHARS.
+    # said twenty turns ago still places the user. The mobile profile turn is
+    # exempt and rides on top (engine._is_profile_turn, capped at 400 chars):
+    # the client sends it first, ahead of a conversation already at 3,000, so
+    # budgeting it dropped the farmer's name and crops in every long chat. A
+    # third value that cannot move without re-measuring the window, alongside
+    # max_tokens and SEND_BUDGET_CHARS.
     history_budget_chars: int = Field(default=3000)
     request_timeout: float = Field(default=120.0)
 

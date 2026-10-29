@@ -2362,8 +2362,16 @@ def _within_history_budget(history: list[dict] | None, budget: int) -> list[dict
     purpose: walk back from the newest turn and STOP at the first that would
     overflow, rather than skip it and keep going - dropping a turn from the
     middle hands the model a conversation that jumps. A turn is never cut in
-    half. So a mobile history, already trimmed by that rule, passes through
-    unchanged.
+    half.
+
+    THE MOBILE PROFILE TURN IS EXEMPT, and the budget applies to the rest.
+    chat.tsx sends profileTurns + recentWithinBudget: the profile FIRST, then a
+    conversation already trimmed to 3,000. That payload is over 3,000 whenever
+    the conversation is full, and a plain walk back drops its oldest turn - the
+    profile - first: measured 2026-10-29 at 7 exchanges (3,076 chars), the name
+    and the crops left the model's view. With the exemption a mobile payload
+    passes through unchanged. It is bounded (see _is_profile_turn), so it is
+    not a way around the budget.
 
     It bounds the MODEL'S VIEW ONLY. Callers still hand the full history to the
     router, to retrieval and to _context_block, so a location stated in a turn
@@ -2373,15 +2381,34 @@ def _within_history_budget(history: list[dict] | None, budget: int) -> list[dict
     turns = [{"role": t.get("role"), "content": t.get("content")}
              for t in history or []
              if t.get("role") in ("user", "assistant") and t.get("content")]
+    pinned = turns[:1] if turns and _is_profile_turn(turns[0]) else []
     kept: list[dict] = []
     used = 0
-    for turn in reversed(turns):
+    for turn in reversed(turns[len(pinned):]):
         cost = len(turn["content"])
         if used + cost > budget:
             break
         used += cost
         kept.insert(0, turn)
-    return kept
+    return pinned + kept
+
+
+# mobile-app/app/(tabs)/chat.tsx's profileTurns ends the profile turn with this
+# sentence, word for word; it is how the server tells that turn from the rest.
+_PROFILE_SENTINEL = "Bunu aklında tut, her cevapta tekrar etme."
+# Any client can end a turn with that sentence, so the exemption is capped. A
+# profile with a name, a province and a few crops is around 100 characters;
+# the profile form sets no length limit, so a longer one is budgeted like any
+# other turn. Its tokens sit on top of the history budget: re-measure the
+# window (config.py's max_tokens) before raising this.
+_PROFILE_TURN_MAX_CHARS = 400
+
+
+def _is_profile_turn(turn: dict) -> bool:
+    content = turn["content"]
+    return (turn["role"] == "user"
+            and content.rstrip().endswith(_PROFILE_SENTINEL)
+            and len(content) <= _PROFILE_TURN_MAX_CHARS)
 
 
 # --------------------------------------------------------------------------- #
