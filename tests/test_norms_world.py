@@ -93,3 +93,45 @@ def test_the_world_year_is_the_cells_own_year():
     never borrow the Turkish file's latest year."""
     norm = norms.lookup(WHEAT, None, country=FRANCE)
     assert norm.yield_kg_da.year <= 2024
+
+
+EGYPT, RUSSIA = 59, 185
+
+
+def test_a_country_table_is_every_crop_resolved_for_that_country():
+    """The budget card's crop list for a farmer abroad - lookup() for each crop,
+    sorted by label, the same contract province_table() keeps for TÜİK, so a
+    submitted figure is verified against the very row the card was built from."""
+    table = norms.country_table(FRANCE)
+    assert len(table) == len(norms.available_crops())
+    assert [row.label for row in table] == sorted(row.label for row in table)
+    for row in table[:40]:
+        assert row == norms.lookup(row.crop, None, country=FRANCE)
+
+
+def test_turkiye_has_no_country_table():
+    """Türkiye is TÜİK's, never FAOSTAT's area 223 - see _resolve."""
+    assert norms.country_table(TURKIYE) == ()
+
+
+@pytest.mark.parametrize("country, year", [(FRANCE, 2024), (EGYPT, 2023), (RUSSIA, 2022)])
+def test_a_country_price_year_is_its_own_latest(country, year):
+    """Countries report prices on different lags - measured 2026-10-29: France
+    2024, Egypt 2023, Russia 2022. One cutoff for all (the dataset's 2024) would
+    serve Egypt no price at all; each country's own latest year serves the
+    figures it last published, and no older ones mixed in."""
+    assert norms.country_price_year(country) == year
+
+
+def test_a_price_year_far_behind_the_dataset_is_no_year():
+    """More than two years behind FAOSTAT's own latest is too old to prefill a
+    price from - nominal prices drift - so the card offers none."""
+    world = norms._load_world()
+    latest = world["meta"]["years"][-1]
+    stale = {k: v for k, v in world["price"].items() if not k.endswith(f"|{FRANCE}")}
+    stale[f"{next(iter(norms._load_fao_map().values()))['fao']}|{FRANCE}"] = {
+        str(latest - 3): [1.0, "A"]}
+    norms._load_world.cache_clear()
+    import unittest.mock
+    with unittest.mock.patch.object(norms, "_load_world", lambda: {**world, "price": stale}):
+        assert norms.country_price_year(FRANCE) is None
