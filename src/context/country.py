@@ -942,6 +942,42 @@ def _find(folded: str, original: str) -> int | None:
     return best_code if best_code is not None else origin_code
 
 
+@lru_cache(maxsize=1)
+def _crop_names() -> frozenset[str]:
+    """Every folded crop family name, for _only_a_crop. Deferred import:
+    src/crop_compare.py imports from src/engine.py at load time."""
+    from src import crop_compare
+    return frozenset(folded for folded, _display in crop_compare._families())
+
+
+_SAYS_WHERE = r"(?:['’‘]|d[ae]y[iı][mz]|t[ae]y[iı][mz])"
+
+
+def _only_a_crop(code: int, folded: str) -> bool:
+    """Whether this turn names the country ONLY by a name that is also a crop,
+    in a form that does not say where - "mısırda" is "in the maize" as readily
+    as "in Egypt", and in this assistant far more often.
+
+    On the shipped tables the one such name is `Mısır`. Measured 2026-10-30:
+    five maize questions with a case ending ("Mısırda çinko eksikliği...",
+    "Mısıra ne zaman gübre...") resolved to Egypt. The name counts as the
+    country in a form that says WHERE: an apostrophe ("Mısır'da"), the "I am in"
+    ending ("mısırdayım"), the bare name as a whole reply ("Mısır"), or another
+    of the country's names ("Egypt") anywhere in the turn.
+    """
+    aliases = [name for name, (area, _turkish) in _FOLDED.items() if area == code]
+    colliding = [name for name in aliases if name in _crop_names()]
+    if not colliding:
+        return False
+    if folded.strip(" .!?…") in colliding:
+        return False
+    for name in colliding:
+        if re.search(rf"(?<!\w){re.escape(name)}{_SAYS_WHERE}", folded):
+            return False
+    return not any(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", folded)
+                   for name in aliases if name not in colliding)
+
+
 def extract_country(message: str, history: list[dict] | None = None) -> int | None:
     """Most recent country mentioned, as an FAO area code: the current message
     wins, then history read backwards. Returns None when nobody has said where
@@ -961,7 +997,7 @@ def extract_country(message: str, history: list[dict] | None = None) -> int | No
     # table holds area 0, so this changes nothing today - which is the reason to
     # write it correctly rather than to leave the code saying something false.
     found = _find(folded, message)
-    if found is not None:
+    if found is not None and not _only_a_crop(found, folded):
         return found
     for turn in reversed(history or []):
         if turn.get("role") != "user":
@@ -976,6 +1012,6 @@ def extract_country(message: str, history: list[dict] | None = None) -> int | No
         # Both forms of the SAME turn, for the reason _find's docstring gives.
         # `is not None` for the reason given above.
         found = _find(content, raw)
-        if found is not None:
+        if found is not None and not _only_a_crop(found, content):
             return found
     return None
