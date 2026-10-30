@@ -16,30 +16,72 @@
   "never defines - and olive's row is the page's '2705 days' typo.",
   "'t12_range' names several Table 12 crops whose rows are printed as one range",
   "(citrus by ground cover and canopy); 'variants' pairs each Table 11 row with",
-  "its own Table 12 row (banana's first and second year)."
+  "its own Table 12 row (banana's first and second year).",
+  "",
+  "SPRING CEREALS come from FAO-56's one latitude-band row, 'Barley/Oats/Wheat,",
+  "March/Apr, 35-45 °L': src/season.py reads a band only when it holds all of",
+  "Türkiye. A variant's own 'note' is printed when that variant's row is used.",
+  "Barley lists the barley-naming row first: for an April planting both it and",
+  "'Grains (small)' fit, and the first in the list wins the tie."
  ],
  "bugday, durum bugdayi haric": {
-  "t11": "Winter Wheat",
-  "t12": [
-   "Winter Wheat",
-   "- with non-frozen soils"
+  "variants": [
+   {
+    "t11": "Winter Wheat",
+    "t12": [
+     "Winter Wheat",
+     "- with non-frozen soils"
+    ]
+   },
+   {
+    "t11": "Barley/Oats/Wheat",
+    "t12": [
+     "Spring Wheat",
+     null
+    ],
+    "note": "FAO-56 bu süreleri arpa, yulaf ve buğday için birlikte yayımlıyor."
+   }
   ]
  },
  "arpa (biralik)": {
-  "t11": "Grains (small)",
-  "t12": [
-   "Barley",
-   null
-  ],
-  "note": "FAO-56 bu süreleri küçük taneli tahıllar için birlikte yayımlıyor."
+  "variants": [
+   {
+    "t11": "Barley/Oats/Wheat",
+    "t12": [
+     "Barley",
+     null
+    ],
+    "note": "FAO-56 bu süreleri arpa, yulaf ve buğday için birlikte yayımlıyor."
+   },
+   {
+    "t11": "Grains (small)",
+    "t12": [
+     "Barley",
+     null
+    ],
+    "note": "FAO-56 bu süreleri küçük taneli tahıllar için birlikte yayımlıyor."
+   }
+  ]
  },
  "arpa (diger)": {
-  "t11": "Grains (small)",
-  "t12": [
-   "Barley",
-   null
-  ],
-  "note": "FAO-56 bu süreleri küçük taneli tahıllar için birlikte yayımlıyor."
+  "variants": [
+   {
+    "t11": "Barley/Oats/Wheat",
+    "t12": [
+     "Barley",
+     null
+    ],
+    "note": "FAO-56 bu süreleri arpa, yulaf ve buğday için birlikte yayımlıyor."
+   },
+   {
+    "t11": "Grains (small)",
+    "t12": [
+     "Barley",
+     null
+    ],
+    "note": "FAO-56 bu süreleri küçük taneli tahıllar için birlikte yayımlıyor."
+   }
+  ]
  },
  "misir": {
   "t11": "Maize (grain)",
@@ -506,6 +548,18 @@
   "t12": [
    "Groundnut (Peanut)",
    null
+  ]
+ },
+ "yulaf": {
+  "variants": [
+   {
+    "t11": "Barley/Oats/Wheat",
+    "t12": [
+     "Oats",
+     null
+    ],
+    "note": "FAO-56 bu süreleri arpa, yulaf ve buğday için birlikte yayımlıyor."
+   }
   ]
  }
 }
