@@ -67,6 +67,24 @@ FERTILIZATION_DOSES = (
 )
 _TIMING_JSON = DATA_DIR / "product_timing.json"
 
+# THE WEATHER RULES ARE THE COMPANY'S OWN, published in its Akademi article
+# "Toprağa Ne Zaman Gübre Atılır?" - quoted, and a test checks the quotes
+# against the scraped article. Its thresholds, not ours: any rain, and 30 °C.
+# The PDF's "yağış varsa sulama ertelenir" has no published source here, so
+# rain is reported in millimetres and irrigation is not advised on.
+WEATHER_SOURCE_URL = ("https://www.ekolojiktarim.com.tr/2025/09/25/"
+                      "topraga-ne-zaman-gubre-atilir-dogru-zamanlama-rehberi/")
+RAIN_RULE_QUOTE = "yağmur öncesi gübre uygulaması kayıplara neden olur"
+RAIN_RULE = (
+    "Yağış bekleniyor. Akademi'ye göre \"yağmur öncesi gübre uygulaması kayıplara "
+    "neden olur\"; uygulama yağmur sonrasına bırakılır."
+)
+HEAT_RULE_QUOTE = "30°C üzeri sıcaklıklarda yaprak uygulaması yapılmamalıdır"
+HEAT_RULE = (
+    "Sıcaklığın 30 °C'yi aşması bekleniyor. Akademi'ye göre \"30°C üzeri "
+    "sıcaklıklarda yaprak uygulaması yapılmamalıdır\"; serin saatler tercih edilir."
+)
+
 
 @lru_cache(maxsize=1)
 def _load() -> tuple[dict, dict]:
@@ -353,8 +371,29 @@ def _day(d: date) -> str:
     return f"{d.day} {_TR_MONTHS[d.month - 1]}"
 
 
-def render(result: SeasonCalendar | NoCalendar) -> str:
-    """Code-written Turkish; the source and the warning are part of the text."""
+def weather_lines(result: SeasonCalendar, today: date, province: str | None,
+                  outlook) -> list[str]:
+    """This week's forecast and the company's rules it triggers - only while
+    the season is under way or a week from starting: a forecast says nothing
+    about a planting months away. `outlook` is weather.Outlook or None."""
+    if outlook is None or province is None:
+        return []
+    if not (result.planting - timedelta(days=7) <= today <= result.stages[-1].end):
+        return []
+    lines = [f"**Bu hafta** ({province}, Open-Meteo tahmini): {outlook.phrase()}."]
+    if outlook.rain_mm > 0:
+        lines.append(RAIN_RULE)
+    if outlook.t_max > 30:
+        lines.append(HEAT_RULE)
+    if len(lines) > 1:
+        lines.append(f"Kaynak: Ekolojik Tarım Akademi, \"Toprağa Ne Zaman Gübre "
+                     f"Atılır?\" ({WEATHER_SOURCE_URL})")
+    return lines
+
+
+def render(result: SeasonCalendar | NoCalendar, weather: list[str] | None = None) -> str:
+    """Code-written Turkish; the source and the warning are part of the text.
+    `weather` is weather_lines()' output, placed after the programme."""
     if isinstance(result, NoCalendar):
         return f"**{result.label}**: {result.reason}\n\n{DISCLAIMER}"
     planted = f"{_day(result.planting)} {result.planting.year}"
@@ -385,5 +424,7 @@ def render(result: SeasonCalendar | NoCalendar) -> str:
         lines.append(FERTILIZATION_DOSES.format(product=result.applications[0].product))
     else:
         lines.append(NO_FERTILIZATION_YET)
+    if weather:
+        lines += [""] + weather
     lines += ["", DISCLAIMER]
     return "\n".join(lines)

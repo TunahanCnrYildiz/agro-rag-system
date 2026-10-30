@@ -2779,7 +2779,32 @@ def _season_crop(message: str) -> str | None:
     return None
 
 
-def _season_result(payload: dict | None, message: str = "") -> ChatResult:
+def _today() -> date:
+    """Today, from one place, so a test can hold the season calendar's
+    "is the season under way" window still."""
+    return date.today()
+
+
+def _season_weather(calendar, message: str, history: list[dict] | None) -> list[str]:
+    """This week's weather lines for a calendar, or none. Never raises: the
+    forecast is a convenience and a failed lookup costs only these lines."""
+    try:
+        from src import season
+        from src.context import location, weather
+        if not isinstance(calendar, season.SeasonCalendar):
+            return []
+        province = location.extract_province(message, history)
+        if province is None:
+            return []
+        today = _today()
+        return season.weather_lines(calendar, today, province,
+                                    weather.outlook(province, today))
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _season_result(payload: dict | None, message: str = "",
+                   history: list[dict] | None = None) -> ChatResult:
     """The season-calendar route (PDF p5): no retrieval, no product match, no
     model call. Published FAO-56 stage lengths added to the farmer's own
     planting date in src/season.py; the card when the payload is absent or
@@ -2798,7 +2823,8 @@ def _season_result(payload: dict | None, message: str = "") -> ChatResult:
             for app in getattr(calendar, "applications", ()):
                 if app.link and app.product not in seen:
                     seen[app.product] = RecommendedProduct(app.product, app.link)
-            return ChatResult(answer=season.render(calendar),
+            return ChatResult(answer=season.render(calendar,
+                                                   _season_weather(calendar, message, history)),
                               recommended_products=list(seen.values()), route="season")
         return ChatResult(answer=season.ASK_FOR_INPUTS, recommended_products=[],
                           route="season",
@@ -2841,7 +2867,7 @@ def answer(message: str, history: list[dict] | None = None,
     # A submitted season card is answered as one whatever its message routes
     # to - the `or payload` rule every card follows.
     if season_payload or route == "season":
-        result = _season_result(season_payload, message)
+        result = _season_result(season_payload, message, history)
         result.route_how = route_how
         return result
 
@@ -2947,7 +2973,7 @@ def stream_answer(
 
     # Must mirror answer(): a card wired only into answer() reaches no user.
     if season_payload or route == "season":
-        result = _season_result(season_payload, message)
+        result = _season_result(season_payload, message, history)
         yield _sse({"type": "token", "content": result.answer})
         if result.season_form is not None:
             # A NEW event type, ignored by a client that predates it - which

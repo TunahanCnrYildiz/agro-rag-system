@@ -106,3 +106,27 @@ def test_the_programmes_products_come_as_link_chips(no_llm):
     events = [json.loads(c.split("data: ", 1)[1]) for c in engine.stream_answer(
         Q, None, None, None, None, {"crop": TOMATO, "planting": "15.04.2027"}) if "data: " in c]
     assert [e["type"] for e in events] == ["token", "products", "done"]
+
+
+def test_a_farmer_in_season_gets_this_weeks_weather(no_llm, monkeypatch):
+    from datetime import date as _date
+    from src.context import weather
+    calls = []
+    monkeypatch.setattr(engine, "_today", lambda: _date(2027, 6, 1))
+    monkeypatch.setattr(weather, "outlook",
+                        lambda province, today=None: calls.append((province, today))
+                        or weather.Outlook(5.0, 9, 24))
+    history = [{"role": "user", "content": "Konya'dayım."}]
+    result = engine.answer(Q, history, None, None, None,
+                           {"crop": TOMATO, "planting": "15.04.2027"})
+    assert calls == [("Konya", _date(2027, 6, 1))]
+    assert "**Bu hafta** (Konya, Open-Meteo tahmini)" in result.answer
+    assert season.RAIN_RULE in result.answer
+
+
+def test_a_weather_failure_costs_only_the_weather(no_llm, monkeypatch):
+    from src.context import weather
+    monkeypatch.setattr(weather, "outlook", lambda *a, **k: 1 / 0)
+    result = engine.answer(Q, [{"role": "user", "content": "Konya'dayım."}], None, None, None,
+                           {"crop": TOMATO, "planting": "15.04.2027"})
+    assert "Orta dönem" in result.answer and "Bu hafta" not in result.answer

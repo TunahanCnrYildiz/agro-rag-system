@@ -218,3 +218,55 @@ def test_the_calendar_prints_the_programme_or_says_there_is_none():
     assert season.NO_FERTILIZATION_YET not in text
     flax = season.render(season.build("keten tohumu", "Keten", date(2027, 4, 15)))
     assert season.NO_FERTILIZATION_YET in flax
+
+
+# --------------------------------------------------------------------------- #
+# This week's weather: the forecast, and the company's own published rules
+# --------------------------------------------------------------------------- #
+from src.context.weather import Outlook  # noqa: E402
+
+PLANTED = date(2027, 4, 15)
+
+
+def _cal():
+    return season.build(TOMATO, "Domates", PLANTED)
+
+
+def test_weather_is_shown_only_while_the_season_is_under_way():
+    wet = Outlook(12.4, 8, 22)
+    assert season.weather_lines(_cal(), date(2027, 1, 10), "Konya", wet) == []   # months ahead
+    assert season.weather_lines(_cal(), date(2027, 4, 9), "Konya", wet)          # a week ahead
+    assert season.weather_lines(_cal(), date(2027, 6, 1), "Konya", wet)          # under way
+    assert season.weather_lines(_cal(), date(2027, 10, 1), "Konya", wet) == []   # over
+
+
+def test_rain_triggers_the_published_rain_rule_with_its_source():
+    lines = season.weather_lines(_cal(), date(2027, 6, 1), "Konya", Outlook(12.4, 8, 22))
+    assert lines[0] == ("**Bu hafta** (Konya, Open-Meteo tahmini): önümüzdeki hafta "
+                        "toplam 12.4 mm yağış bekleniyor, sıcaklık 8-22 °C aralığında.")
+    assert season.RAIN_RULE in lines and season.HEAT_RULE not in lines
+    assert season.WEATHER_SOURCE_URL in lines[-1]
+
+
+def test_heat_over_thirty_triggers_the_published_heat_rule():
+    lines = season.weather_lines(_cal(), date(2027, 7, 10), "Konya", Outlook(0.0, 18, 34))
+    assert season.HEAT_RULE in lines and season.RAIN_RULE not in lines
+
+
+def test_a_dry_mild_week_is_reported_and_advises_nothing():
+    lines = season.weather_lines(_cal(), date(2027, 6, 1), "Konya", Outlook(0.0, 10, 28))
+    assert len(lines) == 1
+
+
+def test_no_province_or_no_forecast_means_no_weather():
+    assert season.weather_lines(_cal(), date(2027, 6, 1), None, Outlook(1.0, 8, 22)) == []
+    assert season.weather_lines(_cal(), date(2027, 6, 1), "Konya", None) == []
+
+
+def test_the_weather_rules_quote_the_companys_article_verbatim():
+    articles = json.loads((DATA_DIR.parent / "docs" / "articles" / "articles.json")
+                          .read_text(encoding="utf-8"))
+    page = next(a for a in articles if a["source_url"] == season.WEATHER_SOURCE_URL)
+    assert season.RAIN_RULE_QUOTE.lower() in _ws(page["content"]).lower()
+    assert season.HEAT_RULE_QUOTE in _ws(page["content"])
+    assert season.RAIN_RULE_QUOTE in season.RAIN_RULE and season.HEAT_RULE_QUOTE in season.HEAT_RULE
