@@ -30,6 +30,8 @@ export default function SeasonCard({ form, onSubmit, disabled }: Props) {
   const [crop, setCrop] = useState(form.crop);
   const [query, setQuery] = useState(labelOf(form, form.crop));
   const [planting, setPlanting] = useState(form.planting || today());
+  // A tree is not planted each year: its calendar runs from the season's start.
+  const isTree = form.crops.find((c) => c.id === crop)?.kind === "tree";
 
   // The list closes when the box already reads as the chosen crop - the
   // budget and dose cards' rule.
@@ -71,7 +73,9 @@ export default function SeasonCard({ form, onSubmit, disabled }: Props) {
       </View>
 
       <View style={styles.row}>
-        <Text style={styles.label}>Ekim (dikim) tarihi</Text>
+        <Text style={styles.label}>
+          {isTree ? "Sezon başlangıcı (uyanma, yaprak açma)" : "Ekim (dikim) tarihi"}
+        </Text>
         <TextInput
           style={styles.input}
           value={planting}

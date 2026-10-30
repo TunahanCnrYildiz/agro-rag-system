@@ -130,3 +130,9 @@ def test_a_weather_failure_costs_only_the_weather(no_llm, monkeypatch):
     result = engine.answer(Q, [{"role": "user", "content": "Konya'dayım."}], None, None, None,
                            {"crop": TOMATO, "planting": "15.04.2027"})
     assert "Orta dönem" in result.answer and "Bu hafta" not in result.answer
+
+
+def test_a_bad_date_for_a_tree_asks_for_the_season_start(no_llm):
+    form = engine.answer(Q, None, None, None, None,
+                         {"crop": "portakal (washington)", "planting": "yok"}).season_form
+    assert form["errors"]["planting"] == season.TREE_DATE_ERROR

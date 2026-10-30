@@ -146,7 +146,7 @@ def available_crops() -> tuple[str, ...]:
     """Our crop ids the map names a Table 11 crop for."""
     _, mapping = _load()
     return tuple(cid for cid, entry in mapping.items()
-                 if isinstance(entry, dict) and entry.get("t11"))
+                 if isinstance(entry, dict) and _variants(entry))
 
 
 def plant_months(text: str) -> frozenset[int]:
@@ -214,12 +214,13 @@ class Stage:
 @dataclass(frozen=True)
 class SeasonCalendar:
     label: str
-    planting: date
+    planting: date       # a tree's season START, an annual's planting
     stages: tuple[Stage, ...]
     row: dict            # the Table 11 row the durations came from
-    kc: dict | None      # the Table 12 row, when the map names one
+    kc: dict | None      # the Table 12 row, or the range a "t12_range" names
     note: str | None
     applications: tuple[Application, ...] = ()
+    kind: str = "annual"  # "annual" | "tree"
 
 
 @dataclass(frozen=True)
@@ -228,13 +229,54 @@ class NoCalendar:
     reason: str
 
 
+def _variants(entry: dict) -> list[tuple[str, object]]:
+    """(Table 11 crop, Table 12 spec) pairs for a map entry. Most crops have one;
+    a crop FAO-56 publishes as several rows with their own coefficients - banana
+    in its first and second year - lists them under "variants", so each row
+    keeps its own Kc."""
+    if isinstance(entry.get("variants"), list):
+        return [(v.get("t11"), v.get("t12")) for v in entry["variants"]
+                if isinstance(v, dict) and v.get("t11")]
+    if entry.get("t11"):
+        return [(entry["t11"], entry.get("t12_range") and {"range": entry["t12_range"]}
+                 or entry.get("t12"))]
+    return []
+
+
+_KC = re.compile(r"\d\.\d{1,2}")
+
+
+def _kc_value(text: object) -> str | None:
+    """A published Kc - "1.15", or a range "0.70-0.90" - or None. Table 12
+    prints some footnote marks unmarked, so walnut's "0.65" reads "0.6518":
+    a value with more than two decimals is not one the table published."""
+    if not isinstance(text, str):
+        return None
+    parts = text.strip().split("-")
+    return text.strip() if parts and all(_KC.fullmatch(x) for x in parts) else None
+
+
 def _kc_row(t12) -> dict | None:
+    """The Table 12 row a spec names, or - for {"range": [crops]} - the range
+    of every row of those crops: citrus is published as six rows by ground
+    cover and canopy, and without asking which, the range is what is known."""
+    stages, _ = _load()
+    rows = stages.get("kc", [])
+    if isinstance(t12, dict) and isinstance(t12.get("range"), list):
+        picked = [r for r in rows if r.get("crop") in t12["range"]]
+        out = {"crop": ", ".join(t12["range"]), "variant": None, "range": True}
+        for key in ("kc_ini", "kc_mid", "kc_end"):
+            values = [float(v) for v in (_kc_value(r.get(key)) for r in picked)
+                      if v is not None and "-" not in v]
+            if not values:
+                return None
+            out[key] = f"{min(values):.2f}-{max(values):.2f}"
+        return out
     if not isinstance(t12, list) or len(t12) != 2:
         return None
-    stages, _ = _load()
     crop, variant = t12
-    return next((r for r in stages.get("kc", [])
-                 if r.get("crop") == crop and r.get("variant") == variant), None)
+    return next((r for r in rows if r.get("crop") == crop and r.get("variant") == variant),
+                None)
 
 
 def _num(text: str) -> str:
@@ -244,48 +286,67 @@ def _num(text: str) -> str:
 
 
 def _water_lines(kc: dict | None) -> tuple[str, str, str, str]:
-    if kc is None or not kc.get("kc_mid"):
+    """The four stages' water lines. The rising-then-falling reading ("artıyor",
+    "en yüksek", "azalıyor") is printed only when the published values say so -
+    mid above the start and the end below mid; a range, or a crop whose
+    mid-season is not its peak, gets the values alone."""
+    values = None if kc is None else tuple(_kc_value(kc.get(k))
+                                           for k in ("kc_ini", "kc_mid", "kc_end"))
+    if values is None or None in values:
         missing = "su ihtiyacı için yayımlanmış katsayı yok"
         return (missing,) * 4
-    ini, mid, end = _num(kc["kc_ini"]), _num(kc["kc_mid"]), _num(kc["kc_end"])
-    return (f"su ihtiyacı düşük (Kc {ini})",
-            f"su ihtiyacı artıyor (Kc {ini} → {mid})",
-            f"su ihtiyacı en yüksek (Kc {mid})",
-            f"su ihtiyacı azalıyor (Kc {mid} → {end})")
+    ini, mid, end = (_num(v) for v in values)
+    lo_hi = [tuple(float(x) for x in v.split("-")) for v in values]
+    # Every reading of a published range must agree: the start's highest below
+    # mid-season's lowest, and the end's highest below it too. Tomato's end
+    # "0.70-0.90" sits wholly under its 1.15; citrus's ranges overlap and get
+    # no reading at all.
+    if max(lo_hi[0]) < min(lo_hi[1]) and max(lo_hi[2]) < min(lo_hi[1]):
+        return (f"su ihtiyacı düşük (Kc {ini})",
+                f"su ihtiyacı artıyor (Kc {ini} → {mid})",
+                f"su ihtiyacı en yüksek (Kc {mid})",
+                f"su ihtiyacı azalıyor (Kc {mid} → {end})")
+    return (f"su ihtiyacı (Kc {ini})", f"su ihtiyacı (Kc {ini} → {mid})",
+            f"su ihtiyacı (Kc {mid})", f"su ihtiyacı (Kc {mid} → {end})")
 
 
 def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalendar:
-    """The calendar for one crop planted on one date, or the reason there is none."""
+    """The calendar for one crop from one date - an annual's planting, a tree's
+    season start - or the reason there is none."""
     _, mapping = _load()
     entry = mapping.get(crop_id)
-    if not isinstance(entry, dict) or not entry.get("t11"):
+    pairs = _variants(entry) if isinstance(entry, dict) else []
+    if not pairs:
         return NoCalendar(label, "FAO-56 bu ürün için gelişim dönemi süresi "
                                  "yayımlamıyor, bu yüzden takvim çıkaramıyorum.")
-    rows = usable_rows(entry["t11"])
+    tree = entry.get("kind") == "tree"
+    rows = [(row, t12) for t11, t12 in pairs for row in usable_rows(t11)]
     if not rows:
         return NoCalendar(label, "FAO-56'da bu ürün için Akdeniz ya da Avrupa "
                                  "iklimine ait, tutarlı bir gelişim dönemi satırı "
                                  "yok, bu yüzden takvim çıkaramıyorum.")
-    gap, row = min(((min(_month_gap(planting.month, m)
-                         for m in plant_months(r["plant"])), r) for r in rows),
-                   key=lambda pair: pair[0])
+    gap, row, t12 = min(((min(_month_gap(planting.month, m)
+                              for m in plant_months(r["plant"])), r, t12)
+                         for r, t12 in rows), key=lambda triple: triple[0])
     if gap > 1:
-        published = sorted({m for r in rows for m in plant_months(r["plant"])})
+        published = sorted({m for r, _ in rows for m in plant_months(r["plant"])})
         months = ", ".join(_TR_MONTHS[m - 1] for m in published)
+        asked = _TR_MONTHS[planting.month - 1]
+        what, of = (("sezon başlangıcına", "başlangıcı") if tree else ("ekimine", "ekimi"))
         return NoCalendar(label, (
-            f"FAO-56 bu ürün için Akdeniz ve Avrupa'da yalnızca {months} "
-            f"ekimine ait süreleri yayımlıyor; {_TR_MONTHS[planting.month - 1]} "
-            f"ekimi için yayımlanmış bir süre olmadığından takvim çıkaramıyorum."))
+            f"FAO-56 bu ürün için Akdeniz ve Avrupa'da yalnızca {months} {what} ait "
+            f"süreleri yayımlıyor; {asked} {of} için yayımlanmış bir süre olmadığından "
+            f"takvim çıkaramıyorum."))
     days = _days(row)
-    water = _water_lines(_kc_row(entry.get("t12")))
+    kc = _kc_row(t12)
+    water = _water_lines(kc)
     stages, start = [], planting
     for name, length, water_line in zip(STAGE_NAMES, days, water):
         end = start + timedelta(days=length - 1)
         stages.append(Stage(name, start, end, length, water_line))
         start = end + timedelta(days=1)
-    return SeasonCalendar(label, planting, tuple(stages), row,
-                          _kc_row(entry.get("t12")), entry.get("note"),
-                          applications(crop_id, planting))
+    return SeasonCalendar(label, planting, tuple(stages), row, kc, entry.get("note"),
+                          applications(crop_id, planting), "tree" if tree else "annual")
 
 
 # --------------------------------------------------------------------------- #
@@ -294,13 +355,15 @@ def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalend
 # Written to stand alone: a client that cannot draw the card shows only this,
 # so it names what the programme is built from instead of pointing at a widget.
 ASK_FOR_INPUTS = (
-    "Sezon programını iki bilgiyle çıkarırım: ürün ve ekim (dikim) tarihi. "
-    "Gelişim dönemlerinin süreleri FAO'nun yayımladığı tablolardan gelir."
+    "Sezon programını iki bilgiyle çıkarırım: ürün ve ekim (dikim) tarihi - "
+    "meyve ağaçlarında sezonun başladığı tarih. Gelişim dönemlerinin süreleri "
+    "FAO'nun yayımladığı tablolardan gelir."
 )
 COMPUTE_FAILED = (
     "Sezon programını çıkaramadım. Lütfen seçimlerinizi kontrol edip tekrar deneyin."
 )
 DATE_ERROR = "Ekim (dikim) tarihini GG.AA.YYYY biçiminde yazın (örn. 15.04.2027)."
+TREE_DATE_ERROR = "Sezon başlangıcını GG.AA.YYYY biçiminde yazın (örn. 01.02.2027)."
 
 
 def crop_options() -> list[dict]:
@@ -308,7 +371,9 @@ def crop_options() -> list[dict]:
     for - with the labels the rest of the product uses for them."""
     from src import norms
     labels = dict(norms.available_crops())
-    return sorted(({"id": cid, "label": labels.get(cid, cid)}
+    _, mapping = _load()
+    return sorted(({"id": cid, "label": labels.get(cid, cid),
+                    "kind": mapping[cid].get("kind", "annual")}
                    for cid in available_crops()), key=lambda c: c["label"])
 
 
@@ -334,7 +399,9 @@ def validate(raw: object) -> tuple[tuple[str, str, date] | None, dict]:
     """((crop id, label, planting date), {}) or (None, {field: message}).
     Never raises; every error at once, like the other cards."""
     raw = raw if isinstance(raw, dict) else {}
-    options = {c["id"]: c["label"] for c in crop_options()}
+    listed = crop_options()
+    options = {c["id"]: c["label"] for c in listed}
+    trees = {c["id"] for c in listed if c.get("kind") == "tree"}
     errors: dict[str, str] = {}
     crop = raw.get("crop")
     if not isinstance(crop, str) or not crop.strip():
@@ -343,7 +410,7 @@ def validate(raw: object) -> tuple[tuple[str, str, date] | None, dict]:
         errors["crop"] = "Bu ürün için yayımlanmış bir gelişim dönemi tablosu yok."
     planting = parse_date(raw.get("planting"))
     if planting is None:
-        errors["planting"] = DATE_ERROR
+        errors["planting"] = TREE_DATE_ERROR if crop in trees else DATE_ERROR
     if errors:
         return None, errors
     return (crop, options[crop], planting), {}
@@ -396,16 +463,19 @@ def render(result: SeasonCalendar | NoCalendar, weather: list[str] | None = None
     `weather` is weather_lines()' output, placed after the programme."""
     if isinstance(result, NoCalendar):
         return f"**{result.label}**: {result.reason}\n\n{DISCLAIMER}"
+    tree = result.kind == "tree"
     planted = f"{_day(result.planting)} {result.planting.year}"
-    lines = [f"**{result.label}** için temsili sezon programı · ekim/dikim: {planted}", ""]
+    started = "sezon başlangıcı" if tree else "ekim/dikim"
+    lines = [f"**{result.label}** için temsili sezon programı · {started}: {planted}", ""]
     for i, s in enumerate(result.stages, 1):
         lines.append(f"{i}. **{s.name}** · {_day(s.start)} – {_day(s.end)} "
                      f"({s.days} gün) · {s.water}")
     last = result.stages[-1].end
-    lines += ["", f"Son dönemin bitişi (hasat dönemi): {_day(last)} {last.year}", ""]
+    closing = "Sezonun bitişi" if tree else "Son dönemin bitişi (hasat dönemi)"
+    lines += ["", f"{closing}: {_day(last)} {last.year}", ""]
     region, plant = result.row.get("region", ""), result.row.get("plant", "")
-    source = (f"Kaynak: FAO-56 (Allen vd., 1998), Tablo 11 - {region}, "
-              f"{plant} ekimi")
+    source = (f"Kaynak: FAO-56 (Allen vd., 1998), Tablo 11 - {result.row.get('crop')}, "
+              f"{region}, {plant} {'başlangıcı' if tree else 'ekimi'}")
     source += " ve Tablo 12." if result.kc else "."
     lines.append(source)
     if result.note:

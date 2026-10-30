@@ -169,6 +169,8 @@ export interface CompareFormSpec {
 export interface SeasonCrop {
   id: string;
   label: string;
+  // "tree": the date is the season's start (bud break), not a planting.
+  kind?: "annual" | "tree";
 }
 
 export interface SeasonFormSpec {
