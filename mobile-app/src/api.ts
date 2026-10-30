@@ -164,12 +164,33 @@ export interface CompareFormSpec {
   errors: { first: string | null; second: string | null };
 }
 
+// The season-calendar card (PDF p5): the crops FAO-56 publishes stage lengths
+// for, and the planting date as GG.AA.YYYY.
+export interface SeasonCrop {
+  id: string;
+  label: string;
+}
+
+export interface SeasonFormSpec {
+  kind: "season";
+  crops: SeasonCrop[];
+  crop: string;
+  planting: string;
+  errors: { crop: string | null; planting: string | null };
+}
+
+export interface SeasonPayload {
+  crop?: string;
+  planting?: string;
+}
+
 export interface ChatStreamHandlers {
   onToken: (content: string) => void;
   onProducts: (products: RecommendedProduct[]) => void;
   onForm?: (form: FormSpec) => void;
   onDoseForm?: (form: DoseFormSpec) => void;
   onCompareForm?: (form: CompareFormSpec) => void;
+  onSeasonForm?: (form: SeasonFormSpec) => void;
   onArticle?: (article: RecommendedArticle) => void;
   // Crops the farmer may add to their profile with a tap (see cropProfile.ts).
   onCropOffer?: (crops: string[]) => void;
@@ -185,7 +206,8 @@ export function sendChatMessageStream(
   handlers: ChatStreamHandlers,
   budget?: BudgetPayload,
   dose?: DosePayload,
-  compare?: ComparePayload
+  compare?: ComparePayload,
+  season?: SeasonPayload
 ): void {
   const xhr = new XMLHttpRequest();
   let processedEvents = 0;
@@ -212,6 +234,8 @@ export function sendChatMessageStream(
         handlers.onDoseForm?.(evt.form);
       } else if (evt.type === "compare_form") {
         handlers.onCompareForm?.(evt.form);
+      } else if (evt.type === "season_form") {
+        handlers.onSeasonForm?.(evt.form);
       } else if (evt.type === "article") {
         handlers.onArticle?.(evt.article);
       } else if (evt.type === "crop_offer") {
@@ -233,7 +257,7 @@ export function sendChatMessageStream(
     }
   };
   xhr.onerror = () => handlers.onError(new Error("Network error"));
-  xhr.send(JSON.stringify({ message, history, stream: true, budget, dose, compare }));
+  xhr.send(JSON.stringify({ message, history, stream: true, budget, dose, compare, season }));
 }
 
 export interface CatalogProduct {

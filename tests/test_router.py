@@ -388,3 +388,36 @@ def test_the_class_questions_reach_the_rule_they_test():
     assert len(qualified_in_hand) == 4
     for query in qualified_in_hand:
         assert not router._FERTILIZER_CLASS.search(_normalize_tr(query)), query
+
+
+@pytest.mark.parametrize("query", [
+    "Domates için sezon programı çıkarır mısın?",
+    "Biberin sulama takvimi nasıl olmalı?",
+    "Buğday için ekim takvimi hazırlar mısın?",
+    "Patatesin yetiştirme takvimi nedir?",
+    "Bana bir takvim çıkarır mısın?",
+    "Mısır için program hazırla",
+])
+def test_a_season_calendar_asked_for_by_name_is_the_season_card(query):
+    assert classify_by_rules(query) == "season"
+
+
+@pytest.mark.parametrize("query, route", [
+    # A FERTILIZATION calendar is fert_plan: the season card has no
+    # fertilization rows yet, and these get the corpus answer they had.
+    ("Fındık için gübreleme takvimi çıkarır mısın?", "fert_plan"),
+    ("Zeytinde gübreleme programı nasıl olmalı?", "fert_plan"),
+    ("Domatese gübreleme takvimi hazırlar mısın?", "fert_plan"),
+])
+def test_a_fertilization_calendar_stays_fert_plan(query, route):
+    assert classify_by_rules(query) == route
+
+
+@pytest.mark.parametrize("query", [
+    "Domatesi ne zaman sulamalıyım?",
+    "Bu programı nasıl izlerim?",
+    "Takvim yaprağı gibi incelen yapraklar neden olur?",
+    "Ekim ayında buğday ekilir mi?",
+])
+def test_a_calendar_word_alone_is_not_a_season_request(query):
+    assert classify_by_rules(query) != "season"

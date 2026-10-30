@@ -83,6 +83,11 @@ class ComparePayload(BaseModel):
     second: str | None = None
 
 
+class SeasonPayload(BaseModel):
+    crop: str | None = None
+    planting: str | None = None
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="The user query.")
     history: list[ChatTurn] = Field(default_factory=list)
@@ -97,6 +102,9 @@ class ChatRequest(BaseModel):
     )
     compare: ComparePayload | None = Field(
         default=None, description="Filled crop-comparison card, when the user submitted one."
+    )
+    season: SeasonPayload | None = Field(
+        default=None, description="Filled season-calendar card, when the user submitted one."
     )
 
 
@@ -123,6 +131,10 @@ class ChatResponse(BaseModel):
     # At most one Akademi article, only under a model answer. Optional for the
     # same reason as the cards.
     article: ArticleRef | None = None
+    # Crops the farmer may add to their profile with a tap.
+    crop_offer: list[str] = Field(default_factory=list)
+    # Optional so an already-deployed client, which never reads it, is unaffected.
+    season_form: dict | None = None
 
 
 class CatalogProduct(BaseModel):
@@ -261,17 +273,18 @@ def chat(req: ChatRequest):
     budget_payload = req.budget.model_dump() if req.budget else None
     dose_payload = req.dose.model_dump() if req.dose else None
     compare_payload = req.compare.model_dump() if req.compare else None
+    season_payload = req.season.model_dump() if req.season else None
 
     if req.stream:
         return StreamingResponse(
             engine.stream_answer(req.message, history, budget_payload,
-                                 dose_payload, compare_payload),
+                                 dose_payload, compare_payload, season_payload),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     result = engine.answer(req.message, history, budget_payload, dose_payload,
-                           compare_payload)
+                           compare_payload, season_payload)
     return ChatResponse(**result.as_api())
 
 

@@ -1,0 +1,176 @@
+{
+ "_README": [
+  "When the company's own product pages say to apply a product - the season calendar's",
+  "fertilization rows (Hüseyin's PDF p5: 'Hangi dönemde hangi üründen ne kadar gerektiği').",
+  "Read off data/raw/product_panels.json (the pages' 'Uygulama' tab) by a person, one",
+  "statement at a time; 'quote' is the page's own words, verbatim, and a test checks it",
+  "against the raw panel so a row cannot drift from its source.",
+  "",
+  "WHO A ROW APPLIES TO is never inferred from agronomy: either the page names the crops",
+  "('crops'), or it says 'Sebzelerde' and the row takes TÜİK's own Sebzeler group",
+  "('tuik_group', derived from data/raw/sebze-*.csv). 'Tarla bitkilerinde' and",
+  "'Meyvelerde' have no one-to-one TÜİK group and are not used. 'Pancar' (sugar or table",
+  "beet?) and a list ending in 'vb.' are taken only as far as they name crops.",
+  "",
+  "'after_planting_days' is set only when the page counts from planting ('dikimden 3",
+  "hafta sonra'); src/season.py then dates it from the farmer's own date. Every other",
+  "timing is printed in the page's own terms ('çiçek öncesi ve sonrası') and never",
+  "turned into a date - that would take an agronomic reading of the stage.",
+  "",
+  "'when' is our Turkish summary of the quote and carries NO pesticide advice: FLY AZOT's",
+  "page times two applications 'ot ilacı ile birlikte', and the assistant never",
+  "recommends chemicals (PDF p16), so that half is left out.",
+  "",
+  "'tuik_groups' is TÜİK's Sebzeler group, as it appears in data/raw/sebze-uretim-*.csv,",
+  "for the crops the calendar carries; a test re-derives it from the raw export."
+ ],
+ "rows": [
+  {
+   "product": "ZİNCER",
+   "crops": [
+    "domates (sofralik)",
+    "domates (salcalik)",
+    "biber (dolmalik)",
+    "biber (salcalik, kapya)",
+    "biber (sivri)",
+    "biber (carliston)",
+    "patlican",
+    "kabak (sakiz)",
+    "kabak (cerezlik)",
+    "fasulye, taze",
+    "bezelye, taze",
+    "marul (gobekli)",
+    "marul (kivircik)",
+    "marul (iceberg)",
+    "sogan (kuru)",
+    "sogan (taze)",
+    "havuc"
+   ],
+   "after_planting_days": 21,
+   "repeat": "2-3 hafta arayla",
+   "when": "dikimden 3 hafta sonra başlayarak, 2-3 hafta arayla",
+   "quote": "Sebzelerde Dikimden 3 hafta sonra 2-3 hafta arayla"
+  },
+  {
+   "product": "ZİNCER",
+   "crops": [
+    "bugday, durum bugdayi haric",
+    "arpa (biralik)",
+    "arpa (diger)",
+    "celtik"
+   ],
+   "when": "kardeşleme döneminde ve 15 gün sonra",
+   "quote": "Hububat Kardeşleme dönemi ve 15 gün sonra"
+  },
+  {
+   "product": "ZİNCER",
+   "crops": [
+    "pamuk, circirlanmamis (kutlu)",
+    "seker pancari",
+    "patates (tatli patates haric)",
+    "misir",
+    "mercimek, kuru (kirmizi)",
+    "mercimek, kuru (yesil)"
+   ],
+   "when": "çapadan sonra 15 gün ara ile",
+   "quote": "Endüstri Bitkileri Çapadan sonra 15 gün ara ile"
+  },
+  {
+   "product": "FLY AZOT",
+   "crops": [
+    "bugday, durum bugdayi haric",
+    "arpa (biralik)",
+    "arpa (diger)",
+    "celtik"
+   ],
+   "when": "kıraç üretimde 2 uygulama: Mart başı, Mart sonu veya Nisan başı; sulu üretimde 3 uygulama: Mart başı, Mart sonu, Nisan'ın 20-25'i",
+   "quote": "Tahıllarda ve Hububatlarda kıraç üretimde dekara 200 cc yapraktan 2 uygulama yapılır. 1.Uygulama : Mart başı"
+  },
+  {
+   "product": "FLY AZOT",
+   "crops": [
+    "misir",
+    "aycicegi tohumu (yaglik)",
+    "aycicegi tohumu (cerezlik)"
+   ],
+   "when": "çıkış sonrası, mısır boyu 10 cm civarındayken",
+   "quote": "Mısır ve Ayçiçeği çıkış sonrası mısır boyu 10 cm civarındayken"
+  },
+  {
+   "product": "FLY AZOT",
+   "crops": [
+    "patates (tatli patates haric)",
+    "sogan (kuru)",
+    "sogan (taze)",
+    "havuc"
+   ],
+   "when": "çıkış sonrası bitki boyu 10 cm civarındayken, yaklaşık 1 ay sonra bir kez daha",
+   "quote": "Pancar, patates, soğan, havuç gibi toprak altı yumrulu bitkilerde çıkış sonrası bitki boyu 10 cm civarı yapraktan 250 cc, yaklaşık 1 ay sonra yine yapraktan 250 cc"
+  },
+  {
+   "product": "FLY AZOT",
+   "crops": [
+    "marul (gobekli)",
+    "marul (kivircik)",
+    "marul (iceberg)"
+   ],
+   "when": "çıkış sonrası gelişim döneminde",
+   "quote": "Yeşil yapraklıların ( marul, maydanoz, tere, roka, vb.) çıkış sonrası gelişim döneminde"
+  },
+  {
+   "product": "HİGRO BARF",
+   "tuik_group": "sebzeler",
+   "when": "çiçek öncesi ve sonrası dönemlerde",
+   "quote": "Çiçek öncesi ve sonrası dönemlerde uygulama dozları : Sebzelerde"
+  },
+  {
+   "product": "A.P.P – ORNE",
+   "tuik_group": "sebzeler",
+   "when": "sayfa iki ayrı başlangıç veriyor: dikimden bir hafta sonra ilk uygulama ve sezon boyunca 3 hafta ara ile; ayrıca dikimden 3-4 gün sonra ilk uygulama ve 20 günde bir",
+   "quote": "Dikimden bir hafta sonra 3 Litre dekara ilk uygulama yapılmalıdır. Sezon boyunca 3 hafta ara ile uygulamaya devam edilir."
+  },
+  {
+   "product": "HİGRO ROOT LEGEND",
+   "tuik_group": "sebzeler",
+   "after_planting_days": 0,
+   "when": "fideyle dikiliyorsa, dikimde fideler eriyiğe bandırılarak",
+   "quote": "Sebze fidesi ve Ağaç fidanlarını bandırma yöntemi ile dikim yapılması önerilir"
+  }
+ ],
+ "tuik_groups": {
+  "sebzeler": [
+   "domates (sofralik)",
+   "domates (salcalik)",
+   "biber (dolmalik)",
+   "biber (salcalik, kapya)",
+   "biber (sivri)",
+   "biber (carliston)",
+   "patlican",
+   "sogan (kuru)",
+   "sogan (taze)",
+   "havuc",
+   "marul (gobekli)",
+   "marul (kivircik)",
+   "marul (iceberg)",
+   "ispanak",
+   "kabak (sakiz)",
+   "kabak (cerezlik)",
+   "kavun",
+   "karpuz",
+   "fasulye, taze",
+   "bakla, taze",
+   "bezelye, taze",
+   "lahana (beyaz)",
+   "lahana (kirmizi)",
+   "lahana (bruksel)",
+   "karnabahar",
+   "brokoli",
+   "kereviz (sap)",
+   "kereviz (kok)",
+   "turp (beyaz)",
+   "turp (kirmizi)",
+   "turp (bayir)",
+   "kuskonmaz"
+  ]
+ }
+}

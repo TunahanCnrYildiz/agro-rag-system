@@ -1424,7 +1424,7 @@ def test_route_is_not_exposed_over_the_api(monkeypatch):
     # Must be a non-budget question; the budget route short-circuits before the stubs above.
     r = engine.answer("Elma ağacı ne zaman budanır?")
     assert set(r.as_api()) == {"answer", "recommended_products", "form", "dose_form",
-                               "compare_form", "article", "crop_offer"}
+                               "compare_form", "article", "crop_offer", "season_form"}
     assert "Kompost" in r.answer  # Corpus path exercises the stubs, not the budget route.
 
 

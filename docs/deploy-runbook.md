@@ -20,7 +20,10 @@ deploy. Nothing here changes local dev — local stays the default.
      and `docker-compose.yml` mounts `./data:/app/data`, so at runtime every
      file under `data/` comes from the host. The app reads tracked files from
      there: `crop_norms.json`, `world_norms.json`, `crop_fao_map.json`,
-     `country_aliases.json`, `product_doses.json`, `fertplan_table.json`. A
+     `country_aliases.json`, `product_doses.json`, `fertplan_table.json`, and
+     for the season calendar `crop_stages.json`, `crop_stage_map.json` and
+     `product_timing.json` (without them the calendar card answers "no
+     calendar" for every crop, again without an error). A
      volume holding only the store starts fine and **raises nothing** - measured
      2026-10-28 with those files deleted: `extract_country("Fransa'dayım")`
      returns `None`, `norms.lookup` returns `None`, and a French grower is asked
@@ -182,7 +185,8 @@ go stale.
    because their absence raises no error (see step 1):
    `docker compose exec api ls /app/data` must list `crop_norms.json`,
    `world_norms.json`, `crop_fao_map.json`, `country_aliases.json`,
-   `product_doses.json` and `fertplan_table.json` beside `vector_store`. Then
+   `product_doses.json`, `fertplan_table.json`, `crop_stages.json`,
+   `crop_stage_map.json` and `product_timing.json` beside `vector_store`. Then
    one behavioural check: ask "Fransa'dayım, bu yıl buğday mı ekmeliyim?" — the
    answer must name France's FAOSTAT figures, not ask for a Turkish province.
 

@@ -17,6 +17,7 @@ cost one lookup, not the feature.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 
 import requests
@@ -32,8 +33,22 @@ _TIMEOUT = 2.0
 # failed lookup is simply retried next time.
 #   coordinates: the 81 provinces do not move, so one lookup each, forever.
 #   forecasts:   keyed by (province, day) - see forecast() for why the day matters.
+@dataclass(frozen=True)
+class Outlook:
+    """The coming week, as the three figures the phrase is made of - so the
+    season calendar can test them against a published rule without a second
+    request and without parsing a sentence back into numbers."""
+    rain_mm: float      # the week's total, to 0,1 mm
+    t_min: int          # the week's lowest daily minimum, °C
+    t_max: int          # the week's highest daily maximum, °C
+
+    def phrase(self) -> str:
+        return (f"önümüzdeki hafta toplam {self.rain_mm} mm yağış bekleniyor, "
+                f"sıcaklık {self.t_min}-{self.t_max} °C aralığında")
+
+
 _GEO_CACHE: dict[str, tuple[float, float]] = {}
-_FORECAST_CACHE: dict[tuple[str, date], str] = {}
+_FORECAST_CACHE: dict[tuple[str, date], Outlook] = {}
 
 
 def cache_clear() -> None:
@@ -63,7 +78,14 @@ def _geocode(province: str) -> tuple[float, float] | None:
 
 
 def forecast(province: str, today: date | None = None) -> str | None:
-    """A Turkish phrase, or None when unavailable for any reason.
+    """A Turkish phrase, or None when unavailable for any reason - outlook()'s
+    figures, written out."""
+    found = outlook(province, today)
+    return found.phrase() if found is not None else None
+
+
+def outlook(province: str, today: date | None = None) -> Outlook | None:
+    """The coming week's figures, or None when unavailable for any reason.
 
     KEYED BY (province, day). An earlier version cached per province only, on the
     reasoning that "a forecast a few hours stale changes no advice" because the
@@ -97,9 +119,7 @@ def forecast(province: str, today: date | None = None) -> str | None:
         tmax = [x for x in (daily.get("temperature_2m_max") or []) if x is not None]
         if not (rain and tmin and tmax):
             return None
-        total_rain = round(sum(rain), 1)
-        phrase = (f"önümüzdeki hafta toplam {total_rain} mm yağış bekleniyor, "
-                  f"sıcaklık {round(min(tmin))}-{round(max(tmax))} °C aralığında")
+        found = Outlook(round(sum(rain), 1), round(min(tmin)), round(max(tmax)))
     except Exception:  # noqa: BLE001
         return None
 
@@ -107,5 +127,5 @@ def forecast(province: str, today: date | None = None) -> str | None:
     # instead of growing by 81 every day the container stays up.
     for stale in [k for k in _FORECAST_CACHE if k[1] != day]:
         del _FORECAST_CACHE[stale]
-    _FORECAST_CACHE[(province, day)] = phrase
-    return phrase
+    _FORECAST_CACHE[(province, day)] = found
+    return found
