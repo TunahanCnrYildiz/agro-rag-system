@@ -35,6 +35,24 @@ _STAGES_JSON = DATA_DIR / "crop_stages.json"
 _MAP_JSON = DATA_DIR / "crop_stage_map.json"
 
 _REGION = re.compile(r"medit|europe|spain|egypt", re.I)
+# A row may name a latitude band instead of a climate - FAO-56 has one, spring
+# "Barley/Oats/Wheat, 35-45 °L". It counts only when the band holds ALL of
+# Türkiye, from southern Hatay to Sinop: arithmetic, unlike "Mid Latitudes",
+# which FAO-56 never defines and which is therefore never read.
+_BAND = re.compile(r"(\d+)\s*-\s*(\d+)\s*°\s*L(?![A-Za-z])")
+TURKIYE_LATITUDE = (35.8, 42.1)
+
+
+def _region_ok(region: str) -> bool:
+    """A published region these farmers are in: the Mediterranean or Europe,
+    or a latitude band that contains Türkiye whole."""
+    if _REGION.search(region or ""):
+        return True
+    band = _BAND.search(region or "")
+    if band is None:
+        return False
+    south, north = float(band.group(1)), float(band.group(2))
+    return south <= TURKIYE_LATITUDE[0] and TURKIYE_LATITUDE[1] <= north
 
 _MONTHS = {
     "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
@@ -193,7 +211,7 @@ def _days(row: dict) -> tuple[int, int, int, int] | None:
 def usable_rows(t11_crop: str) -> list[dict]:
     stages, _ = _load()
     return [row for row in stages.get("stages", [])
-            if row.get("crop") == t11_crop and _REGION.search(row.get("region") or "")
+            if row.get("crop") == t11_crop and _region_ok(row.get("region") or "")
             and _days(row) is not None and plant_months(row.get("plant", ""))]
 
 
@@ -322,8 +340,9 @@ def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalend
     tree = entry.get("kind") == "tree"
     rows = [(row, t12) for t11, t12 in pairs for row in usable_rows(t11)]
     if not rows:
-        return NoCalendar(label, "FAO-56'da bu ürün için Akdeniz ya da Avrupa "
-                                 "iklimine ait, tutarlı bir gelişim dönemi satırı "
+        return NoCalendar(label, "FAO-56'da bu ürün için Türkiye'ye uyan (Akdeniz, "
+                                 "Avrupa ya da Türkiye'yi kapsayan bir enlem aralığı "
+                                 "için yayımlanmış), tutarlı bir gelişim dönemi satırı "
                                  "yok, bu yüzden takvim çıkaramıyorum.")
     gap, row, t12 = min(((min(_month_gap(planting.month, m)
                               for m in plant_months(r["plant"])), r, t12)
@@ -334,7 +353,7 @@ def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalend
         asked = _TR_MONTHS[planting.month - 1]
         what, of = (("sezon başlangıcına", "başlangıcı") if tree else ("ekimine", "ekimi"))
         return NoCalendar(label, (
-            f"FAO-56 bu ürün için Akdeniz ve Avrupa'da yalnızca {months} {what} ait "
+            f"FAO-56 bu ürün için Türkiye'ye uyan satırlarda yalnızca {months} {what} ait "
             f"süreleri yayımlıyor; {asked} {of} için yayımlanmış bir süre olmadığından "
             f"takvim çıkaramıyorum."))
     days = _days(row)
@@ -345,7 +364,13 @@ def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalend
         end = start + timedelta(days=length - 1)
         stages.append(Stage(name, start, end, length, water_line))
         start = end + timedelta(days=1)
-    return SeasonCalendar(label, planting, tuple(stages), row, kc, entry.get("note"),
+    # A variant's own note - "these days are shared by barley, oats and wheat" -
+    # belongs to its row, and is printed only when that row is the one used.
+    variant_note = next((v.get("note") for v in entry.get("variants", [])
+                         if isinstance(v, dict) and v.get("t11") == row.get("crop")
+                         and v.get("note")), None)
+    return SeasonCalendar(label, planting, tuple(stages), row, kc,
+                          variant_note or entry.get("note"),
                           applications(crop_id, planting), "tree" if tree else "annual")
 
 

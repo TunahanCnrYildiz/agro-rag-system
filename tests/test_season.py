@@ -366,3 +366,59 @@ def test_a_flat_end_is_not_called_falling():
     cal = season.build("sogan (taze)", "Taze soğan", date(2027, 4, 10))
     assert all("azalıyor" not in s.water and "artıyor" not in s.water for s in cal.stages)
     assert cal.stages[-1].water == "su ihtiyacı (Kc 1,00 → 1,00)"
+
+
+# --------------------------------------------------------------------------- #
+# Spring cereals: FAO-56's one latitude-band row, "Barley/Oats/Wheat, 35-45 °L"
+# --------------------------------------------------------------------------- #
+WHEAT = "bugday, durum bugdayi haric"
+
+
+@pytest.mark.parametrize("region, ok", [
+    ("35-45 °L", True),          # holds all of Türkiye, 35.8-42.1 °N
+    ("38-45 °L", False),         # would leave the south out
+    ("30-40 °L", False),         # would leave the north out
+    ("Mid Latitudes (wine)", False),
+    ("High Latitudes", False),   # never defined by FAO-56
+    ("Mediterranean", True),
+])
+def test_a_latitude_band_counts_only_when_it_holds_all_of_turkiye(region, ok):
+    assert season._region_ok(region) is ok
+
+
+def test_spring_wheat_comes_from_the_latitude_band_row():
+    cal = season.build(WHEAT, "Buğday", date(2027, 3, 20))
+    assert cal.row["region"] == "35-45 °L"
+    assert [s.days for s in cal.stages] == [20, 25, 60, 30]
+    assert cal.kc["crop"] == "Spring Wheat"
+
+
+def test_winter_wheat_is_unchanged():
+    cal = season.build(WHEAT, "Buğday", date(2026, 11, 5))
+    assert cal.row["crop"] == "Winter Wheat" and cal.kc["crop"] == "Winter Wheat"
+
+
+def test_spring_barley_prefers_the_row_that_names_barley():
+    """Two published rows fit an April barley; the one naming barley wins over
+    "Grains (small)" - a tie-break, recorded in data/crop_stage_map.json."""
+    cal = season.build("arpa (diger)", "Arpa", date(2027, 4, 1))
+    assert cal.row["crop"] == "Barley/Oats/Wheat" and cal.kc["crop"] == "Barley"
+
+
+def test_winter_barley_still_has_no_published_row():
+    result = season.build("arpa (diger)", "Arpa", date(2026, 11, 10))
+    assert isinstance(result, season.NoCalendar)
+    assert "Mart" in result.reason and "Nisan" in result.reason
+
+
+def test_oats_join_the_calendar_and_the_zincer_row_that_names_them():
+    cal = season.build("yulaf", "Yulaf", date(2027, 3, 25))
+    assert isinstance(cal, season.SeasonCalendar) and cal.kc["crop"] == "Oats"
+    assert {a.product for a in cal.applications} == {"ZİNCER", "FLY AZOT"}
+
+
+def test_the_shared_row_says_it_is_shared():
+    text = season.render(season.build(WHEAT, "Buğday", date(2027, 3, 20)))
+    assert "arpa, yulaf ve buğday için birlikte" in text
+    winter = season.render(season.build(WHEAT, "Buğday", date(2026, 11, 5)))
+    assert "birlikte" not in winter
