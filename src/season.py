@@ -55,9 +55,17 @@ KC_EXPLAINED = (
     "1'in üstü referanstan fazla su tükettiği anlamına gelir."
 )
 NO_FERTILIZATION_YET = (
-    "Gübreleme: bu ürünün dönemleri için yayımlanmış bir gübreleme takvimi henüz "
-    "eklenmedi. Dönemlere göre gübreleme için bana ayrıca sorabilirsiniz."
+    "Gübreleme: bu ürün için üreticinin ürün sayfalarında yayımlanmış bir "
+    "uygulama zamanı yok. Dönemlere göre gübreleme için bana ayrıca sorabilirsiniz."
 )
+FERTILIZATION_HEAD = (
+    "**Gübreleme** · üreticinin ürün sayfalarında yayımladığı uygulama zamanları:"
+)
+FERTILIZATION_DOSES = (
+    "Dozlar ürün sayfalarında yazıyor; \"{product} dekara ne kadar?\" diye sorarsanız "
+    "alanınıza göre hesaplarım."
+)
+_TIMING_JSON = DATA_DIR / "product_timing.json"
 
 
 @lru_cache(maxsize=1)
@@ -72,6 +80,48 @@ def _load() -> tuple[dict, dict]:
         return stages, mapping
     except Exception:  # noqa: BLE001
         return {}, {}
+
+
+@lru_cache(maxsize=1)
+def _load_timing() -> tuple[list[dict], dict, dict]:
+    """(timing rows, TÜİK groups, product name -> page URL); empty on any
+    failure - a broken file costs the fertilization rows, never the calendar."""
+    try:
+        from src.config import PRODUCTS_JSON
+        timing = json.loads(_TIMING_JSON.read_text(encoding="utf-8"))
+        products = json.loads(PRODUCTS_JSON.read_text(encoding="utf-8"))
+        links = {p["product_name"]: p.get("source_url", "") for p in products
+                 if isinstance(p, dict) and p.get("product_name")}
+        rows = [r for r in timing.get("rows", []) if isinstance(r, dict)]
+        return rows, timing.get("tuik_groups", {}), links
+    except Exception:  # noqa: BLE001
+        return [], {}, {}
+
+
+@dataclass(frozen=True)
+class Application:
+    """One product application the manufacturer's page times."""
+    product: str
+    link: str
+    when: str
+    first: date | None   # only when the page counts from planting
+
+
+def applications(crop_id: str, planting: date) -> tuple[Application, ...]:
+    """Every published application row that names this crop, or names TÜİK's
+    group it belongs to. Dated from `planting` only where the page itself
+    counts from planting."""
+    rows, groups, links = _load_timing()
+    out = []
+    for row in rows:
+        crops = row.get("crops") or groups.get(row.get("tuik_group", ""), [])
+        if crop_id not in crops:
+            continue
+        days = row.get("after_planting_days")
+        first = planting + timedelta(days=days) if isinstance(days, int) else None
+        out.append(Application(row["product"], links.get(row["product"], ""),
+                               row["when"], first))
+    return tuple(out)
 
 
 def available_crops() -> tuple[str, ...]:
@@ -151,6 +201,7 @@ class SeasonCalendar:
     row: dict            # the Table 11 row the durations came from
     kc: dict | None      # the Table 12 row, when the map names one
     note: str | None
+    applications: tuple[Application, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -215,7 +266,8 @@ def build(crop_id: str, label: str, planting: date) -> SeasonCalendar | NoCalend
         stages.append(Stage(name, start, end, length, water_line))
         start = end + timedelta(days=1)
     return SeasonCalendar(label, planting, tuple(stages), row,
-                          _kc_row(entry.get("t12")), entry.get("note"))
+                          _kc_row(entry.get("t12")), entry.get("note"),
+                          applications(crop_id, planting))
 
 
 # --------------------------------------------------------------------------- #
@@ -321,5 +373,17 @@ def render(result: SeasonCalendar | NoCalendar) -> str:
         lines.append(result.note)
     if result.kc:
         lines.append(KC_EXPLAINED)
-    lines += ["", NO_FERTILIZATION_YET, "", DISCLAIMER]
+    lines.append("")
+    if result.applications:
+        lines.append(FERTILIZATION_HEAD)
+        for app in result.applications:
+            line = f"- **{app.product}** · {app.when}"
+            if app.first is not None:
+                which = "dikim günü" if app.first == result.planting else "ilk uygulama"
+                line += f" · {which}: {_day(app.first)} {app.first.year}"
+            lines.append(line)
+        lines.append(FERTILIZATION_DOSES.format(product=result.applications[0].product))
+    else:
+        lines.append(NO_FERTILIZATION_YET)
+    lines += ["", DISCLAIMER]
     return "\n".join(lines)

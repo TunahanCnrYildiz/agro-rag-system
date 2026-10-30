@@ -115,7 +115,7 @@ def test_every_answer_carries_the_source_and_the_warning():
     text = season.render(season.build(TOMATO, "Domates", date(2027, 4, 15)))
     assert "FAO-56 (Allen vd., 1998), Tablo 11 - Mediterranean, April/May ekimi ve Tablo 12." in text
     assert season.DISCLAIMER in text
-    assert season.NO_FERTILIZATION_YET in text
+    assert season.FERTILIZATION_HEAD in text
     refused = season.render(season.build("nohut, kuru", "Nohut", date(2027, 3, 1)))
     assert season.DISCLAIMER in refused
 
@@ -143,3 +143,78 @@ def test_every_mapped_crop_names_rows_that_exist():
             continue
         assert entry["t11"] is None or entry["t11"] in t11, cid
         assert tuple(entry["t12"]) in t12, cid
+
+
+# --------------------------------------------------------------------------- #
+# Fertilization rows: the company's own product pages (data/product_timing.json)
+# --------------------------------------------------------------------------- #
+import json  # noqa: E402
+import re  # noqa: E402
+
+from src.config import DATA_DIR, PRODUCTS_JSON  # noqa: E402
+
+TIMING = json.loads((DATA_DIR / "product_timing.json").read_text(encoding="utf-8"))
+PANELS = json.loads((DATA_DIR / "raw" / "product_panels.json").read_text(encoding="utf-8"))
+
+
+def _ws(text):
+    return " ".join(str(text).split())
+
+
+@pytest.mark.parametrize("row", TIMING["rows"], ids=lambda r: f"{r['product']}:{r['quote'][:20]}")
+def test_every_row_quotes_its_product_page_verbatim(row):
+    """A row is the page's own words or it is nothing: the quote must appear in
+    the raw panel the page published, whitespace aside."""
+    panel = PANELS.get("panels", PANELS).get(row["product"])
+    assert panel is not None, row["product"]
+    assert _ws(row["quote"]) in _ws(panel if isinstance(panel, str) else json.dumps(panel, ensure_ascii=False))
+
+
+def test_every_row_names_a_catalog_product_and_calendar_crops():
+    names = {p["product_name"] for p in json.loads(PRODUCTS_JSON.read_text(encoding="utf-8"))}
+    crops = set(season.available_crops())
+    for row in TIMING["rows"]:
+        assert row["product"] in names, row["product"]
+        named = row.get("crops") or TIMING["tuik_groups"][row["tuik_group"]]
+        assert set(named) <= crops, row["product"]
+
+
+def test_no_row_recommends_a_pesticide():
+    """FLY AZOT's page times two applications "ot ilacı ile birlikte"; the
+    assistant never recommends chemicals (PDF p16), so a summary may not."""
+    for row in TIMING["rows"]:
+        assert not re.search(r"ila[cç]", row["when"], re.I), row["when"]
+
+
+def test_the_vegetable_group_is_tuiks_own():
+    """Re-derived from the raw TÜİK export: a crop is in "Sebzeler" because
+    TÜİK lists it there, never because we judged it a vegetable."""
+    from src.engine import _normalize_tr
+    raw = _normalize_tr((DATA_DIR / "raw" / "sebze-uretim-2016-2025.csv")
+                        .read_text(encoding="utf-8-sig"))
+    veg = {m.group(1).strip() for m in re.finditer(
+        r"\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\s*\((.*?)\)\s*-\s*\w", raw)}
+    assert TIMING["tuik_groups"]["sebzeler"] == [c for c in season.available_crops() if c in veg]
+
+
+def test_a_planting_relative_row_is_dated_from_the_farmers_date():
+    """ZİNCER: "Dikimden 3 hafta sonra" - 15 April + 21 days."""
+    apps = {a.product: a for a in season.applications(TOMATO, date(2027, 4, 15))}
+    assert apps["ZİNCER"].first == date(2027, 5, 6)
+    assert apps["HİGRO ROOT LEGEND"].first == date(2027, 4, 15)
+    assert apps["HİGRO BARF"].first is None          # "çiçek öncesi" is not a date
+
+
+def test_a_stage_worded_row_is_never_dated():
+    apps = season.applications("bugday, durum bugdayi haric", date(2026, 11, 5))
+    assert {a.product for a in apps} == {"ZİNCER", "FLY AZOT"}
+    assert all(a.first is None for a in apps)
+
+
+def test_the_calendar_prints_the_programme_or_says_there_is_none():
+    text = season.render(season.build(TOMATO, "Domates", date(2027, 4, 15)))
+    assert season.FERTILIZATION_HEAD in text
+    assert "- **ZİNCER** · dikimden 3 hafta sonra başlayarak, 2-3 hafta arayla · ilk uygulama: 6 Mayıs 2027" in text
+    assert season.NO_FERTILIZATION_YET not in text
+    flax = season.render(season.build("keten tohumu", "Keten", date(2027, 4, 15)))
+    assert season.NO_FERTILIZATION_YET in flax

@@ -66,7 +66,7 @@ def test_the_stream_serves_the_same_card_and_calendar(no_llm):
     events = [json.loads(c.split("data: ", 1)[1]) for c in engine.stream_answer(
         Q, None, None, None, None, {"crop": TOMATO, "planting": "15.04.2027"})
         if "data: " in c]
-    assert [e["type"] for e in events] == ["token", "done"]
+    assert [e["type"] for e in events] == ["token", "products", "done"]
     assert "Orta dönem" in events[0]["content"]
 
 
@@ -95,3 +95,14 @@ def test_the_json_transport_carries_the_card():
     body = r.json()
     assert "Orta dönem" in body["answer"] and body["season_form"] is None
     assert body["crop_offer"] == []
+
+
+def test_the_programmes_products_come_as_link_chips(no_llm):
+    result = engine.answer(Q, None, None, None, None,
+                           {"crop": TOMATO, "planting": "15.04.2027"})
+    assert [p.title for p in result.recommended_products] == [
+        "ZİNCER", "HİGRO BARF", "A.P.P – ORNE", "HİGRO ROOT LEGEND"]
+    assert all(p.link.startswith("https://") for p in result.recommended_products)
+    events = [json.loads(c.split("data: ", 1)[1]) for c in engine.stream_answer(
+        Q, None, None, None, None, {"crop": TOMATO, "planting": "15.04.2027"}) if "data: " in c]
+    assert [e["type"] for e in events] == ["token", "products", "done"]

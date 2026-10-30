@@ -2791,8 +2791,15 @@ def _season_result(payload: dict | None, message: str = "") -> ChatResult:
         inputs, errors = season.validate(payload or {})
         if inputs is not None:
             crop_id, label, planting = inputs
-            return ChatResult(answer=season.render(season.build(crop_id, label, planting)),
-                              recommended_products=[], route="season")
+            calendar = season.build(crop_id, label, planting)
+            # The products the programme names, as the same link chips any
+            # answer carries - each once, in the programme's order.
+            seen: dict[str, RecommendedProduct] = {}
+            for app in getattr(calendar, "applications", ()):
+                if app.link and app.product not in seen:
+                    seen[app.product] = RecommendedProduct(app.product, app.link)
+            return ChatResult(answer=season.render(calendar),
+                              recommended_products=list(seen.values()), route="season")
         return ChatResult(answer=season.ASK_FOR_INPUTS, recommended_products=[],
                           route="season",
                           season_form=season.form_spec(
@@ -2946,6 +2953,11 @@ def stream_answer(
             # A NEW event type, ignored by a client that predates it - which
             # then shows ASK_FOR_INPUTS, written to stand alone.
             yield _sse({"type": "season_form", "form": result.season_form})
+        if result.recommended_products:
+            # The programme's own products, after its text - the same event and
+            # place every answer's product chips use.
+            yield _sse({"type": "products",
+                        "recommended_products": [p.as_api() for p in result.recommended_products]})
         yield _sse({"type": "done"})
         return
 
