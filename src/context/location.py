@@ -282,14 +282,53 @@ def _find(text: str) -> str | None:
 
 def extract_province(message: str, history: list[dict] | None = None) -> str | None:
     """Most recent province mentioned: the current message wins, then history
-    read backwards. Returns None when nobody has said where they are."""
-    found = _find(message)
-    if found:
-        return found
-    for turn in reversed(history or []):
-        if turn.get("role") != "user":
-            continue
-        found = _find(turn.get("content", ""))
+    read backwards. Returns None when nobody has said where they are.
+
+    THE MOST RECENT PLACE WINS, NOT THE MOST RECENT PROVINCE (decided by the
+    user 2026-10-30). A turn that names a country outside Türkiye, and no
+    province, ends the search with None, so the caller's country fallback
+    answers. Without this a profile saying "Konya'dayım" - the mobile client
+    sends it as the OLDEST turn - beat "Fransa'dayım" typed a moment ago,
+    because provinces were searched on their own and a province always won.
+    The profile still holds whenever the conversation names no place.
+
+    Within one turn a province still wins: "Konya'dayım ama Fransa'ya da ihracat
+    yapıyorum" is in Konya. Assistant turns are never evidence, as before.
+    """
+    texts = [message] + [turn.get("content", "") for turn in reversed(history or [])
+                         if turn.get("role") == "user"]
+    for text in texts:
+        found = _find(text)
         if found:
             return found
+        if _abroad(text):
+            return None
     return None
+
+
+def _abroad(text: str) -> bool:
+    """Whether this one turn places the farmer outside Türkiye - by the country
+    matcher's own rules, guards included, so "Mısır ekmeli miyim?" is maize and
+    "Türkiye'de" is home. A place it declines to answer for ("Kaliforniya'dayım")
+    is abroad too: the province is no longer where they are.
+
+    Deferred import: src/context/country.py imports from src/engine.py, which
+    imports this module's callers at answer time, not at load time."""
+    # NEVER RAISES. A broken country layer costs the country decision, never
+    # the province: on failure this says "not abroad" and the province search
+    # behaves exactly as it did before countries could outrank it.
+    try:
+        from src import norms
+        from src.context import country as country_ctx
+
+        folded = _normalize_tr(text or "")
+        if not folded:
+            return False
+        if country_ctx._refuses(folded):
+            return True
+        # extract_country on this one turn alone: the same matcher and the same
+        # guards the answer uses, maize-is-not-Egypt included.
+        code = country_ctx.extract_country(text, [])
+        return code is not None and code != norms.TURKIYE_AREA
+    except Exception:  # noqa: BLE001
+        return False

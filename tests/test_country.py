@@ -852,23 +852,26 @@ def test_every_possessive_compound_resolves_without_an_apostrophe():
         assert extract_country(_locative(alias)) == code, alias
 
 
-def test_the_buffer_locative_resolves_for_208_of_the_227_folded_aliases():
+def test_the_buffer_locative_resolves_for_207_of_the_227_folded_aliases():
     """THE GAIN, counted over the whole table and not over the family. Every
     alias is given a buffer it may not need - the regex makes the `n` optional,
-    so `Almanyanda` is accepted as a typo of `Almanya'da` - and 208 of the 227
+    so `Almanyanda` is accepted as a typo of `Almanya'da` - and 207 of the 227
     folded Turkish keys resolve that way.
 
-    THE 19 THAT DO NOT are the 18 short keys, which keep _STRICT_SUFFIX
+    THE 20 THAT DO NOT are the 18 short keys, which keep _STRICT_SUFFIX
     untouched, plus `sudan`, whose capital gate refuses a lowercase English
     noun. That is the pre-existing cost pinned above as "sudanda yasiyorum",
-    not something this branch takes away."""
+    not something this branch takes away - plus `misir` since 2026-10-30:
+    "misirnda" carries no apostrophe and no "I am in" ending, so _only_a_crop
+    reads it as maize, the price of "Mısırda çinko eksikliği" no longer being
+    Egypt."""
     from src.context import country as country_ctx
     folded = {country_ctx._normalize_tr(alias): alias
               for _code, alias in _turkish_aliases()}
     assert len(folded) == 227
     resolved = [key for key, alias in folded.items()
                 if extract_country(key + "n" + _locative(alias)[-2:]) is not None]
-    assert len(resolved) == 208, len(resolved)
+    assert len(resolved) == 207, len(resolved)
 
 
 def test_the_bare_buffer_ablative_is_still_a_supplier():
@@ -1060,3 +1063,32 @@ def test_the_relative_suffix_is_still_not_a_location_without_an_apostrophe():
     location.py does with `-daki` too."""
     assert extract_country("Rusya Federasyonu'ndaki") == 185
     assert extract_country("Rusya Federasyonundaki") is None
+
+
+@pytest.mark.parametrize("message", [
+    "Mısıra ne zaman gübre verilir?",
+    "Mısırda çinko eksikliği belirtisi nedir?",
+    "Alaşehir koşullarında ana ürün mısırda en uygun ekim zamanı nedir?",
+    "İkinci ürün mısırın doğrudan ekiminde hangi gömücü ayak tipi daha iyi çıkış sağlar?",
+    "Mısıra dekara kaç kilo potasyumlu gübre gerekir?",
+])
+def test_maize_with_a_case_ending_is_not_egypt(message):
+    """`Mısır` is maize and Egypt, and a case ending fits both - "mısırda" is
+    "in the maize" as readily as "in Egypt". Measured 2026-10-30: these five
+    maize questions all resolved to Egypt, which put an Egyptian grower's
+    context under a Turkish maize answer, and cost a Konya profile its province
+    once a country named in the conversation began to outrank it. The name
+    counts as the country only in a form that says WHERE: an apostrophe, the
+    "I am in" ending, the bare name as a whole reply, or another of its names."""
+    assert extract_country(message) is None
+
+
+@pytest.mark.parametrize("message", [
+    "Mısır'dayım",
+    "mısırdayım, ne ekeyim?",
+    "Mısır'da buğday verimi nasıl?",
+    "Mısır",
+    "I farm in Egypt",
+])
+def test_egypt_said_as_a_place_is_still_egypt(message):
+    assert extract_country(message) == EGYPT
