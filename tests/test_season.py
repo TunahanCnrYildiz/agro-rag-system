@@ -113,7 +113,7 @@ def test_published_planting_dates_are_read_as_months(text, months):
 
 def test_every_answer_carries_the_source_and_the_warning():
     text = season.render(season.build(TOMATO, "Domates", date(2027, 4, 15)))
-    assert "FAO-56 (Allen vd., 1998), Tablo 11 - Mediterranean, April/May ekimi ve Tablo 12." in text
+    assert "FAO-56 (Allen vd., 1998), Tablo 11 - Tomato, Mediterranean, April/May ekimi ve Tablo 12." in text
     assert season.DISCLAIMER in text
     assert season.FERTILIZATION_HEAD in text
     refused = season.render(season.build("nohut, kuru", "Nohut", date(2027, 3, 1)))
@@ -138,11 +138,18 @@ def test_every_mapped_crop_names_rows_that_exist():
     stages, mapping = season._load()
     t11 = {r["crop"] for r in stages["stages"]}
     t12 = {(r["crop"], r["variant"]) for r in stages["kc"]}
+    t12_crops = {r["crop"] for r in stages["kc"]}
     for cid, entry in mapping.items():
         if cid.startswith("_"):
             continue
-        assert entry["t11"] is None or entry["t11"] in t11, cid
-        assert tuple(entry["t12"]) in t12, cid
+        for name, spec in season._variants(entry):
+            assert name in t11, cid
+            if isinstance(spec, dict):
+                assert set(spec["range"]) <= t12_crops, cid
+            else:
+                assert tuple(spec) in t12, cid
+        if not season._variants(entry):
+            assert tuple(entry["t12"]) in t12, cid      # nohut: Kc only
 
 
 # --------------------------------------------------------------------------- #
@@ -270,3 +277,92 @@ def test_the_weather_rules_quote_the_companys_article_verbatim():
     assert season.RAIN_RULE_QUOTE.lower() in _ws(page["content"]).lower()
     assert season.HEAT_RULE_QUOTE in _ws(page["content"])
     assert season.RAIN_RULE_QUOTE in season.RAIN_RULE and season.HEAT_RULE_QUOTE in season.HEAT_RULE
+
+
+# --------------------------------------------------------------------------- #
+# Fruit trees: the season starts, it is not planted
+# --------------------------------------------------------------------------- #
+ORANGE = "portakal (washington)"
+PISTACHIO = "sam fistigi (antep fistigi)"
+BANANA = "muz, plantain ve benzerleri"
+
+
+def test_a_citrus_season_is_the_published_mediterranean_year():
+    """FAO-56 Table 11, Citrus, Mediterranean, Jan: 60 + 90 + 120 + 95 = 365."""
+    cal = season.build(ORANGE, "Portakal", date(2027, 1, 1))
+    assert isinstance(cal, season.SeasonCalendar)
+    assert [s.days for s in cal.stages] == [60, 90, 120, 95]
+    assert cal.stages[-1].end == date(2027, 12, 31)
+
+
+def test_a_tree_is_worded_as_a_season_not_a_planting():
+    text = season.render(season.build(ORANGE, "Portakal", date(2027, 1, 1)))
+    assert "sezon başlangıcı: 1 Ocak 2027" in text
+    assert "Sezonun bitişi: 31 Aralık 2027" in text
+    assert "ekim/dikim" not in text and "hasat dönemi" not in text
+
+
+def test_citrus_water_use_is_the_whole_published_range_without_a_trend():
+    """Table 12 gives citrus six Kc rows by ground cover and canopy; the
+    calendar prints their full range and no "rising/falling" reading - in some
+    variants mid-season is LOWER than the start."""
+    cal = season.build(ORANGE, "Portakal", date(2027, 1, 1))
+    assert [s.water for s in cal.stages] == [
+        "su ihtiyacı (Kc 0,50-0,85)",
+        "su ihtiyacı (Kc 0,50-0,85 → 0,45-0,85)",
+        "su ihtiyacı (Kc 0,45-0,85)",
+        "su ihtiyacı (Kc 0,45-0,85 → 0,55-0,85)",
+    ]
+
+
+def test_a_tree_season_out_of_the_published_month_says_so_in_tree_words():
+    result = season.build(ORANGE, "Portakal", date(2027, 5, 1))
+    assert isinstance(result, season.NoCalendar)
+    assert "Ocak" in result.reason and "sezon başlangıcı" in result.reason
+
+
+def test_pistachio_and_banana_have_their_mediterranean_rows():
+    assert sum(s.days for s in season.build(PISTACHIO, "Antep fıstığı",
+                                            date(2027, 2, 15)).stages) == 150
+    second = season.build(BANANA, "Muz", date(2027, 2, 1))
+    first = season.build(BANANA, "Muz", date(2027, 3, 1))
+    assert second.row["crop"] == "Banana, 2 yr" and second.kc["variant"] == "- 2 year"
+    assert first.row["crop"] == "Banana, 1 yr" and first.kc["variant"] == "- 1 year"
+
+
+def test_the_source_line_names_the_row_it_used():
+    text = season.render(season.build(BANANA, "Muz", date(2027, 2, 1)))
+    assert "Tablo 11 - Banana, 2 yr, Mediterranean, Feb" in text
+
+
+@pytest.mark.parametrize("kc", ["0.6518", "1.2525", "x", ""])
+def test_a_coefficient_with_a_fused_footnote_is_never_printed(kc):
+    """Table 12 prints some footnote marks unmarked: walnut's "0.65" reads
+    "0.6518". A Kc with more than two decimals is not a published value."""
+    assert season._kc_value(kc) is None
+
+
+def test_trees_are_offered_as_trees():
+    kinds = {c["id"]: c.get("kind") for c in season.crop_options()}
+    assert kinds[ORANGE] == "tree" and kinds[PISTACHIO] == "tree"
+    assert kinds[TOMATO] == "annual"
+
+
+def test_groundnut_is_an_annual_with_a_mediterranean_row():
+    cal = season.build("yerfistigi, kabuklu", "Yerfıstığı", date(2027, 5, 20))
+    assert isinstance(cal, season.SeasonCalendar)
+    assert "ZİNCER" in {a.product for a in cal.applications}
+
+
+def test_citrus_gets_the_zincer_row_its_page_names():
+    apps = season.applications(ORANGE, date(2027, 1, 1))
+    assert [(a.product, a.when) for a in apps] == [
+        ("ZİNCER", "çiçek öncesi ve çiçek sonrası 15 gün ara ile")]
+
+
+def test_a_flat_end_is_not_called_falling():
+    """Green onion: Kc 0.7, 1.00, 1.00. The first version printed "su ihtiyacı
+    azalıyor (Kc 1,00 → 1,00)" - a fall the published values do not show."""
+    cal = season.build("sogan (taze)", "Taze soğan", date(2027, 4, 10))
+    assert all("azalıyor" not in s.water and "artıyor" not in s.water for s in cal.stages)
+    assert cal.stages[-1].water == "su ihtiyacı (Kc 1,00 → 1,00)"

@@ -70,10 +70,28 @@
     "patates (tatli patates haric)",
     "misir",
     "mercimek, kuru (kirmizi)",
-    "mercimek, kuru (yesil)"
+    "mercimek, kuru (yesil)",
+    "yerfistigi, kabuklu"
    ],
    "when": "çapadan sonra 15 gün ara ile",
    "quote": "Endüstri Bitkileri Çapadan sonra 15 gün ara ile"
+  },
+  {
+   "product": "ZİNCER",
+   "crops": [
+    "portakal (washington)",
+    "portakal (yafa)",
+    "mandalina (diger)",
+    "mandalina (king)",
+    "mandalina (klemantin)",
+    "mandalina (satsuma)",
+    "limon ve misket limonu",
+    "greyfurt (altintop)",
+    "turunc",
+    "muz, plantain ve benzerleri"
+   ],
+   "when": "çiçek öncesi ve çiçek sonrası 15 gün ara ile",
+   "quote": "Narenciye, Muz ve Fındık Çiçek öncesi ve çiçek sonrası 15 gün ara ile"
   },
   {
    "product": "FLY AZOT",
