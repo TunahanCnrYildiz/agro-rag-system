@@ -26,6 +26,8 @@ import {
   ChatTurn,
   ComparePayload,
   CompareFormSpec,
+  SeasonFormSpec,
+  SeasonPayload,
   DosePayload,
   DoseFormSpec,
   FormSpec,
@@ -36,6 +38,7 @@ import {
 import BudgetCard from "../../src/BudgetCard";
 import DoseCard from "../../src/DoseCard";
 import CompareCard from "../../src/CompareCard";
+import SeasonCard from "../../src/SeasonCard";
 
 interface Message {
   id: string;
@@ -47,6 +50,7 @@ interface Message {
   form?: FormSpec;
   doseForm?: DoseFormSpec;
   compareForm?: CompareFormSpec;
+  seasonForm?: SeasonFormSpec;
   // The question this form was a reply to. Turn 2 resends it so history stays
   // coherent and the router still classifies the turn the same way.
   question?: string;
@@ -119,7 +123,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!restored) return;
     saveChat({
-      messages: messages.map(({ form, doseForm, compareForm, ...rest }) => rest) as never,
+      messages: messages.map(({ form, doseForm, compareForm, seasonForm, ...rest }) => rest) as never,
       history: historyRef.current,
     });
   }, [messages, restored]);
@@ -160,7 +164,7 @@ export default function ChatScreen() {
   // The caller owns the user bubble: a form turn shows the values entered, not
   // the question repeated.
   function sendTurn(text: string, budget?: BudgetPayload, dose?: DosePayload,
-                    compare?: ComparePayload) {
+                    compare?: ComparePayload, season?: SeasonPayload) {
     // Prior turns only - the current message is sent separately as `text`,
     // so it must not also be the last entry in the history we send.
     //
@@ -230,6 +234,11 @@ export default function ChatScreen() {
           prev.map((m) => (m.id === botId ? { ...m, compareForm, question: text } : m))
         );
       },
+      onSeasonForm: (seasonForm) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, seasonForm, question: text } : m))
+        );
+      },
       // Sent after the answer and its products, so the message exists.
       onArticle: (article) => {
         setMessages((prev) =>
@@ -261,7 +270,7 @@ export default function ChatScreen() {
         setStreamingId(null);
         scrollToEnd();
       },
-    }, budget, dose, compare);
+    }, budget, dose, compare, season);
   }
 
   return (
@@ -411,6 +420,24 @@ export default function ChatScreen() {
                       { id: newId(), role: "user", text: summary },
                     ]);
                     sendTurn(m.question ?? summary, undefined, undefined, payload);
+                  }}
+                />
+              )}
+              {m.seasonForm && (
+                <SeasonCard
+                  form={m.seasonForm}
+                  disabled={loading}
+                  onSubmit={(payload, summary) => {
+                    if (loading) return;
+                    setMessages((prev) => [
+                      // The card is consumed: replace it, so a stale card
+                      // cannot be submitted twice.
+                      ...prev.map((x) =>
+                        x.id === m.id ? { ...x, seasonForm: undefined } : x
+                      ),
+                      { id: newId(), role: "user", text: summary },
+                    ]);
+                    sendTurn(m.question ?? summary, undefined, undefined, undefined, payload);
                   }}
                 />
               )}

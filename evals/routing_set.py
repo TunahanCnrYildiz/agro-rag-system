@@ -7,7 +7,7 @@ record why the expectation was wrong.
 """
 
 ROUTES = ("plant_info", "nutrition", "fert_plan", "budget", "crop_choice",
-          "product_dose", "offscope")
+          "product_dose", "season", "offscope")
 
 ROUTING_CASES = [
     # --- plant_info: growing practice, plant health, physiology --------------
@@ -33,6 +33,12 @@ ROUTING_CASES = [
     {"query": "Domatese ne zaman gübre vermeliyim?", "route": "fert_plan"},
     {"query": "Buğdayda azotu hangi dönemde uygulamalıyım?", "route": "fert_plan"},
     {"query": "Fındık için gübreleme takvimi çıkarır mısın?", "route": "fert_plan"},
+    # --- season: a stage-by-stage season calendar (PDF p5), added 2026-10-30
+    # BEFORE the rule existed. A FERTILIZATION calendar stays fert_plan (above):
+    # the season card carries no fertilization rows yet.
+    {"query": "Domates için sezon programı çıkarır mısın?", "route": "season"},
+    {"query": "Biberin sulama takvimi nasıl olmalı?", "route": "season"},
+    {"query": "Buğday için ekim takvimi hazırlar mısın?", "route": "season"},
     {"query": "Zeytinde gübreleme programı nasıl olmalı?", "route": "fert_plan"},
     {"query": "Asmaya hangi ayda besleme yapılır?", "route": "fert_plan"},
     {"query": "Domates fidesi diktim, ne zaman besleyeyim?", "route": "fert_plan"},

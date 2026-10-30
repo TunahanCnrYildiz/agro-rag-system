@@ -85,6 +85,8 @@ class ChatResult:
     # are deciding what to plant (see _crop_offer). The CLIENT asks; nothing is
     # saved here. Optional on the wire, like the cards.
     crop_offer: tuple[str, ...] = ()
+    # The season-calendar card, on its own key like the other cards.
+    season_form: dict | None = None
 
     def as_api(self) -> dict:
         return {
@@ -95,6 +97,7 @@ class ChatResult:
             "compare_form": self.compare_form,
             "article": self.article.as_api() if self.article else None,
             "crop_offer": list(self.crop_offer),
+            "season_form": self.season_form,
         }
 
 
@@ -2760,10 +2763,52 @@ def _dose_result(payload: dict | None) -> ChatResult:
                           payload if submitted else None))
 
 
+def _season_crop(message: str) -> str | None:
+    """The season card's crop, when the question named one it can draw:
+    "domates için sezon programı" preselects the first tomato row."""
+    try:
+        from src import season
+        options = season.crop_options()
+        for family in _named_crops(message):
+            folded = _normalize_tr(family)
+            for option in options:
+                if _normalize_tr(option["label"]).startswith(folded):
+                    return option["id"]
+    except Exception:  # noqa: BLE001 - a preselection is a convenience
+        pass
+    return None
+
+
+def _season_result(payload: dict | None, message: str = "") -> ChatResult:
+    """The season-calendar route (PDF p5): no retrieval, no product match, no
+    model call. Published FAO-56 stage lengths added to the farmer's own
+    planting date in src/season.py; the card when the payload is absent or
+    incomplete. Any failure is COMPUTE_FAILED, never a guess."""
+    from src import season
+
+    submitted = bool(payload)
+    try:
+        inputs, errors = season.validate(payload or {})
+        if inputs is not None:
+            crop_id, label, planting = inputs
+            return ChatResult(answer=season.render(season.build(crop_id, label, planting)),
+                              recommended_products=[], route="season")
+        return ChatResult(answer=season.ASK_FOR_INPUTS, recommended_products=[],
+                          route="season",
+                          season_form=season.form_spec(
+                              errors if submitted else {},
+                              payload if submitted else None,
+                              None if submitted else _season_crop(message)))
+    except Exception:  # noqa: BLE001 - a broken table must not become a guess
+        return ChatResult(answer=season.COMPUTE_FAILED, recommended_products=[],
+                          route="season")
+
+
 def answer(message: str, history: list[dict] | None = None,
            budget_payload: dict | None = None,
            dose_payload: dict | None = None,
-           compare_payload: dict | None = None) -> ChatResult:
+           compare_payload: dict | None = None,
+           season_payload: dict | None = None) -> ChatResult:
     """Retrieve, match products, and produce a unified JSON-ready result."""
     # Routing is diagnostic in this release: every route still runs the corpus
     # path below. Wiring it now, with behaviour unchanged, is what lets the 55
@@ -2783,6 +2828,13 @@ def answer(message: str, history: list[dict] | None = None,
     # the dose card is the one the user just pressed.
     if dose_payload or route == "product_dose":
         result = _dose_result(dose_payload)
+        result.route_how = route_how
+        return result
+
+    # A submitted season card is answered as one whatever its message routes
+    # to - the `or payload` rule every card follows.
+    if season_payload or route == "season":
+        result = _season_result(season_payload, message)
         result.route_how = route_how
         return result
 
@@ -2857,7 +2909,8 @@ def stream_answer(
     message: str, history: list[dict] | None = None,
     budget_payload: dict | None = None,
     dose_payload: dict | None = None,
-    compare_payload: dict | None = None
+    compare_payload: dict | None = None,
+    season_payload: dict | None = None
 ) -> Iterator[str]:
     """Yield Server-Sent-Event lines. Answer text streams token-by-token first;
     once it's complete a single event carries the product recommendations, then
@@ -2882,6 +2935,17 @@ def stream_answer(
             # `type` (see mobile-app/src/api.ts), so it shows the sentence and
             # no card rather than drawing a budget form out of dose fields.
             yield _sse({"type": "dose_form", "form": result.dose_form})
+        yield _sse({"type": "done"})
+        return
+
+    # Must mirror answer(): a card wired only into answer() reaches no user.
+    if season_payload or route == "season":
+        result = _season_result(season_payload, message)
+        yield _sse({"type": "token", "content": result.answer})
+        if result.season_form is not None:
+            # A NEW event type, ignored by a client that predates it - which
+            # then shows ASK_FOR_INPUTS, written to stand alone.
+            yield _sse({"type": "season_form", "form": result.season_form})
         yield _sse({"type": "done"})
         return
 

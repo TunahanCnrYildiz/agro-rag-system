@@ -20,7 +20,7 @@ from typing import Literal
 from src.engine import _normalize_tr
 
 Route = Literal["plant_info", "nutrition", "fert_plan", "budget",
-                "crop_choice", "product_dose", "offscope"]
+                "crop_choice", "product_dose", "season", "offscope"]
 
 # Stems match with a LEFT boundary and may run into their own suffixes, the same
 # convention the crop lexicon and the product backstop use.
@@ -69,6 +69,14 @@ _PLANT_NUTRITION_STEMS = ("gubre", "azot", "fosfor", "potasyum", "npk",
                           "kompost")
 _TIME_STEMS = ("ne zaman", "hangi ay", "hangi donem", "takvim", "program",
                "donemde", "bu ay", "zamanla")
+
+# A season calendar named outright, or a calendar/programme asked to be drawn up.
+_SEASON_PHRASES = ("sezon program", "sezon takvim", "ekim takvim", "ekim program",
+                   "dikim takvim", "dikim program", "sulama takvim", "sulama program",
+                   "yetistirme takvim", "yetistirme program", "uretim takvim",
+                   "bakim takvim")
+_SEASON_ASK = re.compile(r"(?<!\w)(?:takvim|program)\w*\s+"
+                         r"(?:cikar|olustur|hazirla|yapar|yap\b|ver)")
 
 _CROP_CHOICE_PHRASES = ("ne eksem", "ne ekmek", "ne ekmeli", "ne ekeyim",
                         "hangi urun", "ne yetistir", "hangi meyve",
@@ -242,6 +250,14 @@ def classify_by_rules(message: str) -> Route | None:
 
     if _has_stem(folded, _CROP_CHOICE_PHRASES):
         return "crop_choice"
+
+    # A season calendar (PDF p5) - asked for by name, and only without a
+    # nutrition word: "gübreleme takvimi" stays fert_plan below, because the
+    # season card carries the stages and their water use and no fertilization
+    # rows yet. Checked before fert_plan for that reason alone.
+    if (not _has_stem(folded, _NUTRITION_STEMS)
+            and (_has_stem(folded, _SEASON_PHRASES) or _SEASON_ASK.search(folded))):
+        return "season"
 
     if _has_stem(folded, _NUTRITION_STEMS) and _has_stem(folded, _TIME_STEMS):
         return "fert_plan"
